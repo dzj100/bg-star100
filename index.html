@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>桌游助手合集</title>
+<style>
+:root {
+  --bg: #d6e8f0;
+  --surface: #faf5eb;
+  --card-bg: #fff8ee;
+  --accent: #d94f5c;
+  --gold: #e8a832;
+  --text: #3d3228;
+  --text-dim: #8a7e72;
+  --radius: 14px;
+  --blue: #5ba4d9;
+  --orange: #e8943a;
+  --green: #5aad5e;
+  --purple: #b55dae;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; overflow-x:hidden; }
+
+#portal { display:flex; flex-direction:column; align-items:center; padding:32px 16px; padding-top:max(32px, env(safe-area-inset-top)); min-height:100dvh; }
+.portal-header { text-align:center; margin-bottom:40px; }
+.portal-header h1 { font-size:1.8rem; color:var(--gold); margin-bottom:6px; }
+.portal-header p { color:var(--text-dim); font-size:.9rem; }
+
+.game-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; width:100%; max-width:400px; }
+.game-card { background:var(--surface); border-radius:var(--radius); padding:20px 16px; text-align:center; cursor:pointer; transition:transform .15s, box-shadow .15s; box-shadow:0 2px 8px rgba(60,50,40,.08); display:flex; flex-direction:column; align-items:center; gap:10px; }
+.game-card:active { transform:scale(.96); }
+.game-card .card-icon { font-size:40px; line-height:1; }
+.game-card .card-title { font-size:.95rem; font-weight:bold; color:var(--text); }
+.game-card .card-desc { font-size:.75rem; color:var(--text-dim); line-height:1.3; }
+
+.game-card:nth-child(1) .card-icon { color:var(--purple); }
+.game-card:nth-child(2) .card-icon { color:var(--orange); }
+.game-card:nth-child(3) .card-icon { color:var(--gold); }
+.game-card:nth-child(4) .card-icon { color:var(--green); }
+
+.portal-footer { margin-top:auto; padding-top:32px; padding-bottom:16px; text-align:center; font-size:.75rem; color:var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div id="portal">
+  <div class="portal-header">
+    <h1>桌游助手合集</h1>
+    <p>选择一个游戏开始</p>
+  </div>
+
+  <div class="game-grid">
+    <div class="game-card" onclick="location.href='https://werewolf-word.pages.dev/'">
+      <div class="card-icon">🐺</div>
+      <div class="card-title">狼人真言</div>
+      <div class="card-desc">4~10人 欢乐聚会猜词</div>
+    </div>
+    <div class="game-card" onclick="location.href='https://dog-joker.pages.dev/'">
+      <div class="card-icon">🐶</div>
+      <div class="card-title">夺狗囧事</div>
+      <div class="card-desc">2~5人 吹牛博弈</div>
+    </div>
+    <div class="game-card" onclick="location.href='https://incan-gold.pages.dev/'">
+      <div class="card-icon">💎</div>
+      <div class="card-title">印加宝藏</div>
+      <div class="card-desc">3~8人 赌狗冒险</div>
+    </div>
+    <div class="game-card" onclick="location.href='https://cat-diary-6v8.pages.dev/'">
+      <div class="card-icon">🐱</div>
+      <div class="card-title">捉虫猫日记</div>
+      <div class="card-desc">2人 策略对战</div>
+    </div>
+  </div>
+
+  <div class="portal-footer">@imStar100</div>
+</div>
+
+</body>
+</html>
