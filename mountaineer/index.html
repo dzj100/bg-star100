@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>登山家</title>
+<style>
+:root {
+  --bg: #d6e8f0;
+  --surface: #faf5eb;
+  --card-bg: #fff8ee;
+  --accent: #d94f5c;
+  --gold: #e8a832;
+  --text: #3d3228;
+  --text-dim: #8a7e72;
+  --green: #4a9e4e;
+  --green-dark: #3a7e3e;
+  --blue: #4a8ec9;
+  --blue-dark: #3a6ea9;
+  --radius: 14px;
+  --btn-h: 56px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; }
+
+#landing { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100dvh; padding:32px; text-align:center; position:relative; }
+#landing .rules-corner { position:absolute; top:max(16px, env(safe-area-inset-top)); right:16px; }
+#landing .rules-corner button {
+  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
+  display:flex; align-items:center; gap:4px;
+}
+#landing .rules-corner button:active { background:#e8ddd0; }
+#landing .landing-center { display:flex; flex-direction:column; align-items:center; margin-top:-20px; }
+#landing .landing-icon { font-size:3.5rem; margin-bottom:8px; }
+#landing h1 { font-size:2rem; color:var(--accent); margin-bottom:8px; }
+#landing .subtitle { color:var(--text-dim); font-size:.95rem; margin-bottom:40px; }
+#landing .start-btn {
+  background:var(--accent); color:#fff; border:none; border-radius:var(--radius);
+  height:var(--btn-h); padding:0 48px; font-size:1.1rem; font-weight:bold; cursor:pointer;
+}
+#landing .start-btn:active { opacity:.85; }
+#landing .credit { position:absolute; bottom:10px; font-size:.75rem; color:var(--text-dim); }
+
+#game { display:none; flex-direction:column; min-height:100dvh; padding:16px; padding-top:max(16px, env(safe-area-inset-top)); padding-bottom:max(16px, env(safe-area-inset-bottom)); }
+
+#header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+#header h1 { font-size:1.1rem; font-weight:bold; }
+#header .header-btns { display:flex; gap:6px; }
+#header .header-btns button {
+  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
+  display:flex; align-items:center; gap:4px;
+}
+#header .header-btns button:active { background:#e8ddd0; }
+
+#status { text-align:center; font-size:1rem; font-weight:bold; margin-bottom:12px; padding:10px 16px; background:var(--surface); border-radius:var(--radius); }
+
+#board-area { display:flex; flex-direction:column; align-items:center; margin:8px 0; }
+#board {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:6px;
+  width:100%; max-width:400px;
+  background:var(--surface); padding:12px; border-radius:var(--radius);
+}
+
+.cell {
+  aspect-ratio:1; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  position:relative; cursor:pointer; border:3px solid transparent;
+  transition:transform .15s, border-color .15s, box-shadow .15s;
+  min-width:0;
+}
+.cell.empty-cell { background:rgba(0,0,0,.06); cursor:default; }
+
+.cell.piece-G { background:linear-gradient(135deg,#5cb860,#3d9141); border-color:#2e7a32; box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 2px rgba(255,255,255,.2); }
+.cell.piece-B { background:linear-gradient(135deg,#5ba4d9,#3a7eb8); border-color:#2a6494; box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 2px rgba(255,255,255,.2); }
+
+.cell.selected { border-color:var(--gold)!important; box-shadow:0 0 16px rgba(232,168,50,.6); transform:scale(1.08); z-index:2; }
+.cell.last-move { box-shadow:0 0 8px rgba(232,168,50,.3); }
+/* .cell.selectable { animation:pulse 1.2s ease-in-out infinite; cursor:pointer; } */
+@keyframes pulse {
+  0%,100% { transform:scale(1); border-color:transparent; }
+  50% { transform:scale(1.06); border-color:var(--gold); box-shadow:0 0 14px rgba(232,168,50,.5); }
+}
+
+.piece-face {
+  width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+  border-radius:8px; position:relative;
+}
+.piece-icon {
+  width:55%; height:55%; border-radius:50%;
+  background:rgba(255,255,255,.35);
+  box-shadow:inset 0 -3px 6px rgba(0,0,0,.15), 0 2px 4px rgba(0,0,0,.15);
+}
+.stack-count {
+  font-size:1.3rem; font-weight:900; color:#fff;
+  text-shadow:0 2px 4px rgba(0,0,0,.35);
+  line-height:1;
+}
+.stack-dots {
+  position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+  display:flex; gap:3px;
+}
+.stack-dot {
+  width:7px; height:7px; border-radius:50%;
+  border:1px solid rgba(0,0,0,.2);
+}
+.stack-dot.dot-G { background:#6cc070; }
+.stack-dot.dot-B { background:#6ab0e0; }
+
+#controls { display:flex; flex-direction:column; align-items:center; gap:6px; margin:10px 0; min-height:80px; }
+
+.dir-pad { display:grid; grid-template-columns:repeat(3,var(--btn-h)); grid-template-rows:repeat(2,var(--btn-h)); gap:5px; }
+.dir-btn {
+  background:var(--card-bg); border:2px solid #ddd; border-radius:12px;
+  font-size:1.4rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  color:var(--text);
+}
+.dir-btn:active { background:#e8ddd0; }
+.dir-btn.disabled { opacity:.25; pointer-events:none; }
+.dir-up { grid-column:2; grid-row:1; }
+.dir-left { grid-column:1; grid-row:2; }
+.dir-down { grid-column:2; grid-row:2; }
+.dir-right { grid-column:3; grid-row:2; }
+
+.cancel-btn {
+  background:none; border:1px solid var(--text-dim); border-radius:8px;
+  padding:8px 28px; color:var(--text-dim); font-size:.9rem; cursor:pointer;
+}
+
+.pass-btn {
+  background:var(--gold); color:#fff; border:none; border-radius:var(--radius);
+  height:var(--btn-h); padding:0 40px; font-size:1rem; font-weight:bold; cursor:pointer;
+  margin-top:6px;
+}
+
+#info { display:flex; justify-content:center; gap:24px; margin:8px 0; font-size:.9rem; }
+.info-g { color:var(--green-dark); font-weight:bold; }
+.info-b { color:var(--blue-dark); font-weight:bold; }
+
+#actions { display:flex; justify-content:center; gap:10px; margin:8px 0; }
+.act-btn {
+  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  padding:10px 18px; font-size:.9rem; cursor:pointer; color:var(--text);
+}
+.act-btn:active { background:#e8ddd0; }
+.act-btn.disabled { opacity:.4; pointer-events:none; }
+
+#win-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:100;
+  display:none; align-items:center; justify-content:center; padding:32px;
+}
+#win-overlay.show { display:flex; }
+.win-box {
+  background:var(--surface); border-radius:var(--radius); padding:32px 24px;
+  text-align:center; max-width:320px; width:100%;
+}
+.win-box h2 { font-size:1.6rem; margin-bottom:12px; color:var(--text); }
+.win-box p { font-size:.95rem; margin-bottom:24px; color:var(--text-dim); }
+.win-box button {
+  background:var(--accent); color:#fff; border:none; border-radius:var(--radius);
+  height:var(--btn-h); width:100%; font-size:1rem; font-weight:bold; cursor:pointer;
+}
+.win-box button:active { opacity:.85; }
+
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100;
+  display:flex; align-items:flex-end; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.modal-overlay.show { opacity:1; pointer-events:auto; }
+.modal {
+  background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-width:480px;
+  max-height:80dvh; overflow-y:auto; padding:24px 20px;
+  padding-bottom:max(24px, env(safe-area-inset-bottom));
+  transform:translateY(100%); transition:transform .25s ease-out;
+}
+.modal-overlay.show .modal { transform:translateY(0); }
+.modal h2 { margin-bottom:16px; font-size:1.2rem; }
+.modal h3 { margin:12px 0 6px; font-size:1rem; color:var(--accent); }
+.modal p, .modal li { font-size:.9rem; line-height:1.7; color:var(--text); }
+.modal ul { padding-left:20px; }
+.modal .close-btn {
+  background:var(--accent); color:#fff; border:none; border-radius:var(--radius);
+  height:var(--btn-h); width:100%; font-size:1rem; font-weight:bold; cursor:pointer;
+  margin-top:16px;
+}
+
+.confirm-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200;
+  display:none; align-items:center; justify-content:center; padding:32px;
+}
+.confirm-overlay.show { display:flex; }
+.confirm-box {
+  background:var(--surface); border-radius:var(--radius); padding:24px 20px;
+  width:100%; max-width:320px; text-align:center;
+}
+.confirm-box p { font-size:1rem; margin-bottom:20px; line-height:1.5; }
+.confirm-btns { display:flex; gap:10px; }
+.confirm-btns button {
+  flex:1; height:var(--btn-h); border:none; border-radius:var(--radius);
+  font-size:1rem; font-weight:bold; cursor:pointer;
+}
+.confirm-cancel { background:#ddd; color:var(--text); }
+.confirm-cancel:active { background:#ccc; }
+.confirm-ok { background:var(--accent); color:#fff; }
+.confirm-ok:active { opacity:.85; }
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <div class="rules-corner">
+    <button onclick="showRules()">📖 规则</button>
+  </div>
+  <div class="landing-center">
+    <div class="landing-icon">🏔️</div>
+    <h1>登山家</h1>
+    <p class="subtitle">2人对战桌游助手</p>
+    <button class="start-btn" onclick="startGame()">开始游戏</button>
+  </div>
+  <div class="credit">@imStar100</div>
+</div>
+
+<div id="game">
+  <div id="header">
+    <h1>登山家</h1>
+    <div class="header-btns">
+      <button onclick="showConfirm()">🔄 重置</button>
+      <button onclick="showRules()">📖 规则</button>
+    </div>
+  </div>
+  <div id="status"></div>
+  <div id="board-area">
+    <div id="board"></div>
+  </div>
+  <div id="controls"></div>
+  <div id="info"></div>
+  <div id="actions">
+    <button class="act-btn" id="undo-btn" onclick="undo()">↩ 悔棋</button>
+    <button class="act-btn" onclick="restart()">🔄 再来一局</button>
+  </div>
+</div>
+
+<div id="win-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="win-box">
+    <h2 id="win-title"></h2>
+    <p id="win-msg"></p>
+    <button onclick="restart()">再来一局</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rules-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2>📖 游戏规则</h2>
+    <h3>🎯 目标</h3>
+    <p>当所有棋子叠成一摞时，最顶端棋子属于你的颜色，即获胜。</p>
+    <h3>♟️ 基本规则</h3>
+    <ul>
+      <li>10枚棋子（绿5蓝5）洗混后随机排列在棋盘中</li>
+      <li>绿方先行动，双方交替进行</li>
+      <li>每次选择一个己方<b>最上方</b>的棋子，向上下左右移动1步</li>
+      <li>目的地必须已有棋子，移动的棋子叠放在最上方</li>
+    </ul>
+    <h3>⚠️ 移动限制</h3>
+    <ul>
+      <li>移动后，该棋子必须至少与一枚其他棋子相邻（不可孤立）</li>
+      <li>移动后，棋子岛必须保持连通（不可中断连接）</li>
+      <li>不允许将棋子移动到空白位置</li>
+    </ul>
+    <h3>🏆 胜利条件</h3>
+    <p>所有棋子合并为一摞时，最顶端的棋子颜色所属玩家获胜。</p>
+    <button class="close-btn" onclick="document.getElementById('rules-modal').classList.remove('show')">知道了</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'mountaineer-state';
+const TOTAL = 10;
+
+const LAYOUTS = {
+  grid: {
+    rows: 2, cols: 5,
+    cells: [[0,0],[0,1],[0,2],[0,3],[0,4],[1,0],[1,1],[1,2],[1,3],[1,4]],
+    cellSet: null
+  },
+  triangle: {
+    rows: 4, cols: 4,
+    cells: [[0,0],[1,0],[1,1],[2,0],[2,1],[2,2],[3,0],[3,1],[3,2],[3,3]],
+    cellSet: null
+  },
+  cross: {
+    rows: 4, cols: 3,
+    cells: [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,1]],
+    cellSet: null
+  },
+  hShape: {
+    rows: 4, cols: 3,
+    cells: [[0,0],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,0],[3,2]],
+    cellSet: null
+  },
+  zigzag: {
+    rows: 4, cols: 4,
+    cells: [[0,1],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[2,3],[3,1],[3,3]],
+    cellSet: null
+  }
+};
+for (const k in LAYOUTS) {
+  LAYOUTS[k].cellSet = new Set(LAYOUTS[k].cells.map(([r,c]) => r+','+c));
+}
+
+let state = {
+  board: {},
+  turn: 'G',
+  selected: null,
+  phase: 'landing',
+  winner: null,
+  history: [],
+  lastMove: null,
+  layout: 'grid'
+};
+
+function currentLayout() { return LAYOUTS[state.layout]; }
+
+function posKey(r, c) { return r + ',' + c; }
+
+function neighbors(r, c) {
+  const layout = currentLayout();
+  const n = [];
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  for (const [dr, dc] of dirs) {
+    const nr = r+dr, nc = c+dc;
+    if (layout.cellSet.has(posKey(nr, nc))) n.push([nr, nc]);
+  }
+  return n;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function isAllConnected(board) {
+  const cells = Object.keys(board).filter(k => board[k] && board[k].length > 0);
+  if (cells.length <= 1) return true;
+  const visited = new Set();
+  const queue = [cells[0]];
+  visited.add(cells[0]);
+  while (queue.length > 0) {
+    const [r, c] = queue.shift().split(',').map(Number);
+    for (const [nr, nc] of neighbors(r, c)) {
+      const nk = posKey(nr, nc);
+      if (board[nk] && board[nk].length > 0 && !visited.has(nk)) {
+        visited.add(nk);
+        queue.push(nk);
+      }
+    }
+  }
+  return visited.size === cells.length;
+}
+
+function initBoard() {
+  const keys = Object.keys(LAYOUTS);
+  state.layout = keys[Math.floor(Math.random() * keys.length)];
+  const layout = currentLayout();
+  const pieces = shuffle(['G','G','G','G','G','B','B','B','B','B']);
+  const board = {};
+  layout.cells.forEach(([r,c], i) => {
+    board[posKey(r,c)] = [pieces[i]];
+  });
+  return board;
+}
+
+function getVisible(board, r, c) {
+  const stack = board[posKey(r,c)];
+  return stack && stack.length > 0 ? stack[stack.length-1] : null;
+}
+
+function getStackSize(board, r, c) {
+  const stack = board[posKey(r,c)];
+  return stack ? stack.length : 0;
+}
+
+function canMove(fr, fc, tr, tc) {
+  if (!currentLayout().cellSet.has(posKey(tr, tc))) return false;
+  const fKey = posKey(fr, fc), tKey = posKey(tr, tc);
+  const fStack = state.board[fKey], tStack = state.board[tKey];
+  if (!fStack || fStack.length === 0) return false;
+  if (fStack[fStack.length-1] !== state.turn) return false;
+  if (!tStack || tStack.length === 0) return false;
+
+  const newBoard = {};
+  for (const k in state.board) newBoard[k] = [...state.board[k]];
+  newBoard[fKey].pop();
+  newBoard[tKey].push(state.turn);
+
+  if (!isAllConnected(newBoard)) return false;
+
+  const occ = [];
+  for (const k in newBoard) {
+    if (newBoard[k].length > 0) {
+      const [r,c] = k.split(',').map(Number);
+      occ.push([r,c]);
+    }
+  }
+  if (occ.length <= 1) return true;
+  for (const [r,c] of occ) {
+    if (r === tr && c === tc) continue;
+    for (const [nr,nc] of neighbors(r,c)) {
+      if (nr === tr && nc === tc) return true;
+    }
+  }
+  return false;
+}
+
+function movePiece(fr, fc, tr, tc) {
+  const fKey = posKey(fr, fc), tKey = posKey(tr, tc);
+  state.history.push({
+    board: JSON.parse(JSON.stringify(state.board)),
+    turn: state.turn,
+    lastMove: state.lastMove ? {...state.lastMove} : null
+  });
+
+  state.board[fKey].pop();
+  state.board[tKey].push(state.turn);
+  state.lastMove = { from:{r:fr,c:fc}, to:{r:tr,c:tc} };
+  state.selected = null;
+
+  for (const k in state.board) {
+    if (state.board[k].length === TOTAL) {
+      state.phase = 'game-over';
+      state.winner = state.board[k][state.board[k].length-1];
+      break;
+    }
+  }
+
+  if (state.phase !== 'game-over') {
+    state.turn = state.turn === 'G' ? 'B' : 'G';
+  }
+
+  saveState();
+  render();
+}
+
+function hasAnyMove() {
+  const layout = currentLayout();
+  for (const [r, c] of layout.cells) {
+    if (getVisible(state.board, r, c) !== state.turn) continue;
+    for (const [nr, nc] of neighbors(r, c)) {
+      if (canMove(r, c, nr, nc)) return true;
+    }
+  }
+  return false;
+}
+
+function countVisible(color) {
+  let n = 0;
+  for (const [r, c] of currentLayout().cells)
+    if (getVisible(state.board, r, c) === color) n++;
+  return n;
+}
+
+function selectCell(r, c) {
+  console.log('selectCell:', r, c, 'phase:', state.phase, 'turn:', state.turn, 'top:', getVisible(state.board, r, c));
+  if (state.phase !== 'playing') return;
+  const top = getVisible(state.board, r, c);
+  if (top !== state.turn) { console.log('Not current player piece'); return; }
+
+  if (state.selected && state.selected.r === r && state.selected.c === c) {
+    state.selected = null;
+    render();
+    return;
+  }
+
+  state.selected = { r, c };
+  render();
+}
+
+function tryMoveDir(dr, dc) {
+  if (!state.selected) return;
+  const tr = state.selected.r + dr, tc = state.selected.c + dc;
+  if (canMove(state.selected.r, state.selected.c, tr, tc)) {
+    movePiece(state.selected.r, state.selected.c, tr, tc);
+  }
+}
+
+function tryMoveToCell(r, c) {
+  if (!state.selected || state.phase !== 'playing') return;
+  const sr = state.selected.r, sc = state.selected.c;
+  if (Math.abs(r-sr) + Math.abs(c-sc) !== 1) {
+    selectCell(r, c);
+    return;
+  }
+  if (canMove(sr, sc, r, c)) {
+    movePiece(sr, sc, r, c);
+  } else {
+    selectCell(r, c);
+  }
+}
+
+function passTurn() {
+  state.history.push({
+    board: JSON.parse(JSON.stringify(state.board)),
+    turn: state.turn,
+    lastMove: state.lastMove ? {...state.lastMove} : null
+  });
+  state.turn = state.turn === 'G' ? 'B' : 'G';
+  state.selected = null;
+  saveState();
+  render();
+}
+
+function undo() {
+  if (state.history.length === 0) return;
+  const prev = state.history.pop();
+  state.board = prev.board;
+  state.turn = prev.turn;
+  state.lastMove = prev.lastMove;
+  state.selected = null;
+  state.phase = 'playing';
+  state.winner = null;
+  saveState();
+  render();
+}
+
+function restart() {
+  const board = initBoard();
+  state = {
+    board: board,
+    turn: 'G',
+    selected: null,
+    phase: 'playing',
+    winner: null,
+    history: [],
+    lastMove: null,
+    layout: state.layout
+  };
+  document.getElementById('win-overlay').classList.remove('show');
+  saveState();
+  render();
+}
+
+function startGame() {
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  restart();
+}
+
+function showRules() {
+  document.getElementById('rules-modal').classList.add('show');
+}
+
+function showConfirm() {
+  document.getElementById('confirm-dialog').classList.add('show');
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-dialog').classList.remove('show');
+}
+
+function confirmReset() {
+  closeConfirm();
+  localStorage.removeItem(STORAGE_KEY);
+  state = { board:{}, turn:'G', selected:null, phase:'landing', winner:null, history:[], lastMove:null, layout:'grid' };
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('landing').style.display = 'flex';
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      board: state.board, turn: state.turn, phase: state.phase,
+      winner: state.winner, history: state.history, lastMove: state.lastMove,
+      layout: state.layout
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && s.board && s.phase) return s;
+  } catch(e) {}
+  return null;
+}
+
+function cellHTML(r, c) {
+  const stack = state.board[posKey(r,c)];
+  const gridStyle = state.layout !== 'grid' ? ` style="grid-row:${r+1};grid-column:${c+1}"` : '';
+  if (!stack || stack.length === 0) {
+    return `<div class="cell empty-cell" data-r="${r}" data-c="${c}"${gridStyle}></div>`;
+  }
+  const top = stack[stack.length-1];
+  const sel = state.selected && state.selected.r === r && state.selected.c === c;
+  const isLast = state.lastMove && (
+    (state.lastMove.from.r === r && state.lastMove.from.c === c) ||
+    (state.lastMove.to.r === r && state.lastMove.to.c === c)
+  );
+  const canSelect = state.phase === 'playing' && top === state.turn && !sel;
+
+  let cls = 'cell piece-' + top;
+  if (sel) cls += ' selected';
+  else if (isLast) cls += ' last-move';
+  if (canSelect) cls += ' selectable';
+
+  let inner = '<div class="piece-face">';
+  if (stack.length === 1) {
+    inner += '<div class="piece-icon"></div>';
+  } else {
+    inner += `<span class="stack-count">${stack.length}</span>`;
+    const maxDots = Math.min(stack.length, 6);
+    const startIdx = stack.length - maxDots;
+    inner += '<div class="stack-dots">';
+    for (let i = startIdx; i < stack.length; i++) {
+      inner += `<div class="stack-dot dot-${stack[i]}"></div>`;
+    }
+    inner += '</div>';
+  }
+  inner += '</div>';
+
+  return `<div class="${cls}" data-r="${r}" data-c="${c}"${gridStyle}>${inner}</div>`;
+}
+
+function render() {
+  const boardEl = document.getElementById('board');
+  const layout = currentLayout();
+  if (state.layout === 'grid') {
+    boardEl.style.gridTemplateColumns = 'repeat(5, 1fr)';
+    boardEl.style.gridTemplateRows = '';
+    boardEl.style.maxWidth = '400px';
+  } else {
+    boardEl.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+    boardEl.style.gridTemplateRows = `repeat(${layout.rows}, auto)`;
+    boardEl.style.maxWidth = (layout.cols * 80) + 'px';
+  }
+  let bHTML = '';
+  for (const [r, c] of layout.cells)
+    bHTML += cellHTML(r, c);
+  boardEl.innerHTML = bHTML;
+
+  const tName = state.turn === 'G' ? '绿方' : '蓝方';
+  const tColor = state.turn === 'G' ? 'var(--green)' : 'var(--blue)';
+  document.getElementById('status').innerHTML =
+    `<span style="color:${tColor}">● ${tName}</span> 行动中`;
+
+  const gV = countVisible('G'), bV = countVisible('B');
+  document.getElementById('info').innerHTML =
+    `<span class="info-g">● 绿方 ${gV} 枚可动</span>` +
+    `<span class="info-b">● 蓝方 ${bV} 枚可动</span>`;
+
+  const undoBtn = document.getElementById('undo-btn');
+  undoBtn.classList.toggle('disabled', state.history.length === 0);
+
+  renderControls();
+
+  if (state.phase === 'game-over') {
+    const wn = state.winner === 'G' ? '绿方' : '蓝方';
+    const wc = state.winner === 'G' ? '绿' : '蓝';
+    document.getElementById('win-title').textContent = '🎉 ' + wn + '获胜！';
+    document.getElementById('win-msg').textContent = '所有棋子叠为一摞，顶端为' + wc + '方棋子';
+    document.getElementById('win-overlay').classList.add('show');
+  }
+}
+
+function renderControls() {
+  const el = document.getElementById('controls');
+  if (state.phase !== 'playing') { el.innerHTML = ''; return; }
+
+  if (!state.selected) {
+    const noMove = !hasAnyMove();
+    if (noMove) {
+      el.innerHTML = `<div style="color:var(--text-dim);margin-bottom:6px">当前无可用移动</div>
+        <button class="pass-btn" onclick="passTurn()">跳过回合</button>`;
+    } else {
+      el.innerHTML = `<div style="color:var(--text-dim);font-size:.9rem">点击棋堆顶端${state.turn==='G'?'绿色':'蓝色'}的棋子</div>`;
+    }
+    return;
+  }
+
+  const {r, c} = state.selected;
+  const canU = canMove(r, c, r-1, c);
+  const canD = canMove(r, c, r+1, c);
+  const canL = canMove(r, c, r, c-1);
+  const canR = canMove(r, c, r, c+1);
+
+  el.innerHTML = `
+    <div class="dir-pad">
+      <button class="dir-btn dir-up ${canU?'':'disabled'}" onclick="tryMoveDir(-1,0)">↑</button>
+      <button class="dir-btn dir-left ${canL?'':'disabled'}" onclick="tryMoveDir(0,-1)">←</button>
+      <button class="dir-btn dir-down ${canD?'':'disabled'}" onclick="tryMoveDir(1,0)">↓</button>
+      <button class="dir-btn dir-right ${canR?'':'disabled'}" onclick="tryMoveDir(0,1)">→</button>
+    </div>
+    <button class="cancel-btn" onclick="state.selected=null;render()">取消选择</button>
+  `;
+}
+
+window.rules = showRules;
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('board').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    const r = parseInt(cell.dataset.r);
+    const c = parseInt(cell.dataset.c);
+    console.log('Cell clicked:', r, c, 'phase:', state.phase, 'turn:', state.turn, 'selected:', state.selected);
+    if (state.selected) {
+      tryMoveToCell(r, c);
+    } else {
+      selectCell(r, c);
+    }
+  });
+
+  const saved = loadState();
+  if (saved && (saved.phase === 'playing' || saved.phase === 'game-over')) {
+    state.board = saved.board;
+    state.turn = saved.turn || 'G';
+    state.phase = saved.phase;
+    state.winner = saved.winner || null;
+    state.history = saved.history || [];
+    state.lastMove = saved.lastMove || null;
+    state.layout = saved.layout || 'grid';
+    state.selected = null;
+    document.getElementById('landing').style.display = 'none';
+    document.getElementById('game').style.display = 'flex';
+    render();
+  }
+});
+</script>
+
+<div class="confirm-overlay" id="confirm-dialog">
+  <div class="confirm-box">
+    <p>确定要重置并返回首页吗？</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm()">取消</button>
+      <button class="confirm-ok" onclick="confirmReset()">确认</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
