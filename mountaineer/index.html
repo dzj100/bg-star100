@@ -6,17 +6,17 @@
 <title>登山家</title>
 <style>
 :root {
-  --bg: #d6e8f0;
-  --surface: #faf5eb;
-  --card-bg: #fff8ee;
-  --accent: #d94f5c;
-  --gold: #e8a832;
-  --text: #3d3228;
-  --text-dim: #8a7e72;
-  --green: #4a9e4e;
-  --green-dark: #3a7e3e;
-  --blue: #4a8ec9;
-  --blue-dark: #3a6ea9;
+  --bg: #e8eef6;
+  --surface: #ffffff;
+  --card-bg: #f0f4f8;
+  --accent: #d95b5b;
+  --gold: #e8b84a;
+  --text: #2c3040;
+  --text-dim: #8890a0;
+  --green: #5aad6a;
+  --green-dark: #3d8a4d;
+  --blue: #4a8fd9;
+  --blue-dark: #3670b5;
   --radius: 14px;
   --btn-h: 56px;
 }
@@ -26,11 +26,11 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
 #landing { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100dvh; padding:32px; text-align:center; position:relative; }
 #landing .rules-corner { position:absolute; top:max(16px, env(safe-area-inset-top)); right:16px; }
 #landing .rules-corner button {
-  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  background:var(--surface); border:1px solid #e0e0e0; border-radius:10px;
   padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
   display:flex; align-items:center; gap:4px;
 }
-#landing .rules-corner button:active { background:#e8ddd0; }
+#landing .rules-corner button:active { background:#eee; }
 #landing .landing-center { display:flex; flex-direction:column; align-items:center; margin-top:-20px; }
 #landing .landing-icon { font-size:3.5rem; margin-bottom:8px; }
 #landing h1 { font-size:2rem; color:var(--accent); margin-bottom:8px; }
@@ -44,23 +44,24 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
 
 #game { display:none; flex-direction:column; min-height:100dvh; padding:16px; padding-top:max(16px, env(safe-area-inset-top)); padding-bottom:max(16px, env(safe-area-inset-bottom)); }
 
-#header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+#header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 #header h1 { font-size:1.1rem; font-weight:bold; }
 #header .header-btns { display:flex; gap:6px; }
 #header .header-btns button {
-  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  background:var(--surface); border:1px solid #e0e0e0; border-radius:10px;
   padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
   display:flex; align-items:center; gap:4px;
 }
-#header .header-btns button:active { background:#e8ddd0; }
+#header .header-btns button:active { background:#eee; }
 
-#status { text-align:center; font-size:1rem; font-weight:bold; margin-bottom:12px; padding:10px 16px; background:var(--surface); border-radius:var(--radius); }
+#status { text-align:center; font-size:1rem; font-weight:bold; margin-bottom:12px; padding:10px 16px; background:var(--surface); border-radius:var(--radius); box-shadow:0 1px 3px rgba(0,0,0,.06); }
 
 #board-area { display:flex; flex-direction:column; align-items:center; margin:8px 0; }
 #board {
   display:grid; grid-template-columns:repeat(5,1fr); gap:6px;
   width:100%; max-width:400px;
   background:var(--surface); padding:12px; border-radius:var(--radius);
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
 }
 
 .cell {
@@ -71,15 +72,15 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
 }
 .cell.empty-cell { background:rgba(0,0,0,.06); cursor:default; }
 
-.cell.piece-G { background:linear-gradient(135deg,#5cb860,#3d9141); border-color:#2e7a32; box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 2px rgba(255,255,255,.2); }
-.cell.piece-B { background:linear-gradient(135deg,#5ba4d9,#3a7eb8); border-color:#2a6494; box-shadow:0 3px 6px rgba(0,0,0,.15), inset 0 1px 2px rgba(255,255,255,.2); }
+.cell.piece-G { background:linear-gradient(135deg,#6ec07a,#3d8a4d); border-color:#2e7a3e; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+.cell.piece-B { background:linear-gradient(135deg,#5ea0e8,#3670b5); border-color:#2a5e9a; box-shadow:0 2px 6px rgba(0,0,0,.1); }
 
-.cell.selected { border-color:var(--gold)!important; box-shadow:0 0 16px rgba(232,168,50,.6); transform:scale(1.08); z-index:2; }
-.cell.last-move { box-shadow:0 0 8px rgba(232,168,50,.3); }
+.cell.selected { border-color:var(--gold)!important; box-shadow:0 0 14px rgba(232,184,74,.5); transform:scale(1.08); z-index:2; }
+.cell.last-move { box-shadow:0 0 6px rgba(232,184,74,.3); }
 /* .cell.selectable { animation:pulse 1.2s ease-in-out infinite; cursor:pointer; } */
 @keyframes pulse {
   0%,100% { transform:scale(1); border-color:transparent; }
-  50% { transform:scale(1.06); border-color:var(--gold); box-shadow:0 0 14px rgba(232,168,50,.5); }
+  50% { transform:scale(1.06); border-color:var(--gold); box-shadow:0 0 14px rgba(232,184,74,.5); }
 }
 
 .piece-face {
@@ -104,18 +105,18 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
   width:7px; height:7px; border-radius:50%;
   border:1px solid rgba(0,0,0,.2);
 }
-.stack-dot.dot-G { background:#6cc070; }
-.stack-dot.dot-B { background:#6ab0e0; }
+.stack-dot.dot-G { background:#6ec07a; }
+.stack-dot.dot-B { background:#5ea0e8; }
 
 #controls { display:flex; flex-direction:column; align-items:center; gap:6px; margin:10px 0; min-height:80px; }
 
 .dir-pad { display:grid; grid-template-columns:repeat(3,var(--btn-h)); grid-template-rows:repeat(2,var(--btn-h)); gap:5px; }
 .dir-btn {
-  background:var(--card-bg); border:2px solid #ddd; border-radius:12px;
+  background:var(--card-bg); border:1px solid #e0e0e0; border-radius:12px;
   font-size:1.4rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
   color:var(--text);
 }
-.dir-btn:active { background:#e8ddd0; }
+.dir-btn:active { background:#eee; }
 .dir-btn.disabled { opacity:.25; pointer-events:none; }
 .dir-up { grid-column:2; grid-row:1; }
 .dir-left { grid-column:1; grid-row:2; }
@@ -139,10 +140,10 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
 
 #actions { display:flex; justify-content:center; gap:10px; margin:8px 0; }
 .act-btn {
-  background:var(--surface); border:1px solid #ccc; border-radius:10px;
+  background:var(--surface); border:1px solid #e0e0e0; border-radius:10px;
   padding:10px 18px; font-size:.9rem; cursor:pointer; color:var(--text);
 }
-.act-btn:active { background:#e8ddd0; }
+.act-btn:active { background:#eee; }
 .act-btn.disabled { opacity:.4; pointer-events:none; }
 
 #win-overlay {
@@ -200,8 +201,8 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
   flex:1; height:var(--btn-h); border:none; border-radius:var(--radius);
   font-size:1rem; font-weight:bold; cursor:pointer;
 }
-.confirm-cancel { background:#ddd; color:var(--text); }
-.confirm-cancel:active { background:#ccc; }
+.confirm-cancel { background:#f0f4f8; color:var(--text); }
+.confirm-cancel:active { background:#e0e4e8; }
 .confirm-ok { background:var(--accent); color:#fff; }
 .confirm-ok:active { opacity:.85; }
 </style>
@@ -215,7 +216,7 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
   <div class="landing-center">
     <div class="landing-icon">🏔️</div>
     <h1>登山家</h1>
-    <p class="subtitle">2人对战桌游助手</p>
+    <p class="subtitle">2人对战抽象棋</p>
     <button class="start-btn" onclick="startGame()">开始游戏</button>
   </div>
   <div class="credit">@imStar100</div>
