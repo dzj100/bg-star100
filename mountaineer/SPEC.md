@@ -1,92 +1,180 @@
-# Mountaineer (登山家) - Game Spec
+# 登山家 - 游戏规格文档
 
-## Overview
-2-player abstract strategy stacking game. Players alternate moving their colored pieces on a 2x5 grid island, stacking onto adjacent occupied cells. Win by having your piece on top when all 10 pieces merge into one stack.
+## 游戏概述
+2人对战策略叠棋游戏。双方在一个由10个格子组成的棋子岛上交替移动己方棋子，将棋子叠放到相邻的棋子上。当所有棋子叠为一摞时，最顶端棋子属于谁的颜色，谁就获胜。
 
-## Components
-- 5 green pieces (Player 1)
-- 5 blue pieces (Player 2)
-- 2x5 grid board (10 cells)
+## 棋子与组件
+- 绿色棋子 5 枚（绿方）
+- 蓝色棋子 5 枚（蓝方）
+- 棋子岛棋盘（10 个格子）
 
-## Setup
-1. Shuffle all 10 pieces randomly
-2. Place face-up in a 2x5 grid (2 rows, 5 columns)
-3. Green moves first
+## 初始布局（5种随机选1）
 
-## Rules
+| 布局名称 | 形状描述 | 行列数 |
+|---------|---------|--------|
+| 棋盘 | 2行×5列完整矩形 | 2×5 |
+| 阶梯 | 第1行1格，第2行2格，第3行3格，第4行4格 | 4×4 |
+| 十字 | 3×3方块 + 底部中心1格 | 4×3 |
+| H形 | 左右两列各4格 + 中间横杠2格 | 4×3 |
+| 锯齿 | 顶部1格居中，第2行3格，第3行4格右移，底部2格 | 4×4 |
 
-### Movement
-- On your turn, select one of your **topmost** pieces (not covered by another piece)
-- Move it 1 step in any orthogonal direction (up/down/left/right)
-- Destination **must** already have at least one piece (no moving to empty cells)
-- The moving piece is placed **on top** of the destination stack
+游戏开始时从以上5种布局中**随机选取1种**，将10枚棋子洗混后按布局格子顺序正面朝上摆放。
 
-### Constraints (both must hold after the move)
-1. **Adjacency**: The moved piece must share an edge with at least one other piece on the board
-2. **Connectivity**: All occupied cells must form a single connected island (no splitting)
+## 游戏规则
 
-### Turn Order
-- Green moves first, then Blue, alternating
-- Only the topmost piece at any position can be selected and moved
-- Covered pieces cannot be moved
+### 行动顺序
+- 绿方先行动，蓝方后行动，双方交替进行
 
-### Winning
-- When all 10 pieces are stacked in one cell, the **topmost piece** determines the winner
-- The player whose color is on top wins
+### 移动规则
+- 每回合选择一个己方**最上方**的棋子（未被其他棋子覆盖的）
+- 向上/下/左/右移动 1 步
+- 目的地**必须已有棋子**（不允许移到空格）
+- 移动的棋子叠放在目的地的**最上方**
 
-## Data Structure
+### 移动限制（移动后必须同时满足）
+1. **邻接约束**：移动后的棋子必须至少与一枚其他棋子相邻（四条边至少有一条边与其他棋子相连）
+2. **连通约束**：所有有棋子的格子必须组成一个连通的整体（不允许棋子岛分裂为多个）
+
+### 被覆盖的棋子
+- 被覆盖的棋子不可被选中或移动
+- 只有某位置最顶端的棋子可以被操作
+
+### 无棋可动
+- 当轮到某方行动但该方没有任何合法移动时，显示「跳过回合」按钮
+- 点击后回合交给对方
+
+### 胜利条件
+- 当所有 10 枚棋子叠在同一个格子中时游戏结束
+- 最顶端的棋子属于哪方颜色，该方获胜
+
+## 数据结构
 
 ```js
 state = {
-  board: { "r,c": ["G","B","G",...], ... },  // cell -> stack of pieces (index 0 = bottom)
-  turn: 'G' | 'B',
-  selected: null | { r, c },
+  board: { "r,c": ["G","B","G",...], ... },  // 格子坐标 -> 棋子栈（索引0为底部）
+  turn: 'G' | 'B',          // 当前行动方：G=绿方，B=蓝方
+  selected: null | { r, c }, // 当前选中的棋子坐标
   phase: 'landing' | 'playing' | 'game-over',
-  winner: null | 'G' | 'B',
-  history: [prevStates...],
-  lastMove: null | { from: {r,c}, to: {r,c} }
+  winner: null | 'G' | 'B', // 获胜方
+  history: [...],           // 悔棋用的历史状态栈
+  lastMove: null | { from:{r,c}, to:{r,c} }, // 上一步移动记录
+  layout: 'grid' | 'triangle' | 'cross' | 'hShape' | 'zigzag'  // 当前布局类型
 }
 ```
 
-## Grid Coordinates
-- Row 0 = top row, Row 1 = bottom row
-- Col 0 = left, Col 4 = right
-- 4 neighbors: (r-1,c), (r+1,c), (r,c-1), (r,c+1)
+### 棋盘坐标
+- 行号从上到下：第0行在最上方
+- 列号从左到右：第0列在最左边
+- 相邻方向：上(r-1,c)、下(r+1,c)、左(r,c-1)、右(r,c+1)
+- 邻接判定基于当前布局的 cellSet，只有布局中存在的格子才算相邻
 
-## UI Layout (mobile-first)
+## 布局定义
 
-```
-+---------------------------+
-|     登 山 家               |
-|  Green's Turn  (3 left)   |
-+---------------------------+
-|                           |
-|   [c0] [c1] [c2] [c3] [c4]|  Row 0
-|   [c0] [c1] [c2] [c3] [c4]|  Row 1
-|                           |
-|      [←] [↑] [↓] [→]     |  (when selected)
-|      [Cancel]             |
-+---------------------------+
-|  G: 3 left   B: 2 left    |
-+---------------------------+
-|  [Undo]  [Restart]  [?]   |
-+---------------------------+
+```js
+const LAYOUTS = {
+  grid:     { rows:2, cols:5, cells:[[0,0],[0,1],...,[1,4]] },
+  triangle: { rows:4, cols:4, cells:[[0,0],[1,0],[1,1],...,[3,3]] },
+  cross:    { rows:4, cols:3, cells:[[0,0],[0,1],[0,2],...,[3,1]] },
+  hShape:   { rows:4, cols:3, cells:[[0,0],[0,2],[1,0],...,[3,2]] },
+  zigzag:   { rows:4, cols:4, cells:[[0,1],[1,0],[1,1],...,[3,3]] }
+};
 ```
 
-## Key Algorithms
+每个布局包含 `cellSet`（格子坐标集合），用于邻接判定和移动边界检查。
 
-### Move Validation
-1. Source cell has pieces and top piece matches current player
-2. Destination is within bounds and has pieces
-3. After simulated move: BFS from any occupied cell visits all occupied cells (connectivity)
+## 界面布局（移动端优先）
 
-### Win Check
-- Count total pieces across all cells; if any cell has 10 pieces, game over
+### 首页
+```
++---------------------------+
+|                    [📖 规则] |  ← 右上角规则按钮
+|                             |
+|          🏔️                |
+|        登山家               |  ← 居中显示
+|    2人对战桌游助手           |
+|     [开始游戏]              |
+|                             |
+|       @imStar100            |  ← 底部居中
++---------------------------+
+```
 
-## Interactions
-- Tap cell with your top piece -> select (gold highlight)
-- Tap valid adjacent cell with pieces -> move piece there
-- Tap direction button (when selected) -> move in that direction
-- Tap other own piece -> re-select
-- Tap elsewhere / Cancel -> deselect
-- No valid moves -> show Pass button
+### 游戏中
+```
++---------------------------+
+| 登山家      [🔄 重置][📖 规则] |  ← 顶部栏
++---------------------------+
+|    ● 绿方 行动中            |  ← 状态栏
++---------------------------+
+|                           |
+|   [棋子格子按布局排列]       |  ← 棋盘区域
+|                           |
++---------------------------+
+|    [←] [↑] [↓] [→]       |  ← 方向键（选中后显示）
+|       [取消选择]            |
++---------------------------+
+|  ● 绿方 3枚可动  ● 蓝方 2枚 |  ← 信息栏
++---------------------------+
+|    [↩ 悔棋]  [🔄 再来一局]   |  ← 操作栏
++---------------------------+
+```
+
+### 胜利弹窗
+- 居中卡片式弹窗，显示获胜方
+- 点击遮罩层可关闭
+- 弹窗内「再来一局」按钮原地重开
+
+### 重置确认弹窗
+- 点击顶部「重置」按钮弹出
+- 确认后清除存档并返回首页
+- 取消则关闭弹窗继续游戏
+
+## 核心算法
+
+### 移动合法性校验
+1. 源格子有棋子且最顶端棋子属于当前行动方
+2. 目标格子在布局 cellSet 中存在且有棋子
+3. 模拟移动后：BFS 遍历所有有棋子的格子，确认全部连通
+
+### 胜利判定
+- 每次移动后检查：是否存在某个格子拥有 10 枚棋子
+- 若有则游戏结束，该格子最顶端棋子所属方获胜
+
+### 无棋可动检测
+- 遍历所有当前行动方的可见棋子，检查每个棋子的四个方向是否有合法移动
+- 若全部无合法移动，显示「跳过回合」
+
+## 交互流程
+
+| 操作 | 结果 |
+|------|------|
+| 点击己方闪烁棋子 | 选中（金色边框高亮） |
+| 选中后点击相邻有棋格子 | 移动棋子到该格子 |
+| 选中后点击方向键 | 向该方向移动 |
+| 选中后点击其他己方棋子 | 切换选中 |
+| 选中后点击「取消选择」 | 取消选中 |
+| 无合法移动时 | 显示「跳过回合」按钮 |
+| 点击「悔棋」 | 回退到上一步状态 |
+| 点击「再来一局」 | 重新随机布局开始新局 |
+| 点击「重置」 | 弹确认框，确认后返回首页 |
+
+## 视觉设计
+
+### 棋子样式
+- 绿色棋子：绿色渐变方块 + 中心半透明圆形图标
+- 蓝色棋子：蓝色渐变方块 + 中心半透明圆形图标
+- 堆叠时：显示大号数字 + 底部彩色圆点表示层序
+- 当前行动方棋子：金色呼吸缩放动画（可选中提示）
+
+### 配色方案
+- 背景：`#d6e8f0`
+- 卡片：`#faf5eb`
+- 强调色：`#d94f5c`（红色）
+- 绿方：`#5cb860` → `#3d9141` 渐变
+- 蓝方：`#5ba4d9` → `#3a7eb8` 渐变
+- 选中高亮：`#e8a832`（金色）
+
+## 持久化
+- 使用 localStorage，键名：`mountaineer-state`
+- 每次状态变更后自动保存
+- 页面加载时检测缓存：有存档则直接进入游戏，无缓存则显示首页
+- 重置时清除缓存并返回首页

@@ -237,7 +237,7 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
   <div id="info"></div>
   <div id="actions">
     <button class="act-btn" id="undo-btn" onclick="undo()">↩ 悔棋</button>
-    <button class="act-btn" onclick="restart()">🔄 再来一局</button>
+    <button class="act-btn" id="restart-btn" onclick="restart()">🔄 再来一局</button>
   </div>
 </div>
 
@@ -654,6 +654,7 @@ function render() {
 
   const undoBtn = document.getElementById('undo-btn');
   undoBtn.classList.toggle('disabled', state.history.length === 0);
+  document.getElementById('restart-btn').style.display = state.phase === 'game-over' ? '' : 'none';
 
   renderControls();
 
