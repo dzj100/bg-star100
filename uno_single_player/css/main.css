@@ -530,7 +530,8 @@ body{
     /*overflow: hidden;*/ /*否则对话框会被隐藏*/
 }
 #playground-absolute #playground-table tr{
-    /*height: 8.334%;*/
+    /* 之前对height打了注释，但是页面布局会比较异常 */
+    height: 8.334%;
     overflow: hidden;
 }
 #playground-absolute #playground-table td{
