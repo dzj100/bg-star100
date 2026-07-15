@@ -1,0 +1,206 @@
+<!-- HELP -->
+<style type="text/css">
+    #help-load{
+        width: calc(100% + 1.125rem);
+        height: calc(100% - 6rem);
+        overflow: auto;
+        box-sizing: border-box;
+        padding: 0rem 3rem 3rem 2rem;
+        margin-top: 1rem;
+    }
+    #help-load .help-load-title{
+        margin:auto;
+        color:#ddd;
+        text-align: center;
+        font-size: 1.5rem;
+    }
+    #help-load .help-load-content{
+        color: #ccc;
+        margin-top: 1rem;
+        line-height: 1.5rem;
+        font-size: 0.9rem;
+        letter-spacing:0.0625rem;  
+    }
+    #help-load .help-load-content p{
+        margin-bottom: 0.5rem;
+        text-shadow: 0.0625rem 0.0625rem 0.0625rem #000;
+    }
+    #help-load .help-load-content b{
+        font-size: 1rem;
+        color: #fff;
+    }
+    #help-load .help-load-content .help-load-content-element{
+        margin-bottom: 0.5rem;
+        border-bottom: 0.0625rem solid rgba(255,255,255,0.1);
+    }
+    #help-load .help-load-content .help-load-content-element > b{
+        text-align: center;
+        background-color: rgba(155,155,155,0.08);
+        box-shadow: 0 0 0.25rem #fff;
+        display: block;
+        padding: 0.2rem 0;
+        cursor: pointer;
+    }
+    #help-load .help-load-content .help-load-content-element > p{
+        margin-top: 0.25rem;
+        display: none;
+    }
+    #help-load .help-load-element{
+        display: none;
+    }
+    #help-load .help-load-element:nth-child(3){
+        height: 120%;
+    }
+    @media screen and (min-width: 38rem) {
+        #help-load .help-load-element:nth-child(2),
+        #help-load .help-load-element:nth-child(3){
+            width: calc(100% + 1.125rem);
+        }
+    }
+    
+    #help-load-operate{
+        text-align: center;
+        margin-top: 3rem;
+    }
+    #help-load-operate .help-load-operate-close{
+        position: absolute;
+        right: 1rem;
+        top: 0.6rem;
+        color: white;
+        font-size: 2rem;
+        line-height: 80%;
+        cursor: pointer;
+    }
+    #help-load-operate .help-load-operate-button{
+        color: #8adff9;
+        border: 0.0625rem solid #8adff9;
+        border-radius:0.25rem;
+        padding: 0.125rem 0.5rem;
+        display: inline-block;
+        box-shadow: 0 0 0.25rem #8adff9;
+        cursor: pointer;
+        background-color: rgba(0,0,0,0.1);
+        margin: 0 0.125rem;
+    }
+    #help-load-operate .help-load-operate-button-select{
+        background-color: rgba(39, 93, 109, 1);
+    }
+
+</style>
+        <div id="help-load-operate">
+            <div class="help-load-operate-button" onclick="helpPageChange(0);">牌组说明</div>
+            <div class="help-load-operate-button help-load-operate-button-select" onclick="helpPageChange(1);">功能说明</div>
+            <div class="help-load-operate-button" onclick="helpPageChange(2);">玩法说明</div>
+            <div class="help-load-operate-close" onclick="hideHelpGame();">×</div>
+        </div>
+        <div id="help-load">
+            <div class="help-load-element">
+                <p class="help-load-title">牌组说明</p>
+                <div class="help-load-content">
+                    <p><b>UNO</b>拥有三种类型牌：<b>数字牌</b>、<b>功能牌</b>和<b>万能牌</b>，由红、黄、蓝、绿、黑这<b>五种颜色</b>组成，共计108张。</p>
+                    <p><b>数字牌</b>：分四种颜色，红、黄、蓝、绿，每种颜色各19张牌，牌面由数字0~9组成，其中0只有一张，其余的数字均有两张，共计76张。</p>
+                    <p><b>功能牌</b>：分四种颜色，红、黄、蓝、绿，每种颜色各6张牌，种类分为<b>禁止牌</b>（Skip）、<b>反转牌</b>（Reverse）、<b>惩罚牌</b>（+2），每种各两张，共计24张。</p>
+                    <p><b>万能牌</b>：又叫特殊牌或黑牌，颜色为黑色，种类分为<b>换色牌</b>（Wild）、<b>王牌</b>（+4），每种各四张，共计8张。</p>
+                    <br>
+                </div>
+            </div>
+            <div class="help-load-element" style="display:block;">
+                <p class="help-load-title">功能说明</p>
+                <div class="help-load-content">
+                    <br><br>
+                    <div class="one-card red" data-face="Skip">Skip</div>
+                    <div class="one-card yellow" data-face="Skip">Skip</div>
+                    <div class="one-card blue" data-face="Skip">Skip</div>
+                    <div class="one-card green" data-face="Skip">Skip</div>
+                    <p><b>禁止牌</b>：（Skip），打出这张牌之后下家被跳过。即下家不能出牌且直接轮到下下家出牌。</p>
+                    <br><br>
+                    <div class="one-card red" data-face="Reverse">Reverse</div>
+                    <div class="one-card yellow" data-face="Reverse">Reverse</div>
+                    <div class="one-card blue" data-face="Reverse">Reverse</div>
+                    <div class="one-card green" data-face="Reverse">Reverse</div>
+                    <p><b>反转牌</b>（Reverse），打出这张牌之后，出牌方式将进行反转。例原本是顺时针出牌顺序，出牌后将变成逆时针。</p>
+                    <br><br>
+                    <div class="one-card red" data-face="+2">+2</div>
+                    <div class="one-card yellow" data-face="+2">+2</div>
+                    <div class="one-card blue" data-face="+2">+2</div>
+                    <div class="one-card green" data-face="+2">+2</div>
+                    <p><b>惩罚牌</b>（+2），打出这张牌之后，下家将惩罚抽取2张牌，且被跳过。但下家依旧可以打出一张<b>惩罚牌</b>进行叠加惩罚。</p>
+                    <br><br>
+                    <div class="one-card black" data-face="Wild">Wild</div>
+                    <div class="one-card black" data-face="Wild">Wild</div>
+                    <div class="one-card black" data-face="Wild">Wild</div>
+                    <div class="one-card black" data-face="Wild">Wild</div>
+                    <p><b>换色牌</b>（Wild），打出这张牌之后，宣言一种颜色，此时下家只能打出该颜色的牌。但下家依旧可以打出一张<b>换色牌</b>进行新的宣言。</p>
+                    <br><br>
+                    <div class="one-card black" data-face="+4">+4</div>
+                    <div class="one-card black" data-face="+4">+4</div>
+                    <div class="one-card black" data-face="+4">+4</div>
+                    <div class="one-card black" data-face="+4">+4</div>
+                    <p><b>王牌</b>（+4），打出这张牌之后，宣言一种颜色，下家惩罚抽取4张牌，且被跳过，下下家只能打出刚刚宣言的颜色的牌。<b>但下家可以进行检举</b>。检举将公开打出王牌的玩家的手牌，若此玩家手牌中拥有本回合允许打出的颜色的牌，则判定为下家检举成功，否则检举失败。<b>检举成功</b>时，惩罚抽牌的对象将从下家变更为打出王牌的玩家，且下家可以正常出牌，但只能打出刚刚宣言的颜色的牌。<b>检举失败</b>时，下家惩罚摸取的牌的数量将额外增加2张。</p>
+                    <br>
+                </div>
+            </div>
+            <div class="help-load-element">
+                <p class="help-load-title">玩法说明</p>
+                <div class="help-load-content">
+                    <div class="help-load-content-element" onclick="wanfaPageChange(0);">
+                        <b>开局</b>
+                        <p style="display: block;">初始化牌库之后将给每位玩家分发7张牌作为初始手牌，且随机定位一名玩家作为先手，确定先手玩家之后亮出牌库最上方的牌作为初始条件牌。若翻出<b>禁止牌</b>则直接结束本次出牌，开始下一位玩家出牌；若翻出<b>反转牌</b>则变更游戏初始出牌顺序；若翻出<b>惩罚牌</b>则先手玩家进入惩罚倒计时，没能做出响应则惩罚摸取2张牌并结束本次出牌；若翻出<b>换色牌</b>则由先手玩家指定一个颜色作为初始颜色条件。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(1);">
+                        <b>出牌</b>
+                        <p>在当前出牌玩家的回合中，可以打出与上家打出的牌的<b>颜色</b>或<b>数字</b>或<b>功能</b>相同的牌。<b>换色牌</b>可以在未进入惩罚倒计时的时候打出，<b>王牌</b>则都可以打出。需注意的是，如果手牌中拥有其他符合当前颜色的牌，被检举成功的话要自己接受惩罚噢。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(2);">
+                        <b>抢牌</b>
+                        <p>当玩家的手中拥有和当前打出的牌<b>完全相同</b>的牌，可以进行<b>抢牌</b>，抢牌操作将直接获得打出此牌的权限。需注意的是，若此牌为<b>反转牌</b>，则不再进行反转效果。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(3);">
+                        <b>出牌顺序</b>
+                        <p>游戏开局时，默认的出牌顺序是<b>顺时针</b>，当有玩家打出<b>反转牌</b>时，出牌顺序将进行一次反转。当前桌布背景的<b>旋转方向</b>与当前出牌顺序一致，可以悄悄观察。需注意的是，若是进行<b>抢牌</b>而打出的反转牌，将不再进行一次出牌顺序的反转！</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(4);">
+                        <b>摸取一张</b>
+                        <p>在当前出牌玩家的回合中，所有的手牌都不符合出牌条件时，可从牌库摸取一张，若该牌可以打出，则需打出，若不可打出，则结束当前回合。当然，也可以假装不能出牌，直接进行<b>摸取一张</b>。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(5);">
+                        <b>惩罚</b>
+                        <p>打出<b>惩罚牌</b>或者<b>王牌</b>之后，将进入惩罚倒计时，若在倒计时内无法响应或放弃响应出牌时，则被惩罚的玩家将摸取等同惩罚数量的牌。此时可以执行的响应有<b>出牌</b>和<b>抢牌</b></p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(6);">
+                        <b>检举</b>
+                        <p>打出<b>王牌</b>的玩家的下家可以选择是否进行检举。进行检举时，公开打出王牌的玩家的所有手牌，如果打出王牌的玩家手中拥有其他符合当前<b>颜色</b>条件的牌，则检举成功，反之检举失败。检举成功则惩罚对象变更为打出王牌的玩家，检举失败则进行检举的玩家需多惩罚摸取2张。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(7);">
+                        <b>“UNO”</b>
+                        <p>当玩家打出一张牌之后，若手上有且仅剩下一张牌时，需呐喊一声<b>“UNO”</b>。如果忘记呐喊且被其他玩家发现时，忘记呐喊的玩家要被惩罚摸取2张牌噢。玩家若发现有其他玩家忘记呐喊时，可以通过点击Ta的头像对Ta进行惩罚。需注意的是，若Ta的下家进行出牌了，则无法对Ta进行惩罚。</p>
+                    </div>
+                    <div class="help-load-content-element" onclick="wanfaPageChange(8);">
+                        <b>胜利</b>
+                        <p>当某一位玩家打出最后一张手牌时，则宣布<b>胜利</b>，游戏结束。需注意的是，<b>万能牌</b>不能作为最后一张打出噢！</p>
+                    </div>
+                    <!-- <div class="help-load-content-element">
+                        <b></b>
+                        <p></p>
+                    </div> -->
+                </div>
+            </div>
+        </div>
+<script type="text/javascript">
+    function helpPageChange(page){
+        if($('.help-load-element').eq(page).css('display') == 'block'){
+            return;
+        }
+        $('.help-load-operate-button').removeClass('help-load-operate-button-select');
+        $('.help-load-operate-button').eq(page).addClass('help-load-operate-button-select');
+        $('.help-load-element').hide();
+        $('.help-load-element').eq(page).fadeIn(200);    
+    }
+    function wanfaPageChange(page){
+        $('.help-load-content-element').find('p').stop().slideUp();
+        $('.help-load-content-element').find('p').eq(page).stop().slideDown();
+    }
+    function hideHelpGame(){
+    	$('#help-absolute').hide();
+    }
+</script>

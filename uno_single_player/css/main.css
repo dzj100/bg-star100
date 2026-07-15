@@ -1,0 +1,1283 @@
+@charset "utf-8";
+*{
+    margin:0rem; 
+    padding:0rem;
+}
+html{
+    height: 100%;
+    width: 100%;
+    /*padding: 0.5rem;*/
+}
+body{
+    font:16px/1.6 Tahoma,microsoft yahei,"微软雅黑","宋体";
+    font-family:"\5fae\8f6f\96c5\9ed1","\5b8b\4f53";
+    height: calc(100% - 0rem);
+    position: relative;
+    /*overflow: hidden;*/
+}
+.one-card{
+    margin:-3rem 0rem 0.3125rem 0.3125rem;
+    height:5rem;
+    width:3.75rem;
+    border:0.0625rem solid #FFF;
+    border-radius:0.3125rem;
+    color:#e2e2e2;
+    display:inline-block;
+    line-height: 4.7rem;
+    text-align: center;
+    overflow: hidden;
+    /*box-shadow: 0.0625rem 0.1875rem 0.3125rem #555;*/
+    /*text-shadow: 0.1875rem 0.1875rem 0.625rem rgba(0,0,0,0.7);*/
+    /*opacity: 0;*/
+    /*transition: all 0.5s;*/
+    /*animation:showCard 0.35s 1 linear ;*/
+    position: relative;
+    /*background-image: url(../images/card8.png);*/
+    /*font-size: 0.5rem;*/
+    font-size: 1.2rem;
+    box-shadow: none;
+    text-shadow: 0.125rem 0.125rem 0.25rem rgba(0,0,0,0.8);
+}
+@keyframes showCard{
+    from{
+        opacity: 0;
+    }
+    to{
+        opacity: 1;
+    }
+}
+.one-card-flashlight{
+    position:relative;
+    opacity:0.8;
+    animation:flashlightCard .15s 1 linear !important;
+    animation-fill-mode: forwards !important;
+}
+@keyframes flashlightCard{
+    from{
+        opacity: 0.8;
+        transform:scale(1);
+    }
+    to{
+        opacity: 0;
+        transform:scale(2);
+    }
+}
+.one-card-touch-animate{
+    position: absolute;
+    margin: 0;
+    transform:translate(-50%,0) scale(0.7);
+    top: 0;
+    left: 50%;
+    animation: touchCard .75s 1 ease-out ;
+    animation-fill-mode: forwards;
+}
+@keyframes touchCard{
+    from{
+        opacity: 1;
+        top: 0;
+    }
+    to{
+        opacity: 0;
+        top: 50%;
+    }
+}
+.one-card-just-now{
+    filter: brightness(100%) !important;
+    animation: neon 1.25s ease-in-out infinite alternate;
+}
+@keyframes neon {
+  100% {
+        box-shadow: 0 0 0.5rem #FFF,
+                    0 0 1rem #FFF,
+                    0 0 2rem #CCC,
+                    0 0 3rem #888,
+                    0 0 4rem #555;
+    }
+}
+.one-card:before{
+    content : url(../images/card8_2.png);
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.2;
+}
+.otherplayer{
+    background-color: #333;
+    content: url(../images/bg.png);
+}
+.otherplayer-vip{
+    background-color: #333;
+    content: url(../images/bg-vip.png);
+}
+#shadow , #reverse{
+    background-color: rgba(0,0,0,0.5);
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0rem;
+    top: 0rem;
+    bottom: 0rem;
+    right: 0rem;
+}
+#shadow #shadow-situation{
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 10%;
+    color: #eee;
+    text-shadow: 0 0 0.25rem #999;
+    font-size: 1.5rem;
+    text-align: center;
+    z-index: 2;
+}
+#shadow #change-color{
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    width: 18rem;
+    height: 18rem;
+    border-radius: 9rem;
+    border: 0.4rem solid #292929 ;
+    /*box-sizing: border-box; */
+    overflow: hidden;
+    background-color: #292929;
+}
+#shadow #change-color .change-color-element{
+    /*display: inline-block;*/
+    float: left;
+    width: calc(50% - 0rem);
+    height: calc(50% - 0rem);
+    box-sizing: border-box;
+}
+#shadow #change-color .change-color-element:nth-child(1){
+    border-right: 0.2rem solid #333;
+    border-bottom: 0.2rem solid #333;
+}
+#shadow #change-color .change-color-element:nth-child(2){
+    border-left: 0.2rem solid #333;
+    border-bottom: 0.2rem solid #333;
+}
+#shadow #change-color .change-color-element:nth-child(3){
+    border-right: 0.2rem solid #333;
+    border-top: 0.2rem solid #333;
+}
+#shadow #change-color .change-color-element:nth-child(4){
+    border-left: 0.2rem solid #333;
+    border-top: 0.2rem solid #333;
+}
+
+#shadow-other{
+    /*background-color: rgba(255,255,255,0.5);*/
+    display: none;
+    position: absolute;
+    z-index: 100;
+    left: 0rem;
+    top: 0rem;
+    width: 100%;
+    height: 100%;
+}
+#shadow-other #change-color{
+    border-radius: 50%;
+    border: 0.125rem solid #292929;
+    overflow: hidden;
+    box-shadow: 0.2rem 0.2rem 0.5rem;
+    box-sizing: border-box;
+}
+#shadow-other #change-color .change-color-element{
+    float: left;
+    width: 50%;
+    height: 50%;
+    box-sizing: border-box;
+}
+#shadow-other #change-color .change-color-element:nth-child(1){
+    border-right: 0.1rem solid #333;
+    border-bottom: 0.1rem solid #333;
+}
+#shadow-other #change-color .change-color-element:nth-child(2){
+    border-left: 0.1rem solid #333;
+    border-bottom: 0.1rem solid #333;
+}
+#shadow-other #change-color .change-color-element:nth-child(3){
+    border-right: 0.1rem solid #333;
+    border-top: 0.1rem solid #333;
+}
+#shadow-other #change-color .change-color-element:nth-child(4){
+    border-left: 0.1rem solid #333;
+    border-top: 0.1rem solid #333;
+}
+
+
+#shadow #check-up{
+    display: none; 
+    position: absolute;
+    left: 50%;
+    bottom: 11rem;
+    height: 3rem;
+    background-color: rgba(0,0,0,0.5);
+    /* right: 5rem; */
+    padding: 0.5rem;
+    /* font-size: 1.5rem; */
+    margin: 0 auto;
+    width: 30rem;
+    transform: translate(-50%,0);
+    color: rgba(0,0,0,0.8);
+}
+#shadow #check-up .check-up-button{
+    display: inline-block;
+    margin: 0 1rem;
+    width: 10rem;
+    height: 2.8rem;
+    border-radius: 1.3rem;
+    border: 0.2rem solid rgba(0,0,0,0.2);
+    box-sizing: border-box;
+    text-align: center;
+    font-family: 'fangsong';
+    font-weight: bold;
+    cursor: pointer;
+    opacity: 0.8;
+    font-size: 1.5rem;
+}
+#shadow #thistime-card{
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 11rem;
+    background-color: rgba(0,0,0,0.5);
+    right: 0;
+    padding: 0.5rem;
+    padding-top: 2.4rem;
+    box-sizing: border-box;
+}
+#reverse #reverse-opinion{
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    height: 15rem;
+    width: 20rem;
+    /*background-color: rgba(33,33,33,1);*/
+    padding: 0.5rem;
+    transform: translate(-50%,-50%); 
+}
+#reverse #reverse-opinion .reverse-opinion-element{
+    width:9rem;
+    float: left;
+    height: 15rem;
+    margin: 0 0.5rem;
+    text-align: center;
+    font-size: 4rem;
+    color:rgba(0,0,0,0.8);
+    box-sizing: border-box;
+    border-top: 0.45rem solid rgba(0,0,0,0.15);
+    border-left: 0.45rem solid rgba(0,0,0,0.20);
+    border-right: 0.5rem solid rgba(0,0,0,0.35);
+    border-bottom: 0.5rem solid rgba(0,0,0,0.4);
+    /*opacity: 0.8;*/
+    cursor: pointer;
+}
+.black{
+    background-color: #333333;
+}
+.red{
+    background-color: #CC3333;
+    /*background-color: #FC797A;*/
+}
+.green{
+    background-color: #339933;
+    /*background-color: #2ABB9B;*/
+}
+.blue{
+    background-color: #336699;
+    /*background-color: #6EB6E5;*/
+}
+.yellow{
+    background-color: #FF9900;
+    /*background-color: #FBB44C;*/
+}
+.setting-button{
+    position: absolute;
+    right: 0.7rem;
+    top: 0.7rem;
+    width: 15%;
+    cursor: pointer;
+    z-index: 1;
+}
+.setting-button img{
+    width: 100%;
+}
+#punishnum,
+#issayuno{
+    display: none;
+    position: absolute;
+    top: 1rem;
+    left: calc(50% - 10rem);
+    width:20rem;
+    height: 5rem;
+    border-radius: 2.5rem;
+    background-color: rgba(68,137,206,0.7);
+    box-sizing: border-box;
+    border: 0.4rem solid rgba(0,0,0,0.1);
+    font-family: 'kaiti','fangsong';
+    line-height: 3rem;
+    font-size: 1.8rem;
+    padding: 0.5rem 1rem;
+    color: rgba(0,0,0,0.75);
+    text-align: center;
+}
+#issayuno{
+    background-color: rgba(255,153,0,0.7);
+    top: 10rem;
+    font-size: 2rem;
+}
+.issayuno-shake{
+    display: block !important;
+    opacity: 0.1;
+    animation: shakeButton 1s 1 linear;
+    animation-fill-mode: forwards;
+}
+@keyframes shakeButton{
+    0%{    transform: rotate(-6deg) scale(2);}
+    25%{    transform: scale(1);opacity: 1;}
+    40%{    transform: rotate(5deg);}
+    50%{    transform: rotate(-4deg);}
+    60%{    transform: rotate(3deg);}
+    70%{    transform: rotate(-2deg);}
+    80%{    transform: rotate(1deg);}
+    90%{    transform: rotate(-0.5deg);}
+    100%{    transform: rotate(0deg);opacity: 1;}
+}
+
+/*3月25日从页面合并过来*/
+.full-left{
+    float: left;
+}
+.full-center{
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+}
+.full-right{
+    float: right;
+}
+@media screen and (min-width: 38rem) {
+    html{
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%,0);
+    }
+}
+#nav-absolute{
+    /*position: absolute;*/
+    background-color: #333;
+    height: 3rem;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    width: calc(100% - 0rem);
+    color: #eee;
+    padding: 0.5rem 0.5rem 0 0.5rem ;
+    /*z-index: 2;*/
+}
+#nav-absolute p{
+    display: inline-block;
+}
+#nav-absolute #nav-back{
+    padding: 0.2rem 0.3rem 0;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+#nav-absolute #nav-helf{
+    border: 0.1rem solid rgba(255,255,255,0.05);
+    box-sizing: border-box;
+    padding: 0.1rem 0.3rem 0;
+    border-radius: 0.3rem;
+    background-color: rgba(255,255,255,0.1);
+    cursor: pointer;
+}
+#nav-absolute .full-center{
+    line-height: 1.5rem;
+}
+#nav-absolute .full-center p{
+    display: block;
+}
+#nav-absolute .full-center #nav-title{
+    font-weight: bold;
+}
+#nav-absolute .full-center #nav-num{
+    font-size: 0.5rem;
+    transform: scale(0.7);
+    line-height: 0.4rem;
+}
+#nav-absolute #music-switch-div{
+    height: 2.5rem;
+    width: 3.5625rem;
+    padding-left: 7rem;
+}
+#nav-absolute #music-switch{
+    cursor: pointer;
+    height: 3.6875rem;
+    width: 3.5625rem;
+    transform: scale(0.25);
+    background-repeat: no-repeat;
+    opacity: 0.3;
+    background-image: url('../images/music-open.png');
+    margin-top: -1.1rem;
+}
+#nav-absolute .music-switch-close{
+    background-image: url('../images/music-close.png') !important;
+}
+#beover-absolute{
+    position: absolute;
+    top: 2.8rem;
+    left: 0;
+    width: 100%;
+    height: 0.2rem;
+    z-index: 101;
+    display: none;
+}
+#beover-absolute #beover-absolute-free{
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(to right, #FDFC47, #24FE41);  /* Chrome 10-25, Safari 5.1-6 */
+    background: linear-gradient(to right, #FDFC47, #24FE41); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
+#playground-absolute{
+    /*position: absolute;*/
+    /*top: 3rem;*/
+    /*left: 0;*/
+    width: 100%;
+    height: calc(100% - 13rem);
+    background-color: rgba(33,33,33,0.4);
+    -webkit-tap-highlight-color:rgba(0,0,0,0);
+    /*overflow: hidden;*/ /*否则对话框会被隐藏*/
+    /*overflow: auto;*/
+}
+#playground-absolute .other-player-table{
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: 0.18rem solid transparent;
+    position: relative;
+    background-color: rgba(0,0,0,0.6);
+}
+#playground-absolute .other-player-table .other-player-address,
+#epilogue .other-player-address{
+    height: 100%;
+    width: 100%;
+    border-radius: 0.2rem;
+    overflow: hidden;
+}
+#playground-absolute .other-player-table .other-player-head,
+#epilogue .other-player-head{
+    width: 100%;
+    height: 55%;
+    background-color: #369;
+    box-sizing: border-box;
+    /*background-image: url(../images/other-head.jpg);*/
+    background-position: center;
+    background-size: cover;
+}
+#playground-absolute .other-player-table .other-player-info,
+#epilogue .other-player-info{
+    position: absolute;
+    left: 0;
+    bottom: 25%;
+    height: 20%;
+    width: 100%;
+    background-color: #333;
+    box-sizing: border-box;
+    text-align: center;
+    overflow: hidden;
+    display: flex;
+}
+#playground-absolute .other-player-table .other-player-info:after{
+    /*content: '你打的真是太好了';
+    position: absolute;
+    top: 100%;
+    z-index: 1;
+    background-color: rgba(255,255,255,0.5);*/
+}
+#playground-absolute .other-player-table .other-player-card{
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 25%;
+    width: 100%;
+    background-color: #333;
+    box-sizing: border-box;
+    border: 0.2rem solid #222;
+    text-align: center;
+    display: flex;
+}
+#playground-absolute .other-player-table .other-player-info .other-player-info-name,
+#playground-absolute .other-player-table .other-player-card .other-player-card-num,
+#epilogue .other-player-info .other-player-info-name{
+    text-align: center;
+    /*height: 1.5rem;*/
+    /*line-height: 1.05rem;*/
+    /*margin-top: 7%;*/
+    overflow: hidden;
+    margin: auto;
+    font-size: 0.7rem;
+    color: #ccc;
+}
+#playground-absolute #playground-table{
+    width: 100%;
+    height: 100%;
+    /*overflow: hidden;*/ /*否则对话框会被隐藏*/
+}
+#playground-absolute #playground-table tr{
+    /*height: 8.334%;*/
+    overflow: hidden;
+}
+#playground-absolute #playground-table td{
+    width: 8.334%;
+    /*border: 0.1rem solid red;*/
+    /*overflow: hidden;*/
+}
+#playground-absolute #playground-table tr:nth-last-child(1){
+    height: 0.001rem;
+}
+#playground-absolute #playground-table #playground-table-put{
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+#playground-absolute #playground-table #playground-table-put #playground-table-put-area{
+    height: 95%;
+    width: 95%;
+    background-color: rgba(188,188,188,0.5);
+    box-sizing: border-box;
+    /*border: 0.2rem solid #888;*/
+    box-shadow: 0 0 1rem rgba(0,0,0,0.45);
+    border-radius: 1rem;
+    margin: 2.5% 2.5% 0 2.5%;
+    position: relative;
+}
+#playground-absolute #playground-table #playground-table-put #playground-table-put-count{
+    /*top: 50%;*/
+    padding: 0.5rem 0rem 0.5rem 1rem;
+    width: 12.7rem;
+    transform: translate(-50%,-50%) scale(0.35);
+    /*background-color: rgba(255, 255, 255 ,0.5);*/
+    background-color: rgba(255, 255, 255, 0.35);
+    border-radius: 1rem;
+}
+
+#playground-table-put-area .one-card{
+    margin: 0;
+    height: 4rem;
+    width: 3rem;
+    border: 0.0625rem solid #FFF;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+    line-height: 3.7rem;
+    box-shadow: none;
+    position: absolute;
+    filter: brightness(75%);
+}
+#playground-table-put-area .one-card:before,
+#mine-handcard .one-card:before,
+#thistime-card .one-card:before{
+    content : url(../images/card8_2.png);
+}
+#mine-absolute{
+    /*display: none;*/
+    /*position: absolute;*/
+    /*bottom: 0;*/
+    /*left: 0;*/
+    width: 100%;
+    height: 10rem;
+    box-sizing: border-box;
+    background-color: #000;
+    padding: 0.15rem;
+    position: relative;
+}
+#mine-absolute #mine-handcard{
+    height: 100%;
+    width: calc(100% - 5rem);
+    background-color: #333;
+    padding-top: 2.4rem;
+    box-sizing: border-box;
+    overflow: auto;
+    -webkit-tap-highlight-color:rgba(0,0,0,0);
+}
+#mine-absolute #mine-operate{
+    width: 5rem;
+    height: 100%;
+    background-color: #333;
+    box-sizing: border-box;
+    padding: 0.1rem;
+    text-align: center;
+    border-left: 0.1rem solid #111;
+    position: relative;
+}
+#mine-absolute #mine-operate #mine-operate-head,
+#epilogue #mine-operate-head{
+    width: 100%;
+    height: 4.75rem;
+    background-color: #369;
+    background-image: url(../images/mine-head.jpg);
+    background-position: center;
+    background-size: cover;
+}
+#mine-absolute #mine-operate #mine-operate-info,
+#epilogue #mine-operate-info{
+    width: 100%;
+    height: 1rem;
+    background-color: #222;
+    color: #ccc;
+    font-size: 0.7rem;
+    line-height: 1.1rem;
+    text-align: center;
+    overflow: hidden;
+}
+#mine-absolute #mine-operate #mine-operate-area{
+    margin-top: 0.2rem;
+    width: 100%;
+    height: calc(100% - 5.90rem);
+    /*background-color: #666;*/
+}
+#mine-absolute #mine-operate #mine-operate-sayuno,
+#mine-absolute #mine-operate #mine-operate-area div{
+    box-sizing: border-box;
+    border: 0.2rem solid rgba(0,0,0,0.1);
+    border-radius: 0.0875rem;
+    font-size: 0.8rem;
+    background-color: #FF9900;
+    height: 1.625rem;
+    cursor: pointer;
+}
+#mine-absolute #mine-operate #mine-operate-area #mine-operate-rest{
+    margin-top: 0.2rem;
+}
+#mine-absolute #mine-operate #mine-operate-sayuno{
+    background-color: #CC3333;
+    position: relative;
+    margin-top: -1.625rem;
+    display: none;
+}
+#mine-absolute .mine-sayuno:before,
+.other-player-table .other-sayuno:before{
+    content: "UNO！";
+    position: absolute;
+    top: -1.5rem;
+    left: 0;
+    width: 100%;
+    background-color: rgba(255,255,255,0.5);
+    border-radius: 0.5rem;
+    text-align: center;
+    border: 0.0625rem solid rgba(0,0,0,0.35);
+}
+#mine-handcard .one-card,
+#thistime-card .one-card,
+#help-absolute .one-card{
+    margin-left: 0.0625rem;
+    margin-right:  0.0625rem;
+    margin-top: -2.4rem;
+    height: 4rem;
+    width: 3rem;
+    border: 0.0625rem solid #FFF;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+    line-height: 3.7rem;
+    box-shadow: none;
+    animation:showCard 0.35s 1 linear ;
+    overflow: hidden;
+}
+#mine-handcard .one-card{
+    cursor: pointer;
+}
+#epilogue{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(31,31,31,0.8);
+    z-index: 886;
+    display: none;
+}
+#epilogue #mine-operate-head{
+    height: 80%;
+}
+#epilogue #mine-operate-info{
+    height: 20%;
+}
+#epilogue #epilogue-cap{
+    background-image: url(../images/winner.png);
+    background-size: cover;
+    width: 11.65rem;
+    height: 10.8rem;
+    z-index: 666;
+    position: absolute;
+    right: -5rem;
+    top: -5.5rem;
+    transform: scale(0.8);
+}
+#epilogue #epilogue-operate{
+    position: absolute;
+    bottom: 0;
+    height: 40%;
+    width: 100%;
+    padding: 0 25%;
+    box-sizing: border-box;
+}
+#epilogue #epilogue-operate .epilogue-operate-button{
+    text-align: center;
+    box-sizing: border-box;
+    border: 0.35rem solid rgba(0,0,0,0.3);
+    height: 3rem;
+    font-size: 1.5rem;
+    margin-bottom: 1.6rem;
+    font-weight: bold;
+    color: rgba(0,0,0,0.6);
+    font-family: 'fangsong';
+    cursor: pointer;
+    display: none;
+}
+
+.bg-rotate-ssz{
+    -webkit-animation: bgrotating 12s linear infinite;
+    -moz-animation: bgrotating 12s linear infinite;
+    animation: bgrotating 12s linear infinite;
+}
+@keyframes bgrotating{
+    0%  {
+        text-shadow: 0 0 5rem #222;
+        transform:translate(-50%,-50%) rotate(0) ;
+    }
+    50%{
+        text-shadow: 0 0 5rem #FFF;
+    }
+    100% {
+        text-shadow: 0 0 5rem #222;
+        transform:translate(-50%,-50%) rotate(360deg);
+    }
+}
+.bg-rotate-nsz{
+    -webkit-animation: bgrotatings 12s linear infinite ;
+    -moz-animation: bgrotatings 12s linear infinite ;
+    animation: bgrotatings 12s linear infinite ;
+}
+@keyframes bgrotatings{
+    0%  {
+        text-shadow: 0 0 5rem #222;
+        transform:translate(-50%,-50%) rotate(360deg);
+    }
+    50%{
+        text-shadow: 0 0 5rem #FFF;
+    }
+    100% {
+        text-shadow: 0 0 5rem #222;
+        transform:translate(-50%,-50%) rotate(0) ;
+    }
+}
+
+/*禁止 翻转 黑牌 +2*/
+.one-card[data-face="Skip"],
+.one-card[data-face="Reverse"],
+.one-card[data-face="Wild"],
+.one-card[data-face="+4"],
+.one-card[data-face="+2"]{
+    color: transparent;
+    text-shadow:none !important;
+}
+.one-card[data-face="Reverse"]{
+    font-size: 0.8rem;
+}
+.one-card[data-face="Skip"]:before{
+    content : url(../images/skip.png) !important;
+    opacity: 0.5;
+}
+.one-card[data-face="Reverse"]:before{
+    content : url(../images/reverse.png) !important;
+    opacity: 0.5;
+}
+.one-card[data-face="Wild"]:before{
+    content : url(../images/wild.png) !important;
+    opacity: 1;
+}
+.one-card[data-face="+4"]:before{
+    content : url(../images/addfour2.png) !important;
+    opacity: 1;
+}
+.one-card[data-face="+2"]:before{
+    content : url(../images/addtwo2.png) !important;
+    opacity: 1;
+}
+
+/*警醒提示框*/
+.last-dont-black:before,
+.sayuno-dont-touch:before,
+.someone-want-zhiyi:before,
+.someone-want-buzhiyi:before,
+.someone-want-qiangpai:before,
+.someone-want-qiangpais:before,
+.painted-eggshell-wjl:before,
+.painted-eggshell-star:before,
+.painted-eggshell-jiayou:before,
+.painted-eggshell-tanqi:before,
+.painted-eggshell-xuejie:before{
+    position: absolute;
+    top: -1rem;
+    left: 0;
+    padding: 0 0.25rem;
+    font-size: 0.9rem;
+    background-color: rgba(255,255,255,0.5);
+    border-radius: 0.5rem;
+    text-align: center;
+    border: 0.0625rem solid rgba(0,0,0,0.35);
+}
+.last-dont-black:before{
+    content: "黑色牌不能作为最后一张噢";
+}
+.sayuno-dont-touch:before{
+    content: "说了UNO就不能摸牌咯";
+}
+.painted-eggshell-wjl:before{
+    content: "我定个小目标";
+    font-size: 0.625rem;
+}
+.painted-eggshell-star:before{
+    content: "谢谢你玩我的游戏";
+    font-size: 0.625rem;
+}
+.painted-eggshell-jiayou:before{
+    content: "嘿你要加油噢";
+    font-size: 0.625rem;
+}
+.painted-eggshell-tanqi:before{
+    content: "蓝瘦..哎";
+    font-size: 0.625rem;
+}
+.painted-eggshell-xuejie:before{
+    content: "嘿嘿我先手喔";
+    font-size: 0.625rem;
+}
+.someone-want-zhiyi:before{
+    content: "检举 !" !important;
+}
+.someone-want-buzhiyi:before{
+    content: "不检举" !important;
+}
+.someone-want-qiangpai:before{
+    content: "抢牌！" !important;
+}
+.someone-want-qiangpais:before{
+    content: "没想到吧！" !important;
+}
+*:not(#help-absolute){
+    moz-user-select: -moz-none;
+    -moz-user-select: none;
+    -o-user-select:none;
+    -khtml-user-select:none;
+    -webkit-user-select:none;
+    -ms-user-select:none;
+    user-select:none;
+}
+
+.round-highlight{
+    background-color: #C33 !important;
+    /*box-shadow: 0 0 2rem rgba(255,255,255,0.4);*/
+    box-shadow: 0.5rem 0.5rem 1rem rgba(0,0,0,0.6) , 0.5rem 0.5rem 2rem rgba(0,0,0,0.75);
+}
+#preface{
+    /*display: none;*/
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    box-sizing: border-box;
+    background-color: rgba(0,0,0,0.8);
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%,from(rgba(0,0,0,0.8)), to(rgba(0,0,0,1)));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,1));
+    padding: 1.5rem;
+    text-align: center;
+}
+
+#preface #preface-area{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+    width: 100%;
+}
+#preface #preface-title{
+    margin: 0 auto 7%;
+    font-weight: bold;
+    color: #EAEAEA;
+    text-shadow: 0 0 1rem #CCC;
+    width: 10rem;
+    font-size: 2.5rem;
+}
+#preface #preface-operate{
+    width: 75%;
+    margin: 1rem auto;
+}
+#preface #preface-operate .preface-operate-button{
+    font-size: 1.8rem;
+    color: rgba(0,0,0,0.7);
+    box-sizing: border-box;
+    border: 0.25rem solid rgba(0,0,0,0.3);
+    border-radius: 0.5rem;
+    margin: 0.75rem 0;
+    cursor: pointer;
+    height: 3.35rem;
+    position: relative;
+}
+#loading{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    box-sizing: border-box;
+    background-color: rgba(0,0,0,0.5);
+    text-align: center;
+    color: #ddd;
+    text-shadow: 0 0 0.5rem wheat;
+}
+#loading #loading-area{
+    width: 90%;
+    height: 100%;
+    margin: 0 auto;
+    position: relative;
+}
+#loading #loading-title{
+    position: absolute;
+    bottom: 5rem;
+    width: 100%;
+}
+#loading #loading-going{
+    position: absolute;
+    bottom: 2.5rem;
+    height: 1rem;
+    width:1%;
+    border-width: 0.2rem;
+    background: #26b026;  /* fallback for old browsers */
+    background: -webkit-linear-gradient(to left, #26b026, #00222e);  /* Chrome 10-25, Safari 5.1-6 */
+    background: linear-gradient(to left, #26b026, #00222e); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
+
+#bg-rotate-absolute{
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: -2;
+    width: 15rem;
+    height: 15rem;
+    box-sizing: border-box;
+    border-radius: 10rem;
+    opacity: 0.3;
+    border-left: 1rem solid #CC3333;
+    border-top: 1rem solid #339933;
+    border-right: 1rem solid #336699;
+    border-bottom: 1rem solid #FF9900;
+    transform:translate(-50%,-50%);
+    text-align: center;
+    line-height: 13rem;
+    font-size: 5rem;
+    font-weight: bold;
+    color: #FFF;
+    text-shadow: 0 0 5rem #555;
+}
+
+#help-absolute{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(20,20,20,0.8);
+    z-index: 200;
+    box-sizing: border-box;
+    box-shadow: 0 0 5rem #000 inset;
+    overflow: hidden;
+}
+/* 设置 */
+#setting{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    box-sizing: border-box;
+    background-color: rgba(200,200,200,0.95);
+    box-shadow: 0 0 8rem #000 inset;
+    padding: 1.5rem;
+    text-align: center;
+}
+#setting #setting-title{
+    margin: 0 auto;
+    font-weight: bold;
+    color: #EAEAEA;
+    text-shadow: 0 0.25rem 1.25rem #111;
+    width: 10rem;
+    font-size: 2.5rem;
+}
+#setting #setting-content{
+    height: calc(100% - 7.5rem);
+    overflow: auto;
+}
+#setting #setting-content #setting-speed{
+    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+}
+#setting #setting-content #setting-speed input[type=range]{
+    margin-top: 0.5rem;  
+    outline: none;   
+    -webkit-appearance: none;/*清除系统默认样式*/    
+    width:56% !important;    
+    background: -webkit-linear-gradient(#6CF, #369) no-repeat, #ddd;    
+    background-size: 30% 100%;/*设置左右宽度比例*/    
+    height: 0.5rem;/*横条的高度*/
+    border-radius: 0.5rem;
+}   
+#setting #setting-content #setting-speed input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;/*清除系统默认样式*/    
+    height: 1.25rem;/*拖动块高度*/    
+    width: 1.25rem;/*拖动块宽度*/    
+    background: #fff;/*拖动块背景*/    
+    border-radius: 50%; /*外观设置为圆形*/    
+    border: solid 1px #AAA  ; /*设置边框*/    
+}
+#setting #setting-content .setting-element-selected{
+    background-color: #dadada;
+    border-top-left-radius: 3rem;
+    position: relative;
+}
+#setting #setting-content .setting-element-selected *{
+    opacity: 0.95;
+}
+#setting #setting-content .setting-element-selected:before{
+    content:' ';
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 1.5rem;
+    background-color: #4a4a4a;
+    height: 3rem;
+    width: 3rem;
+    z-index: -1;
+}
+#setting #setting-content .setting-element{
+    float: left;
+    width: 40%;
+    margin: 0 5% 0.25rem;
+    padding: 1rem 1rem 0.625rem;
+    box-sizing: border-box;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+#setting #setting-content .setting-element .setting-element-img{
+    width: 80%;
+    margin: 0 auto 0.25rem;
+}
+#setting #setting-content .setting-element .setting-element-word{
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+#setting #setting-content .setting-element .setting-element-detail{
+    height: 3.85rem;
+}
+#setting #setting-content .setting-element .setting-element-details{
+    height: 2.85rem;
+}
+#setting #setting-content .setting-element .setting-element-img img{
+    width: 100%;
+    display: block;
+}
+#setting #setting-close{
+    margin: auto;
+    width: 60%;
+    height: 4rem;
+    border: 0.25rem solid #666;
+    box-sizing: border-box;
+    border-top: 0.2rem solid #777;
+    border-bottom: 0.35rem solid #555;
+    line-height: 2.9rem;
+    color: #555;
+    background-color: #bdbdbd;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%,from(rgba(255,255,255,0.5)), to(rgba(255,255,255,0.1)));
+    background: linear-gradient(to bottom, rgba(255,255,255,0.5), rgba(255,255,255,0.1));
+    font-size: 1.7rem;
+    cursor: pointer;
+}
+/*零最大技能窗*/
+#header-animate{
+    position: fixed;
+    top: 20%;
+    left: 0;
+    width: 100%;
+    height: 30%;
+    z-index: 880;
+    overflow: hidden;
+    display: none;
+}
+#header-animate #header-animate-touxiang{
+    position: absolute;
+    float: left;
+    height: 100%;
+    width: 100%;
+    z-index: 1;
+}
+#header-animate #header-animate-handcard{
+    position: absolute;
+    width: 100%;
+    z-index: 1;
+    height: 4rem;
+    bottom: 0.25rem;
+    left: -12%;
+    transform: scale(0.75);
+    opacity: 0.75;
+    overflow: hidden;
+}
+#heshi-animate #heshi-animate-card .one-card,
+#header-animate #header-animate-handcard .one-card{
+    margin: 0rem 0.0625rem;
+    height: 4rem;
+    width: 3rem;
+    border: 0.0625rem solid #FFF;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+    line-height: 3.7rem;
+}
+#header-animate #header-animate-touxiang img{
+    position: absolute;
+    left: 100%;
+    height: 100%;
+}
+#header-animate #header-animate-zhezhao{
+    height: 100%;
+    float: right;
+    width: 100%;
+    display: none;
+    background: rgba(0,0,0,0.75);
+    background: -webkit-gradient(linear, 0% 0%, 100% 0%,from(rgba(0,0,0,0.25)), to(rgba(0,0,0,0.8)));
+    background: linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,0.8));
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+#header-animate #header-animate-zhezhao img{
+    position: absolute;
+    display: none;
+    opacity: 0.5;
+    animation: lzd-animate .1s 1 linear !important;
+    animation-fill-mode: forwards !important;
+}
+#header-animate #header-animate-zhezhao img:nth-child(1){
+    right: 25%;
+    top: 5%;
+    width:18.7%;
+}
+#header-animate #header-animate-zhezhao img:nth-child(2){
+    right:7%;
+    top:21%;
+    width:20.5%;
+}
+#header-animate #header-animate-zhezhao img:nth-child(3){
+    right:20%;
+    top:55%;
+    width:18%;
+}
+@keyframes lzd-animate{
+    from{
+        opacity: 0.5;
+        transform:scale(2);
+    }
+    to{
+        opacity: 1;
+        transform:scale(1);
+    }
+}
+/*回合提示*/
+#warmtips-animate{
+    position: fixed;
+    bottom: 11rem;
+    left: 0;
+    width: 100%;
+    height: 9rem;
+    box-sizing: border-box;
+    border-top:0.25rem solid rgba(0,0,0,0.2);
+    border-bottom:0.25rem solid rgba(0,0,0,0.2);
+    text-align: center;
+    font-size: 3rem;
+    line-height: 8rem;
+    animation: warmtips-animate 1s linear !important;
+    animation-fill-mode: forwards !important;
+    display: none;
+}
+@keyframes warmtips-animate{
+    0%,100%{opacity:0;}
+    50%{opacity: 0.2;}
+    25%,75%{opacity: 1;}
+}
+/*2018年9月4日*/
+#heshi-animate{
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 880;
+    overflow: hidden;
+    background-color: rgba(0,0,0,0.5);
+}
+#heshi-animate #heshi-animate-card{
+    width: 8rem;
+    height: 8rem;
+    position: absolute;
+    top: calc(50% - 4rem);
+    left: calc(50% - 4rem);
+}
+#heshi-animate .heshi-animate-card-rotating{
+    animation: heshiRotating 1s 1 ease-out;
+    animation-fill-mode: forwards;
+}
+#heshi-animate #heshi-animate-card #heshi-animate-card-last{
+    position: absolute;
+    top: -4rem;
+    left: 0;
+    perspective: 100px;
+}
+#heshi-animate #heshi-animate-card #heshi-animate-card-new{
+    position: absolute;
+    top: 8rem;
+    left: 4.9rem;
+    perspective: 100px;
+}
+#heshi-animate #heshi-animate-card .one-card{
+    transition: all .2s;
+}
+@keyframes heshiRotating{
+    0%{    transform: rotate(0deg) scale(1);}
+    30%{    transform: rotate(-100deg) scale(1);}
+    40%{    transform: rotate(-80deg) scale(1);}
+    100%{    transform: rotate(720deg) scale(2.5);}
+}
+#heshi-animate #heshi-animate-card .blackholeLeft{
+    transform: rotateY(40deg) rotateX(15deg) scaleX(1.2);
+}
+#heshi-animate #heshi-animate-card .blackholeLeft-end{
+    transform:rotateY(60deg) rotateX(30deg) scaleY(0.4) scaleX(0.8);
+    left:2rem;
+}
+#heshi-animate #heshi-animate-card .blackholeRight{
+    transform: rotateY(-35deg) rotateX(30deg) scaleX(1.1) scaleY(0.9);
+}
+#heshi-animate #heshi-animate-card .blackholeRight-end{
+    transform:rotateY(-60deg) rotateX(35deg) scaleY(0.35) scaleX(0.75);
+    left:-1.7rem;
+}

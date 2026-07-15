@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" style="max-width: 38rem;max-height:67.5rem;overflow-x:hidden;">
+
+<head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+    <meta name="viewport" content="width=device-width,target-densitydpi=high-dpi,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>UNO单机版</title>
+
+    <meta name="description" content="整天打打杀杀，不如坐下打牌。来局UNO呗，游戏中还有彩蛋噢！">
+
+    <link href="css/main.css" rel="stylesheet" />
+
+    <script src="js/jquery.v2.2.4.min.js" type="text/javascript"></script>
+
+    
+
+</head>
+
+<style type="text/css">
+
+ /**/
+
+</style>
+
+<body>
+
+    <div id="loading">
+
+        <div id="loading-area">
+
+            <div id="loading-title">正在载入资源...</div>
+
+            <div id="loading-going"></div>
+
+        </div> 
+
+    </div>
+
+                <script type="text/javascript">
+
+                    $('#loading-going').animate({'width':'100%'},3500,function(){
+
+                        $('#loading').hide();
+
+                    });
+
+                </script>
+
+
+
+
+
+
+
+
+
+    <div id="bg-rotate-absolute" class="">UNO</div>
+
+
+
+    <div id="nav-absolute">
+
+        <div class="full-left">
+
+            <p id="nav-back" onclick="backGame();">返回</p>
+
+        </div>
+
+        <div id="music-switch-div" class="full-center">
+
+            <div id="music-switch" onclick="musicSwitch();"></div>
+
+        </div>
+
+        <div class="full-center">
+
+            <p id="nav-title">UNO单机版</p>
+
+            <p id="nav-num"></p>
+
+                        <script type="text/javascript">
+
+                            var nowDate = new Date();
+
+                            var mmm = nowDate.getMonth() + 1;
+
+                            var ddd = nowDate.getDate();
+
+                            var show = mmm + '-' + ddd;
+
+                            $('#nav-num').html(show); 
+
+                        </script>
+
+        </div>
+
+        <div class="full-right">
+
+            <p id="nav-helf" onclick="helpGame();">帮助</p>
+
+        </div>
+
+    </div>
+
+
+
+    <div id="beover-absolute">
+
+        <div id="beover-absolute-free"></div>
+
+    </div>
+
+
+
+    <div id="playground-absolute">
+
+        <!-- LOAD -->
+
+    </div>
+
+
+
+    <div id="mine-absolute">
+
+        <div id="mine-handcard" class="full-left"></div>
+
+        <div id="mine-operate" class="full-right">
+
+            <div id="mine-operate-address">
+
+                <div id="mine-operate-head"></div>
+
+                <div id="mine-operate-info">冒险家</div>
+
+            </div>
+
+            <div id="mine-operate-sayuno">
+
+                <p onclick="sayUnoToEveryone(0)">UNO</p>
+
+            </div>
+
+            <div id="mine-operate-area">
+
+                <div id="mine-operate-touch">
+
+                    <p onclick="touchOneCard(0);">摸取一张</p>
+
+                </div>
+
+                <div id="mine-operate-rest">
+
+                    <p onclick="autoPlayCard(0);">游戏托管</p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="shadow-other">
+
+        <div id="change-color">
+
+            <div class="change-color-element green" data-color="green"></div>
+
+            <div class="change-color-element yellow" data-color="yellow"></div>
+
+            <div class="change-color-element blue" data-color="blue"></div>
+
+            <div class="change-color-element red" data-color="red"></div>
+
+        </div>
+
+    </div>
+
+
+
+    <div id="shadow">
+
+        <div id="shadow-situation"></div>
+
+        <div id="change-color">
+
+            <div class="change-color-element green" data-color="green"></div>
+
+            <div class="change-color-element yellow" data-color="yellow"></div>
+
+            <div class="change-color-element blue" data-color="blue"></div>
+
+            <div class="change-color-element red" data-color="red"></div>
+
+        </div>
+
+        <div id="check-up">
+
+            <div style="text-align:center;">
+
+                <div class="check-up-button red" onclick="punishOpinion(1);">检举上家</div>
+
+                <div class="check-up-button yellow" onclick="punishOpinion(0);">放弃检举</div>
+
+            </div>
+
+        </div>
+
+        <div id="thistime-card"></div>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="reverse">
+
+        <div id="reverse-opinion">
+
+            <div class="reverse-opinion-element green" title="此操作将不进行翻转出牌顺序，只作出牌记录。" onclick="reverseOpinion(1);">跟<br>牌</div>
+
+            <div class="reverse-opinion-element blue" title="此操作将进行翻转出牌顺序，更改当前的出牌顺序。" onclick="reverseOpinion(0);">逆<br>转</div>
+
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="punishnum">
+
+        <span id="punishnum-title">当前惩罚：&nbsp;</span>
+
+        <span id="punishnum-tip">0</span>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="issayuno">
+
+        <span id="issayuno-title">UNO???</span>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="epilogue">
+
+        <div class="setting-button" onclick="showSetting();">
+
+            <img src="images/setting-button3.png">
+
+        </div>
+
+        <div id="epilogue-operate">
+
+            <div class="epilogue-operate-button green" onclick="onceGame();">再次游戏</div>
+
+            <div class="epilogue-operate-button green" onclick="backGame();">模式选择</div>
+
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+    <div id="preface">
+
+        <div class="setting-button" onclick="showSetting();">
+
+            <img src="images/setting-button3.png">
+
+        </div>
+
+        <div id="preface-area">
+
+            <div id="preface-title">游戏模式</div>
+
+            <div id="preface-operate">
+
+                <div class="preface-operate-button blue" onclick="initPlaygroud(3);">3人场</div>
+
+                <div class="preface-operate-button blue" onclick="initPlaygroud(4);">4人场<img src="images/newplay1.png" style="position: absolute;right: 0;height:2rem;opacity: 0.75;"></div>
+
+                <div class="preface-operate-button yellow" onclick="initPlaygroud(5);">5人场</div>
+
+                <div class="preface-operate-button yellow" onclick="initPlaygroud(6);">6人场<img src="images/newplay2.png" style="position: absolute;right: 0;height:2rem;opacity: 0.75;"></div>
+
+                <div class="preface-operate-button red" onclick="initPlaygroud(7);">7人场</div>
+
+                <div class="preface-operate-button red" onclick="initPlaygroud(8);">8人场<img src="images/newplay3.png" style="position: absolute;right: 0;height:2rem;opacity: 0.75;"></div>
+
+                <div style="height:3.33rem;overflow:hidden;">
+
+                    <div style="width:100%;overflow:auto;">
+
+                        <div style="width:200%;">
+
+                            <div class="preface-operate-button full-right" style="width:50%;margin:0;" onclick="initPlaygroud(9);">VIP场</div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    
+
+    
+
+    <div id="setting">
+
+        <div id="setting-title">游戏设置</div>
+
+        <div id="setting-content">
+
+            <div id="setting-speed">
+
+                <span style="font-size: 1.2rem;font-weight: bold;">AI</span>
+
+                <span style="font-size: 0.8rem;">出牌速度</span>
+
+                <input type="range" id="range_speed" value="30" oninput="changeSpeed();">
+
+            </div>
+
+            <div class="setting-element setting-element-selected">
+
+                <div class="setting-element-img">
+
+                    <img src="images/setting_lianxu.jpg">
+
+                </div>
+
+                <div class="setting-element-area">
+
+                    <div class="setting-element-word">连续惩罚</div>
+
+                    <div class="setting-element-detail">被上家+2可以打出+2进行连续惩罚</div>
+
+                </div>
+
+            </div>
+
+            <div class="setting-element setting-element-selected">
+
+                <div class="setting-element-img">
+
+                    <img src="images/setting_qiangduan.jpg">
+
+                </div>
+
+                <div class="setting-element-area">
+
+                    <div class="setting-element-word">抢断出牌</div>
+
+                    <div class="setting-element-detail">可直接打出和前一张完全相同的牌</div>
+
+                </div>
+
+            </div>
+
+            <div class="setting-element">
+
+                <div class="setting-element-img">
+
+                    <img src="images/setting_wusheng.jpg">
+
+                </div>
+
+                <div class="setting-element-area">
+
+                    <div class="setting-element-word">悄无声息</div>
+
+                    <div class="setting-element-detail">被+4之后的玩家不能进行检举</div>
+
+                </div>
+
+            </div>
+
+            <div class="setting-element">
+
+                <div class="setting-element-img">
+
+                    <img src="images/setting_zuida.jpg">
+
+                </div>
+
+                <div class="setting-element-area">
+
+                    <div class="setting-element-word">零·最大</div>
+
+                    <div class="setting-element-detail">打出任意0后将失去所有与0同色的牌</div>
+
+                </div>
+
+            </div>
+
+            <div class="setting-element">
+
+                <div class="setting-element-img">
+
+                    <img src="images/setting_heshi.jpg">
+
+                </div>
+
+                <div class="setting-element-area">
+
+                    <div class="setting-element-word">十·律动</div>
+
+                    <div class="setting-element-detail">可连打面值相加为十的同色数字牌</div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="setting-close" onclick="hideSetting();">完成设置</div>
+
+    </div>
+
+    
+
+    
+
+    <div id="header-animate">
+
+        <div id="header-animate-touxiang">
+
+            <img src="images/other-head-STAR.jpg"/>
+
+        </div>
+
+        <div id="header-animate-handcard">
+
+                <!-- one-card -->
+
+        </div>
+
+        <div id="header-animate-zhezhao">
+
+            <img src="images/lzd-ling.png"/>
+
+            <img src="images/lzd-zui.png"/>
+
+            <img src="images/lzd-da.png"/>
+
+        </div>
+
+    </div>
+
+
+
+    <div id="heshi-animate">
+
+        <div id="heshi-animate-card">
+
+            <div id="heshi-animate-card-last"></div>
+
+            <div id="heshi-animate-card-new"></div>
+
+        </div>
+
+    </div>
+
+    
+
+    
+
+    <div id="warmtips-animate" class="red">
+
+        <p>我的回合</p>
+
+    </div>
+
+    
+
+    
+
+    <div id="help-absolute">
+
+        <!-- LOAD -->
+
+    </div>
+
+    <audio autoplay="" loop="" id="bgmusic"><source src="music/bgmusic.mp3"></audio>
+
+    <audio id="lzdmusic"><source src="music/lingzuida.mp3"></audio>
+
+    <!-- <audio id="sldmusic"><source src="music/shilvdong.mp3"></audio> -->
+
+    <audio id="sldmusic2"><source src="music/shilvdong2.mp3"></audio>
+
+    
+
+<script src="js/common.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+
+    
+
+    var important_session_library = [];     //牌库
+
+    var important_session_discard = [];     //弃牌堆
+
+    var important_session_player_card = []; //玩家手牌
+
+    var important_card_color = '';          //当前牌的颜色
+
+    var important_card_face = '';           //当前牌的牌面
+
+    var important_card_boss = '';           //当前牌的主人
+
+    var important_player_round = '';        //当前哪个的回合
+
+    var important_player_arr = new Array(); //游戏玩家数组
+
+    var important_player_order = '++';      //++顺时针 --逆时针
+
+    var important_player_rest = 0;          //托管是否开启 0未开启 1开启
+
+    var important_player_vip = false;       //vip模式 true开启 false关闭
+
+    var important_player_music = true;      //用户是否开启音乐 true开启 false关闭
+
+    var important_punish_arr = new Array(); //惩罚数组 +2 +2 +4叠加在这里
+
+    var important_punish_timer = '';        //惩罚倒计时定时器
+
+    var important_punish_done = 0;          //惩罚进行记录 0当前没有进入惩罚节奏 1准备惩罚 2当前刚刚结束惩罚
+
+    var important_computer_timer = '';      //AI定时器
+
+    var important_close_timer = '';         //自动关闭窗口的倒计时定时器
+
+    var important_someone_sayuno = '00';    //00当前不需要说uno 10当前需要说但是没说 11当前需要说且说了
+
+    var important_player_heshi = false;     //合十动画是否执行
+
+    
+
+    var important_setting_arr = [true,true,false,false,false];//游戏设定 模式数组
+
+    var important_setting_speed = 30;       //游戏设定 AI 速度
+
+    
+
+</script>
+
+<script type="text/javascript">
+
+    function isWeiXin() {
+
+        // return true;
+
+        var ua = window.navigator.userAgent.toLowerCase();
+
+        if (ua.match(/MicroMessenger/i) == 'micromessenger') {
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    
+
+    function isIOS(){
+
+        if (/(iPhone|iPad|iPod|iOS)/i.test(navigator.userAgent)) {
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+
+
+    function getUserInfo(){
+
+        var head,name = '';
+
+        head = $("body",parent.document).find('#userinfo').find('img').attr('src');
+
+        name = $("body",parent.document).find('#userinfo').find('span').eq(0).html();
+
+        if(head != undefined){
+
+            $('#mine-operate-head').css({'background-image':'url('+head+')'});
+
+        }
+
+        if(name != undefined){
+
+            $('#mine-operate-info').html(name);
+
+        }        
+
+    }
+
+        
+
+    if(navigator.userAgent.indexOf("Firefox")>0){  
+
+        document.write('<style>#playground-absolute #playground-table tr{height: 8.334%;}</style>');
+
+    }
+
+
+
+    $(function(){
+
+        // var height_arr = $('.setting-element').map(function(){
+
+        //     return $(this).height();
+
+        // }).get();
+
+        // $('.setting-element').height(Math.max.apply(null, height_arr));
+
+        // var settingElementHeight = (($(document.body).width() - 1.5*2*16 ) * 0.8 * 0.5 - 2 * 16)* 0.8 + 0.125 * 16 + (1.2 + 3 * 0.8) * 1.6 * 16 + 2 * 16 - 1.625 * 16;
+
+        if(($(document.body).width() - 1.5*2*16 ) * 0.8 * 0.5 - 2 * 16 > 110){
+
+            $('.setting-element-detail').addClass('setting-element-details')
+
+        }
+
+        useCookieSetting();
+
+        if(isWeiXin()){
+
+            // $('#playground-absolute').css({height:'calc(100% - 10.2rem)'});
+
+            // $('#shadow-other').css({height:'calc(100% + 2.8rem)'});
+
+            if(isIOS()){
+
+                // var $iframe_par = $("body",parent.document).find('iframe').parent('div');
+
+                // $iframe_par.css({'-webkit-overflow-scrolling':'touch','overflow-y':'scroll'});
+
+            }else{
+
+                $('#playground-absolute').css({height:'calc(100% - 10.2rem)'});
+
+                $('#shadow-other').css({height:'calc(100% + 2.8rem)'});
+
+            }
+
+        }
+
+        if(isIOS()){
+
+            audioAutoPlay();
+
+        }
+
+        getUserInfo();
+
+    });
+
+
+
+    function setCookie(name,value){
+
+        var Days = 7;
+
+        var exp = new Date();
+
+        exp.setTime(exp.getTime() + Days*24*60*60*1000);
+
+        document.cookie = name + "="+ escape (value) + ";expires=" + exp.toGMTString();
+
+    }
+
+
+
+    function getCookie(name){
+
+        var arr,reg = new RegExp("(^| )"+name+"=([^;]*)(;|$)");
+
+        if(arr=document.cookie.match(reg)){
+
+            return unescape(arr[2]);
+
+        }else{
+
+            return null;
+
+        }
+
+    }
+
+
+
+    
+
+
+
+</script>
+
+</body>
+
+</html>
