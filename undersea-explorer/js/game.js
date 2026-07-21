@@ -121,14 +121,14 @@ function bundleSVG(size){
 function submarineSVG(size){
   const h = Math.round(size*1024/1054);
   return `<svg viewBox="0 0 1054 1024" width="${size}" height="${h}">
-    <path d="M59.640768 433.761246h135.636914v288.60903H59.640768z" fill="#d4a017"/>
-    <path d="M560.020827 155.457928h36.545872v148.989673H560.020827z" fill="#f5c518"/>
-    <path d="M560.020827 155.457928h95.578634v28.11095H560.020827z" fill="#f5c518"/>
-    <path d="M411.031154 269.777195h333.587485v112.850698H411.031154z" fill="#e8b710"/>
-    <path d="M183.330352 579.940058a397.774272 216.457357 0 1 0 795.548545 0 397.774272 216.457357 0 1 0-795.548545 0Z" fill="#f5c518"/>
-    <path d="M303.271342 583.84767a88.551481 53.881075 90 1 0 107.76215 0 88.551481 53.881075 90 1 0-107.76215 0Z" fill="#0f3460"/>
-    <path d="M523.944991 579.940058a88.551481 53.881075 90 1 0 107.76215 0 88.551481 53.881075 90 1 0-107.76215 0Z" fill="#0f3460"/>
-    <path d="M744.618639 583.688652a88.551481 53.881075 90 1 0 107.762151 0 88.551481 53.881075 90 1 0-107.762151 0Z" fill="#0f3460"/>
+    <path d="M59.640768 433.761246h135.636914v288.60903H59.640768z" fill="#45bab2"/>
+    <path d="M560.020827 155.457928h36.545872v148.989673H560.020827z" fill="#45bab2"/>
+    <path d="M560.020827 155.457928h95.578634v28.11095H560.020827z" fill="#45bab2"/>
+    <path d="M411.031154 269.777195h333.587485v112.850698H411.031154z" fill="#45bab2"/>
+    <path d="M183.330352 579.940058a397.774272 216.457357 0 1 0 795.548545 0 397.774272 216.457357 0 1 0-795.548545 0Z" fill="#45bab2"/>
+    <path d="M303.271342 583.84767a88.551481 53.881075 90 1 0 107.76215 0 88.551481 53.881075 90 1 0-107.76215 0Z" fill="#10325c"/>
+    <path d="M523.944991 579.940058a88.551481 53.881075 90 1 0 107.76215 0 88.551481 53.881075 90 1 0-107.76215 0Z" fill="#10325c"/>
+    <path d="M744.618639 583.688652a88.551481 53.881075 90 1 0 107.762151 0 88.551481 53.881075 90 1 0-107.762151 0Z" fill="#10325c"/>
   </svg>`;
 }
 // 绘制单个骰子（1~3 点），val 为 0 时显示占位 "?"
@@ -601,7 +601,7 @@ function renderGame(){
         <div class="oxy-bar">${Array.from({length:25},(_,i)=>`<div class="oxy-cell ${i<state.oxygen?'on':''} ${low&&i<state.oxygen?'low':''}"></div>`).join('')}</div>
       </div>
       ${renderBoardGrid()}
-      ${(()=>{ const vis = state.bundles.map((b,i)=>({b,pos:32+i})).filter(o=>o.b.state!=='empty'); return vis.length?`<div class="zone-label">— 海底最深处 · 宝藏包区 —</div><div class="bundle-zone">${vis.map(o=>`<div class="tile ${hereClass(o.b,o.pos)}">${tileContent(o.b)}${tokenHTML(o.b)}</div>`).join('')}</div>`:''; })()}
+      ${(()=>{ const vis = state.bundles.map((b,i)=>({b,pos:32+i})).filter(o=>o.b.state!=='empty'); return vis.length?`<div class="zone-label">— 海底最深处 —</div><div class="bundle-zone">${vis.map(o=>`<div class="tile ${hereClass(o.b,o.pos)}">${tileContent(o.b)}${tokenHTML(o.b)}</div>`).join('')}</div>`:''; })()}
     </div>
   </div>`;
 }
@@ -613,7 +613,7 @@ function renderPlayersStrip(){
       <div class="p-name"><span class="dot" style="background:${PLAYER_COLORS[i]}"></span>${pl.name}</div>
       <div class="p-score">总分 ${pl.score}</div>
       <div class="p-bag">${pl.backpack.map(t=>t.isBundle?bundleSVG(17):shapeSVG(t.shape,t.dots,17)).join('')||'<span style="font-size:10px;color:var(--text-dim)">空背包</span>'}</div>
-      <div class="p-status">${pl.returned?'🏠 已返回':(i===state.currentPlayerIdx?'🎯 行动中':'等待中')}</div>
+      <div class="p-status">${pl.returned?'🏠 已返回':(i===state.currentPlayerIdx?(pl.choseReturn?'⬆ 返仓中':'🎯 行动中'):(pl.choseReturn?'⬆ 等待返仓中':'等待中'))}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -621,7 +621,7 @@ function renderPlayersStrip(){
 function renderActionModule(p){
   let body = '';
   if(state.phase!=='playing'){
-    body = `<div class="wait-text">本轮已结束</div>`;
+    body = `<div class="wait-text"><span class="action-link" onclick="showSettlement()">本轮已结束</span></div>`;
   } else if(state.turnPhase==='roll'){
     // 投骰阶段无弹窗，清掉缓存以免后续误弹出过期内容
     _lastModalHTML = '';
