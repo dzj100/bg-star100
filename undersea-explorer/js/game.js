@@ -20,11 +20,25 @@ const COLS = 8;                       // 每行格子数
 const M = 7;                          // 行首/行尾格子中心到板边缘的距离
 const S = 11;                         // 格子边长
 const DX = (100 - 2*M) / (COLS-1);    // 同行相邻格子中心的水平间距
-const ANGLE = 5 * Math.PI / 180;      // 每行倾斜角 5°
-const DY = DX * Math.tan(ANGLE);      // 同行相邻格子中心的垂直落差
+const MAX_TILT = 7.52;                // 单行首尾总落差（= 旧版 7*DX*tan(5°)）
 const ROW_GAP = 13;                   // 相邻两行连接处的行间距（中心到中心）
 const Y0 = 7;                         // 第一行首个格子中心的纵坐标
-const BOARD_H = 84;                   // 路径区域总高度（与 CSS aspect-ratio 100/84 对应）
+// 板子高度（板宽百分比单位）：根据当前实际行数动态计算
+// = 最底行的下边缘 y + 下边距，保证 path-board 始终兜住所有格子
+function boardH(){
+  const bundleCount = (state && state.bundles) ? state.bundles.length : 0;
+  const totalRows = 4 + Math.ceil(bundleCount / COLS);   // 4 行路径 + bundle 行
+  const lastRow = totalRows - 1;
+  const bottomOfLastRow = Y0 + lastRow*(MAX_TILT + ROW_GAP) + MAX_TILT + S/2;
+  return Math.ceil(bottomOfLastRow + 4);                  // +4 下边距
+}
+
+// 平滑缓动（快-慢-快）：t∈[0,1] → [0,1]，两端斜率大、中段斜率小
+// f(t) = t + (1/3)·sin²(πt)·(1-2t)，满足 f(0)=0、f(1)=1、f(0.5)=0.5
+function easeInOut(t){
+  const s = Math.sin(Math.PI * t);
+  return t + (0.4) * s * s * (1 - 2*t);
+}
 
 /* ================= 工具函数 ================= */
 
@@ -65,7 +79,7 @@ function refreshWaitText(){
   const wt = document.querySelector('.wait-text');
   if(!wt || !state || state.phase!=='playing' || state.turnPhase==='roll') return;
   const p = state.players[state.currentPlayerIdx];
-  const dirText = p.choseReturn ? '（本轮已选择返仓）' : '';
+  const dirText = p.choseReturn ? '（本轮已选择返舱）' : '';
   const phaseLabel = state.turnPhase==='direction' ? '选择方向'
                    : state.turnPhase==='action'    ? '选择行动'
                    : '操作';
@@ -182,13 +196,16 @@ function setOccupant(pos, val){ const t=getTile(pos); if(t) t.occupant=val; }
 // 当前可抵达的最大位置（路径末端 + 宝藏包格数量）
 function maxPos(){ return 31 + state.bundles.length; }
 
-// 计算某路径格中心的坐标（S 形倾斜布局：奇数行向右下、偶数行向左下延伸 5°）
+// 计算某路径格中心的坐标（S 形倾斜布局：奇数行向右下、偶数行向左下延伸，
+// 纵向落差采用 smoothstep 缓动：首尾陡峭、中段平缓）
 function tilePos(idx){
   const row = Math.floor(idx / COLS);
   const col = idx % COLS;
   const ltr = row % 2 === 0;                 // 偶数行自左向右，奇数行自右向左
   const x = ltr ? M + col*DX : M + (COLS-1-col)*DX;
-  const y = Y0 + row*((COLS-1)*DY + ROW_GAP) + col*DY;
+  const t = col / (COLS - 1);
+  const tiltY = easeInOut(t) * MAX_TILT;
+  const y = Y0 + row*(MAX_TILT + ROW_GAP) + tiltY;
   return { x, y };
 }
 
@@ -204,9 +221,9 @@ function subCenterInBoard(){
   const bR = board.getBoundingClientRect();
   const sR = svg.getBoundingClientRect();
   const x = (sR.left + sR.width/2 - bR.left) / bR.width * 100;
-  // 路径板使用 aspect-ratio 100/84，内部百分比 y 映射到像素为 y/100 * width * 0.84
+  // 路径板 aspect-ratio 由 boardH() 动态给出；1 单位 y = 板宽 × boardH()/100 像素
   // y 取 SVG 底部边缘再往下 2px，让 token 看起来从潜水艇底部冒出
-  const y = (sR.top + sR.height + 2 - bR.top) / (bR.width * BOARD_H / 100) * 100;
+  const y = (sR.top + sR.height + 2 - bR.top) / (bR.width * boardH() / 100) * 100;
   return { x, y };
 }
 
@@ -287,22 +304,22 @@ function rollDice(){
   setTimeout(openDirectionModal, 500);
 }
 
-// 打开方向选择弹窗；若本轮已选过返仓则默认返仓、跳过询问
+// 打开方向选择弹窗；若本轮已选过返舱则默认返舱、跳过询问
 function openDirectionModal(){
   const p = state.players[state.currentPlayerIdx];
   if(p.choseReturn){ chooseDirection('return'); return; }
   showModal(`
     <h3>选择方向</h3>
-    <p class="m-desc">投掷结果 ${state.lastRoll}，可移动 <b style="color:var(--ocean)">${state.effectiveSteps}</b> 格<br>下潜：向深海前进 · 返仓：朝潜水艇后退</p>
-    <button class="m-btn warn" onclick="chooseDirection('return')">⬆ 返仓</button>
+    <p class="m-desc">投掷结果 ${state.lastRoll}，可移动 <b style="color:var(--ocean)">${state.effectiveSteps}</b> 格<br>下潜：向深海前进 · 返舱：朝潜水艇后退</p>
+    <button class="m-btn warn" onclick="chooseDirection('return')">⬆ 返舱</button>
     <button class="m-btn go" onclick="chooseDirection('dive')">⬇ 下潜</button>
   `);
 }
-// 确认方向选择：选返仓后本轮后续回合不再询问；随后执行移动
+// 确认方向选择：选返舱后本轮后续回合不再询问；随后执行移动
 function chooseDirection(dir){
   const p = state.players[state.currentPlayerIdx];
   if(dir==='return') p.choseReturn = true;
-  toast(`${p.name} 选择${dir==='dive'?'下潜':'返仓'}`);
+  toast(`${p.name} 选择${dir==='dive'?'下潜':'返舱'}`);
   hideModal();
   executeMove(dir);
 }
@@ -335,7 +352,7 @@ function animateToken(steps, pIdx, fromPos){
       // tile left = (x - S/2)%, tile width = S%, tile right = (x + S/2)%
       // token left = tile right - 21px (27px width - 6px offset)
       ghost.style.left = `calc(${x + S/2}% - 21px)`;
-      ghost.style.top = `calc(${(y - S/2) / BOARD_H * 100}% - 10px)`;
+      ghost.style.top = `calc(${(y - S/2) / boardH() * 100}% - 10px)`;
       i++;
       setTimeout(step, 260);
     }
@@ -687,7 +704,6 @@ function renderGame(){
         <div class="oxy-bar">${Array.from({length:25},(_,i)=>`<div class="oxy-cell ${i<state.oxygen?'on':''} ${low&&i<state.oxygen?'low':''}"></div>`).join('')}</div>
       </div>
       ${renderBoardGrid()}
-      ${(()=>{ const vis = state.bundles.map((b,i)=>({b,pos:32+i})).filter(o=>o.b.state!=='empty'); return vis.length?`<div class="zone-label">— 海底最深处 —</div><div class="bundle-zone">${vis.map(o=>`<div class="tile ${hereClass(o.b,o.pos)}">${tileContent(o.b)}${tokenHTML(o.b)}</div>`).join('')}</div>`:''; })()}
     </div>
   </div>`;
 }
@@ -699,7 +715,7 @@ function renderPlayersStrip(){
       <div class="p-name"><span class="dot" style="background:${PLAYER_COLORS[i]}"></span>${pl.name}</div>
       <div class="p-score">总分 ${pl.score}</div>
       <div class="p-bag">${pl.backpack.map(t=>t.isBundle?bundleSVG(17):shapeSVG(t.shape,t.dots,17)).join('')||'<span style="font-size:10px;color:var(--text-dim)">空背包</span>'}</div>
-      <div class="p-status">${pl.returned?'🏠 已返回':(i===state.currentPlayerIdx?(pl.choseReturn?'⬆ 返仓中':'🎯 行动中'):(pl.choseReturn?'⬆ 等待返仓中':'等待中'))}</div>
+      <div class="p-status">${pl.returned?'🏠 已返回':(i===state.currentPlayerIdx?(pl.choseReturn?'⬆ 返舱中':'🎯 行动中'):(pl.choseReturn?'⬆ 等待返舱中':'等待中'))}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -713,7 +729,7 @@ function renderActionModule(p){
     _lastModalHTML = '';
     body = `<button class="roll-btn" onclick="rollDice()">🎲 投掷骰子</button>`;
   } else {
-    const dirText = p.choseReturn?'（本轮已选择返仓）':'';
+    const dirText = p.choseReturn?'（本轮已选择返舱）':'';
     // 根据当前阶段给出带下划线的可点击状态：点击后重新弹出决策弹窗
     const phaseLabel = state.turnPhase==='direction' ? '选择方向'
                      : state.turnPhase==='action'    ? '选择行动'
@@ -761,16 +777,18 @@ function hereClass(tile, pos){
   return (cur && cur.position===pos && state.phase==='playing') ? 'here' : '';
 }
 
-// 渲染 S 形倾斜路径：按 tilePos 绝对定位，已移除的格子留空（不可落脚）
+// 渲染 S 形倾斜路径（含宝藏包行）：统一用 tilePos 绝对定位到 .path-board
+// idx 0..31 = 普通路径格；idx 32+ = 宝藏包格（state.bundles[idx-32]）
 function renderBoardGrid(){
   let cells = '';
-  for(let idx=0; idx<32; idx++){
-    const tile = state.path[idx];
+  const total = 32 + state.bundles.length;
+  for(let idx=0; idx<total; idx++){
+    const tile = idx < 32 ? state.path[idx] : state.bundles[idx-32];
     if(tile.state==='empty') continue;
     const {x,y} = tilePos(idx);
-    cells += `<div class="tile abs ${hereClass(tile,idx)}" style="left:${x-S/2}%;top:${(y-S/2)/BOARD_H*100}%;width:${S}%">${tileContent(tile)}${tokenHTML(tile)}</div>`;
+    cells += `<div class="tile abs ${hereClass(tile,idx)}" style="left:${x-S/2}%;top:${(y-S/2)/boardH()*100}%;width:${S}%">${tileContent(tile)}${tokenHTML(tile)}</div>`;
   }
-  return `<div class="path-board">${cells}</div>`;
+  return `<div class="path-board" style="aspect-ratio:100/${boardH()}">${cells}</div>`;
 }
 
 // 渲染游戏结束页：按总分排名的积分榜单（含各轮得分）

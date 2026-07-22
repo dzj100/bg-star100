@@ -16,7 +16,7 @@
 html,body { height:100%; }
 body {
   font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
-  background:linear-gradient(180deg,#1a1a2e 0%,#16213e 55%,#0f3460 100%);
+  background:linear-gradient(180deg,#0f3460 0%,#16213e 45%,#1a1a2e 100%);
   background-attachment:fixed;
   color:var(--text); min-height:100dvh;
   -webkit-user-select:none; user-select:none;
@@ -103,7 +103,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .action-mod .action-link:active { opacity:.7; }
 
 /* board */
-.board { background:rgba(15,52,96,.45); border-radius:var(--radius); padding:12px 10px; border:1px solid rgba(38,198,218,.15); }
+.board { background:rgba(15,52,96,.45); border-radius:var(--radius); padding:12px 10px 0; border:1px solid rgba(38,198,218,.15); }
 .sub-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
 .sub-row .sub-tokens { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
 .sub-row .sub-label { font-size:11px; color:var(--text-dim); }
@@ -116,7 +116,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .oxy-cell.on { background:var(--ocean); }
 .oxy-cell.on.low { background:var(--danger); }
 
-.path-board { position:relative; width:100%; aspect-ratio:100/84; margin:2px 0 6px; }
+.path-board { position:relative; width:100%; }
 .tile {
   border-radius:7px; background:rgba(255,255,255,.05);
   display:flex; align-items:center; justify-content:center; position:relative;
@@ -133,9 +133,6 @@ button { font-family:inherit; cursor:pointer; border:none; }
   transition: left 240ms ease-in-out, top 240ms ease-in-out;
 }
 .tile.here { outline:2px solid var(--accent); outline-offset:1px; }
-.bundle-zone { margin-top:6px; display:flex; gap:3px; flex-wrap:wrap; }
-.bundle-zone .tile { width:calc(12.5% - 3px); aspect-ratio:1/1; }
-.zone-label { font-size:11px; color:var(--text-dim); margin-top:8px; text-align:center; }
 
 /* ===== Modal ===== */
 .modal-overlay {
