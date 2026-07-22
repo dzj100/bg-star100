@@ -71,7 +71,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .players-strip { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; scrollbar-width:none; }
 .players-strip::-webkit-scrollbar { display:none; }
 .p-card {
-  flex:0 0 auto; width:112px; background:var(--surface); border:2px solid transparent;
+  flex:0 0 auto; width:90px; background:var(--surface); border:2px solid transparent;
   border-radius:var(--radius); padding:8px 10px; transition:border-color .2s;
 }
 .p-card.current { border-color:var(--accent); box-shadow:0 0 12px rgba(233,69,96,.35); }
@@ -124,8 +124,8 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .tile.abs { position:absolute; aspect-ratio:1/1; }
 .tile > svg { display:block; width:100%; height:100%; }
 .tile .token {
-  position:absolute; top:-3px; right:-3px; width:13px; height:13px; border-radius:50%;
-  border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.5); z-index:2;
+  position:absolute; top:-10px; right:-6px; width:27px; height:27px;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); z-index:2;
 }
 .tile.here { outline:2px solid var(--accent); outline-offset:1px; }
 .bundle-zone { margin-top:6px; display:flex; gap:3px; flex-wrap:wrap; }
