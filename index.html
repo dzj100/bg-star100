@@ -39,7 +39,8 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
 .game-card:nth-child(3) .card-icon { color:var(--gold); }
 .game-card:nth-child(4) .card-icon { color:var(--green); }
 .game-card:nth-child(5) .card-icon { color:var(--blue); }
-.game-card:nth-child(6) .card-icon { color:var(--blue); }
+.game-card:nth-child(6) .card-icon { color:var(--accent); }
+.game-card:nth-child(7) .card-icon { color:var(--blue); }
 
 .portal-footer { margin-top:auto; padding-top:32px; padding-bottom:16px; text-align:center; font-size:.75rem; color:var(--text-dim); }
 </style>
@@ -78,10 +79,28 @@ body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); col
       <div class="card-title">登山家</div>
       <div class="card-desc">2人 叠棋策略</div>
     </div>
+    <div class="game-card" onclick="location.href='uno_single_player/index.html'">
+      <div class="card-icon" style="height: 40px;">
+        <img src="uno_single_player/images/addfour2.png" alt="UNO" style="width:40px;height:40px;object-fit:contain;scale: 1.3;">
+      </div>
+      <div class="card-title">UNO</div>
+      <div class="card-desc">1人 手牌管理</div>
+    </div>
     <div class="game-card" onclick="location.href='undersea-explorer/index.html'">
-      <div class="card-icon">🌊</div>
+      <div class="card-icon" style="height: 40px;">
+        <svg viewBox="0 0 1054 1024" width="45" height="45">
+          <path d="M59.64 433.76h135.64v288.61H59.64z" fill="#45bab2"/>
+          <path d="M560.02 155.46h36.55v148.99H560.02z" fill="#45bab2"/>
+          <path d="M560.02 155.46h95.58v28.11H560.02z" fill="#45bab2"/>
+          <path d="M411.03 269.78h333.59v112.85H411.03z" fill="#45bab2"/>
+          <path d="M183.33 579.94a397.77 216.46 0 1 0 795.55 0 397.77 216.46 0 1 0-795.55 0Z" fill="#45bab2"/>
+          <path d="M303.27 583.85a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
+          <path d="M523.94 579.94a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
+          <path d="M744.62 583.69a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
+        </svg>
+      </div>
       <div class="card-title">海底探险</div>
-      <div class="card-desc">2~6人 深潜寻宝</div>
+      <div class="card-desc">2~6人 骰子聚会冒险</div>
     </div>
   </div>
 
