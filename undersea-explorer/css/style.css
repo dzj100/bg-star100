@@ -24,11 +24,18 @@ body {
 button { font-family:inherit; cursor:pointer; border:none; }
 
 /* ===== Landing ===== */
-.landing { min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:32px 24px; text-align:center; }
+.landing { position:relative; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:32px 24px; text-align:center; }
 .landing .logo-sub { filter:drop-shadow(0 6px 16px rgba(69,186,178,.35)); }
 .landing h1 { font-size:34px; letter-spacing:6px; color:var(--ocean); text-shadow:0 2px 12px rgba(69,186,178,.4); }
 .landing .tagline { color:var(--text-dim); font-size:14px; line-height:1.8; }
 .landing .credit { position:fixed; bottom:max(16px, env(safe-area-inset-bottom)); color:var(--text-dim); font-size:12px; opacity:.7; }
+.landing .rules-corner { position:absolute; top:max(16px, env(safe-area-inset-top)); right:16px; }
+.landing .rules-corner button {
+  background:var(--surface); border:1px solid rgba(255,255,255,.15); border-radius:10px;
+  padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
+  display:flex; align-items:center; gap:4px;
+}
+.landing .rules-corner button:active { background:var(--card-bg); }
 .btn-primary {
   height:var(--btn-h); padding:0 40px; border-radius:var(--radius);
   background:linear-gradient(135deg,var(--accent),#c73e54); color:#fff;
@@ -65,7 +72,13 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .game { max-width:480px; margin:0 auto; padding:10px 10px max(16px, env(safe-area-inset-bottom)); }
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 10px; }
 .topbar .round-info { font-size:15px; font-weight:600; color:var(--gold); }
-.topbar .reset-btn { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.08); color:var(--text-dim); font-size:15px; }
+.topbar .topbar-btns { display:flex; gap:6px; }
+.topbar .topbar-btns button {
+  background:var(--surface); border:1px solid rgba(255,255,255,.15); border-radius:10px;
+  padding:7px 12px; font-size:.8rem; cursor:pointer; color:var(--text);
+  display:flex; align-items:center; gap:4px;
+}
+.topbar .topbar-btns button:active { background:var(--card-bg); }
 
 /* players strip */
 .players-strip { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; scrollbar-width:none; }
@@ -103,7 +116,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .action-mod .action-link:active { opacity:.7; }
 
 /* board */
-.board { background:rgba(15,52,96,.45); border-radius:var(--radius); padding:12px 10px 0; border:1px solid rgba(38,198,218,.15); }
+.board { background:rgba(15,52,96,.45); border-radius:var(--radius); padding:12px 10px; border:1px solid rgba(38,198,218,.15); }
 .sub-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
 .sub-row .sub-tokens { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
 .sub-row .sub-label { font-size:11px; color:var(--text-dim); }
@@ -116,7 +129,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .oxy-cell.on { background:var(--ocean); }
 .oxy-cell.on.low { background:var(--danger); }
 
-.path-board { position:relative; width:100%; }
+.path-board { position:relative; width:100%; aspect-ratio:100/84; }
 .tile {
   border-radius:7px; background:rgba(255,255,255,.05);
   display:flex; align-items:center; justify-content:center; position:relative;
@@ -156,6 +169,11 @@ button { font-family:inherit; cursor:pointer; border:none; }
 .modal .m-btn.warn { background:linear-gradient(135deg,var(--accent),#c73e54); color:#fff; }
 .modal .m-btn.ghost { background:var(--card-bg); color:var(--text); border:1px solid rgba(255,255,255,.15); }
 .modal .m-btn.item { background:var(--card-bg); color:var(--text); border:1px solid rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; gap:8px; }
+.rules-body { text-align:left; }
+.rules-body h3 { font-size:15px; margin:14px 0 6px; color:var(--ocean); text-align:left; }
+.rules-body h3:first-child { margin-top:0; }
+.rules-body p, .rules-body li { font-size:13px; line-height:1.8; color:var(--text); }
+.rules-body ul { padding-left:20px; margin-bottom:4px; }
 
 /* settlement */
 .settle-player { background:var(--card-bg); border-radius:var(--radius); padding:12px 14px; margin-bottom:10px; }

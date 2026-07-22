@@ -23,17 +23,7 @@ const DX = (100 - 2*M) / (COLS-1);    // 同行相邻格子中心的水平间距
 const MAX_TILT = 7.52;                // 单行首尾总落差（= 旧版 7*DX*tan(5°)）
 const ROW_GAP = 13;                   // 相邻两行连接处的行间距（中心到中心）
 const Y0 = 7;                         // 第一行首个格子中心的纵坐标
-// 板子高度（板宽百分比单位）：根据当前实际行数动态计算
-// = 最底行的下边缘 y + 下边距，保证 path-board 始终兜住所有格子
-// 仅按"已渲染的 bundle 行数"增长，pending bundle 不撑高
-function boardH(){
-  const pending = (state && state.pendingBundles) ?? 0;
-  const visibleBundles = (state && state.bundles) ? state.bundles.length - pending : 0;
-  const totalRows = 4 + Math.ceil(Math.max(0, visibleBundles) / COLS);
-  const lastRow = totalRows - 1;
-  const bottomOfLastRow = Y0 + lastRow*(MAX_TILT + ROW_GAP) + MAX_TILT + S/2;
-  return Math.ceil(bottomOfLastRow + 4);
-}
+const BOARD_H = 84;                   // 路径板高度（板宽百分比单位），对应 CSS aspect-ratio 100/84
 
 // 平滑缓动（快-慢-快）：t∈[0,1] → [0,1]，两端斜率大、中段斜率小
 // f(t) = t + (1/3)·sin²(πt)·(1-2t)，满足 f(0)=0、f(1)=1、f(0.5)=0.5
@@ -223,9 +213,9 @@ function subCenterInBoard(){
   const bR = board.getBoundingClientRect();
   const sR = svg.getBoundingClientRect();
   const x = (sR.left + sR.width/2 - bR.left) / bR.width * 100;
-  // 路径板 aspect-ratio 由 boardH() 动态给出；1 单位 y = 板宽 × boardH()/100 像素
+  // 路径板 aspect-ratio 100/BOARD_H；1 单位 y = 板宽 × BOARD_H/100 像素
   // y 取 SVG 底部边缘再往下 2px，让 token 看起来从潜水艇底部冒出
-  const y = (sR.top + sR.height + 2 - bR.top) / (bR.width * boardH() / 100) * 100;
+  const y = (sR.top + sR.height + 2 - bR.top) / (bR.width * BOARD_H / 100) * 100;
   return { x, y };
 }
 
@@ -354,7 +344,7 @@ function animateToken(steps, pIdx, fromPos){
       // tile left = (x - S/2)%, tile width = S%, tile right = (x + S/2)%
       // token left = tile right - 21px (27px width - 6px offset)
       ghost.style.left = `calc(${x + S/2}% - 21px)`;
-      ghost.style.top = `calc(${(y - S/2) / boardH() * 100}% - 10px)`;
+      ghost.style.top = `calc(${(y - S/2) / BOARD_H * 100}% - 10px)`;
       i++;
       setTimeout(step, 260);
     }
@@ -625,7 +615,6 @@ function nextRound(){
     }
   }
   state.bundles = [];
-  state.pendingBundles = 0;
 
   state.players.forEach(p=>{ p.position=-1; p.returned=false; p.choseReturn=false; p.backpack=[]; });
   state.oxygen = 25;
@@ -656,9 +645,10 @@ function render(){
 // 渲染落地页（标题 + 开始按钮 + 开发者署名）
 function renderLanding(){
   return `<div class="landing">
+    <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
     <div class="logo-sub">${submarineSVG(110)}</div>
     <h1>海底探险</h1>
-    <p class="tagline">2~6人 · 投骰下潜 · 拾取宝藏<br>在氧气耗尽前返回潜水艇！</p>
+    <p class="tagline">2~6人 · 下潜寻宝<br>在氧气耗尽前返回潜水艇！</p>
     <button class="btn-primary" onclick="showSetup()">开始游戏</button>
     <div class="credit">@imStar100</div>
   </div>`;
@@ -705,7 +695,10 @@ function renderGame(){
   return `<div class="game">
     <div class="topbar">
       <span class="round-info">第 ${state.round} / 3 轮</span>
-      <button class="reset-btn" onclick="confirmReset()">↺</button>
+      <div class="topbar-btns">
+        <button onclick="confirmReset()">🔄 重置</button>
+        <button onclick="showRules()">📖 规则</button>
+      </div>
     </div>
     ${renderPlayersStrip()}
     ${renderActionModule(p)}
@@ -809,9 +802,9 @@ function renderBoardGrid(){
     const tile = idx < 32 ? state.path[idx] : state.bundles[idx-32];
     if(tile.state==='empty') continue;
     const {x,y} = tilePos(idx);
-    cells += `<div class="tile abs ${hereClass(tile,idx)}" style="left:${x-S/2}%;top:${(y-S/2)/boardH()*100}%;width:${S}%">${tileContent(tile)}${tokenHTML(tile)}</div>`;
+    cells += `<div class="tile abs ${hereClass(tile,idx)}" style="left:${x-S/2}%;top:${(y-S/2)/BOARD_H*100}%;width:${S}%">${tileContent(tile)}${tokenHTML(tile)}</div>`;
   }
-  return `<div class="path-board" style="aspect-ratio:100/${boardH()}">${cells}</div>`;
+  return `<div class="path-board">${cells}</div>`;
 }
 
 // 渲染游戏结束页：按总分排名的积分榜单（含各轮得分）
@@ -838,6 +831,42 @@ function renderGameOver(){
 function playAgain(){ clearState(); state=null; showSetup(); }
 // 游戏结束后返回首页
 function backHome(){ clearState(); setupNames=[]; state=null; screen='landing'; render(); }
+// 弹出游戏规则弹窗
+function showRules(){
+  showModal(`<h3>📖 游戏规则</h3>
+    <div class="rules-body">
+      <h3>🎯 目标</h3>
+      <p>3轮制海底寻宝，在氧气耗尽前拾取宝藏并安全返回潜水艇，累计最高分获胜。</p>
+      <h3>🧩 组件</h3>
+      <ul>
+        <li>2个骰子（面 1/2/3，点数 2~6）</li>
+        <li>32枚宝藏：三角(0~3分)、四角(4~7分)、五角(8~11分)、六角(12~15分) 各8枚</li>
+        <li>25格共享氧气条</li>
+      </ul>
+      <h3>🔄 回合流程</h3>
+      <ul>
+        <li><b>氧气消耗</b>：持有N个宝藏 → 消耗N点氧气</li>
+        <li><b>投骰</b>：掷2个骰子得到点数</li>
+        <li><b>选方向</b>：下潜（前进）或返舱（后退）</li>
+        <li><b>移动</b>：有效步数 = 骰子点数 − 持有宝藏数（≥0），跳过已有人的格</li>
+        <li><b>行动</b>：拾取脚下宝藏/宝藏包，或在X标记格放置背包中的宝藏</li>
+      </ul>
+      <h3>⚠️ 返舱规则</h3>
+      <ul>
+        <li>每轮每位玩家只能选择一次"返舱"，选定后本轮后续回合默认返舱</li>
+        <li>返回潜水艇后结算背包宝藏得分，清空背包</li>
+      </ul>
+      <h3>📦 一轮结束</h3>
+      <ul>
+        <li>所有玩家返回潜水艇 → 正常结算</li>
+        <li>氧气耗尽 → 已返回的玩家正常结算，未返回的玩家宝藏打包为<b>宝藏包</b>沉入海底</li>
+        <li>宝藏包视为1个宝藏，分值为内含宝藏分值之和</li>
+      </ul>
+      <h3>🏆 计分</h3>
+      <p>3轮结束后，按累计总分排名。每轮得分 = 返回潜水艇时背包中所有宝藏的分值之和。</p>
+    </div>
+    <button class="m-btn go" onclick="hideModal()">知道了</button>`);
+}
 // 弹出重置确认窗口
 function confirmReset(){
   showModal(`<h3>重新开始？</h3><p class="m-desc">将清除当前游戏进度</p>

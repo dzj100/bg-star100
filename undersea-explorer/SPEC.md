@@ -26,13 +26,17 @@
 3. 所有玩家标记在潜水艇上
 4. 氧气满格（25）
 
-### 版图布局（倾斜S形）
+### 版图布局（缓动倾斜S形）
 
-宝藏路径不是水平网格，而是每行倾斜约5°的之字形下潜路线：
-- 第1行从左上向右下延伸（5°），末端（右下角）连接第2行
-- 第2行以第1行末端为右上角，向左下延伸（5°），末端（左下角）连接第3行
+宝藏路径不是水平网格，而是每行采用**快-慢-快**缓动倾斜的之字形下潜路线：
+- 第1行从左上向右下延伸，末端（右下角）连接第2行
+- 第2行以第1行末端为右上角，向左下延伸，末端（左下角）连接第3行
 - 第3行向右下延伸，第4行向左下延伸，依次类推
-- 实现上采用绝对定位：按 `tilePos(idx)` 计算每格中心坐标，偶数行自左向右、奇数行自右向左，逐格累加水平间距与5°垂直落差
+- 每行首尾的纵向落差大（陡峭）、中段平缓，缓动公式：`f(t) = t + 0.4·sin²(πt)·(1-2t)`
+- 实现上采用绝对定位：按 `tilePos(idx)` 计算每格中心坐标，偶数行自左向右、奇数行自右向左
+- 几何参数：`COLS=8, M=7, S=11, MAX_TILT=7.52, ROW_GAP=13, Y0=7, BOARD_H=84`
+- `.path-board` 使用 `aspect-ratio: 100/84` 固定比例；因压实机制保证可见格数 ≤ 32，无需动态高度
+- 宝藏包格（如有）紧接路径末端，使用同一套 `tilePos` 定位，视觉上无缝延续
 
 ## 游戏流程
 
@@ -95,19 +99,25 @@
 - 宝藏包生成信息（如有）
 - 关闭弹窗后进入轮间清理，开始下一轮（或游戏结束）
 
-### 轮间清理
+### 轮间清理（含压实）
 
-1. 本轮被拾取过的格子（有X标记）在下一轮直接移除：不再渲染、不可落脚，移动时跳过
-2. 未被拾取的宝藏保留在原位（下一轮继续使用）
-3. 所有玩家回到潜水艇
-4. 氧气重置为25
-5. 本轮最后行动的玩家作为下一轮初始玩家
-6. 重置所有玩家的"返舱"选择状态
+1. 本轮被拾取过的格子（`state==='taken'`，有X标记）标记为 `empty`
+2. **压实**：将 `path` 和 `bundles` 中所有非空 tile 按原顺序合并，前移到 `path[0..N]`，剩余位置填 `empty`；`bundles` 数组清空
+   - 效果：宝藏包并入路径、X标记格被剔除，路径始终连续无空档
+   - 因压实后可见格数 ≤ 32，`.path-board` 高度固定为 `BOARD_H=84`，无需动态计算
+3. 本轮新生成的宝藏包（`pendingBundles`）在结算弹窗中以文字提示，**不立即渲染**；点击"下一轮"后才在版图上显示
+4. 未被拾取的宝藏保留在原位（下一轮继续使用）
+5. 所有玩家回到潜水艇
+6. 氧气重置为25
+7. 本轮最后行动的玩家作为下一轮初始玩家
+8. 重置所有玩家的"返舱"选择状态
 
 ### 游戏结束
 
 - 累计3轮后游戏结束
-- 展示积分榜单（排名 + 各轮得分 + 总分）
+- 展示积分榜单（排名 + 玩家 + R1/R2/R3 各轮得分 + 总分）
+- 点击"再来一局"：清档并回到玩家设置页，**自动保留上局玩家昵称**（便于快速开局）
+- 点击"返回首页"：清档并清除昵称，回到落地页
 
 ## 数据结构
 
@@ -120,9 +130,9 @@
   firstPlayerIdx: 0,           // 本轮初始玩家索引
   turnPhase: 'oxygen' | 'roll' | 'direction' | 'move' | 'action' | 'done',
   dice: [0, 0],               // 两个骰子结果
-  directionChosen: false,      // 本轮是否已选择返舱
   lastRoll: 0,                 // 本次投骰结果
   effectiveSteps: 0,           // 有效步数
+  pendingBundles: 0,           // 本轮新产生的宝藏包数（结算弹窗中文字提示，下一轮才渲染）
 
   players: [{
     name: '玩家1',
@@ -131,25 +141,33 @@
     backpack: [],              // 背包 [{id, shape, dots, value, isBundle, bundleValues}]
     returned: false,           // 本轮是否已返回潜水艇
     choseReturn: false,        // 本轮是否已选择返舱
+    roundScores: [],           // 各轮得分明细（用于游戏结束页积分榜）
   }],
 
-  path: [{                     // 32格路径
+  path: [{                     // 32格路径（压实后：前N格为非空tile，后面为empty）
     id: 0,
     shape: 'triangle' | 'square' | 'pentagon' | 'hexagon',
     dots: 1,                   // 正面标记点数
     value: 3,                  // 实际分值（背面）
-    state: 'treasure' | 'taken' | 'empty',  // treasure=有宝藏, taken=本轮被拿走(X标记,可落脚), empty=上一轮被拾取后移除(不渲染,不可落脚)
-    bundle: null,              // 放置在该格上的宝藏包（如有）
+    state: 'treasure' | 'taken' | 'empty',
+    //   treasure = 有宝藏（或宝藏包）
+    //   taken    = 本轮被拿走（圆形X标记，可落脚，可放置）
+    //   empty    = 上轮被拾取后已移除（不渲染，不可落脚，移动时跳过）
+    bundle: null,              // 放置在该格上的宝藏包 { values:[], totalValue }（如有）
     occupant: null,            // 占据该格的玩家索引
   }],
 
-  bundles: [{                  // 宝藏包（放在路径末尾之后）
-    id: 'bundle-1',
-    position: 32,              // 路径后虚拟位置
-    values: [2, 5, 8],        // 包含的宝藏分值
-    totalValue: 15,
-    state: 'treasure' | 'taken',  // 被拾取后同样显示X标记
+  bundles: [{                  // 宝藏包格（轮间压实前暂存，压实后并入path并清空）
+    id: 0,
+    shape: null,
+    dots: 0,
+    value: 0,
+    state: 'treasure' | 'taken' | 'empty',
+    bundle: { values: [2, 5, 8], totalValue: 15 },
+    occupant: null,
   }],
+
+  roundResults: null,          // 本轮结算数据 { reason, results, bundlesCreated }
 }
 ```
 
@@ -191,6 +209,10 @@
 - 行动选择：底部弹窗显示可选操作
 - 放置宝藏：弹窗中列出背包宝藏供选择
 - 吐司提示：顶部滑入，2秒自动消失
+- **移动动画**：token 以 ghost 元素逐格步进（每格 260ms），路径格使用 `tilePos` 定位
+- **潜水艇出发动画**：首帧将 ghost 定位在潜水艇 SVG 底部（通过 `getBoundingClientRect` 动态计算），再逐格前进；同时移除 `.sub-tokens` 中该玩家的色点标记
+- **弹窗缓存**：行动/方向弹窗内容缓存到 `_lastModalHTML`，行动条上的"等待 xxx 操作…"文字可点击重新弹出
+- **玩家条滚动**：回合切换时 `scrollToCurrentPlayer` 平滑滚动使当前玩家卡片进入视口
 
 ## 吐司提示时机
 
@@ -255,9 +277,14 @@
 
 ## 技术要点
 
-- 单文件 `index.html`，零依赖
+- 单文件 `index.html`，零依赖（CSS/JS 内联于 `css/style.css` 和 `js/game.js`）
 - localStorage 存档（key: `undersea-explorer-state`）
 - 每次状态变更后 saveState + render
 - Fisher-Yates 洗牌
-- 深色海洋主题配色
+- 深色海洋主题配色（body 渐变：`#0f3460`(顶) → `#16213e` → `#1a1a2e`(底)，模拟深海氛围）
 - 触控友好（按钮最小56px高度）
+- **异步动画**：`animateToken` 返回 Promise，`executeMove` 为 async 函数，动画期间隐藏原 token 避免双影
+- **屏幕状态**：全局 `screen` 变量（`'landing'` | `'setup'`）控制无存档时的界面；`setupNames` 全局数组暂存玩家昵称（跨游戏保留）
+- **subCenterInBoard**：通过 `getBoundingClientRect` 动态计算潜水艇 SVG 在 `.path-board` 百分比坐标系中的位置，用于出潜/返潜动画起止点
+- **渲染优化**：`render()` 重建 `#app` 前保存玩家条 `scrollLeft`，重建后恢复，避免 re-render 重置滚动位置
+- **弹窗与渲染解耦**：modal 位于 `#app` 之外，弹窗操作不触发整页 render，仅通过 `refreshWaitText` 局部刷新行动条文本
