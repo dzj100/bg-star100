@@ -192,6 +192,24 @@ function tilePos(idx){
   return { x, y };
 }
 
+// 计算潜水艇 SVG 中心在 .path-board 百分比坐标系中的位置
+// 用于 token 从潜水艇出发 / 返回潜水艇时的动画起止点
+function subCenterInBoard(){
+  const board = document.querySelector('.path-board');
+  const svg = document.querySelector('.sub-row svg');
+  if(!board || !svg){
+    // 回退值：大致估算潜水艇在路径板左上方
+    return { x:5, y:-12 };
+  }
+  const bR = board.getBoundingClientRect();
+  const sR = svg.getBoundingClientRect();
+  const x = (sR.left + sR.width/2 - bR.left) / bR.width * 100;
+  // 路径板使用 aspect-ratio 100/84，内部百分比 y 映射到像素为 y/100 * width * 0.84
+  // y 取 SVG 底部边缘再往下 2px，让 token 看起来从潜水艇底部冒出
+  const y = (sR.top + sR.height + 2 - bR.top) / (bR.width * BOARD_H / 100) * 100;
+  return { x, y };
+}
+
 // 判断某格是否不可落脚：被其他玩家占据，或已被移除（上一轮拾取后清空）
 function isBlocked(pos, pIdx){
   const t = getTile(pos);
@@ -290,7 +308,8 @@ function chooseDirection(dir){
 }
 
 // 动画：token 逐格移动（steps 包含起点到终点的每一格索引）
-function animateToken(steps, pIdx){
+// fromPos = -1 表示本段移动从潜水艇出发，首帧定在潜水艇 SVG 中心
+function animateToken(steps, pIdx, fromPos){
   return new Promise(resolve => {
     if(steps.length < 2){ resolve(); return; }
     const board = document.querySelector('.path-board');
@@ -300,10 +319,18 @@ function animateToken(steps, pIdx){
     ghost.innerHTML = tokenSVG(PLAYER_COLORS[pIdx]);
     board.appendChild(ghost);
 
+    // 从潜水艇出发：第一帧定位在潜水艇 SVG 中心，再逐格前进
+    const fromSub = (fromPos === -1);
+
     let i = 0;
     function step(){
       if(i >= steps.length){ ghost.remove(); resolve(); return; }
-      const {x, y} = tilePos(steps[i]);
+      let x, y;
+      if(fromSub && i === 0){
+        ({x, y} = subCenterInBoard());
+      } else {
+        ({x, y} = tilePos(steps[i]));
+      }
       // 匹配 .tile .token 的定位：tile 右上角偏移 (top:-10px, right:-6px)
       // tile left = (x - S/2)%, tile width = S%, tile right = (x + S/2)%
       // token left = tile right - 21px (27px width - 6px offset)
@@ -358,7 +385,23 @@ async function executeMove(dir){
   // 先隐藏原 token，播放移动动画
   if(from !== -1) setOccupant(from, null);
   render();
-  await animateToken(steps, pIdx);
+  // 出潜时：动画还没播完，p.position 仍是 -1，render 会把该玩家的小圆点留在潜水艇上。
+  // 这里局部把它摘掉，避免 ghost 起飞时舱内还残留一个同款圆点。
+  if(from === -1){
+    const subTokens = document.querySelector('.sub-row .sub-tokens');
+    if(subTokens){
+      const dotIdx = state.players.slice(0, pIdx).filter(pl => pl.position === -1).length;
+      const dots = subTokens.querySelectorAll('span[style]');
+      if(dots[dotIdx]) dots[dotIdx].remove();
+      const anyoneLeft = state.players.some((pl, i) => i !== pIdx && pl.position === -1);
+      if(!anyoneLeft && !subTokens.querySelector('.sub-label')){
+        const lab = document.createElement('span');
+        lab.className = 'sub-label'; lab.textContent = '潜水艇上空无一人';
+        subTokens.appendChild(lab);
+      }
+    }
+  }
+  await animateToken(steps, pIdx, from);
 
   // 动画结束，更新最终状态
   p.position = pos;
