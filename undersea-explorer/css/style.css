@@ -83,7 +83,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 
 /* action module */
 .action-mod {
-  background:var(--surface); border-radius:var(--radius); padding:14px;
+  background:#142749; border-radius:var(--radius); padding:14px;
   margin-bottom:12px; text-align:center; border:1px solid rgba(255,255,255,.08);
 }
 .action-mod .turn-label { font-size:14px; color:var(--text-dim); margin-bottom:10px; }
@@ -171,7 +171,7 @@ button { font-family:inherit; cursor:pointer; border:none; }
 
 /* game over */
 .gameover { min-height:100dvh; padding:40px 20px; max-width:480px; margin:0 auto; text-align:center; }
-.gameover h2 { color:var(--gold); font-size:26px; letter-spacing:4px; margin-bottom:24px; }
+.gameover h2 { color:var(--ocean); font-size:26px; letter-spacing:4px; margin-bottom:24px; }
 .rank-table { width:100%; border-collapse:collapse; margin-bottom:28px; }
 .rank-table th,.rank-table td { padding:10px 6px; font-size:13px; border-bottom:1px solid rgba(255,255,255,.08); }
 .rank-table th { color:var(--text-dim); font-weight:500; }

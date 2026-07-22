@@ -25,12 +25,14 @@ const ROW_GAP = 13;                   // 相邻两行连接处的行间距（中
 const Y0 = 7;                         // 第一行首个格子中心的纵坐标
 // 板子高度（板宽百分比单位）：根据当前实际行数动态计算
 // = 最底行的下边缘 y + 下边距，保证 path-board 始终兜住所有格子
+// 仅按"已渲染的 bundle 行数"增长，pending bundle 不撑高
 function boardH(){
-  const bundleCount = (state && state.bundles) ? state.bundles.length : 0;
-  const totalRows = 4 + Math.ceil(bundleCount / COLS);   // 4 行路径 + bundle 行
+  const pending = (state && state.pendingBundles) ?? 0;
+  const visibleBundles = (state && state.bundles) ? state.bundles.length - pending : 0;
+  const totalRows = 4 + Math.ceil(Math.max(0, visibleBundles) / COLS);
   const lastRow = totalRows - 1;
   const bottomOfLastRow = Y0 + lastRow*(MAX_TILT + ROW_GAP) + MAX_TILT + S/2;
-  return Math.ceil(bottomOfLastRow + 4);                  // +4 下边距
+  return Math.ceil(bottomOfLastRow + 4);
 }
 
 // 平滑缓动（快-慢-快）：t∈[0,1] → [0,1]，两端斜率大、中段斜率小
@@ -177,7 +179,7 @@ function initGame(names){
     currentPlayerIdx:0, firstPlayerIdx:0,
     turnPhase:'roll', dice:[0,0], lastRoll:0, effectiveSteps:0,
     players: names.map(n=>({ name:n, position:-1, score:0, backpack:[], returned:false, choseReturn:false, roundScores:[] })),
-    path: generatePath(), bundles:[], roundResults:null,
+    path: generatePath(), bundles:[], pendingBundles:0, roundResults:null,
   };
   console.log('[新游戏]', names.join(','), '路径已生成');
   startTurn();
@@ -559,6 +561,7 @@ function endRound(reason){
         const vals = items.map(t=>t.value);
         const total = vals.reduce((a,b)=>a+b,0);
         state.bundles.push({ shape:null, dots:0, value:0, state:'treasure', bundle:{ values:vals, totalValue:total }, occupant:null });
+        state.pendingBundles = (state.pendingBundles ?? 0) + 1;
         bundlesCreated.push({ name:p.name, count:vals.length, totalValue:total });
         console.log(`[宝藏包] ${p.name} 的${vals.length}个宝藏(价值${total})沉入海底`);
         p.backpack = [];
@@ -606,6 +609,24 @@ function nextRound(){
   if(state.round>=3){ state.phase='game-over'; saveState(); render(); return; }
   state.path.forEach(t=>{ if(t.state==='taken') t.state='empty'; });
   state.bundles.forEach(t=>{ if(t.state==='taken') t.state='empty'; });
+
+  // 压实：path + bundles 中的非空 tile 按原顺序前移到 path 前段，
+  // 避免被拾取格留下空档；bundle 并入 path，不再单独占末尾区域
+  const remaining = [
+    ...state.path.filter(t => t.state !== 'empty'),
+    ...state.bundles.filter(t => t.state !== 'empty'),
+  ];
+  console.log(`[压实] 剩余 tile: ${remaining.length} 个（path + bundles 合并）`);
+  for(let i=0; i<state.path.length; i++){
+    if(i < remaining.length){
+      state.path[i] = { ...remaining[i], occupant:null, bundle:remaining[i].bundle ?? null };
+    } else {
+      state.path[i] = { id:i, shape:null, dots:0, value:0, state:'empty', bundle:null, occupant:null };
+    }
+  }
+  state.bundles = [];
+  state.pendingBundles = 0;
+
   state.players.forEach(p=>{ p.position=-1; p.returned=false; p.choseReturn=false; p.backpack=[]; });
   state.oxygen = 25;
   state.firstPlayerIdx = state.currentPlayerIdx;   // 本轮最后行动者作为下轮初始玩家
@@ -779,9 +800,11 @@ function hereClass(tile, pos){
 
 // 渲染 S 形倾斜路径（含宝藏包行）：统一用 tilePos 绝对定位到 .path-board
 // idx 0..31 = 普通路径格；idx 32+ = 宝藏包格（state.bundles[idx-32]）
+// 本轮刚生成的"待渲染"bundle 存在 state.bundles 末尾，下一轮开始前不参与渲染
 function renderBoardGrid(){
   let cells = '';
-  const total = 32 + state.bundles.length;
+  const visibleBundles = state.bundles.length - (state.pendingBundles ?? 0);
+  const total = 32 + visibleBundles;
   for(let idx=0; idx<total; idx++){
     const tile = idx < 32 ? state.path[idx] : state.bundles[idx-32];
     if(tile.state==='empty') continue;
@@ -811,8 +834,8 @@ function renderGameOver(){
     <button class="btn-secondary" style="width:100%" onclick="backHome()">返回首页</button>
   </div>`;
 }
-// 游戏结束后再来一局：清档并回到玩家设置页
-function playAgain(){ clearState(); setupNames=[]; state=null; showSetup(); }
+// 游戏结束后再来一局：清档并回到玩家设置页（保留上局昵称，便于快速开局）
+function playAgain(){ clearState(); state=null; showSetup(); }
 // 游戏结束后返回首页
 function backHome(){ clearState(); setupNames=[]; state=null; screen='landing'; render(); }
 // 弹出重置确认窗口
