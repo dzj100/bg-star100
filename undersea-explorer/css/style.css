@@ -127,6 +127,11 @@ button { font-family:inherit; cursor:pointer; border:none; }
   position:absolute; top:-10px; right:-6px; width:27px; height:27px;
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); z-index:2;
 }
+.token-ghost {
+  position:absolute; width:27px; height:27px; z-index:10;
+  pointer-events:none; filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+  transition: left 240ms ease-in-out, top 240ms ease-in-out;
+}
 .tile.here { outline:2px solid var(--accent); outline-offset:1px; }
 .bundle-zone { margin-top:6px; display:flex; gap:3px; flex-wrap:wrap; }
 .bundle-zone .tile { width:calc(12.5% - 3px); aspect-ratio:1/1; }
