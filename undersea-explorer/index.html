@@ -11,5 +11,17 @@
 <div id="toast-container"></div>
 <div class="modal-overlay" id="modal-overlay"><div class="modal" id="modal-content"></div></div>
 <script src="js/game.js"></script>
+<script>
+// 兼容微信 X5 内核不支持 dvh：将 window.innerHeight 的 1% 注入为 --vh CSS 变量
+(function(){
+  function setVh(){
+    try{ document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px'); }catch(e){}
+  }
+  setVh();
+  window.addEventListener('resize', setVh);
+  window.addEventListener('orientationchange', setVh);
+  window.addEventListener('pageshow', setVh);
+})();
+</script>
 </body>
 </html>

@@ -296,10 +296,11 @@ function rollDice(){
   setTimeout(openDirectionModal, 500);
 }
 
-// 打开方向选择弹窗；若本轮已选过返舱则默认返舱、跳过询问
+// 打开方向选择弹窗；若本轮已选过返舱则默认返舱、跳过询问；仍在潜水艇内（首次投掷）默认下潜
 function openDirectionModal(){
   const p = state.players[state.currentPlayerIdx];
   if(p.choseReturn){ chooseDirection('return'); return; }
+  if(p.position===-1){ chooseDirection('dive'); return; }
   showModal(`
     <h3>选择方向</h3>
     <p class="m-desc">投掷结果 ${state.lastRoll}，可移动 <b style="color:var(--ocean)">${state.effectiveSteps}</b> 格<br>下潜：向深海前进 · 返舱：朝潜水艇后退</p>
