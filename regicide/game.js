@@ -527,6 +527,7 @@ function renderCardHTML(card, extraClass = '', onclick = '') {
 let _longPressTimer = null;
 let _tooltipEl = null;
 let _tooltipShown = false;
+let _recentTouch = 0; // 最近一次 touchstart 时间戳，用于屏蔽后续幻影鼠标事件
 
 /** 血条/攻击条上一次渲染的宽度百分比，用于过渡动画 */
 let _prevBarWidths = { hp: null, atk: null };
@@ -578,6 +579,7 @@ function hideSkillTooltip() {
 }
 
 function onCardTouchStart(e) {
+  _recentTouch = Date.now();
   const el = e.currentTarget;
   const suit = el.dataset.skill;
   const value = parseInt(el.dataset.value) || 0;
@@ -587,6 +589,7 @@ function onCardTouchStart(e) {
 }
 function onCardTouchEnd() { hideSkillTooltip(); }
 function onCardMouseDown(e) {
+  if (Date.now() - _recentTouch < 500) return; // 屏蔽触屏触发的幻影 mousedown
   const el = e.currentTarget;
   const suit = el.dataset.skill;
   const value = parseInt(el.dataset.value) || 0;
@@ -594,8 +597,12 @@ function onCardMouseDown(e) {
   if (!suit) return;
   _longPressTimer = setTimeout(() => { showSkillTooltip(el, suit, value, rank); }, 400);
 }
-function onCardMouseUp() { hideSkillTooltip(); }
+function onCardMouseUp() {
+  if (Date.now() - _recentTouch < 500) return;
+  hideSkillTooltip();
+}
 function onCardMouseEnter(e) {
+  if (Date.now() - _recentTouch < 500) return;
   const el = e.currentTarget;
   const suit = el.dataset.skill;
   const value = parseInt(el.dataset.value) || 0;
@@ -603,7 +610,10 @@ function onCardMouseEnter(e) {
   if (!suit) return;
   _longPressTimer = setTimeout(() => { showSkillTooltip(el, suit, value, rank); }, 400);
 }
-function onCardMouseLeave() { hideSkillTooltip(); }
+function onCardMouseLeave() {
+  if (Date.now() - _recentTouch < 500) return;
+  hideSkillTooltip();
+}
 
 /* ============================================================
    出牌阶段（subPhase: 'play'）
@@ -635,7 +645,7 @@ function renderPlayPhase() {
 
   // 操作按钮
   const passes = state.consecutivePasses || 0;
-  const passLimit = state.playerCount - 1;
+  const passLimit = Math.max(1, state.playerCount - 1);
   const canPass = passes < passLimit;
   let actionsHTML = `<div class="action-bar">`;
   if (selected.length > 0) {
@@ -796,7 +806,7 @@ function confirmPlay() {
       const content = `
         <h2>⚠️ 震慑预警</h2>
         <p style="text-align:center;color:var(--text-dim);margin:12px 0;">
-          当前Boss为 <strong style="color:var(--gold)">${suitName}${boss.card.rank}</strong>，震慑花色 ${suitName}。<br>
+          当前Boss为 <strong>${suitName}${boss.card.rank} ${boss.name || ''}</strong>，震慑花色 ${suitName}。<br>
           选中的 <strong style="color:var(--danger)">${names}</strong> 技能将失效，仅计入数值。
         </p>
         <p style="text-align:center;margin:8px 0 16px;">
@@ -838,9 +848,14 @@ function doConfirmPlay(cards, selected) {
     return;
   }
 
+  // 在出牌瞬间锁定震慑状态（之后即使小丑移除震慑，本批次的技能仍按当时的震慑判定）
+  const boss = state.currentBoss;
+  const lockIntimidate = !!(boss && boss.intimidateActive && !state.extraTurnIntimidate);
+  const intimidatedSuits = lockIntimidate && boss ? new Set([boss.suit]) : new Set();
+
   // 进入技能结算阶段
   state.subPhase = 'skill';
-  resolveSkills(cards);
+  resolveSkills(cards, intimidatedSuits);
   saveState();
   renderGame();
 }
@@ -916,7 +931,7 @@ function confirmPassPlay() {
  *
  * @param {Array} cards - 打出的卡牌数组
  */
-function resolveSkills(cards) {
+function resolveSkills(cards, intimidatedSuits = new Set()) {
   const totalValue = cards.reduce((sum, c) => sum + c.value, 0);
   const playedSuits = new Set(cards.map(c => c.suit));
   const suitsPresent = ['h', 'd', 's', 'c', 'joker'].filter(s => playedSuits.has(s));
@@ -924,8 +939,8 @@ function resolveSkills(cards) {
   const results = [];
 
   for (const suit of suitsPresent) {
-    // 检查是否被Boss震慑（小丑额外回合内震慑失效）
-    const isIntimidated = boss && boss.intimidateActive && boss.suit === suit && !state.extraTurnIntimidate;
+    // 使用出牌瞬间锁定的震慑状态（避免后续小丑移除震慑时回溯）
+    const isIntimidated = intimidatedSuits.has(suit);
 
     if (isIntimidated) {
       results.push({ suit, value: totalValue, skill: SUIT_SKILL[suit], blocked: true, detail: `${SUIT_NAMES[suit]}震慑 - 技能失效` });
@@ -1227,7 +1242,9 @@ function renderDefensePhase() {
   html += `<div class="hand-section"><div class="hand-label">${jokerPrefix}手牌 (点击选择防御牌)</div><div class="hand-cards">`;
   player.hand.forEach((card, i) => {
     const isSelected = selected.includes(i);
-    html += renderCardHTML(card, isSelected ? 'selected' : '', `toggleDefenseSelect(${i})`);
+    const isJoker = card.suit === 'joker';
+    const extra = (isSelected ? 'selected ' : '') + (isJoker ? 'disabled' : '');
+    html += renderCardHTML(card, extra.trim(), isJoker ? '' : `toggleDefenseSelect(${i})`);
   });
   html += '</div></div>';
 
@@ -1259,6 +1276,9 @@ function renderDefensePhase() {
  */
 function toggleDefenseSelect(index) {
   if (_tooltipShown) return;
+  const player = state.players[state.currentPlayerIndex];
+  const card = player.hand[index];
+  if (card && card.suit === 'joker') return; // 小丑不可用于防御
   if (!state.defenseSelectedIndices) state.defenseSelectedIndices = [];
   const idx = state.defenseSelectedIndices.indexOf(index);
   if (idx >= 0) {
@@ -1608,7 +1628,7 @@ function showRules() {
       <p style="font-size:.75rem;color:var(--text-dim)">感化：恰好将血量扣到0时，Boss牌放回酒馆顶部，后续可被摸起当伤害牌使用</p>
 
       <h3>回合阶段</h3>
-      <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，至多连续「人数-1」人次）</p>
+      <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，单人限1次、多人至多连续「人数-1」人次）</p>
       <p><strong>② 技能结算</strong>：按花色触发技能效果</p>
       <p><strong>③ 造成伤害</strong>：牌面数字之和扣减Boss血量（梅花×2）</p>
       <p><strong>④ Boss处理</strong>：血量&lt;0击杀 / 恰好=0感化(放回酒馆) / &gt;0进入攻击</p>
