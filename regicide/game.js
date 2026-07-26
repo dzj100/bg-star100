@@ -372,14 +372,13 @@ function addLog(msg) {
 function renderGame() {
   if (!state) return;
   if (state.phase === 'game-over') {
-    showGame();
     renderGameOver();
     return;
   }
   const content = document.getElementById('gameContent');
 
   let topHTML = renderInfoBar() + renderLogToggle();
-  let centerHTML = renderBossArea() + renderTurnInfo();
+  let centerHTML = renderBossArea();
   let bottomHTML = '';
 
   switch (state.subPhase) {
@@ -496,33 +495,6 @@ function renderInfoBar() {
 }
 
 /* ============================================================
-   渲染 - 回合信息
-   ============================================================ */
-
-/**
- * 渲染当前回合信息：当前玩家名和阶段名
- * 如果是小丑额外回合，显示特殊标记
- * @returns {string} HTML字符串
- */
-function renderTurnInfo() {
-  const player = state.players[state.currentPlayerIndex];
-  const phaseNames = {
-    play: '出牌', skill: '技能结算', damage: '伤害结算',
-    resolve: 'Boss结算', 'boss-attack': 'Boss攻击', defense: '防御',
-    'joker-pick': '指定玩家', 'solo-joker': '小丑换牌'
-  };
-  let extra = '';
-  if (state.extraTurnPlayer !== null && state.extraTurnIntimidate) {
-    extra = ' <span style="color:var(--gold)">[小丑额外回合]</span>';
-  }
-  return `
-    <div class="turn-info">
-      轮到 <span class="player-name">${player.name}</span>${extra}
-      · <span class="phase-label">${phaseNames[state.subPhase] || state.subPhase}</span>
-    </div>`;
-}
-
-/* ============================================================
    渲染 - 卡牌HTML
    ============================================================ */
 
@@ -543,7 +515,8 @@ function renderCardHTML(card, extraClass = '', onclick = '') {
     : `<span class="card-center${isJoker ? ' joker-center' : ''}">${SUIT_NAMES[card.suit] || '🃏'}</span>`;
   return `<div class="card ${suitClass} ${extraClass}" ${onclick ? `onclick="${onclick}"` : ''} ${skillAttr}
     ontouchstart="onCardTouchStart(event)" ontouchend="onCardTouchEnd(event)"
-    onmousedown="onCardMouseDown(event)" onmouseup="onCardMouseUp(event)" onmouseleave="onCardMouseUp(event)">
+    onmousedown="onCardMouseDown(event)" onmouseup="onCardMouseUp(event)"
+    onmouseenter="onCardMouseEnter(event)" onmouseleave="onCardMouseLeave(event)">
     ${isJoker ? '' : `<span class="card-suit">${SUIT_NAMES[card.suit]}</span><span class="card-rank">${RANK_NAMES[card.rank]}</span>`}
     ${centerContent}
     ${skillName && !isJoker ? `<span class="card-skill">${skillName}</span>` : ''}
@@ -622,6 +595,15 @@ function onCardMouseDown(e) {
   _longPressTimer = setTimeout(() => { showSkillTooltip(el, suit, value, rank); }, 400);
 }
 function onCardMouseUp() { hideSkillTooltip(); }
+function onCardMouseEnter(e) {
+  const el = e.currentTarget;
+  const suit = el.dataset.skill;
+  const value = parseInt(el.dataset.value) || 0;
+  const rank = el.dataset.rank;
+  if (!suit) return;
+  _longPressTimer = setTimeout(() => { showSkillTooltip(el, suit, value, rank); }, 400);
+}
+function onCardMouseLeave() { hideSkillTooltip(); }
 
 /* ============================================================
    出牌阶段（subPhase: 'play'）
@@ -638,7 +620,9 @@ function renderPlayPhase() {
   const selected = state.selectedHandIndices || [];
 
   // 渲染手牌
-  let handHTML = `<div class="hand-section"><div class="hand-label">${player.name} 的手牌 (${player.hand.length}/${player.handLimit})</div><div class="hand-cards">`;
+  const jokerPrefix = state.extraTurnPlayer !== null && state.extraTurnIntimidate
+    ? '<span class="extra-turn-tag">额外回合</span> ' : '';
+  let handHTML = `<div class="hand-section"><div class="hand-label">${jokerPrefix}${player.name} 的手牌 (${player.hand.length}/${player.handLimit})</div><div class="hand-cards">`;
   player.hand.forEach((card, i) => {
     const isSelected = selected.includes(i);
     handHTML += renderCardHTML(card, isSelected ? 'selected' : '', `toggleCardSelect(${i})`);
@@ -651,15 +635,22 @@ function renderPlayPhase() {
 
   // 操作按钮
   const passes = state.consecutivePasses || 0;
-  const canPass = passes < 2;
+  const passLimit = state.playerCount - 1;
+  const canPass = passes < passLimit;
   let actionsHTML = `<div class="action-bar">`;
   if (selected.length > 0) {
     actionsHTML += `<button class="clear-btn" onclick="clearSelection()">清空选择</button>`;
     actionsHTML += `<button class="confirm-btn" onclick="confirmPlay()" ${canConfirm ? '' : 'disabled'}>确认出牌${validation.valid ? '' : ' (' + validation.reason + ')'}</button>`;
   } else {
-    actionsHTML += `<button class="clear-btn" onclick="passPlay()" ${canPass ? '' : 'disabled'}>跳过出牌${canPass ? '' : ' (已连续2次)'}</button>`;
+    actionsHTML += `<button class="clear-btn" onclick="passPlay()" ${canPass ? '' : 'disabled'}>跳过出牌${canPass ? '' : ` (已连续${passLimit}次，无法跳过)`}</button>`;
   }
   actionsHTML += '</div>';
+
+  // 手牌为空且已无法跳过 → 只能接受失败
+  if (player.hand.length === 0 && !canPass) {
+    actionsHTML += `<div style="text-align:center;font-size:.85rem;color:var(--danger);margin-top:8px;">无牌可出，且无法继续跳过</div>`;
+    actionsHTML += `<div class="action-bar" style="margin-top:8px;"><button class="confirm-btn" style="background:var(--danger)" onclick="gameLose()">接受失败</button></div>`;
+  }
 
   // 无效组合提示
   if (!validation.valid && selected.length > 0) {
@@ -834,7 +825,7 @@ function confirmPassPlay() {
   closeModal();
   state.consecutivePasses = (state.consecutivePasses || 0) + 1;
   const player = state.players[state.currentPlayerIndex];
-  addLog(`${player.name} 放弃出牌 (${state.consecutivePasses}/2)`);
+  addLog(`${player.name} 放弃出牌 (${state.consecutivePasses}/${state.playerCount - 1})`);
 
   const boss = state.currentBoss;
   if (boss && boss.currentAttack <= 0) {
@@ -867,7 +858,8 @@ function confirmPassPlay() {
  */
 function resolveSkills(cards) {
   const totalValue = cards.reduce((sum, c) => sum + c.value, 0);
-  const suitsPresent = [...new Set(cards.map(c => c.suit))];
+  const playedSuits = new Set(cards.map(c => c.suit));
+  const suitsPresent = ['h', 'd', 's', 'c', 'joker'].filter(s => playedSuits.has(s));
   const boss = state.currentBoss;
   const results = [];
 
@@ -898,32 +890,30 @@ function resolveSkills(cards) {
         break;
       }
       case 'd': {
-        // ♦增援：从当前玩家开始按座位顺序轮流抽牌
+        // ♦增援：从当前玩家开始按座位顺序轮流抽牌（酒馆抽空则停止，不判输）
         let drawn = 0;
         let pIdx = state.currentPlayerIndex;
         const drawnDetails = [];
+        let stalled = 0;
         // 防死循环：最大迭代次数 = 目标数 × 人数 + 人数
         let maxIter = totalValue * state.playerCount + state.playerCount;
         while (drawn < totalValue && maxIter-- > 0) {
-          // 酒馆抽空则游戏失败
-          if (state.tavern.length === 0) {
-            state.gameResult = 'lose';
-            state.phase = 'game-over';
-            addLog('酒馆牌库被抽空!');
-            saveState();
-            renderGame();
-            renderGameOver();
-            return;
-          }
           const p = state.players[pIdx];
-          // 手牌未满才能抽牌
           if (p.hand.length < p.handLimit) {
+            if (state.tavern.length === 0) {
+              // 酒馆已空，无法继续增援
+              stalled = totalValue - drawn;
+              break;
+            }
             const card = state.tavern.shift();
             p.hand.push(card);
             drawn++;
             drawnDetails.push(`${p.name}抽1张`);
           }
           pIdx = (pIdx + 1) % state.playerCount;
+        }
+        if (stalled > 0) {
+          drawnDetails.push(`酒馆已空(少抽${stalled}张)`);
         }
         detail = drawnDetails.length > 0 ? drawnDetails.join(', ') + ` (共${drawn}张)` : `所有玩家手牌已满`;
         break;
@@ -1172,7 +1162,9 @@ function renderDefensePhase() {
   html += '</div>';
 
   // 手牌
-  html += `<div class="hand-section"><div class="hand-label">手牌 (点击选择防御牌)</div><div class="hand-cards">`;
+  const jokerPrefix = state.extraTurnPlayer !== null && state.extraTurnIntimidate
+    ? '<span class="extra-turn-tag">额外回合</span> ' : '';
+  html += `<div class="hand-section"><div class="hand-label">${jokerPrefix}手牌 (点击选择防御牌)</div><div class="hand-cards">`;
   player.hand.forEach((card, i) => {
     const isSelected = selected.includes(i);
     html += renderCardHTML(card, isSelected ? 'selected' : '', `toggleDefenseSelect(${i})`);
@@ -1363,20 +1355,13 @@ function confirmSoloJoker() {
   }
   player.hand = [];
 
-  // 摸8张新牌
+  // 摸8张新牌（酒馆不足则摸光，不判输）
   const drawCount = Math.min(8, state.tavern.length);
   for (let i = 0; i < drawCount; i++) {
     player.hand.push(state.tavern.shift());
   }
-
-  // 酒馆抽空则游戏失败
-  if (drawCount < 8 && state.tavern.length === 0) {
-    state.gameResult = 'lose';
-    state.phase = 'game-over';
-    addLog('酒馆牌库被抽空!');
-    saveState();
-    renderGameOver();
-    return;
+  if (drawCount < 8) {
+    addLog(`酒馆仅余${drawCount}张，换牌摸${drawCount}张`);
   }
 
   state.soloJokers--;
@@ -1419,17 +1404,6 @@ function nextTurn() {
   state.skillResults = [];
   state.turnCount++;
 
-  // 检查下一位玩家是否有牌可用
-  const player = state.players[state.currentPlayerIndex];
-  if (player.hand.length === 0 && state.tavern.length === 0) {
-    state.gameResult = 'lose';
-    state.phase = 'game-over';
-    addLog(`${player.name} 无牌可用，讨伐失败!`);
-    saveState();
-    renderGameOver();
-    return;
-  }
-
   saveState();
   renderGame();
 }
@@ -1467,7 +1441,19 @@ function renderGameOver() {
  */
 function restartGame() {
   document.getElementById('gameover-overlay').classList.remove('show');
+  const keepCount = state && state.playerCount;
+  const keepNames = state && state.players ? state.players.map(p => p.name) : [];
+  clearState();
+  state = null;
   showSetup();
+  if (keepCount) {
+    selectedCount = keepCount;
+    renderSetup();
+    keepNames.forEach((name, i) => {
+      const input = document.getElementById('pname' + i);
+      if (input) input.value = name;
+    });
+  }
 }
 
 /**
@@ -1552,8 +1538,17 @@ function showRules() {
         <tr><td>8张</td><td>7张</td><td>6张</td><td>5张</td></tr>
       </table>
 
+      <h3>Boss属性</h3>
+      <table style="width:100%;text-align:center;font-size:.85rem;margin:4px 0;">
+        <tr style="color:var(--gold)"><td>Boss</td><td>血量</td><td>攻击</td><td>感化后数值</td></tr>
+        <tr><td>J 骑士</td><td>20</td><td>10</td><td>10</td></tr>
+        <tr><td>Q 王后</td><td>30</td><td>15</td><td>15</td></tr>
+        <tr><td>K 国王</td><td>40</td><td>20</td><td>20</td></tr>
+      </table>
+      <p style="font-size:.75rem;color:var(--text-dim)">感化：恰好将血量扣到0时，Boss牌放回酒馆顶部，后续可被摸起当伤害牌使用</p>
+
       <h3>回合阶段</h3>
-      <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，至多连续2人次）</p>
+      <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，至多连续「人数-1」人次）</p>
       <p><strong>② 技能结算</strong>：按花色触发技能效果</p>
       <p><strong>③ 造成伤害</strong>：牌面数字之和扣减Boss血量（梅花×2）</p>
       <p><strong>④ Boss处理</strong>：血量&lt;0击杀 / 恰好=0感化(放回酒馆) / &gt;0进入攻击</p>
@@ -1580,7 +1575,7 @@ function showRules() {
       <p>单人：点击顶部🃏换牌按钮，弃掉所有手牌摸8张新牌（限2次）</p>
 
       <h3>失败条件</h3>
-      <p>无法防御Boss攻击 / 酒馆牌库抽空 / 手牌和酒馆都无牌</p>
+      <p>无法防御Boss攻击 / 既无手牌也无法跳过</p>
     </div>
     <button class="modal-btn primary" onclick="closeModal()">知道了</button>`;
   openModal(content);
@@ -1688,10 +1683,11 @@ function closeModal() {
  */
 document.addEventListener('DOMContentLoaded', () => {
   const saved = loadState();
-  if (saved) {
+  if (saved && saved.phase !== 'game-over') {
     state = saved;
     showGame();
   } else {
+    if (saved) clearState();
     showLanding();
   }
 });

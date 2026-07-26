@@ -148,6 +148,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   border-radius: 4px; color: #fff; align-self: center;
 }
 .boss-info .intimidate-tag.disabled { background: #3a3a42; text-decoration: line-through; }
+.extra-turn-tag { font-size: .6rem; background: var(--gold); color: #000; padding: 1px 6px; border-radius: 3px; font-weight: bold; vertical-align: middle; }
 
 /* 血条/攻击条 */
 .bar-container { display: flex; align-items: center; gap: 8px; }
@@ -175,11 +176,6 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .log-toggle:active { opacity: .7; }
 .log-toggle .log-last { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-toggle .log-more { color: var(--gold); font-size: .85rem; margin-left: 8px; }
-
-/* --- 回合信息 --- */
-.turn-info { text-align: center; padding: 8px; background: var(--surface); border-radius: 8px; font-size: .9rem; width: 100%; }
-.turn-info .player-name { color: var(--gold); font-weight: bold; }
-.turn-info .phase-label { color: var(--accent); }
 
 /* --- 玩家侧边栏 --- */
 .player-sidebar {
