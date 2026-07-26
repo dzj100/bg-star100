@@ -1,0 +1,468 @@
+/* ============================================================
+   弑君者 (Regicide) - 样式表
+   ============================================================ */
+
+/* --- CSS 变量 --- */
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --card-bg: #0f3460;
+  --accent: #e94560;
+  --gold: #f5c518;
+  --text: #eee;
+  --text-dim: #999;
+  --safe: #4caf50;
+  --danger: #f44336;
+  --heart: #e74c3c;
+  --diamond: #e67e22;
+  --spade: #8e9aaf;
+  --club: #27ae60;
+  --radius: 12px;
+  --btn-h: 56px;
+}
+
+/* --- 全局重置 --- */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; overflow-x: hidden; }
+
+/* ============================================================
+   首页
+   ============================================================ */
+#landing {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100dvh; padding: 32px; text-align: center; position: relative;
+}
+#landing .rules-corner { position: absolute; top: max(16px, env(safe-area-inset-top)); right: 16px; }
+#landing .rules-corner button {
+  background: var(--surface); border: 1px solid #333; border-radius: 10px;
+  padding: 7px 12px; font-size: .8rem; cursor: pointer; color: var(--text);
+}
+#landing .rules-corner button:active { background: #222; }
+#landing .landing-icon { font-size: 3.5rem; margin-bottom: 8px; }
+#landing h1 { font-size: 2rem; color: var(--accent); margin-bottom: 8px; }
+#landing .subtitle { color: var(--text-dim); font-size: .95rem; margin-bottom: 40px; }
+
+.start-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+  height: var(--btn-h); padding: 0 48px; font-size: 1.1rem; font-weight: bold; cursor: pointer;
+}
+.start-btn:active { opacity: .85; }
+.credit { position: absolute; bottom: 10px; font-size: .75rem; color: var(--text-dim); }
+
+/* ============================================================
+   设置页
+   ============================================================ */
+#setup {
+  display: none; flex-direction: column; min-height: 100dvh; padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.setup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.setup-header h1 { font-size: 1.1rem; }
+.back-btn {
+  background: var(--surface); border: 1px solid #333; border-radius: 10px;
+  padding: 7px 12px; font-size: .8rem; cursor: pointer; color: var(--text);
+}
+.back-btn:active { background: #222; }
+
+/* 人数选择按钮 */
+.count-select { display: flex; gap: 10px; margin: 12px 0 20px; }
+.count-btn {
+  flex: 1; height: var(--btn-h); background: var(--surface);
+  border: 2px solid transparent; border-radius: var(--radius);
+  color: var(--text); font-size: 1.1rem; font-weight: bold; cursor: pointer;
+}
+.count-btn.active { border-color: var(--accent); background: var(--card-bg); }
+.count-btn:active { opacity: .8; }
+
+/* 玩家输入框 */
+.player-inputs { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.player-input { display: flex; align-items: center; gap: 10px; }
+.player-input label { font-size: .9rem; color: var(--text-dim); min-width: 50px; }
+.player-input input {
+  flex: 1; height: 44px; background: var(--surface); border: 1px solid #333;
+  border-radius: 8px; padding: 0 12px; color: var(--text); font-size: 1rem;
+}
+.player-input input:focus { outline: none; border-color: var(--accent); }
+.start-game-btn {
+  width: 100%; height: var(--btn-h); background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius); font-size: 1.1rem; font-weight: bold; cursor: pointer;
+}
+.start-game-btn:active { opacity: .85; }
+.start-game-btn:disabled { opacity: .4; }
+
+/* ============================================================
+   游戏主界面
+   ============================================================ */
+#game {
+  display: none; flex-direction: column;
+  min-height: 100dvh; padding: 0;
+  padding-top: 56px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+#game-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  background: var(--bg); padding: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+#game-header h1 { font-size: 1rem; }
+.header-btns { display: flex; gap: 6px; }
+.header-btns button {
+  background: var(--surface); border: 1px solid #333; border-radius: 8px;
+  padding: 6px 10px; font-size: .75rem; cursor: pointer; color: var(--text);
+}
+.header-btns button:active { background: #222; }
+
+#gameContent {
+  flex: 1; display: flex; flex-direction: column;
+  padding: 8px 12px; overflow: hidden;
+}
+
+.top-section { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
+.center-section { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+.bottom-section { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; max-height: 45vh; overflow-y: auto; }
+
+/* --- Boss 区域 --- */
+.boss-area {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: 100%;
+}
+.boss-card {
+  width: 100px; height: 136px; background: var(--card-bg); border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid var(--gold); flex-shrink: 0;
+}
+.boss-card .boss-suit { font-size: 2rem; }
+.boss-card .boss-rank { font-size: 1.5rem; font-weight: bold; color: var(--gold); }
+.boss-card .boss-name { font-size: .75rem; color: var(--text-dim); margin-top: 2px; }
+.boss-svg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 6px; }
+.boss-svg svg { width: 100%; height: 100%; color: var(--gold); }
+.card-svg { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.card-svg svg { width: 100%; height: 100%; }
+.boss-info { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.boss-info .boss-title { font-size: 1.1rem; font-weight: bold; text-align: center; }
+.boss-info .intimidate-tag {
+  font-size: .6rem; background: var(--danger); padding: 2px 8px;
+  border-radius: 4px; color: #fff; align-self: center;
+}
+.boss-info .intimidate-tag.disabled { background: #555; text-decoration: line-through; }
+
+/* 血条/攻击条 */
+.bar-container { display: flex; align-items: center; gap: 8px; }
+.bar-label { font-size: .75rem; color: var(--text-dim); min-width: 32px; }
+.bar-track { flex: 1; height: 14px; background: #111; border-radius: 7px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; border-radius: 7px; transition: width .6s; }
+.bar-fill.hp { background: linear-gradient(90deg, var(--danger), var(--accent)); }
+.bar-value { font-size: .7rem; color: var(--text); min-width: 40px; text-align: right; }
+
+/* --- 信息栏 --- */
+.info-bar { display: flex; gap: 8px; font-size: .8rem; }
+.info-item { flex: 1; background: var(--surface); border-radius: 8px; padding: 8px 10px; text-align: center; }
+.info-item .info-label { color: var(--text-dim); font-size: .65rem; }
+.info-item .info-value { font-size: 1rem; font-weight: bold; margin-top: 2px; }
+.info-item.info-joker { cursor: pointer; border: 1px solid var(--gold); }
+.info-item.info-joker:active { opacity: .7; }
+.info-item.info-joker .info-label { color: var(--gold); }
+
+/* --- 日志折叠 --- */
+.log-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border-radius: 8px; padding: 6px 12px;
+  font-size: .75rem; color: var(--text-dim); cursor: pointer;
+}
+.log-toggle:active { opacity: .7; }
+.log-toggle .log-last { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-toggle .log-more { color: var(--gold); font-size: .85rem; margin-left: 8px; }
+
+/* --- 回合信息 --- */
+.turn-info { text-align: center; padding: 8px; background: var(--surface); border-radius: 8px; font-size: .9rem; width: 100%; }
+.turn-info .player-name { color: var(--gold); font-weight: bold; }
+.turn-info .phase-label { color: var(--accent); }
+
+/* --- 玩家侧边栏 --- */
+.player-sidebar {
+  position: fixed; left: 4px; top: 200px;
+  z-index: 20; background: var(--surface); border: 1px solid #333;
+  border-radius: 10px; padding: 6px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.player-widget {
+  background: var(--surface); border-radius: 10px;
+  padding: 8px; text-align: center; cursor: pointer;
+  min-width: 48px; font-size: .7rem;
+}
+.player-widget:active { opacity: .7; }
+.player-widget .widget-avatar { font-size: 1.2rem; }
+.player-widget .widget-name { color: var(--text); margin-top: 2px; font-size: .65rem; }
+.player-widget .widget-count { color: var(--text-dim); font-size: .6rem; }
+
+/* ============================================================
+   卡牌样式
+   ============================================================ */
+
+/* 手牌区域 */
+.hand-section {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 10px;
+}
+.hand-section .hand-label { font-size: .75rem; color: var(--text-dim); margin-bottom: 6px; }
+.hand-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 单张卡牌 */
+.card {
+  width: 52px; height: 72px; background: #fff; border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+  position: relative; user-select: none;
+}
+.card:active { transform: scale(.95); }
+.card.selected { border-color: var(--gold); box-shadow: 0 0 10px rgba(245, 197, 24, .5); transform: translateY(-6px); }
+.card.disabled { opacity: .4; pointer-events: none; }
+.card .card-suit { font-size: .9rem; position: absolute; top: 4px; left: 6px; }
+.card .card-rank { font-size: .8rem; font-weight: bold; position: absolute; top: 3px; right: 5px; }
+.card .card-center { font-size: 1.3rem; }
+.card .card-skill { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: .5rem; color: #666; font-weight: 500; }
+.card.suit-h .card-skill { color: var(--heart); }
+.card.suit-d .card-skill { color: var(--diamond); }
+.card.suit-s .card-skill { color: var(--spade); }
+.card.suit-c .card-skill { color: var(--club); }
+
+/* Skill tooltip bubble */
+.skill-tooltip { position: fixed; z-index: 300; background: #222; color: var(--text); border: 1px solid #555; border-radius: 10px; padding: 10px 14px; font-size: .8rem; line-height: 1.5; max-width: 240px; box-shadow: 0 4px 16px rgba(0,0,0,.6); pointer-events: none; }
+.skill-tooltip .tip-title { font-weight: bold; margin-bottom: 4px; }
+.skill-tooltip .tip-title.h { color: var(--heart); }
+.skill-tooltip .tip-title.d { color: var(--diamond); }
+.skill-tooltip .tip-title.s { color: var(--spade); }
+.skill-tooltip .tip-title.c { color: var(--club); }
+
+/* Discard pile card stack */
+.discard-stack { position: relative; width: 80px; height: 120px; margin: 20px auto 8px; }
+.stack-card { position: absolute; width: 70px; height: 100px; background: #fff; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.stack-card .card-suit { font-size: 1rem; position: absolute; top: 6px; left: 8px; }
+.stack-card .card-rank { font-size: .9rem; font-weight: bold; position: absolute; top: 5px; right: 7px; }
+.stack-card .card-center { font-size: 1.5rem; }
+.stack-card.suit-h .card-suit, .stack-card.suit-h .card-rank { color: var(--heart); }
+.stack-card.suit-d .card-suit, .stack-card.suit-d .card-rank { color: var(--diamond); }
+.stack-card.suit-s .card-suit, .stack-card.suit-s .card-rank { color: var(--spade); }
+.stack-card.suit-c .card-suit, .stack-card.suit-c .card-rank { color: var(--club); }
+.stack-card.ghost { background: transparent; border: 2px dashed #555; box-shadow: none; }
+.stack-card.ghost .card-suit, .stack-card.ghost .card-rank, .stack-card.ghost .card-center { color: #555 !important; }
+
+/* 花色颜色 */
+.card.suit-h .card-suit, .card.suit-h .card-rank { color: var(--heart); }
+.card.suit-d .card-suit, .card.suit-d .card-rank { color: var(--diamond); }
+.card.suit-s .card-suit, .card.suit-s .card-rank { color: var(--spade); }
+.card.suit-c .card-suit, .card.suit-c .card-rank { color: var(--club); }
+
+/* 小丑牌特殊样式 */
+.card.suit-joker { background: linear-gradient(135deg, #2c2c54, #474787); }
+.card.suit-joker .card-suit,
+.card.suit-joker .card-rank,
+.card.suit-joker .card-center { color: var(--gold); }
+.joker-center { font-size: 2.2rem !important; }
+
+/* 城堡卡牌 */
+.castle-card { background: linear-gradient(135deg, #2c2c54, #40407a); }
+.castle-card .card-suit,
+.castle-card .card-rank,
+.castle-card .card-center { color: var(--gold); }
+
+/* ============================================================
+   操作按钮
+   ============================================================ */
+.action-bar { display: flex; gap: 8px; min-height: var(--btn-h); }
+.action-bar button {
+  flex: 1; height: var(--btn-h); border: none; border-radius: var(--radius);
+  font-size: 1rem; font-weight: bold; cursor: pointer;
+}
+.action-bar button:active { opacity: .85; }
+.action-bar .confirm-btn { background: var(--accent); color: #fff; }
+.action-bar .confirm-btn:disabled { opacity: .4; }
+.action-bar .clear-btn { background: var(--surface); color: var(--text); border: 1px solid #333; }
+.action-bar .joker-btn { background: var(--gold); color: #000; }
+
+/* ============================================================
+   技能结算面板
+   ============================================================ */
+.skill-result { background: var(--surface); border-radius: var(--radius); padding: 14px; }
+.skill-result h3 { font-size: .9rem; margin-bottom: 8px; color: var(--gold); }
+.skill-line { font-size: .85rem; padding: 4px 0; display: flex; align-items: center; gap: 6px; }
+.skill-line .skill-icon { font-size: 1rem; }
+.skill-line.blocked { color: var(--text-dim); text-decoration: line-through; }
+
+/* ============================================================
+   防御面板
+   ============================================================ */
+.defense-info { text-align: center; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.defense-info .defense-title { font-size: 1rem; font-weight: bold; color: var(--danger); margin-bottom: 4px; }
+.defense-info .defense-value { font-size: .85rem; color: var(--text-dim); }
+.defense-selected { text-align: center; padding: 8px; background: var(--card-bg); border-radius: 8px; margin: 8px 0; }
+.defense-selected .def-value { font-size: 1.2rem; font-weight: bold; }
+.defense-selected .def-value.valid { color: var(--safe); }
+.defense-selected .def-value.invalid { color: var(--danger); }
+
+/* ============================================================
+   弹窗（底部抽屉）
+   ============================================================ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .7); z-index: 100;
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--surface); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
+  max-height: 80dvh; overflow-y: auto; padding: 24px 20px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .25s ease-out;
+}
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal h2 { font-size: 1.1rem; margin-bottom: 16px; text-align: center; }
+.modal .modal-btn {
+  width: 100%; height: var(--btn-h); border: none; border-radius: var(--radius);
+  font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 8px;
+}
+.modal .modal-btn:active { opacity: .85; }
+.modal .modal-btn.primary { background: var(--accent); color: #fff; }
+.modal .modal-btn.secondary { background: var(--card-bg); color: var(--text); }
+
+/* ============================================================
+   游戏结束弹窗
+   ============================================================ */
+#gameover-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .8); z-index: 200;
+  display: none; align-items: center; justify-content: center; padding: 32px;
+}
+#gameover-overlay.show { display: flex; }
+.gameover-card {
+  background: var(--surface); border-radius: 20px; padding: 32px 24px;
+  text-align: center; max-width: 360px; width: 100%;
+}
+.gameover-card .go-icon { font-size: 3rem; margin-bottom: 8px; }
+.gameover-card .go-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 8px; }
+.gameover-card .go-title.win { color: var(--gold); }
+.gameover-card .go-title.lose { color: var(--danger); }
+.gameover-card .go-stats { font-size: .9rem; color: var(--text-dim); margin-bottom: 24px; line-height: 1.8; }
+.gameover-card .go-btns { display: flex; flex-direction: column; gap: 8px; }
+.gameover-card .go-btns button {
+  width: 100%; height: var(--btn-h); border: none; border-radius: var(--radius);
+  font-size: 1rem; font-weight: bold; cursor: pointer;
+}
+.gameover-card .go-btns button:active { opacity: .85; }
+.gameover-card .go-btns .primary { background: var(--accent); color: #fff; }
+.gameover-card .go-btns .secondary { background: var(--card-bg); color: var(--text); }
+
+/* ============================================================
+   小丑牌 - 玩家选择器
+   ============================================================ */
+.player-pick { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.player-pick button {
+  width: 100%; height: var(--btn-h); background: var(--card-bg);
+  border: 1px solid #333; border-radius: var(--radius);
+  color: var(--text); font-size: 1rem; cursor: pointer;
+}
+.player-pick button:active { background: #222; }
+.player-pick button.current { opacity: .4; pointer-events: none; }
+
+/* ============================================================
+   游戏日志
+   ============================================================ */
+.log-area {
+  background: var(--surface); border-radius: var(--radius); padding: 10px;
+  max-height: 50vh; overflow-y: auto; font-size: .75rem;
+  color: var(--text-dim); line-height: 1.6;
+}
+.log-sep { text-align: center; color: #555; margin: 4px 0; letter-spacing: 2px; }
+
+/* ============================================================
+   规则弹窗内容
+   ============================================================ */
+.rules-content { font-size: .85rem; line-height: 1.8; }
+.rules-content h3 { color: var(--gold); margin: 12px 0 6px; font-size: .95rem; }
+.rules-content p { margin-bottom: 6px; }
+
+/* ============================================================
+   动画
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn .3s ease-out; }
+
+@keyframes bossHit {
+  0% { opacity: 1; transform: translateX(0); }
+  10% { opacity: .3; transform: translateX(-8px); }
+  20% { opacity: 1; transform: translateX(8px); }
+  30% { opacity: .3; transform: translateX(-6px); }
+  40% { opacity: 1; transform: translateX(6px); }
+  50% { opacity: .3; transform: translateX(-4px); }
+  60% { opacity: 1; transform: translateX(4px); }
+  70% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.boss-hit { animation: bossHit .5s ease-out; }
+
+@keyframes bossAttack {
+  0%   { transform: translateY(0) scale(1); }
+  40%  { transform: translateY(-10px) scale(.97); }
+  55%  { transform: translateY(-12px) scale(.95); }
+  70%  { transform: translateY(28px) scale(1.08); }
+  80%  { transform: translateY(-4px) scale(1.02); }
+  90%  { transform: translateY(2px) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+.boss-attack-anim { position: relative; z-index: 5; }
+.boss-attack-anim .boss-card {
+  animation: bossAttack .8s cubic-bezier(.2,.8,.3,1), bossGlow .8s ease-out;
+}
+@keyframes bossGlow {
+  0%   { box-shadow: 0 0 0 0 transparent; }
+  55%  { box-shadow: 0 0 0 0 transparent; }
+  70%  { box-shadow: 0 0 20px 6px var(--danger); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Boss 退场（抖动渐隐） */
+@keyframes bossDying {
+  0%   { opacity: 1; transform: translateX(0); }
+  15%  { transform: translateX(-6px); }
+  30%  { transform: translateX(6px); opacity: .8; }
+  45%  { transform: translateX(-4px); opacity: .6; }
+  60%  { transform: translateX(4px); opacity: .4; }
+  75%  { transform: translateX(-2px); opacity: .2; }
+  100% { opacity: 0; transform: translateX(0); }
+}
+.boss-dying { animation: bossDying .5s ease-out forwards; }
+
+/* 新Boss入场（透明渐显 + 放大 + 缩回） */
+@keyframes bossEnter {
+  0%   { transform: scale(0.5); opacity: 0.5; }
+  55%  { transform: scale(1); opacity: 1; }
+  72%  { transform: scale(0.93); }
+  84%  { transform: scale(1.04); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.boss-entering { animation: bossEnter .9s cubic-bezier(.2,.8,.3,1) forwards; transform-origin: center center; }
+
+/* 屏幕震动 */
+@keyframes screenShake {
+  0%   { transform: translate(0, 0); }
+  8%   { transform: translate(-5px, 6px); }
+  16%  { transform: translate(6px, -4px); }
+  24%  { transform: translate(-4px, -5px); }
+  32%  { transform: translate(5px, 5px); }
+  40%  { transform: translate(-6px, -3px); }
+  48%  { transform: translate(4px, 6px); }
+  56%  { transform: translate(-3px, -4px); }
+  64%  { transform: translate(5px, 3px); }
+  72%  { transform: translate(-4px, 5px); }
+  80%  { transform: translate(3px, -3px); }
+  88%  { transform: translate(-2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+.screen-shake { animation: screenShake .6s ease-out; }
