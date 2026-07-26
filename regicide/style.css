@@ -4,19 +4,19 @@
 
 /* --- CSS 变量 --- */
 :root {
-  --bg: #1a1a2e;
-  --surface: #16213e;
-  --card-bg: #0f3460;
-  --accent: #e94560;
-  --gold: #f5c518;
-  --text: #eee;
-  --text-dim: #999;
-  --safe: #4caf50;
-  --danger: #f44336;
-  --heart: #e74c3c;
-  --diamond: #e67e22;
-  --spade: #8e9aaf;
-  --club: #27ae60;
+  --bg: #0c0c10;
+  --surface: #18181f;
+  --card-bg: #20202a;
+  --accent: #8b2020;
+  --gold: #b8943e;
+  --text: #d4c5a9;
+  --text-dim: #6b6352;
+  --safe: #5a7247;
+  --danger: #a83232;
+  --heart: #9b2c2c;
+  --diamond: #b87333;
+  --spade: #6b7b8d;
+  --club: #4a7c59;
   --radius: 12px;
   --btn-h: 56px;
 }
@@ -34,10 +34,10 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 }
 #landing .rules-corner { position: absolute; top: max(16px, env(safe-area-inset-top)); right: 16px; }
 #landing .rules-corner button {
-  background: var(--surface); border: 1px solid #333; border-radius: 10px;
+  background: var(--surface); border: 1px solid #2a2a32; border-radius: 10px;
   padding: 7px 12px; font-size: .8rem; cursor: pointer; color: var(--text);
 }
-#landing .rules-corner button:active { background: #222; }
+#landing .rules-corner button:active { background: #252530; }
 #landing .landing-icon { font-size: 3.5rem; margin-bottom: 8px; }
 #landing h1 { font-size: 2rem; color: var(--accent); margin-bottom: 8px; }
 #landing .subtitle { color: var(--text-dim); font-size: .95rem; margin-bottom: 40px; }
@@ -60,10 +60,10 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .setup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .setup-header h1 { font-size: 1.1rem; }
 .back-btn {
-  background: var(--surface); border: 1px solid #333; border-radius: 10px;
+  background: var(--surface); border: 1px solid #2a2a32; border-radius: 10px;
   padding: 7px 12px; font-size: .8rem; cursor: pointer; color: var(--text);
 }
-.back-btn:active { background: #222; }
+.back-btn:active { background: #252530; }
 
 /* 人数选择按钮 */
 .count-select { display: flex; gap: 10px; margin: 12px 0 20px; }
@@ -80,7 +80,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .player-input { display: flex; align-items: center; gap: 10px; }
 .player-input label { font-size: .9rem; color: var(--text-dim); min-width: 50px; }
 .player-input input {
-  flex: 1; height: 44px; background: var(--surface); border: 1px solid #333;
+  flex: 1; height: 44px; background: var(--surface); border: 1px solid #2a2a32;
   border-radius: 8px; padding: 0 12px; color: var(--text); font-size: 1rem;
 }
 .player-input input:focus { outline: none; border-color: var(--accent); }
@@ -109,10 +109,10 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 #game-header h1 { font-size: 1rem; }
 .header-btns { display: flex; gap: 6px; }
 .header-btns button {
-  background: var(--surface); border: 1px solid #333; border-radius: 8px;
+  background: var(--surface); border: 1px solid #2a2a32; border-radius: 8px;
   padding: 6px 10px; font-size: .75rem; cursor: pointer; color: var(--text);
 }
-.header-btns button:active { background: #222; }
+.header-btns button:active { background: #252530; }
 
 #gameContent {
   flex: 1; display: flex; flex-direction: column;
@@ -147,12 +147,12 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   font-size: .6rem; background: var(--danger); padding: 2px 8px;
   border-radius: 4px; color: #fff; align-self: center;
 }
-.boss-info .intimidate-tag.disabled { background: #555; text-decoration: line-through; }
+.boss-info .intimidate-tag.disabled { background: #3a3a42; text-decoration: line-through; }
 
 /* 血条/攻击条 */
 .bar-container { display: flex; align-items: center; gap: 8px; }
 .bar-label { font-size: .75rem; color: var(--text-dim); min-width: 32px; }
-.bar-track { flex: 1; height: 14px; background: #111; border-radius: 7px; overflow: hidden; position: relative; }
+.bar-track { flex: 1; height: 14px; background: #0f0f14; border-radius: 7px; overflow: hidden; position: relative; }
 .bar-fill { height: 100%; border-radius: 7px; transition: width .6s; }
 .bar-fill.hp { background: linear-gradient(90deg, var(--danger), var(--accent)); }
 .bar-value { font-size: .7rem; color: var(--text); min-width: 40px; text-align: right; }
@@ -184,7 +184,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 /* --- 玩家侧边栏 --- */
 .player-sidebar {
   position: fixed; left: 4px; top: 200px;
-  z-index: 20; background: var(--surface); border: 1px solid #333;
+  z-index: 20; background: var(--surface); border: 1px solid #2a2a32;
   border-radius: 10px; padding: 6px;
   display: flex; flex-direction: column; gap: 8px;
 }
@@ -212,7 +212,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 
 /* 单张卡牌 */
 .card {
-  width: 52px; height: 72px; background: #fff; border-radius: 8px;
+  width: 52px; height: 72px; background: #ede7d5; border-radius: 8px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   cursor: pointer; border: 2px solid transparent;
   transition: transform .15s, border-color .15s, box-shadow .15s;
@@ -224,14 +224,14 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .card .card-suit { font-size: .9rem; position: absolute; top: 4px; left: 6px; }
 .card .card-rank { font-size: .8rem; font-weight: bold; position: absolute; top: 3px; right: 5px; }
 .card .card-center { font-size: 1.3rem; }
-.card .card-skill { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: .5rem; color: #666; font-weight: 500; }
+.card .card-skill { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: .5rem; color: #8a7e6b; font-weight: 500; }
 .card.suit-h .card-skill { color: var(--heart); }
 .card.suit-d .card-skill { color: var(--diamond); }
 .card.suit-s .card-skill { color: var(--spade); }
 .card.suit-c .card-skill { color: var(--club); }
 
 /* Skill tooltip bubble */
-.skill-tooltip { position: fixed; z-index: 300; background: #222; color: var(--text); border: 1px solid #555; border-radius: 10px; padding: 10px 14px; font-size: .8rem; line-height: 1.5; max-width: 240px; box-shadow: 0 4px 16px rgba(0,0,0,.6); pointer-events: none; }
+.skill-tooltip { position: fixed; z-index: 300; background: #252530; color: var(--text); border: 1px solid #3a3a42; border-radius: 10px; padding: 10px 14px; font-size: .8rem; line-height: 1.5; max-width: 240px; box-shadow: 0 4px 16px rgba(0,0,0,.6); pointer-events: none; }
 .skill-tooltip .tip-title { font-weight: bold; margin-bottom: 4px; }
 .skill-tooltip .tip-title.h { color: var(--heart); }
 .skill-tooltip .tip-title.d { color: var(--diamond); }
@@ -240,7 +240,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 
 /* Discard pile card stack */
 .discard-stack { position: relative; width: 80px; height: 120px; margin: 20px auto 8px; }
-.stack-card { position: absolute; width: 70px; height: 100px; background: #fff; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.stack-card { position: absolute; width: 70px; height: 100px; background: #ede7d5; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .stack-card .card-suit { font-size: 1rem; position: absolute; top: 6px; left: 8px; }
 .stack-card .card-rank { font-size: .9rem; font-weight: bold; position: absolute; top: 5px; right: 7px; }
 .stack-card .card-center { font-size: 1.5rem; }
@@ -248,8 +248,8 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .stack-card.suit-d .card-suit, .stack-card.suit-d .card-rank { color: var(--diamond); }
 .stack-card.suit-s .card-suit, .stack-card.suit-s .card-rank { color: var(--spade); }
 .stack-card.suit-c .card-suit, .stack-card.suit-c .card-rank { color: var(--club); }
-.stack-card.ghost { background: transparent; border: 2px dashed #555; box-shadow: none; }
-.stack-card.ghost .card-suit, .stack-card.ghost .card-rank, .stack-card.ghost .card-center { color: #555 !important; }
+.stack-card.ghost { background: transparent; border: 2px dashed #3a3a42; box-shadow: none; }
+.stack-card.ghost .card-suit, .stack-card.ghost .card-rank, .stack-card.ghost .card-center { color: #3a3a42 !important; }
 
 /* 花色颜色 */
 .card.suit-h .card-suit, .card.suit-h .card-rank { color: var(--heart); }
@@ -258,14 +258,14 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .card.suit-c .card-suit, .card.suit-c .card-rank { color: var(--club); }
 
 /* 小丑牌特殊样式 */
-.card.suit-joker { background: linear-gradient(135deg, #2c2c54, #474787); }
+.card.suit-joker { background: linear-gradient(135deg, #1a1218, #2d1a1a); }
 .card.suit-joker .card-suit,
 .card.suit-joker .card-rank,
 .card.suit-joker .card-center { color: var(--gold); }
 .joker-center { font-size: 2.2rem !important; }
 
 /* 城堡卡牌 */
-.castle-card { background: linear-gradient(135deg, #2c2c54, #40407a); }
+.castle-card { background: linear-gradient(135deg, #1a1a22, #2a2530); }
 .castle-card .card-suit,
 .castle-card .card-rank,
 .castle-card .card-center { color: var(--gold); }
@@ -281,7 +281,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .action-bar button:active { opacity: .85; }
 .action-bar .confirm-btn { background: var(--accent); color: #fff; }
 .action-bar .confirm-btn:disabled { opacity: .4; }
-.action-bar .clear-btn { background: var(--surface); color: var(--text); border: 1px solid #333; }
+.action-bar .clear-btn { background: var(--surface); color: var(--text); border: 1px solid #2a2a32; }
 .action-bar .joker-btn { background: var(--gold); color: #000; }
 
 /* ============================================================
@@ -361,10 +361,10 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .player-pick { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .player-pick button {
   width: 100%; height: var(--btn-h); background: var(--card-bg);
-  border: 1px solid #333; border-radius: var(--radius);
+  border: 1px solid #2a2a32; border-radius: var(--radius);
   color: var(--text); font-size: 1rem; cursor: pointer;
 }
-.player-pick button:active { background: #222; }
+.player-pick button:active { background: #252530; }
 .player-pick button.current { opacity: .4; pointer-events: none; }
 
 /* ============================================================
@@ -375,7 +375,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   max-height: 50vh; overflow-y: auto; font-size: .75rem;
   color: var(--text-dim); line-height: 1.6;
 }
-.log-sep { text-align: center; color: #555; margin: 4px 0; letter-spacing: 2px; }
+.log-sep { text-align: center; color: #3a3a42; margin: 4px 0; letter-spacing: 2px; }
 
 /* ============================================================
    规则弹窗内容
