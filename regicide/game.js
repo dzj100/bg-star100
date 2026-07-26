@@ -785,6 +785,44 @@ function confirmPlay() {
   const selected = [...state.selectedHandIndices].sort((a, b) => b - a);
   const cards = selected.map(i => player.hand[i]);
 
+  // 震慑花色预警（未勾选"不再提示"时）
+  const boss = state.currentBoss;
+  const skipTip = sessionStorage.getItem('regicide-skip-intimidate-tip');
+  if (boss && boss.intimidateActive && !state.extraTurnIntimidate && !skipTip) {
+    const intimidated = cards.filter(c => c.suit === boss.suit && c.suit !== 'joker');
+    if (intimidated.length > 0) {
+      const suitName = SUIT_NAMES[boss.suit];
+      const names = intimidated.map(c => suitName + RANK_NAMES[c.rank]).join('、');
+      const content = `
+        <h2>⚠️ 震慑预警</h2>
+        <p style="text-align:center;color:var(--text-dim);margin:12px 0;">
+          当前Boss为 <strong style="color:var(--gold)">${suitName}${boss.card.rank}</strong>，震慑花色 ${suitName}。<br>
+          选中的 <strong style="color:var(--danger)">${names}</strong> 技能将失效，仅计入数值。
+        </p>
+        <p style="text-align:center;margin:8px 0 16px;">
+          <label class="chk">
+            <input type="checkbox" id="skipIntimidateTip">
+            <span class="box"></span>
+            本局不再提示
+          </label>
+        </p>
+        <button class="modal-btn primary" onclick="proceedAfterIntimidateTip()">继续出牌</button>
+        <button class="modal-btn secondary" onclick="cancelIntimidateTip()">返回更换</button>`;
+      openModal(content);
+      return;
+    }
+  }
+
+  doConfirmPlay(cards, selected);
+}
+
+/**
+ * 真正执行出牌：移出手牌、重置跳过计数、进入技能结算或小丑流程
+ * 由 confirmPlay 直接调用，或被震慑预警确认后调用
+ */
+function doConfirmPlay(cards, selected) {
+  const player = state.players[state.currentPlayerIndex];
+
   // 从手牌中移除（倒序避免索引偏移）
   for (const i of selected) {
     player.hand.splice(i, 1);
@@ -805,6 +843,28 @@ function confirmPlay() {
   resolveSkills(cards);
   saveState();
   renderGame();
+}
+
+/**
+ * 震慑预警弹窗 → 继续出牌
+ */
+function proceedAfterIntimidateTip() {
+  const cb = document.getElementById('skipIntimidateTip');
+  if (cb && cb.checked) sessionStorage.setItem('regicide-skip-intimidate-tip', '1');
+  const player = state.players[state.currentPlayerIndex];
+  const selected = [...state.selectedHandIndices].sort((a, b) => b - a);
+  const cards = selected.map(i => player.hand[i]);
+  closeModal();
+  doConfirmPlay(cards, selected);
+}
+
+/**
+ * 震慑预警弹窗 → 返回更换
+ */
+function cancelIntimidateTip() {
+  const cb = document.getElementById('skipIntimidateTip');
+  if (cb && cb.checked) sessionStorage.setItem('regicide-skip-intimidate-tip', '1');
+  closeModal();
 }
 
 /**

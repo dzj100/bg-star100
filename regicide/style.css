@@ -325,6 +325,39 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .modal .modal-btn.primary { background: var(--accent); color: #fff; }
 .modal .modal-btn.secondary { background: var(--card-bg); color: var(--text); }
 
+/* 自定义勾选框（地下城主题） */
+.chk {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .85rem; color: var(--text-dim); cursor: pointer;
+  user-select: none;
+}
+.chk input[type="checkbox"] {
+  position: absolute; opacity: 0; pointer-events: none;
+}
+.chk .box {
+  width: 16px; height: 16px;
+  background: var(--card-bg);
+  border: 1px solid #3a3a42;
+  border-radius: 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.chk .box::after {
+  content: '';
+  width: 4px; height: 8px;
+  border: solid var(--gold);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform .15s;
+}
+.chk input:checked + .box {
+  background: #2a2218;
+  border-color: var(--gold);
+}
+.chk input:checked + .box::after { transform: rotate(45deg) scale(1); }
+.chk:active .box { opacity: .7; }
+
 /* ============================================================
    游戏结束弹窗
    ============================================================ */
