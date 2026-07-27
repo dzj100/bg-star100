@@ -526,3 +526,85 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .boss-float-num.weaken { color: #783cb4; }
 .boss-float-num.unseal { color: #d8a523; font-size: 1.6rem; }
 .boss-float-num.damage { color: #db2424; font-size: 1.55rem; }
+
+/* ============================================================
+   联机大厅
+   ============================================================ */
+#online {
+  display: none; flex-direction: column; min-height: 100dvh; padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+/* 牌背（非本人回合手牌） */
+.card.card-back {
+  background: repeating-linear-gradient(
+    45deg,
+    #1a1a2e,
+    #1a1a2e 6px,
+    #252540 6px,
+    #252540 12px
+  );
+  border: 2px solid #3a3a52;
+  cursor: default;
+}
+.card.card-back::after {
+  content: '';
+  width: 20px; height: 20px;
+  border: 2px solid #4a4a6a;
+  border-radius: 50%;
+}
+.player-widget.current-turn {
+  border-left: 3px solid var(--gold);
+  background: rgba(184, 148, 62, .08);
+}
+.player-widget.departed {
+  opacity: .45;
+  border-left: 3px solid var(--danger);
+}
+
+/* 联机：非自己回合 → 手牌半透明 + 禁用操作 */
+.bottom-section.online-waiting .hand-cards {
+  opacity: .35;
+  pointer-events: none;
+}
+.bottom-section.online-waiting .action-bar {
+  pointer-events: none;
+  opacity: .3;
+}
+.online-wait-banner {
+  text-align: center;
+  padding: 10px;
+  color: var(--text-dim);
+  font-size: .85rem;
+  background: rgba(0,0,0,.2);
+  border-radius: 6px;
+  margin-top: 4px;
+}
+.online-wait-banner strong {
+  color: var(--gold);
+}
+.my-turn-indicator {
+  text-align: center;
+  padding: 6px;
+  color: var(--safe);
+  font-size: .85rem;
+  font-weight: bold;
+  background: rgba(0,0,0,.2);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.takeover-banner {
+  text-align: center;
+  padding: 8px;
+  color: var(--gold);
+  font-size: .85rem;
+  font-weight: bold;
+  background: rgba(184, 148, 62, .12);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.takeover-banner strong {
+  color: var(--danger);
+}

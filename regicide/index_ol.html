@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>弑君者</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 首页 -->
+<div id="landing">
+  <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
+  <div class="landing-icon">⚔️</div>
+  <h1>弑君者</h1>
+  <p class="subtitle">合作制卡牌桌游助手</p>
+  <!-- <button class="start-btn" onclick="showSetup()">开始游戏</button> -->
+  <button class="start-btn" onclick="showOnlineLobby()" style="background:var(--surface);border:1px solid var(--gold);color:var(--gold);margin-top:8px;">联机模式</button>
+  <div class="credit">@imStar100</div>
+</div>
+
+<!-- 设置页 -->
+<div id="setup">
+  <div class="setup-header">
+    <h1>⚔️ 弑君者</h1>
+    <button class="back-btn" onclick="showLanding()">✕ 返回</button>
+  </div>
+  <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px;">选择玩家人数</p>
+  <div class="count-select" id="countSelect"></div>
+  <div class="player-inputs" id="playerInputs"></div>
+  <button class="start-game-btn" id="startGameBtn" onclick="startGame()" disabled>开始冒险</button>
+</div>
+
+<!-- 联机大厅 -->
+<div id="online">
+</div>
+
+<!-- 游戏界面 -->
+<div id="game">
+  <div id="game-header">
+    <h1>⚔️ 弑君者</h1>
+    <div class="header-btns">
+      <button onclick="showRules()">📖 规则</button>
+    </div>
+  </div>
+  <div id="gameContent"></div>
+</div>
+
+<!-- 游戏结束弹窗 -->
+<div id="gameover-overlay">
+  <div class="gameover-card fade-in" id="gameoverCard"></div>
+</div>
+
+<!-- 通用弹窗 -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script src="boss-svg.js"></script>
+<script src="game.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="net.js"></script>
+<script src="online.js"></script>
+</body>
+</html>
