@@ -652,7 +652,7 @@ function renderPlayPhase() {
   let actionsHTML = `<div class="action-bar">`;
   if (selected.length > 0) {
     actionsHTML += `<button class="clear-btn" onclick="clearSelection()">清空选择</button>`;
-    actionsHTML += `<button class="confirm-btn" onclick="confirmPlay()" ${canConfirm ? '' : 'disabled'}>确认出牌${validation.valid ? '' : ' (' + validation.reason + ')'}</button>`;
+    actionsHTML += `<button class="confirm-btn" onclick="confirmPlay()" ${canConfirm ? '' : 'disabled'}>确认出牌${validation.valid ? '' : ' <br>(' + validation.reason + ')'}</button>`;
   } else {
     actionsHTML += `<button class="clear-btn" onclick="passPlay()" ${canPass ? '' : 'disabled'}>跳过出牌${canPass ? '' : ` (已连续${passLimit}次，无法跳过)`}</button>`;
   }
@@ -666,7 +666,7 @@ function renderPlayPhase() {
 
   // 无效组合提示
   if (!validation.valid && selected.length > 0) {
-    actionsHTML += `<div style="text-align:center;font-size:.75rem;color:var(--danger);margin-top:4px;">${validation.reason}</div>`;
+    // actionsHTML += `<div style="text-align:center;font-size:.75rem;color:var(--danger);margin-top:4px;">${validation.reason}</div>`;
   }
 
   return handHTML + actionsHTML;
@@ -860,6 +860,7 @@ function doConfirmPlay(cards, selected) {
   resolveSkills(cards, intimidatedSuits);
   saveState();
   renderGame();
+  triggerPendingAnims();
 }
 
 /**
@@ -948,14 +949,10 @@ function resolveSkills(cards, intimidatedSuits = new Set()) {
       // 黑桃虚弱特殊处理：被震慑时不立即生效，累计到 pendingWeaken，等小丑解封后补结算
       if (suit === 's') {
         state.pendingWeaken = (state.pendingWeaken || 0) + totalValue;
-        // results.push({ suit, value: totalValue, skill: SUIT_SKILL[suit], blocked: true, detail: `被震慑封印 ${totalValue} 点虚弱，待解封后补扣` });
-        // 封印时的日志意义不大（技能结算面板已展示 detail），小丑解封补扣时再记录
-        // continue;
       }
       results.push({ suit, value: totalValue, skill: SUIT_SKILL[suit], blocked: true, detail: `${SUIT_NAMES[suit]}震慑 - 技能失效` });
       continue;
     }
-
     let detail = '';
     switch (suit) {
       case 'h': {
@@ -1008,6 +1005,9 @@ function resolveSkills(cards, intimidatedSuits = new Set()) {
           const oldAtk = boss.currentAttack;
           boss.currentAttack = Math.max(0, boss.currentAttack - totalValue);
           detail = `Boss攻击力 ${oldAtk} → ${boss.currentAttack}`;
+          if (oldAtk !== boss.currentAttack) {
+            state._weakenAnim = { value: totalValue, from: oldAtk, to: boss.currentAttack };
+          }
         }
         break;
       }
@@ -1077,8 +1077,10 @@ function proceedToDamage() {
   state.subPhase = 'damage';
   state.damageDealt = damage;
   state.hasClub = clubNotBlocked;
+  state._damageAnim = { value: damage, club: clubNotBlocked };
   saveState();
   renderGame();
+  triggerPendingAnims();
 }
 
 /**
@@ -1365,6 +1367,7 @@ function handleJokerPlay() {
       const oldAtk = boss.currentAttack;
       boss.currentAttack = Math.max(0, boss.currentAttack - pending);
       addLog(`🃏 解封虚弱! Boss攻击力补扣 ${pending} 点 (${oldAtk} → ${boss.currentAttack})`);
+      state._weakenAnim = { value: pending, from: oldAtk, to: boss.currentAttack, isUnseal: true };
       state.pendingWeaken = 0;
     }
   }
@@ -1384,6 +1387,7 @@ function handleJokerPlay() {
   }
   saveState();
   renderGame();
+  triggerPendingAnims();
 }
 
 /**
@@ -1769,6 +1773,107 @@ function openModal(html) {
  */
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('show');
+}
+
+/* ============================================================
+   虚弱动画触发器（renderGame 后调用）
+   ============================================================ */
+
+/**
+ * 在 renderGame 完成后调用：
+ *   - state._weakenAnim → 触发紫色脉冲 + 飘字（isUnseal=true 时飘 "🃏 -N" 金色）
+ *   - state._damageAnim → 飘红色伤害数字（-N 或 -N(×2)）
+ * 一次性消费 flag，避免重复触发。两者同帧触发时各自独立飘字。
+ */
+function triggerPendingAnims() {
+  const weaken = state && state._weakenAnim;
+  const damage = state && state._damageAnim;
+  if (weaken) state._weakenAnim = null;
+  if (damage) state._damageAnim = null;
+  if (!weaken && !damage) return;
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const bossArea = document.querySelector('.boss-area');
+      const bossCard = document.querySelector('.boss-card');
+      if (!bossArea || !bossCard) return;
+
+      if (weaken) {
+        bossArea.classList.remove('boss-weaken-anim');
+        void bossArea.offsetWidth;
+        bossArea.classList.add('boss-weaken-anim');
+        const text = weaken.isUnseal ? `-${weaken.value}` : `-${weaken.value}`;
+        const type = weaken.isUnseal ? 'unseal' : 'weaken';
+        addFloatNumber(bossCard, text, type);
+        bossCard.addEventListener('animationend', () => bossArea.classList.remove('boss-weaken-anim'), { once: true });
+      }
+
+      if (damage) {
+        const text = damage.club ? `-${damage.value}` : `-${damage.value}`;
+        addFloatNumber(bossCard, text, 'damage');
+      }
+    });
+  });
+}
+
+/**
+ * 在 boss-card 上方插入一个飘浮数字元素，动画结束后自动移除
+ * @param {HTMLElement} bossCard
+ * @param {string} text - 显示文本，如 "-5" 或 "🃏 -10"
+ * @param {'weaken'|'unseal'} type
+ */
+function addFloatNumber(bossCard, text, type) {
+  const el = document.createElement('div');
+  el.className = 'boss-float-num ' + type;
+  el.textContent = text;
+  bossCard.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+/* ============================================================
+   调试入口（浏览器控制台调用）
+   ============================================================ */
+
+/**
+ * 在 window 上挂出调试函数：
+ *   debugWeaken(n = 5)           → 模拟一次普通虚弱（紫色脉冲 + 飘 "-n"）
+ *   debugWeaken(n, true)         → 模拟一次小丑解封虚弱（紫色脉冲 + 飘 "🃏 -n"）
+ *   debugDamage(n = 10, club)    → 模拟一次伤害飘字（红色 "-n"，club=true 时显示 "-n(×2)"）
+ *   debugWeakenLive(n = 5, isUnseal) → 真实修改当前 Boss 攻击力并触发对应动画（需在游戏内）
+ * 调用示例：debugWeaken(5) / debugWeaken(10, true) / debugDamage(14, true) / debugWeakenLive(7)
+ */
+if (typeof window !== 'undefined') {
+  window.debugWeaken = (n = 5, isUnseal = false) => {
+    const bossArea = document.querySelector('.boss-area');
+    const bossCard = document.querySelector('.boss-card');
+    if (!bossArea || !bossCard) return console.warn('未找到 .boss-card / .boss-area，请先进入游戏界面');
+    bossArea.classList.remove('boss-weaken-anim');
+    void bossArea.offsetWidth;
+    bossArea.classList.add('boss-weaken-anim');
+    const text = isUnseal ? `-${n}` : `-${n}`;
+    const type = isUnseal ? 'unseal' : 'weaken';
+    addFloatNumber(bossCard, text, type);
+    bossCard.addEventListener('animationend', () => bossArea.classList.remove('boss-weaken-anim'), { once: true });
+    return isUnseal ? `模拟解封脉冲 -${n}` : `模拟虚弱脉冲 -${n}`;
+  };
+  window.debugDamage = (n = 10, club = false) => {
+    const bossCard = document.querySelector('.boss-card');
+    if (!bossCard) return console.warn('未找到 .boss-card，请先进入游戏界面');
+    const text = club ? `-${n}` : `-${n}`;
+    addFloatNumber(bossCard, text, 'damage');
+    return `模拟伤害飘字 ${text}`;
+  };
+  window.debugWeakenLive = (n = 5, isUnseal = false) => {
+    if (!state || !state.currentBoss) return console.warn('当前无 Boss');
+    const boss = state.currentBoss;
+    const oldAtk = boss.currentAttack;
+    boss.currentAttack = Math.max(0, boss.currentAttack - n);
+    state._weakenAnim = { value: n, from: oldAtk, to: boss.currentAttack, isUnseal };
+    saveState();
+    renderGame();
+    triggerPendingAnims();
+    return `真实虚弱：攻击力 ${oldAtk} → ${boss.currentAttack}`;
+  };
 }
 
 /* ============================================================
