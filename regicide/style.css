@@ -423,16 +423,16 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .fade-in { animation: fadeIn .3s ease-out; }
 
 @keyframes bossHit {
-  0% { opacity: 1; transform: translateX(0); }
-  10% { opacity: .3; transform: translateX(-8px); }
-  20% { opacity: 1; transform: translateX(8px); }
-  30% { opacity: .3; transform: translateX(-6px); }
-  40% { opacity: 1; transform: translateX(6px); }
-  50% { opacity: .3; transform: translateX(-4px); }
-  60% { opacity: 1; transform: translateX(4px); }
-  70% { transform: translateX(-2px); }
-  80% { transform: translateX(2px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% { opacity: 1; transform: translateY(0); }
+  10% { opacity: .3; transform: translateY(-8px); }
+  20% { opacity: 1; transform: translateY(8px); }
+  30% { opacity: .3; transform: translateY(-6px); }
+  40% { opacity: 1; transform: translateY(6px); }
+  50% { opacity: .3; transform: translateY(-4px); }
+  60% { opacity: 1; transform: translateY(4px); }
+  70% { transform: translateY(-2px); }
+  80% { transform: translateY(2px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 .boss-hit { animation: bossHit .5s ease-out; }
 
@@ -471,7 +471,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 /* 新Boss入场（透明渐显 + 放大 + 缩回） */
 @keyframes bossEnter {
   0%   { transform: scale(0.5); opacity: 0.5; }
-  55%  { transform: scale(1); opacity: 1; }
+  55%  { transform: scale(1.2) rotate(-5deg); opacity: 1; }
   72%  { transform: scale(0.93); }
   84%  { transform: scale(1.04); }
   100% { transform: scale(1); opacity: 1; }

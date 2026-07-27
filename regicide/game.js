@@ -24,7 +24,7 @@ const SUIT_SKILL = { h: '治愈', d: '增援', s: '虚弱', c: '强力' };
 /** 震慑效果描述 */
 const INTIMIDATE_DESC = {
   h: '无法从弃牌堆回收卡牌',
-  d: '无法抽取额外卡牌',
+  d: '无法从酒馆抽取卡牌',
   s: '无法降低Boss攻击力',
   c: '受到伤害不会翻倍',
 };
@@ -252,6 +252,7 @@ function initState(players, playerCount) {
     extraTurnPlayer: null,     // 小丑指定的额外回合玩家索引
     extraTurnIntimidate: false, // 额外回合内震慑是否失效
     jokerUser: null,           // 打出小丑牌的玩家索引（用于回合流转）
+    pendingWeaken: 0,          // 被震慑封印、待小丑解封后补结算的虚弱累计值
     gameResult: null,          // 游戏结果: 'win' | 'lose' | null
     log: [],                   // 游戏日志（最新在前）
     convertedCount: 0,         // 感化Boss计数
@@ -343,6 +344,7 @@ function revealNextBoss() {
     intimidateActive: true,      // 震慑是否有效
     name: stats.name,
   };
+  state.pendingWeaken = 0;       // 新Boss登场，前一个Boss的"虚弱欠条"作废
   state.subPhase = 'play';
   state.playedCards = [];
   state.selectedHandIndices = [];
@@ -451,7 +453,7 @@ function renderBossArea() {
       </div>
       <div class="boss-info">
         <div class="boss-title">${suitSymbol}${b.card.rank} ${b.name}</div>
-        <div class="intimidate-tag ${intimidateClass}">震慑${intimidateSkill}（${intimidateDesc}）</div>
+        <div class="intimidate-tag ${intimidateClass}">震慑 #${intimidateSkill}（${intimidateDesc}）</div>
         <div class="bar-container">
           <span class="bar-label">血量</span>
           <div class="bar-track"><div class="bar-fill hp" style="width:${renderHp}%"></div></div>
@@ -544,10 +546,10 @@ function getSkillDescription(suit, value, rank) {
   const valSuffix = isFace ? ` (数值${value})` : '';
   switch (suit) {
     case 'h': return { title: `♥ 治愈 ${value}`, desc: '从弃牌堆随机取' + value + '张牌，放回酒馆（牌库）底部' + valSuffix };
-    case 'd': return { title: `♦ 增援 ${value}`, desc: '从酒馆摸' + value + '张牌，轮流分给各玩家（不超过手牌上限）' + valSuffix };
+    case 'd': return { title: `♦ 增援 ${value}`, desc: '玩家轮流从酒馆摸1张牌，如持有手牌上限则跳过，累计摸' + value + '张牌' + valSuffix };
     case 's': return { title: `♠ 虚弱 ${value}`, desc: 'Boss本回合攻击力减少' + value + '点' + valSuffix };
     case 'c': return { title: `♣ 强力`, desc: '本次出牌造成的伤害翻倍' + valSuffix };
-    case 'joker': return { title: '🃏 小丑牌', desc: '打出后指定一名玩家立即执行一个额外回合（震慑失效）；单人模式下可换牌' };
+    case 'joker': return { title: '🃏 小丑牌', desc: '打出后Boss的震慑失效，指定一名玩家立即执行一个额外回合' };
     default: return { title: '', desc: '' };
   }
 }
@@ -943,6 +945,13 @@ function resolveSkills(cards, intimidatedSuits = new Set()) {
     const isIntimidated = intimidatedSuits.has(suit);
 
     if (isIntimidated) {
+      // 黑桃虚弱特殊处理：被震慑时不立即生效，累计到 pendingWeaken，等小丑解封后补结算
+      if (suit === 's') {
+        state.pendingWeaken = (state.pendingWeaken || 0) + totalValue;
+        // results.push({ suit, value: totalValue, skill: SUIT_SKILL[suit], blocked: true, detail: `被震慑封印 ${totalValue} 点虚弱，待解封后补扣` });
+        // 封印时的日志意义不大（技能结算面板已展示 detail），小丑解封补扣时再记录
+        // continue;
+      }
       results.push({ suit, value: totalValue, skill: SUIT_SKILL[suit], blocked: true, detail: `${SUIT_NAMES[suit]}震慑 - 技能失效` });
       continue;
     }
@@ -961,7 +970,7 @@ function resolveSkills(cards, intimidatedSuits = new Set()) {
           const idx = state.discardPile.findIndex(c => c.id === card.id);
           if (idx >= 0) state.discardPile.splice(idx, 1);
         }
-        detail = `从弃牌堆取${n}张牌放入酒馆底部`;
+        detail = `从弃牌堆随机取${n}张牌放入酒馆底部`;
         break;
       }
       case 'd': {
@@ -1153,7 +1162,7 @@ function resolveBossDamage() {
         saveState();
         renderGame();
       }, 600);
-    }, 800);
+    }, 650);
   }, 600);
 }
 
@@ -1349,6 +1358,15 @@ function handleJokerPlay() {
   if (boss) {
     boss.intimidateActive = false;
     addLog(`${state.players[state.currentPlayerIndex].name} 🃏 小丑牌! ${SUIT_NAMES[boss.suit]}${boss.card.rank} 永久失去震慑!`);
+
+    // 解封后补结算此前被震慑封印的虚弱累计值
+    const pending = state.pendingWeaken || 0;
+    if (pending > 0) {
+      const oldAtk = boss.currentAttack;
+      boss.currentAttack = Math.max(0, boss.currentAttack - pending);
+      addLog(`🃏 解封虚弱! Boss攻击力补扣 ${pending} 点 (${oldAtk} → ${boss.currentAttack})`);
+      state.pendingWeaken = 0;
+    }
   }
 
   // 小丑牌移入弃牌堆
@@ -1625,19 +1643,19 @@ function showRules() {
         <tr><td>Q 王后</td><td>30</td><td>15</td><td>15</td></tr>
         <tr><td>K 国王</td><td>40</td><td>20</td><td>20</td></tr>
       </table>
-      <p style="font-size:.75rem;color:var(--text-dim)">感化：恰好将血量扣到0时，Boss牌放回酒馆顶部，后续可被摸起当伤害牌使用</p>
+      <p style="font-size:.75rem;color:var(--text-dim)">感化：恰好将血量扣到0时，Boss牌放入酒馆顶部，后续可被摸起当手牌使用</p>
 
       <h3>回合阶段</h3>
       <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，单人限1次、多人至多连续「人数-1」人次）</p>
       <p><strong>② 技能结算</strong>：按花色触发技能效果</p>
       <p><strong>③ 造成伤害</strong>：牌面数字之和扣减Boss血量（梅花×2）</p>
-      <p><strong>④ Boss处理</strong>：血量&lt;0击杀 / 恰好=0感化(放回酒馆) / &gt;0进入攻击</p>
+      <p><strong>④ Boss处理</strong>：血量&lt;0击杀 / 恰好=0感化(放入酒馆) / &gt;0进入攻击</p>
       <p><strong>⑤ Boss攻击</strong>：玩家打出手牌≥Boss攻击力进行防御</p>
-      <p style="font-size:.75rem;color:var(--text-dim)">Boss被击杀/感化后跳过⑤，当前玩家继续行动</p>
+      <p style="font-size:.75rem;color:var(--text-dim)">Boss被击杀/感化后跳过⑤，下一位Boss登场，当前玩家继续新一回合</p>
 
       <h3>花色技能</h3>
-      <p>♥ <strong>治愈</strong>: 从弃牌堆取牌放回酒馆底部</p>
-      <p>♦ <strong>增援</strong>: 玩家轮流抽牌</p>
+      <p>♥ <strong>治愈</strong>: 从弃牌堆随机取牌放回酒馆底部</p>
+      <p>♦ <strong>增援</strong>: 玩家轮流从酒馆抽牌</p>
       <p>♠ <strong>虚弱</strong>: 降低Boss攻击力</p>
       <p>♣ <strong>强力</strong>: 伤害翻倍</p>
 
@@ -1647,11 +1665,11 @@ function showRules() {
 
       <h3>出牌规则</h3>
       <p>单张1~10/J/Q/K / 对子1~5 / 三条1~3 / 四个1或2</p>
-      <p>数字1可单独打出、多张组合、或搭配其他牌（1+X / 1+对子 / 1+三条）</p>
+      <p>数字1可单独打出、多张组合、或搭配其他牌（1+X）</p>
       <p>多张结算：数字求和，每种花色按总和触发一次（同花色不重复）</p>
 
       <h3>小丑牌</h3>
-      <p>多人：打出后Boss永久失去震慑，指定一名玩家额外回合</p>
+      <p>多人：数值视为0，打出后Boss永久失去震慑，指定一名玩家额外回合（2人游戏没有小丑牌; 3人游戏加入1张; 4人游戏加入2张）</p>
       <p>单人：点击顶部🃏换牌按钮，弃掉所有手牌摸8张新牌（限2次）</p>
 
       <h3>失败条件</h3>
@@ -1738,7 +1756,7 @@ function showDiscardPile() {
     </div>`;
   });
   stackHTML += '</div>';
-  openModal(`<h2>弃牌堆 (${pile.length}张)</h2>${stackHTML}<p style="text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:12px;">最近弃置的牌（最新在上）</p>`);
+  openModal(`<h2>弃牌堆 (${pile.length}张)</h2>${stackHTML}<p style="text-align:center;color:var(--text-dim);font-size:.75rem;margin-top:12px;">只能查看弃牌堆最上面的1张</p>`);
 }
 
 function openModal(html) {
