@@ -272,9 +272,11 @@ function _subscribeToRoom(roomId) {
     if (row.status === 'playing' && row.state) {
       // 当前回合进行人（或房主接管已离开玩家回合）是数据源，不同步 Realtime，避免回声二次播放。
       // 但"刚接过回合"的首条推送必须放行（本地 state.cur 还是上一位玩家），否则会丢失回合切换信号。
+      // 对房主接管场景：只跳过 src 来自自己（host）的回声；其他人推出的"轮到你接管"通知必须放行。
       const curPlayer = row.state.currentPlayerIndex;
       const departed = row.state.departedPlayers || [];
-      const iTakeover = _isHost && departed.includes(curPlayer);
+      const iTakeover = _isHost && departed.includes(curPlayer)
+        && (row.state._src === _mySeatIndex);
       const localCur = state && state.currentPlayerIndex;
       const iAmAlreadyOperator = curPlayer === _mySeatIndex && localCur === _mySeatIndex;
       if (iAmAlreadyOperator || iTakeover) return;
@@ -350,6 +352,13 @@ window.saveState = function() {
     return;
   }
 
+  // 游戏结束后不再推送：renderGameOver 覆盖已推过一次 status='finished'，
+  // 之后的 saveState（UI 交互、renderGame 副作用）再推只会产生重复 RECV。
+  if (state && state.phase === 'game-over') {
+    console.log('[saveState] SKIP phase=game-over');
+    return;
+  }
+
   // 操作者判定：当前行动玩家本人，或上一回合行动玩家（用于 nextTurn 后推送"切回合"状态），
   // 或房主接管已离开玩家回合。
   const hasDeparted = _isHost && state && state.departedPlayers && state.departedPlayers.length > 0;
@@ -368,15 +377,9 @@ window.saveState = function() {
     return;
   }
 
-  // 推送前打标记：pushId = "{座位}-{本座位序号}"，全局唯一；记入 _myPushedIds 用于识别回声
-  _myPushSeq++;
-  const pushId = _mySeatIndex + '-' + _myPushSeq;
-  state._pushId = pushId;
-  state._src = _mySeatIndex;
-  _myPushedIds.add(pushId);
-  console.log('[PUSH] seat=', _mySeatIndex, 'pushId=', pushId,
-    'cur=', state.currentPlayerIndex, 'sub=', state.subPhase);
-  netUpdateGameState(_onlineRoomId, state);
+  // 推送前打标记并发送：抽成 _markPushAndSend 以便 _onTakeoverPlayer 等直接调用点复用，
+  // 防止绕过 saveState 的推送被自己的 Realtime 回声覆盖。
+  _markPushAndSend(state);
 
   // 推送成功：本次自己是操作者 → 记录座位；下次若 currentPlayerIndex 切走，仍允许再推一次
   if (isCurrentActor) {
@@ -385,6 +388,21 @@ window.saveState = function() {
     _pendingPushSeat = null;
   }
 };
+
+/**
+ * 给 state 打上 pushId 标记、记入 _myPushedIds，再发到 Supabase。
+ * 供 saveState 与直接 netUpdateGameState 的调用点（如 _onTakeoverPlayer）复用。
+ */
+function _markPushAndSend(stateObj) {
+  _myPushSeq++;
+  const pushId = _mySeatIndex + '-' + _myPushSeq;
+  stateObj._pushId = pushId;
+  stateObj._src = _mySeatIndex;
+  _myPushedIds.add(pushId);
+  console.log('[PUSH] seat=', _mySeatIndex, 'pushId=', pushId,
+    'cur=', stateObj.currentPlayerIndex, 'sub=', stateObj.subPhase);
+  netUpdateGameState(_onlineRoomId, stateObj);
+}
 
 /* ============================================================
    游戏集成：非我的回合 → 覆盖底部区域
@@ -451,8 +469,14 @@ window.renderGame = function() {
         content.insertBefore(banner, content.firstChild);
       }
       banner.innerHTML = `🎮 你正在操作 <strong>${_esc(departedPlayer.name)}</strong> 的回合`;
-      const oldIndicator = content.querySelector('.my-turn-indicator');
-      if (oldIndicator) oldIndicator.remove();
+      // 给房主一个明显的"轮到你"指示，避免和"等待中"混淆
+      let indicator = content.querySelector('.my-turn-indicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'my-turn-indicator';
+        content.insertBefore(indicator, content.firstChild);
+      }
+      indicator.textContent = '✦ 轮到你操作（接管中）';
     } else if (!isMyTurn) {
       // 不是我的回合 → 我的手牌（半透明）+ 等待提示
       bottomSection.classList.add('online-waiting');
@@ -613,15 +637,10 @@ function _onTakeoverPlayer() {
   }
   addLog(_esc(state.players[seat].name) + ' 离开了房间，房主接管操作');
 
-  // 生成 pushId 以便订阅回调识别此推送的回声（不走 saveState，手动标记）
-  _myPushSeq++;
-  const pushId = _mySeatIndex + '-' + _myPushSeq;
-  state._pushId = pushId;
-  state._src = _mySeatIndex;
-  _myPushedIds.add(pushId);
-
+  // 通过 _markPushAndSend 打上 pushId 并记入 _myPushedIds，
+  // 防止后续 Realtime 回声把刚写入的 departedPlayers 抹掉
   _isReceiving = false;
-  netUpdateGameState(_onlineRoomId, state);
+  _markPushAndSend(state);
   renderGame();
 }
 
@@ -648,23 +667,26 @@ window.renderGameOver = function() {
   _originalRenderGameOver();
   if (!_onlineRoomId) return;
 
-  // 更新 Supabase 房间状态为 finished
+  // 更新 Supabase 房间状态为 finished，通过 _markPushAndSend 打上 pushId
+  // 让自己的 Realtime 回声能被 _myPushedIds 识别跳过，避免循环推送。
   if (_isHost) {
+    _markPushAndSend(state);
     netUpdateGameState(_onlineRoomId, state, 'finished');
   }
 
-  // 在游戏结束卡片中追加退出按钮
+  // 联机模式下：移除"再来一局"，将"返回首页"改为"退出房间"
   requestAnimationFrame(() => {
     const card = document.getElementById('gameoverCard');
     if (!card) return;
     const btns = card.querySelector('.go-btns');
     if (!btns) return;
-    const exitBtn = document.createElement('button');
-    exitBtn.className = 'secondary';
-    exitBtn.style.marginTop = '8px';
-    exitBtn.textContent = '退出房间';
-    exitBtn.onclick = confirmExitRoom;
-    btns.appendChild(exitBtn);
+    const primaryBtn = btns.querySelector('.primary');
+    if (primaryBtn) primaryBtn.remove();
+    const secondaryBtn = btns.querySelector('.secondary');
+    if (secondaryBtn) {
+      secondaryBtn.textContent = '退出房间';
+      secondaryBtn.onclick = confirmExitRoom;
+    }
   });
 };
 
@@ -709,11 +731,18 @@ _subscribeToRoom = function(roomId) {
     }
 
     if (row.status === 'finished') {
+      // 跳过自己的 finished 回声（pushId 在 _myPushedIds 里）
+      const remotePushId = row.state && row.state._pushId;
+      if (remotePushId && _myPushedIds.has(remotePushId)) return;
+
       _isReceiving = true;
       if (row.state) {
         state = row.state;
         if (state.phase === 'game-over') {
-          // 正常游戏结束（非房主玩家收到）
+          // 房主已在 gameWin/gameLose → renderGameOver 里渲染并推送过 finished；
+          // 此处再渲染会触发新一轮 netUpdateGameState，造成循环推送。
+          if (_isHost) return;
+          // 非房主玩家：首次收到游戏结束通知，渲染结算
           if (document.getElementById('game').style.display === 'none') {
             document.getElementById('online').style.display = 'none';
             showGame();
@@ -738,9 +767,11 @@ _subscribeToRoom = function(roomId) {
     if (row.status === 'playing' && row.state) {
       // 当前回合进行人（或房主接管已离开玩家回合）是数据源，不同步 Realtime，避免回声二次播放。
       // 但"刚接过回合"的首条推送必须放行（本地 state.cur 还是上一位玩家），否则会丢失回合切换信号。
+      // 对房主接管场景：只跳过 src 来自自己（host）的回声；其他人推出的"轮到你接管"通知必须放行。
       const curPlayer = row.state.currentPlayerIndex;
       const departed = row.state.departedPlayers || [];
-      const iTakeover = _isHost && departed.includes(curPlayer);
+      const iTakeover = _isHost && departed.includes(curPlayer)
+        && (row.state._src === _mySeatIndex);
       const localCur = state && state.currentPlayerIndex;
       const iAmAlreadyOperator = curPlayer === _mySeatIndex && localCur === _mySeatIndex;
       if (iAmAlreadyOperator || iTakeover) return;
