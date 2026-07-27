@@ -349,7 +349,6 @@ function revealNextBoss() {
   state.playedCards = [];
   state.selectedHandIndices = [];
   state.defenseSelectedIndices = [];
-  state.extraTurnIntimidate = false;
   addLog(`新Boss出现: ${SUIT_NAMES[card.suit]}${rank} ${stats.name} (${stats.hp}血/${stats.atk}攻)`);
 }
 
@@ -1146,7 +1145,6 @@ function resolveBossDamage() {
     }
     addLog('─────────');
     state.currentBoss = null;
-    state.extraTurnIntimidate = false;
     revealNextBoss();
     if (state.gameResult === 'win') { state.bossAnim = null; saveState(); renderGameOver(); return; }
 
