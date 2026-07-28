@@ -334,6 +334,7 @@ function _subscribeToRoom(roomId) {
           showGame();
         } else {
           renderGame();
+          triggerPendingAnims();
         }
       }
       _isReceiving = false;
@@ -832,6 +833,7 @@ _subscribeToRoom = function(roomId) {
           showGame();
         } else {
           renderGame();
+          triggerPendingAnims();
         }
       }
       _isReceiving = false;

@@ -1360,6 +1360,7 @@ function handleJokerPlay() {
   const boss = state.currentBoss;
   if (boss) {
     boss.intimidateActive = false;
+    state._intimidateShatter = true;
     addLog(`${state.players[state.currentPlayerIndex].name} 🃏 小丑牌! ${SUIT_NAMES[boss.suit]}${boss.card.rank} 永久失去震慑!`);
 
     // 解封后补结算此前被震慑封印的虚弱累计值
@@ -1789,9 +1790,11 @@ function closeModal() {
 function triggerPendingAnims() {
   const weaken = state && state._weakenAnim;
   const damage = state && state._damageAnim;
+  const shatter = state && state._intimidateShatter;
   if (weaken) state._weakenAnim = null;
   if (damage) state._damageAnim = null;
-  if (!weaken && !damage) return;
+  if (shatter) state._intimidateShatter = null;
+  if (!weaken && !damage && !shatter) return;
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1813,6 +1816,10 @@ function triggerPendingAnims() {
         const text = damage.club ? `-${damage.value}` : `-${damage.value}`;
         addFloatNumber(bossCard, text, 'damage');
       }
+
+      if (shatter) {
+        playIntimidateShatterAnim();
+      }
     });
   });
 }
@@ -1829,6 +1836,59 @@ function addFloatNumber(bossCard, text, type) {
   el.textContent = text;
   bossCard.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
+}
+
+/**
+ * 震慑瓦解释放动画：抖动 → 碎片飞散 + 金色冲击波 + 横幅文字
+ * 由 triggerPendingAnims 在 state._intimidateShatter 时调用
+ */
+function playIntimidateShatterAnim() {
+  const tag = document.querySelector('.intimidate-tag');
+  if (!tag) return;
+
+  tag.classList.remove('intimidate-shake');
+  void tag.offsetWidth;
+  tag.classList.add('intimidate-shake');
+
+  setTimeout(() => {
+    tag.classList.remove('intimidate-shake');
+    tag.style.position = 'relative';
+    const rect = tag.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    for (let i = 0; i < 10; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'shatter-piece';
+      const angle = (Math.PI * 2 * i) / 10 + (Math.random() - .5) * .6;
+      const dist = 40 + Math.random() * 50;
+      piece.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+      piece.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+      piece.style.setProperty('--sr', (Math.random() * 720 - 360) + 'deg');
+      piece.style.left = (rect.left + Math.random() * rect.width) + 'px';
+      piece.style.top = (rect.top + Math.random() * rect.height) + 'px';
+      piece.style.width = (4 + Math.random() * 4) + 'px';
+      piece.style.height = (3 + Math.random() * 3) + 'px';
+      document.body.appendChild(piece);
+      piece.addEventListener('animationend', () => piece.remove());
+    }
+
+    const wave = document.createElement('div');
+    wave.className = 'intimidate-shockwave';
+    wave.style.left = cx + 'px';
+    wave.style.top = cy + 'px';
+    wave.style.position = 'fixed';
+    document.body.appendChild(wave);
+    wave.addEventListener('animationend', () => wave.remove());
+  }, 350);
+
+  setTimeout(() => {
+    const banner = document.createElement('div');
+    banner.className = 'intimidate-banner';
+    banner.textContent = '震慑瓦解';
+    document.body.appendChild(banner);
+    banner.addEventListener('animationend', () => banner.remove());
+  }, 200);
 }
 
 /* ============================================================
