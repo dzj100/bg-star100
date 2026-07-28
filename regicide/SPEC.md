@@ -51,7 +51,7 @@
   - ♠ 震慑：无法降低Boss攻击力
   - ♣ 震慑：受到伤害不会翻倍
 - 小丑牌打出后，当前Boss永久失去震慑
-- **震慑在出牌瞬间锁定**：玩家打出卡牌时若Boss仍具有震慑，对应花色技能当场失效；即便之后小丑移除震慑，之前被挡下的技能也不会追溯生效
+- **震慑在出牌瞬间锁定**：玩家打出卡牌时若Boss仍具有震慑，对应花色技能当场失效；若之后小丑移除震慑，之前被挡下的黑桃虚弱会追溯生效（累计扣除Boss攻击力），其余花色不会追溯生效
 
 ## 卡牌技能（酒馆数字牌）
 
@@ -153,7 +153,7 @@
 ```js
 state = {
   phase: 'landing' | 'setup' | 'playing' | 'game-over',
-  subPhase: 'play' | 'skill' | 'damage' | 'resolve' | 'boss-attack' | 'defense' | 'joker-pick' | 'solo-joker',
+  subPhase: 'play' | 'skill' | 'damage' | 'boss-attack' | 'defense' | 'joker-pick',
   playerCount: 1 | 2 | 3 | 4,
   players: [
     { name: string, hand: Card[], handLimit: number },

@@ -386,11 +386,9 @@ function renderGame() {
     case 'play': bottomHTML = renderPlayPhase(); break;
     case 'skill': bottomHTML = renderSkillPhase(); break;
     case 'damage': bottomHTML = renderDamagePhase(); break;
-    case 'resolve': bottomHTML = renderResolvePhase(); break;
     case 'boss-attack': bottomHTML = renderBossAttackPhase(); break;
     case 'defense': bottomHTML = renderDefensePhase(); break;
     case 'joker-pick': bottomHTML = renderJokerPickPhase(); break;
-    case 'solo-joker': bottomHTML = renderSoloJokerPhase(); break;
   }
 
   let sidebarHTML = renderPlayerSidebar();
@@ -493,7 +491,7 @@ function renderInfoBar() {
         <div class="info-label">弃牌</div>
         <div class="info-value">${state.discardPile.length}张</div>
       </div>
-      ${state.playerCount === 1 && state.soloJokers > 0 ? `<div class="info-item info-joker" onclick="useSoloJoker()"><div class="info-label">🃏 换牌</div><div class="info-value">${state.soloJokers}次</div></div>` : ''}
+      ${state.playerCount === 1 && state.soloJokers > 0 && (state.subPhase === 'play' || state.subPhase === 'defense') ? `<div class="info-item info-joker" onclick="useSoloJoker()"><div class="info-label">🃏 换牌</div><div class="info-value">${state.soloJokers}次</div></div>` : ''}
     </div>`;
 }
 
@@ -1471,7 +1469,7 @@ function confirmSoloJoker() {
   state.soloJokers--;
   state.playedCards = [];
   state.selectedHandIndices = [];
-  state.subPhase = 'play';
+  state.defenseSelectedIndices = [];
   saveState();
   renderGame();
 }
@@ -1885,7 +1883,7 @@ function playIntimidateShatterAnim() {
   setTimeout(() => {
     const banner = document.createElement('div');
     banner.className = 'intimidate-banner';
-    banner.textContent = '震慑瓦解';
+    banner.textContent = '破!!';
     document.body.appendChild(banner);
     banner.addEventListener('animationend', () => banner.remove());
   }, 200);
