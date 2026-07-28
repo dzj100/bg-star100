@@ -534,6 +534,9 @@ let _recentTouch = 0; // 最近一次 touchstart 时间戳，用于屏蔽后续�
 /** 血条/攻击条上一次渲染的宽度百分比，用于过渡动画 */
 let _prevBarWidths = { hp: null, atk: null };
 
+/** 防止 resolveBossDamage 在动画期间被重复调用 */
+let _resolvingBoss = false;
+
 /**
  * 获取花色技能的详细描述
  * @param {string} suit 花色标识
@@ -556,6 +559,7 @@ function getSkillDescription(suit, value, rank) {
 
 function showSkillTooltip(el, suit, value, rank) {
   hideSkillTooltip();
+  if (!el.isConnected) return;
   _tooltipShown = true;
   const info = getSkillDescription(suit, value, rank);
   if (!info.title) return;
@@ -1115,8 +1119,12 @@ function renderDamagePhase() {
  * 击杀/感化后当前玩家继续行动（跳过阶段5）
  */
 function resolveBossDamage() {
+  if (_resolvingBoss) return;
+  _resolvingBoss = true;
+
   const boss = state.currentBoss;
   if (!boss) {
+    _resolvingBoss = false;
     state.gameResult = 'win';
     state.phase = 'game-over';
     saveState();
@@ -1126,6 +1134,7 @@ function resolveBossDamage() {
 
   if (boss.hp > 0) {
     // Boss存活：进入Boss攻击阶段
+    _resolvingBoss = false;
     state.subPhase = 'boss-attack';
     saveState();
     renderGame();
@@ -1154,7 +1163,13 @@ function resolveBossDamage() {
     addLog('─────────');
     state.currentBoss = null;
     revealNextBoss();
-    if (state.gameResult === 'win') { state.bossAnim = null; saveState(); renderGameOver(); return; }
+    if (state.gameResult === 'win') {
+      _resolvingBoss = false;
+      state.bossAnim = null;
+      saveState();
+      renderGameOver();
+      return;
+    }
 
     // 新Boss入场动画
     state.bossAnim = 'entering';
@@ -1167,6 +1182,7 @@ function resolveBossDamage() {
       state.bossAnim = null;
       saveState();
       renderGame();
+      _resolvingBoss = false;
     }, 1300);
   }, 600);
 }
