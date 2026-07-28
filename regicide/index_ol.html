@@ -8,6 +8,15 @@
 </head>
 <body>
 
+<!-- 初始化加载遮罩：在 JS 全部载入前显示，online.js 末尾移除 -->
+<div id="init-loading-overlay" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#121218;">
+  <div style="text-align:center;color:#e8e6e3;font-size:1rem;">
+    <div style="width:36px;height:36px;border:3px solid #444;border-top-color:#d4a843;border-radius:50%;animation:irl-spin .7s linear infinite;margin:0 auto 14px;"></div>
+    载入中...
+  </div>
+  <style>@keyframes irl-spin{to{transform:rotate(360deg)}}</style>
+</div>
+
 <!-- 首页 -->
 <div id="landing">
   <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>

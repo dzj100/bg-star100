@@ -117,7 +117,7 @@ function renderOnlineLobby() {
       </div>
       <div style="text-align:center;color:var(--text-dim);margin-bottom:12px;">—— 或 ——</div>
       <div>
-        <input id="joinRoomInput" type="text" placeholder="输入4位房间号" maxlength="4"
+        <input id="joinRoomInput" type="text" inputmode="numeric" placeholder="输入4位房间号" maxlength="4"
           style="width:100%;padding:12px;font-size:1.2rem;text-align:center;
                  letter-spacing:.4em;text-transform:uppercase;
                  background:var(--surface);color:var(--text);border:1px solid #2a2a32;
@@ -132,6 +132,34 @@ function renderOnlineLobby() {
 }
 
 /* ============================================================
+   网络请求 Loading 遮罩
+   ============================================================ */
+
+function _showNetLoading(text) {
+  let el = document.getElementById('net-loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'net-loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);';
+    el.innerHTML = `<div style="background:#1a1a24;padding:24px 36px;border-radius:12px;text-align:center;color:#e8e6e3;font-size:1rem;">
+      <div style="width:32px;height:32px;border:3px solid #444;border-top-color:#d4a843;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;"></div>
+      <span id="net-loading-text"></span>
+    </div>`;
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    el.appendChild(style);
+    document.body.appendChild(el);
+  }
+  document.getElementById('net-loading-text').textContent = text || '加载中...';
+  el.style.display = 'flex';
+}
+
+function _hideNetLoading() {
+  const el = document.getElementById('net-loading-overlay');
+  if (el) el.style.display = 'none';
+}
+
+/* ============================================================
    创建 / 加入房间
    ============================================================ */
 
@@ -140,6 +168,7 @@ async function onCreateRoom() {
   if (!name || !name.trim()) return;
   _myPlayerName = name.trim();
 
+  _showNetLoading('正在创建房间...');
   try {
     const roomId = await netCreateRoom(_myPlayerName);
     _onlineRoomId = roomId;
@@ -152,6 +181,8 @@ async function onCreateRoom() {
     renderWaitingRoom({ seats: [{ name: _myPlayerName, seatIndex: 0 }] });
   } catch (e) {
     alert('创建房间失败: ' + e.message);
+  } finally {
+    _hideNetLoading();
   }
 }
 
@@ -162,6 +193,7 @@ async function onJoinRoom() {
   if (!name)                           { alert('请输入你的名字');  return; }
 
   _myPlayerName = name;
+  _showNetLoading('正在加入房间...');
   try {
     const { seatIndex, room } = await netJoinRoom(roomId, name);
     _onlineRoomId = roomId;
@@ -182,6 +214,8 @@ async function onJoinRoom() {
     }
   } catch (e) {
     alert(e.message || '加入失败');
+  } finally {
+    _hideNetLoading();
   }
 }
 
@@ -290,10 +324,8 @@ function _subscribeToRoom(roomId) {
       const newState = row.state;
       const changed = JSON.stringify(state) !== JSON.stringify(newState);
 
-      // 推送权接棒：非当前操作者时，记住当前操作座位，等其回合结束时本地可接棒推送"切回合"状态
-      if (_mySeatIndex !== newState.currentPlayerIndex) {
-        _pendingPushSeat = newState.currentPlayerIndex;
-      }
+      // 推送权接棒：始终记住当前操作座位，当其回合结束 nextTurn() 后仍可接棒推送"切回合"状态
+      _pendingPushSeat = newState.currentPlayerIndex;
 
       state = newState;
       if (changed) {
@@ -315,6 +347,7 @@ function _subscribeToRoom(roomId) {
 
 async function startOnlineGame() {
   if (!_isHost) return;
+  _showNetLoading('正在开始游戏...');
   try {
     const room = await netGetRoom(_onlineRoomId);
     const seats = room.seats || [];
@@ -331,6 +364,8 @@ async function startOnlineGame() {
     await netUpdateGameState(_onlineRoomId, state, 'playing');
   } catch (e) {
     alert('开始游戏失败: ' + e.message);
+  } finally {
+    _hideNetLoading();
   }
 }
 
@@ -668,11 +703,10 @@ window.renderGameOver = function() {
   if (!_onlineRoomId) return;
 
   // 更新 Supabase 房间状态为 finished，通过 _markPushAndSend 打上 pushId
-  // 让自己的 Realtime 回声能被 _myPushedIds 识别跳过，避免循环推送。
-  if (_isHost) {
-    _markPushAndSend(state);
-    netUpdateGameState(_onlineRoomId, state, 'finished');
-  }
+  // 不限房主：gameLose 可由任何玩家触发（防御不足时轮到谁就谁点），
+  // pushId 回声过滤保证不会循环推送。
+  _markPushAndSend(state);
+  netUpdateGameState(_onlineRoomId, state, 'finished');
 
   // 联机模式下：移除"再来一局"，将"返回首页"改为"退出房间"
   requestAnimationFrame(() => {
@@ -737,17 +771,20 @@ _subscribeToRoom = function(roomId) {
 
       _isReceiving = true;
       if (row.state) {
+        const alreadyOver = state && state.phase === 'game-over';
         state = row.state;
         if (state.phase === 'game-over') {
-          // 房主已在 gameWin/gameLose → renderGameOver 里渲染并推送过 finished；
-          // 此处再渲染会触发新一轮 netUpdateGameState，造成循环推送。
-          if (_isHost) return;
-          // 非房主玩家：首次收到游戏结束通知，渲染结算
-          if (document.getElementById('game').style.display === 'none') {
-            document.getElementById('online').style.display = 'none';
-            showGame();
+          // pushId 回声过滤已在上方处理；任何玩家均可推送 game-over，
+          // 触发者自身被 pushId 拦截，其余玩家在此渲染结算。
+          // alreadyOver：本地已渲染过 game-over（自己触发或其他人推送），
+          // 不再重复渲染，避免 renderGameOver 里的 _markPushAndSend 造成级联推送。
+          if (!alreadyOver) {
+            if (document.getElementById('game').style.display === 'none') {
+              document.getElementById('online').style.display = 'none';
+              showGame();
+            }
+            renderGameOver();
           }
-          renderGameOver();
         }
       } else {
         // 房主退出/房间解散 → 踢回首页
@@ -785,10 +822,8 @@ _subscribeToRoom = function(roomId) {
       const newState = row.state;
       const changed = JSON.stringify(state) !== JSON.stringify(newState);
 
-      // 推送权接棒：非当前操作者时，记住当前操作座位，等其回合结束时本地可接棒推送"切回合"状态
-      if (_mySeatIndex !== newState.currentPlayerIndex) {
-        _pendingPushSeat = newState.currentPlayerIndex;
-      }
+      // 推送权接棒：始终记住当前操作座位，当其回合结束 nextTurn() 后仍可接棒推送"切回合"状态
+      _pendingPushSeat = newState.currentPlayerIndex;
 
       state = newState;
       if (changed) {
@@ -851,8 +886,14 @@ async function _tryReconnect() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem(ONLINE_SESSION_KEY);
-  if (saved) {
-    await _tryReconnect();
+  try {
+    const saved = localStorage.getItem(ONLINE_SESSION_KEY);
+    if (saved) {
+      await _tryReconnect();
+    }
+  } finally {
+    // 所有 JS 已载入、重连尝试完毕，移除初始化遮罩
+    const overlay = document.getElementById('init-loading-overlay');
+    if (overlay) overlay.remove();
   }
 });

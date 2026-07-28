@@ -11,9 +11,8 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 /* ------------------------------------------------------------------ */
 
 function generateRoomId() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let id = '';
-  for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) id += Math.floor(Math.random() * 10);
   return id;
 }
 

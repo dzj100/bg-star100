@@ -180,9 +180,10 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 
 /* --- 玩家侧边栏 --- */
 .player-sidebar {
-  position: fixed; left: 4px; top: 200px;
+  position: fixed; left: 0; top: 170px;
   z-index: 20; background: var(--surface); border: 1px solid #2a2a32;
-  border-radius: 10px; padding: 6px;
+  border-left: none;
+  border-radius: 0 10px 10px 0; padding: 6px;
   display: flex; flex-direction: column; gap: 8px;
 }
 .player-widget {
@@ -218,7 +219,7 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .card:active { transform: scale(.95); }
 .card.selected { border-color: var(--gold); box-shadow: 0 0 10px rgba(245, 197, 24, .5); transform: translateY(-6px); }
 .card.disabled { opacity: .4; pointer-events: none; }
-.card .card-suit { font-size: .9rem; position: absolute; top: 4px; left: 6px; }
+.card .card-suit { font-size: .9rem; position: absolute; top: 1px; left: 5px; }
 .card .card-rank { font-size: .8rem; font-weight: bold; position: absolute; top: 3px; right: 5px; }
 .card .card-center { font-size: 1.3rem; }
 .card .card-skill { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: .5rem; color: #8a7e6b; font-weight: 500; }
@@ -255,10 +256,12 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .card.suit-c .card-suit, .card.suit-c .card-rank { color: var(--club); }
 
 /* 小丑牌特殊样式 */
-.card.suit-joker { background: linear-gradient(135deg, #1a1218, #2d1a1a); }
+/* .card.suit-joker { background: linear-gradient(135deg, #1a1218, #2d1a1a); } */
 .card.suit-joker .card-suit,
 .card.suit-joker .card-rank,
-.card.suit-joker .card-center { color: var(--gold); }
+.card.suit-joker .card-center,
+.card.suit-joker .card-svg,
+.card.suit-joker .card-skill { color: var(--gold); }
 .joker-center { font-size: 2.2rem !important; }
 
 /* 城堡卡牌 */
@@ -455,6 +458,41 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   55%  { box-shadow: 0 0 0 0 transparent; }
   70%  { box-shadow: 0 0 20px 6px var(--danger); }
   100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Boss 强力攻击（攻击力>10时触发） */
+@keyframes bossHeavyAttack {
+  /* 0-35% 快速小幅度抖动蓄力 */
+  0%   { transform: translate(0, 0) scale(1); }
+  4%   { transform: translate(-2px, 1px) scale(1); }
+  8%   { transform: translate(2px, -2px) scale(1); }
+  12%  { transform: translate(-1px, 2px) scale(1); }
+  16%  { transform: translate(2px, -1px) scale(1); }
+  20%  { transform: translate(-2px, -2px) scale(1); }
+  24%  { transform: translate(1px, 2px) scale(1); }
+  28%  { transform: translate(-2px, 1px) scale(1); }
+  32%  { transform: translate(2px, -2px) scale(1); }
+  35%  { transform: translate(0, 0) scale(1); }
+  /* 35-55% 猛冲俯冲 */
+  /* 45%  { transform: translate(0, 15px) scale(1.08); } */
+  55%  { transform: translate(0, 45px) scale(1.08); }
+  /* 55-75% 停顿 */
+  65%  { transform: translate(0, 45px) scale(1.08); }
+  85%  { transform: translate(0, 42x) scale(1.08); }
+  /* 75-100% 返回 */
+  /* 87%  { transform: translate(0, 10px) scale(1.05); } */
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes bossHeavyGlow {
+  0%   { box-shadow: 0 0 0 0 transparent; }
+  35%  { box-shadow: 0 0 0 0 transparent; }
+  55%  { box-shadow: 0 0 20px 10px var(--danger); }
+  75%  { box-shadow: 0 0 20px 10px var(--danger); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.boss-heavy-attack-anim { position: relative; z-index: 5; }
+.boss-heavy-attack-anim .boss-card {
+  animation: bossHeavyAttack 1.2s cubic-bezier(.2,.8,.3,1), bossHeavyGlow 1.2s ease-out;
 }
 
 /* Boss 退场（抖动渐隐） */

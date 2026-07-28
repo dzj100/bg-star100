@@ -440,7 +440,9 @@ function renderBossArea() {
   const hitClass = state.bossAnim === 'dying' ? ' boss-dying'
     : state.bossAnim === 'entering' ? ' boss-entering'
     : state.subPhase === 'damage' ? ' boss-hit'
-    : state.subPhase === 'boss-attack' ? ' boss-attack-anim' : '';
+    : state.subPhase === 'boss-attack'
+      ? (b.currentAttack > 10 ? ' boss-heavy-attack-anim' : ' boss-attack-anim')
+      : '';
   return `
     <div class="boss-area${hitClass}">
       <div class="boss-card">
@@ -509,18 +511,19 @@ function renderInfoBar() {
 function renderCardHTML(card, extraClass = '', onclick = '') {
   const suitClass = 'suit-' + card.suit;
   const isJoker = card.suit === 'joker';
-  const skillName = !isJoker ? (SUIT_SKILL[card.suit] || '') : '小丑';
-  const skillAttr = skillName ? `data-skill="${card.suit}" data-value="${card.value}" data-rank="${card.rank}"` : '';
+  const skillName = !isJoker ? (SUIT_SKILL[card.suit] || '') : '';
+  const skillAttr = (skillName || isJoker) ? `data-skill="${card.suit}" data-value="${card.value}" data-rank="${card.rank}"` : '';
   const centerContent = HAND_CARD_SVG[card.rank]
     ? `<span class="card-svg">${HAND_CARD_SVG[card.rank]}</span>`
     : `<span class="card-center${isJoker ? ' joker-center' : ''}">${SUIT_NAMES[card.suit] || '🃏'}</span>`;
+  const bottomLabel = isJoker ? '<span class="card-skill">小丑牌</span>' : (skillName ? `<span class="card-skill">${skillName}</span>` : '');
   return `<div class="card ${suitClass} ${extraClass}" ${onclick ? `onclick="${onclick}"` : ''} ${skillAttr}
     ontouchstart="onCardTouchStart(event)" ontouchend="onCardTouchEnd(event)"
     onmousedown="onCardMouseDown(event)" onmouseup="onCardMouseUp(event)"
     onmouseenter="onCardMouseEnter(event)" onmouseleave="onCardMouseLeave(event)">
     ${isJoker ? '' : `<span class="card-suit">${SUIT_NAMES[card.suit]}</span><span class="card-rank">${RANK_NAMES[card.rank]}</span>`}
     ${centerContent}
-    ${skillName && !isJoker ? `<span class="card-skill">${skillName}</span>` : ''}
+    ${bottomLabel}
   </div>`;
 }
 
