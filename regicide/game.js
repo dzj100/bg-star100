@@ -709,8 +709,6 @@ function clearSelection() {
  *   - 三条 1~3（同数字）
  *   - 四个1或四个2
  *   - 1+X（1张1 + 1张2~10或J/Q/K）
- *   - 1+对子（1张1 + 2张同数字2~5）
- *   - 1+三条（1张1 + 3张同数字2~3）
  *   - 小丑牌（单独打出）
  * J/Q/K（感化的Boss牌）可单独打出，也可作为X参与1+X组合
  *
@@ -764,27 +762,29 @@ function validatePlay() {
     return { valid: false, reason: '无效的2张组合' };
   }
 
-  // 3张组合：三条(1~3) 或 1+对子(2~5)
+  // 3张组合：三条(1~3)
   if (n === 3) {
     if (!hasFaceCard && allSame && (firstRank === 1 || isTripleRank(firstRank))) return { valid: true, type: 'three' };
-    const ones = cards.filter(c => c.rank === 1);
-    const others = cards.filter(c => c.rank !== 1);
-    if (ones.length === 1 && others.length === 2) {
-      const oRanks = others.map(c => c.rank);
-      if (oRanks[0] === oRanks[1] && isPairRank(oRanks[0])) return { valid: true, type: '1plus' };
-    }
+    // [已禁用] 1+对子（1张1 + 2张同数字2~5）
+    // const ones = cards.filter(c => c.rank === 1);
+    // const others = cards.filter(c => c.rank !== 1);
+    // if (ones.length === 1 && others.length === 2) {
+    //   const oRanks = others.map(c => c.rank);
+    //   if (oRanks[0] === oRanks[1] && isPairRank(oRanks[0])) return { valid: true, type: '1plus' };
+    // }
     return { valid: false, reason: '无效的3张组合' };
   }
 
-  // 4张组合：四个1或四个2 或 1+三条(2~3)
+  // 4张组合：四个1或四个2
   if (n === 4) {
     if (!hasFaceCard && allSame && (firstRank === 1 || firstRank === 2)) return { valid: true, type: 'four' };
-    const ones = cards.filter(c => c.rank === 1);
-    const others = cards.filter(c => c.rank !== 1);
-    if (ones.length === 1 && others.length === 3) {
-      const oRanks = others.map(c => c.rank);
-      if (oRanks.every(r => r === oRanks[0]) && isTripleRank(oRanks[0])) return { valid: true, type: '1plus' };
-    }
+    // [已禁用] 1+三条（1张1 + 3张同数字2~3）
+    // const ones = cards.filter(c => c.rank === 1);
+    // const others = cards.filter(c => c.rank !== 1);
+    // if (ones.length === 1 && others.length === 3) {
+    //   const oRanks = others.map(c => c.rank);
+    //   if (oRanks.every(r => r === oRanks[0]) && isTripleRank(oRanks[0])) return { valid: true, type: '1plus' };
+    // }
     return { valid: false, reason: '无效的4张组合' };
   }
 
