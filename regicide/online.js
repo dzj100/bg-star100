@@ -435,9 +435,10 @@ function _markPushAndSend(stateObj) {
   stateObj._pushId = pushId;
   stateObj._src = _mySeatIndex;
   _myPushedIds.add(pushId);
+  const snapshot = JSON.parse(JSON.stringify(stateObj));
   console.log('[PUSH] seat=', _mySeatIndex, 'pushId=', pushId,
-    'cur=', stateObj.currentPlayerIndex, 'sub=', stateObj.subPhase);
-  netUpdateGameState(_onlineRoomId, stateObj);
+    'cur=', snapshot.currentPlayerIndex, 'sub=', snapshot.subPhase);
+  netUpdateGameState(_onlineRoomId, snapshot);
 }
 
 /* ============================================================

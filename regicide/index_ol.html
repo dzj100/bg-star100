@@ -56,7 +56,7 @@
 </div>
 
 <!-- 游戏结束弹窗 -->
-<div id="gameover-overlay">
+<div id="gameover-overlay" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="gameover-card fade-in" id="gameoverCard"></div>
 </div>
 

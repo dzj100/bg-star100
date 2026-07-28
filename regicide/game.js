@@ -1116,6 +1116,13 @@ function renderDamagePhase() {
  */
 function resolveBossDamage() {
   const boss = state.currentBoss;
+  if (!boss) {
+    state.gameResult = 'win';
+    state.phase = 'game-over';
+    saveState();
+    renderGameOver();
+    return;
+  }
 
   if (boss.hp > 0) {
     // Boss存活：进入Boss攻击阶段
@@ -1154,16 +1161,13 @@ function resolveBossDamage() {
     state.subPhase = 'play';
     saveState();
     renderGame();
+    triggerPendingAnims();
 
     setTimeout(() => {
-      document.getElementById('game').classList.add('screen-shake');
-      setTimeout(() => {
-        state.bossAnim = null;
-        document.getElementById('game').classList.remove('screen-shake');
-        saveState();
-        renderGame();
-      }, 600);
-    }, 650);
+      state.bossAnim = null;
+      saveState();
+      renderGame();
+    }, 1300);
   }, 600);
 }
 
@@ -1792,7 +1796,8 @@ function triggerPendingAnims() {
   if (weaken) state._weakenAnim = null;
   if (damage) state._damageAnim = null;
   if (shatter) state._intimidateShatter = null;
-  if (!weaken && !damage && !shatter) return;
+  const entering = state && state.bossAnim === 'entering';
+  if (!weaken && !damage && !shatter && !entering) return;
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1817,6 +1822,16 @@ function triggerPendingAnims() {
 
       if (shatter) {
         playIntimidateShatterAnim();
+      }
+
+      if (entering) {
+        setTimeout(() => {
+          const game = document.getElementById('game');
+          if (game) {
+            game.classList.add('screen-shake');
+            setTimeout(() => game.classList.remove('screen-shake'), 600);
+          }
+        }, 650);
       }
     });
   });
