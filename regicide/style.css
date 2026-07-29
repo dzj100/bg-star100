@@ -495,6 +495,26 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   animation: bossHeavyAttack 1.2s cubic-bezier(.2,.8,.3,1), bossHeavyGlow 1.2s ease-out;
 }
 
+/* Boss 攻击力=0：原地左右轻晃一次（无伤害） */
+@keyframes bossZeroAttack {
+  0%   { transform: rotate(0deg); }
+  11%  { transform: rotate(2.5deg); }
+  22%  { transform: rotate(-2.5deg); }
+  33%  { transform: rotate(3deg); }
+  44%  { transform: rotate(-3deg); }
+  55%  { transform: rotate(2.5deg); }
+  66%  { transform: rotate(-2.5deg); }
+  78%  { transform: rotate(2deg); }
+  89%  { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+.boss-zero-attack-anim { position: relative; z-index: 5; }
+.boss-zero-attack-anim .boss-card {
+  animation: bossZeroAttack .5s ease-in-out;
+  transform-origin: 50% 70%;
+  filter: grayscale(.3) brightness(.9);
+}
+
 /* Boss 退场（抖动渐隐） */
 @keyframes bossDying {
   0%   { opacity: 1; transform: translateX(0); }
@@ -705,6 +725,8 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   color: var(--gold);
 }
 .my-turn-indicator {
+  /* 感觉没必要展示 */
+  display: none;
   text-align: center;
   padding: 6px;
   color: var(--safe);

@@ -33,6 +33,18 @@ let _myPushedIds = new Set();  // 本客户端推过的 pushId 集合
 // 用 _pendingPushSeat 记住上一次的操作座位，让它在紧随其后的那次 saveState 里仍可推送。
 let _pendingPushSeat = null;
 
+// 兜底：本客户端上一次推送时的 currentPlayerIndex。如果下一次 saveState 发现它变了，
+// 就当作发生了 nextTurn/pickJokerPlayer 等回合切换，由原操作者再推一次"切回合"状态。
+let _lastPushedCurrentSeat = null;
+
+// 供 game.js 在 nextTurn 前显式标出"即将交出回合"的座位（例如跳过 boss 攻击、跳过防御等分支），
+// 避免 _pendingPushSeat 因前置 saveState 没走到推送分支而遗留为 null，导致切回合状态推不出去。
+window.__markOutgoingSeat = function(seatIndex) {
+  if (_onlineRoomId && typeof seatIndex === 'number') {
+    _pendingPushSeat = seatIndex;
+  }
+};
+
 // Boss 动画防重复播放
 let _prevBossAnimState = null;  // 上一次渲染时的 bossAnim 值
 let _bossAnimVersion = 0;       // 本地观察到的 bossAnim 状态机版本
@@ -98,6 +110,7 @@ function _cleanupOnline() {
   _myPushSeq = 0;
   _myPushedIds = new Set();
   _pendingPushSeat = null;
+  _lastPushedCurrentSeat = null;
   _clearSession();
 }
 
@@ -400,7 +413,14 @@ window.saveState = function() {
   const hasDeparted = _isHost && state && state.departedPlayers && state.departedPlayers.length > 0;
   const isCurrentActor = state && state.currentPlayerIndex === _mySeatIndex;
   const isOutgoingActor = _pendingPushSeat === _mySeatIndex;
-  const canPush = isCurrentActor || isOutgoingActor || hasDeparted;
+  // 兜底：自动检测回合切换。如果本客户端上一次推送时 currentPlayerIndex 是 A，
+  // 本次 saveState 变成了 B，说明中间发生了 nextTurn/pickJokerPlayer 等切换，
+  // 把 A 视为交出方，允许 A（即本机）再推一次"切回合"状态。
+  const turnJustHandedOff =
+    _lastPushedCurrentSeat !== null
+    && _lastPushedCurrentSeat !== (state && state.currentPlayerIndex)
+    && _lastPushedCurrentSeat === _mySeatIndex;
+  const canPush = isCurrentActor || isOutgoingActor || turnJustHandedOff || hasDeparted;
   if (!canPush) {
     console.log('[saveState] SKIP canPush=false (cur=',
       state && state.currentPlayerIndex, ' my=', _mySeatIndex,
@@ -436,6 +456,8 @@ function _markPushAndSend(stateObj) {
   stateObj._src = _mySeatIndex;
   _myPushedIds.add(pushId);
   const snapshot = JSON.parse(JSON.stringify(stateObj));
+  _lastPushedCurrentSeat = typeof snapshot.currentPlayerIndex === 'number'
+    ? snapshot.currentPlayerIndex : null;
   console.log('[PUSH] seat=', _mySeatIndex, 'pushId=', pushId,
     'cur=', snapshot.currentPlayerIndex, 'sub=', snapshot.subPhase);
   netUpdateGameState(_onlineRoomId, snapshot);

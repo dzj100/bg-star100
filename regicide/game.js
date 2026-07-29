@@ -439,7 +439,9 @@ function renderBossArea() {
     : state.bossAnim === 'entering' ? ' boss-entering'
     : state.subPhase === 'damage' ? ' boss-hit'
     : state.subPhase === 'boss-attack'
-      ? (b.currentAttack > 10 ? ' boss-heavy-attack-anim' : ' boss-attack-anim')
+      ? (b.currentAttack <= 0
+          ? ' boss-zero-attack-anim'
+          : (b.currentAttack > 10 ? ' boss-heavy-attack-anim' : ' boss-attack-anim'))
       : '';
   return `
     <div class="boss-area${hitClass}">
@@ -912,6 +914,8 @@ function confirmPassPlay() {
   const boss = state.currentBoss;
   if (boss && boss.currentAttack <= 0) {
     addLog(`${SUIT_NAMES[boss.suit]}${boss.card.rank} 攻击力为0，跳过攻击`);
+    // 联机模式：显式把当前座位标为交出方，确保 nextTurn 后的 saveState 仍能推送切回合状态
+    window.__markOutgoingSeat && window.__markOutgoingSeat(state.currentPlayerIndex);
     nextTurn();
     return;
   }
@@ -1218,6 +1222,8 @@ function renderBossAttackPhase() {
  */
 function skipBossAttack() {
   addLog(`${SUIT_NAMES[state.currentBoss.suit]}${state.currentBoss.card.rank} 攻击力为0，跳过攻击`);
+  // 联机模式：显式把当前座位标为交出方，防止 _pendingPushSeat 遗留为 null 导致切回合推送被跳过
+  window.__markOutgoingSeat && window.__markOutgoingSeat(state.currentPlayerIndex);
   nextTurn();
 }
 
@@ -1347,6 +1353,8 @@ function confirmDefense() {
   player.hand = player.hand.filter((_, i) => !selected.includes(i));
 
   state.defenseSelectedIndices = [];
+  // 联机模式：显式把当前座位标为交出方，确保 nextTurn 后的 saveState 仍能推送切回合状态
+  window.__markOutgoingSeat && window.__markOutgoingSeat(state.currentPlayerIndex);
   nextTurn();
 }
 
@@ -1433,6 +1441,7 @@ function renderJokerPickPhase() {
  */
 function pickJokerPlayer(index) {
   if (index === state.currentPlayerIndex) return;
+  const jokerUserSeat = state.currentPlayerIndex;
   state.extraTurnPlayer = index;
   state.extraTurnIntimidate = true;
   addLog(`指定 ${state.players[index].name} 执行额外回合 (震慑失效)`);
@@ -1440,6 +1449,8 @@ function pickJokerPlayer(index) {
   state.subPhase = 'play';
   state.playedCards = [];
   state.selectedHandIndices = [];
+  // 联机模式：把小丑使用者标为交出方，确保切换额外回合的 saveState 仍能由其推送
+  window.__markOutgoingSeat && window.__markOutgoingSeat(jokerUserSeat);
   saveState();
   renderGame();
 }
@@ -1975,6 +1986,15 @@ if (typeof window !== 'undefined') {
  * 有存档 → 恢复游戏；无存档 → 显示首页
  */
 document.addEventListener('DOMContentLoaded', () => {
+  // 联机页由 online.js 负责初始化流程，这里不要读取单机存档，
+  // 否则单机的 'regicide-state' 会让联机页直接跳进游戏界面、缺"退出"入口
+  const isOnlinePage = /index_ol\.html($|\?|#)/.test(location.pathname + location.search);
+  if (isOnlinePage) {
+    const saved = loadState();
+    if (saved) clearState();
+    showLanding();
+    return;
+  }
   const saved = loadState();
   if (saved && saved.phase !== 'game-over') {
     state = saved;
