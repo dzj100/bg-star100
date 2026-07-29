@@ -678,10 +678,15 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   border-left: 3px solid var(--danger);
 }
 
-/* 联机：非自己回合 → 手牌半透明 + 禁用操作 */
+/* 联机：非自己回合 → 手牌半透明，但仍允许悬停/长按查看卡牌技能 tooltip */
 .bottom-section.online-waiting .hand-cards {
   opacity: .35;
-  pointer-events: none;
+}
+.bottom-section.online-waiting .hand-cards .card {
+  cursor: default;
+}
+.bottom-section.online-waiting .hand-cards .card:active {
+  transform: none;
 }
 .bottom-section.online-waiting .action-bar {
   pointer-events: none;
