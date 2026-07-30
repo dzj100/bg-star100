@@ -212,7 +212,7 @@
     #ff7a20 35%,
     #c81020 70%,
     transparent 95%);
-  filter: blur(0px); /* was blur(12px) */
+  filter: blur(12px);
   mix-blend-mode: screen;
   transform: rotate(var(--ang, 0deg)) translateY(var(--start, -20px));
   opacity: 0;
@@ -296,7 +296,7 @@
     #ff6a00 40%,
     #c81020 70%,
     transparent 90%);
-  filter: blur(0px); /* was blur(8px) */
+  filter: blur(8px);
   mix-blend-mode: screen;
   opacity: 0;
   animation: scHBuildup .2s ease-in forwards;
@@ -304,9 +304,9 @@
   pointer-events: none;
 }
 @keyframes scHBuildup {
-  0%   { transform: scale(.15); opacity: 0; filter: blur(0px); /* was blur(8px) */ }
+  0%   { transform: scale(.15); opacity: 0; filter: blur(8px); }
   60%  { opacity: .95; }
-  100% { transform: scale(.9); opacity: 1; filter: blur(0px); /* was blur(14px) */ }
+  100% { transform: scale(.9); opacity: 1; filter: blur(14px); }
 }
 
 .sc-h-buildup-spark {
