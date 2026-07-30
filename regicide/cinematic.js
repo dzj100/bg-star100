@@ -145,9 +145,9 @@ function _buildSuitHearts(root) {
   root.appendChild(backdrop);
 
   // === 酝酿阶段 (T=0~0.5s) ===
-  const buildup = document.createElement('div');
-  buildup.className = 'sc-h-buildup';
-  root.appendChild(buildup);
+  // const buildup = document.createElement('div');
+  // buildup.className = 'sc-h-buildup';
+  // root.appendChild(buildup);
 
   // 8 颗向内汇聚的小火星，蓄力感
   for (let i = 0; i < 8; i++) {
@@ -420,7 +420,7 @@ function _buildSuitClubs(root) {
   }
 
   // 毒波扩散 (3层)
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < 5; i++) {
     var w = document.createElement('div');
     w.className = 'sc-c-wave';
     w.style.cssText = '--delay:' + (i * 0.15).toFixed(2) + 's;';
@@ -446,11 +446,11 @@ function _buildSuitClubs(root) {
   // }
 
   // === 毒云残留 (T=1.3~2.5s) ===
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 2; i++) {
     var c = document.createElement('div');
     c.className = 'sc-c-toxic-cloud';
     var size = 240 + Math.random() * 240;
-    var delay = 1.3 + Math.random() * 0.5;
+    var delay = 1.1 + Math.random() * 0.5;
     c.style.cssText =
       'left:' + (10 + Math.random() * 80) + '%;' +
       'top:' + (15 + Math.random() * 60) + '%;' +

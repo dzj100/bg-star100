@@ -345,7 +345,7 @@ function revealNextBoss() {
     name: stats.name,
     // 倒数第二个 Boss（shift 后剩 1 张）或最后一个 Boss（shift 后剩 0 张）
     // 触发该花色专属的全屏登场演出（cinematic.css / cinematic.js）
-    cinematic: state.castle.length <= 11,
+    cinematic: state.castle.length <= 3,
   };
   state.pendingWeaken = 0;       // 新Boss登场，前一个Boss的"虚弱欠条"作废
   state.subPhase = 'play';
