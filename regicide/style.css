@@ -527,6 +527,9 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 }
 .boss-dying { animation: bossDying .5s ease-out forwards; }
 
+/* Boss 已就位但演出进行中：隐藏但占位，等待入场动画接管 */
+.boss-hidden { opacity: 0; visibility: hidden; }
+
 /* 新Boss入场（透明渐显 + 放大 + 缩回） */
 @keyframes bossEnter {
   0%   { transform: scale(0.5); opacity: 0.5; }

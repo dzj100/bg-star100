@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boss 演出预览</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="cinematic.css">
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #121218;
+    color: #e8e6e3;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 8px; }
+  p  { color: #8a7e6b; font-size: .85rem; margin: 0 0 24px; }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    padding: 12px 20px;
+    background: #23232e;
+    color: #e8e6e3;
+    border: 1px solid #3a3a42;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .95rem;
+    min-width: 140px;
+  }
+  .btn:hover { background: #2e2e3c; }
+  .btn.s { border-color: #6a5acd; color: #b4a0e6; }
+  .btn.h { border-color: #d94040; color: #ff8585; }
+  .btn.c { border-color: #5e9a5e; color: #a8d8a8; }
+  .btn.d { border-color: #c9923a; color: #f0c674; }
+  .btn.skip { background: #3a2a2a; border-color: #6a3a3a; color: #ffaaaa; }
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #2a2a32;
+    border: 1px solid #3a3a42;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: .8rem;
+    color: #f0c674;
+    margin-left: 4px;
+  }
+  .hint { font-size: .75rem; color: #6a6352; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Boss 全屏演出预览</h1>
+<p>点击按钮或按键盘 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> 触发；<kbd>Esc</kbd> / 鼠标点击跳过</p>
+
+<div class="btn-row">
+  <button class="btn s" onclick="playSuitCinematic('s')">♠ 暗月降临 <kbd>1</kbd></button>
+  <button class="btn h" onclick="playSuitCinematic('h')">♥ 烈焰燃烧 <kbd>2</kbd></button>
+  <button class="btn c" onclick="playSuitCinematic('c')">♣ 剧毒侵蚀 <kbd>3</kbd></button>
+  <button class="btn d" onclick="playSuitCinematic('d')">♦ 万剑归宗 <kbd>4</kbd></button>
+  <button class="btn skip" onclick="playClubsWall()">♣ 城墙(旧) <kbd>5</kbd></button>
+  <button class="btn skip" onclick="skipSuitCinematic()">跳过 <kbd>Esc</kbd></button>
+</div>
+
+<div class="hint">
+  提示：四种花色专属动画已全部实现。<br>
+  打开 DevTools Console (F12) 也可直接调用 <code>playSuitCinematic('s')</code>。
+</div>
+
+<script src="cinematic.js"></script>
+<script>
+  function playClubsWall() {
+    var orig = _buildSuitClubs;
+    _buildSuitClubs = _buildSuitClubsWall;
+    playSuitCinematic('c');
+    _buildSuitClubs = orig;
+  }
+  // 键盘快捷键
+  document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case '1': playSuitCinematic('s'); break;
+      case '2': playSuitCinematic('h'); break;
+      case '3': playSuitCinematic('c'); break;
+      case '4': playSuitCinematic('d'); break;
+      case '5': playClubsWall(); break;
+    }
+  });
+</script>
+
+</body>
+</html>

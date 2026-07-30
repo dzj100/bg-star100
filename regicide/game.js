@@ -343,6 +343,9 @@ function revealNextBoss() {
     suit: card.suit,
     intimidateActive: true,      // 震慑是否有效
     name: stats.name,
+    // 倒数第二个 Boss（shift 后剩 1 张）或最后一个 Boss（shift 后剩 0 张）
+    // 触发该花色专属的全屏登场演出（cinematic.css / cinematic.js）
+    cinematic: state.castle.length <= 11,
   };
   state.pendingWeaken = 0;       // 新Boss登场，前一个Boss的"虚弱欠条"作废
   state.subPhase = 'play';
@@ -437,6 +440,7 @@ function renderBossArea() {
   const intimidateDesc = INTIMIDATE_DESC[b.suit] || '';
   const hitClass = state.bossAnim === 'dying' ? ' boss-dying'
     : state.bossAnim === 'entering' ? ' boss-entering'
+    : state.bossAnim === 'hidden' ? ' boss-hidden'
     : state.subPhase === 'damage' ? ' boss-hit'
     : state.subPhase === 'boss-attack'
       ? (b.currentAttack <= 0
@@ -1175,19 +1179,38 @@ function resolveBossDamage() {
       return;
     }
 
-    // 新Boss入场动画
-    state.bossAnim = 'entering';
+    // 新 Boss 是否需要演出
+    const needCinematic = !!(state.currentBoss && state.currentBoss.cinematic);
+
+    // 先把旧 dying 状态清掉（退场动画已经播完），但先不要进入 entering，
+    // 避免 Boss 卡在画面中与演出同屏。若需要演出，把状态标为 'hidden' 让渲染隐藏 Boss 卡。
+    state.bossAnim = needCinematic ? 'hidden' : null;
     state.subPhase = 'play';
     saveState();
     renderGame();
-    triggerPendingAnims();
 
-    setTimeout(() => {
-      state.bossAnim = null;
+    const playEntering = () => {
+      state.bossAnim = 'entering';
       saveState();
       renderGame();
-      _resolvingBoss = false;
-    }, 1300);
+      triggerPendingAnims();
+      setTimeout(() => {
+        state.bossAnim = null;
+        saveState();
+        renderGame();
+        _resolvingBoss = false;
+      }, 1300);
+    };
+
+    if (needCinematic && typeof playSuitCinematic === 'function') {
+      // 全屏演出期间不显示 Boss 卡（bossAnim=null），演出淡出后再走入场流程
+      playSuitCinematic(state.currentBoss.suit);
+      // 3000ms 演出 + 260ms 淡出缓冲
+      setTimeout(playEntering, 2500);
+    } else {
+      // 无演出：直接进入入场动画（与改动前一致）
+      playEntering();
+    }
   }, 600);
 }
 
