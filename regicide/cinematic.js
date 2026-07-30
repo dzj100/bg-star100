@@ -420,7 +420,7 @@ function _buildSuitClubs(root) {
   }
 
   // 毒波扩散 (3层)
-  for (var i = 0; i < 3; i++) {
+  for (var i = 0; i < 4; i++) {
     var w = document.createElement('div');
     w.className = 'sc-c-wave';
     w.style.cssText = '--delay:' + (i * 0.15).toFixed(2) + 's;';
@@ -428,28 +428,28 @@ function _buildSuitClubs(root) {
   }
 
   // === 后期气泡 (T=1.5~2.5s) ===
-  for (var i = 0; i < 25; i++) {
-    var b = document.createElement('div');
-    b.className = 'sc-c-bubble';
-    var size = 12 + Math.random() * 12;
-    var delay = 1.5 + Math.random() * 0.8;
-    var dur = 1.2 + Math.random() * 0.8;
-    b.style.cssText =
-      'left:' + (5 + Math.random() * 90) + '%;' +
-      'bottom:-' + size + 'px;' +
-      'width:' + size + 'px;height:' + size + 'px;' +
-      '--delay:' + delay + 's;' +
-      '--dur:' + dur + 's;' +
-      '--drift:' + ((Math.random() - 0.5) * 50).toFixed(1) + 'px;' +
-      '--opa:' + (0.4 + Math.random() * 0.4).toFixed(2) + ';';
-    root.appendChild(b);
-  }
+  // for (var i = 0; i < 25; i++) {
+  //   var b = document.createElement('div');
+  //   b.className = 'sc-c-bubble';
+  //   var size = 12 + Math.random() * 12;
+  //   var delay = 1.5 + Math.random() * 0.8;
+  //   var dur = 1.2 + Math.random() * 0.8;
+  //   b.style.cssText =
+  //     'left:' + (5 + Math.random() * 90) + '%;' +
+  //     'bottom:-' + size + 'px;' +
+  //     'width:' + size + 'px;height:' + size + 'px;' +
+  //     '--delay:' + delay + 's;' +
+  //     '--dur:' + dur + 's;' +
+  //     '--drift:' + ((Math.random() - 0.5) * 50).toFixed(1) + 'px;' +
+  //     '--opa:' + (0.4 + Math.random() * 0.4).toFixed(2) + ';';
+  //   root.appendChild(b);
+  // }
 
   // === 毒云残留 (T=1.3~2.5s) ===
-  for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < 5; i++) {
     var c = document.createElement('div');
     c.className = 'sc-c-toxic-cloud';
-    var size = 80 + Math.random() * 120;
+    var size = 240 + Math.random() * 240;
     var delay = 1.3 + Math.random() * 0.5;
     c.style.cssText =
       'left:' + (10 + Math.random() * 80) + '%;' +
