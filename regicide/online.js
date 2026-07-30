@@ -49,6 +49,7 @@ window.__markOutgoingSeat = function(seatIndex) {
 let _prevBossAnimState = null;  // 上一次渲染时的 bossAnim 值
 let _bossAnimVersion = 0;       // 本地观察到的 bossAnim 状态机版本
 let _bossAnimRendered = false;  // 当前版本的动画是否已渲染过一次
+let _lastCinematicBossId = null; // 远端玩家：上一次触发演出的 boss，防止重播
 
 const ONLINE_SESSION_KEY = 'regicide-online';
 
@@ -107,6 +108,7 @@ function _cleanupOnline() {
   _prevBossAnimState = null;
   _bossAnimVersion = 0;
   _bossAnimRendered = false;
+  _lastCinematicBossId = null;
   _myPushSeq = 0;
   _myPushedIds = new Set();
   _pendingPushSeat = null;
@@ -479,6 +481,18 @@ window.renderGame = function() {
     if (curBossAnim !== _prevBossAnimState) {
       _bossAnimVersion++;
       _bossAnimRendered = false;
+    }
+  }
+
+  // --- 远端玩家：同步播放 Boss 登场演出 ---
+  if (state.currentPlayerIndex !== _mySeatIndex
+      && curBossAnim === 'hidden'
+      && state.currentBoss && state.currentBoss.cinematic
+      && typeof playSuitCinematic === 'function') {
+    const bossKey = state.currentBoss.card.id;
+    if (_lastCinematicBossId !== bossKey) {
+      _lastCinematicBossId = bossKey;
+      playSuitCinematic(state.currentBoss.suit);
     }
   }
 
@@ -894,6 +908,7 @@ async function _tryReconnect() {
     _prevBossAnimState = null;
     _bossAnimVersion = 0;
     _bossAnimRendered = false;
+    _lastCinematicBossId = null;
     _myPushSeq = 0;
     _myPushedIds = new Set();
     _pendingPushSeat = null;

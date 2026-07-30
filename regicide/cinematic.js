@@ -199,7 +199,7 @@ function _buildSuitHearts(root) {
   }
 
   // 50 颗火星：小点向四面八方飞出
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 30; i++) {
     const s = document.createElement('div');
     s.className = 'sc-h-spark';
     const ang = Math.random() * 360;
@@ -213,7 +213,7 @@ function _buildSuitHearts(root) {
   }
 
   // === 四周余烬阶段 (T≈1.4s 起) ===
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 30; i++) {
     const e = document.createElement('div');
     e.className = 'sc-h-linger';
     // 偏边缘分布：35% 顶 / 35% 底 / 15% 左 / 15% 右，部分延伸到中部
@@ -225,7 +225,7 @@ function _buildSuitHearts(root) {
       case 2: x = Math.random() * 35;  y = 20 + Math.random() * 60; break;      // 左
       default: x = 65 + Math.random() * 35; y = 20 + Math.random() * 60; break; // 右
     }
-    const size = 14 + Math.random() * 18;  // 14~32px
+    const size = 25 + Math.random() * 18;  // 14~32px
     const opa = 0.8 + Math.random() * 0.2; // 0.8~1.0
     const delay = 1.0 + Math.random() * 0.4; // 1.0~1.4s 错开
     e.style.cssText =
@@ -300,7 +300,7 @@ function _buildSuitDiamonds(root) {
     const ang = (i / 36) * 360 + (Math.random() - 0.5) * 8;
     const dist = 45 + Math.random() * 25;
     const len = 60 + Math.random() * 60;
-    const delay = 0.85 + Math.random() * 0.45;
+    const delay = 0.45 + Math.random() * 0.75;
     const ox = (Math.random() - 0.5) * 30;
     const oy = (Math.random() - 0.5) * 30;
     s.style.cssText =
@@ -366,7 +366,7 @@ function _buildSuitClubs(root) {
   for (var i = 0; i < 12; i++) {
     var b = document.createElement('div');
     b.className = 'sc-c-bubble';
-    var size = 6 + Math.random() * 14;
+    var size = 18 + Math.random() * 14;
     var delay = 0.1 + Math.random() * 0.6;
     var dur = 1.5 + Math.random() * 1.0;
     b.style.cssText =
@@ -409,9 +409,10 @@ function _buildSuitClubs(root) {
     s.className = 'sc-c-splash';
     var ang = (i / 16) * 360 + (Math.random() - 0.5) * 15;
     var dist = 20 + Math.random() * 30;
-    var size = 6 + Math.random() * 10;
+    var size = 12 + Math.random() * 10;
     s.style.cssText =
       'width:' + size + 'px;height:' + size + 'px;' +
+      'margin-left:' + (-size / 2) + 'px;margin-top:' + (-size / 2) + 'px;' +
       '--ang:' + ang.toFixed(1) + 'deg;' +
       '--dist:' + dist + 'vmin;' +
       '--delay:' + (Math.random() * 0.1).toFixed(2) + 's;';
@@ -430,7 +431,7 @@ function _buildSuitClubs(root) {
   for (var i = 0; i < 25; i++) {
     var b = document.createElement('div');
     b.className = 'sc-c-bubble';
-    var size = 4 + Math.random() * 12;
+    var size = 12 + Math.random() * 12;
     var delay = 1.5 + Math.random() * 0.8;
     var dur = 1.2 + Math.random() * 0.8;
     b.style.cssText =
@@ -444,12 +445,12 @@ function _buildSuitClubs(root) {
     root.appendChild(b);
   }
 
-  // === 毒云残留 (T=1.8~2.5s) ===
+  // === 毒云残留 (T=1.3~2.5s) ===
   for (var i = 0; i < 8; i++) {
     var c = document.createElement('div');
     c.className = 'sc-c-toxic-cloud';
     var size = 80 + Math.random() * 120;
-    var delay = 1.8 + Math.random() * 0.5;
+    var delay = 1.3 + Math.random() * 0.5;
     c.style.cssText =
       'left:' + (10 + Math.random() * 80) + '%;' +
       'top:' + (15 + Math.random() * 60) + '%;' +

@@ -25,7 +25,7 @@ const SUIT_SKILL = { h: '治愈', d: '增援', s: '虚弱', c: '强力' };
 const INTIMIDATE_DESC = {
   h: '无法从弃牌堆回收卡牌',
   d: '无法从酒馆抽取卡牌',
-  s: '无法降低Boss攻击力',
+  s: 'Boss攻击力无法降低',
   c: '受到伤害不会翻倍',
 };
 
@@ -552,11 +552,11 @@ let _resolvingBoss = false;
 function getSkillDescription(suit, value, rank) {
   const name = SUIT_SKILL[suit] || '';
   const isFace = rank === 'J' || rank === 'Q' || rank === 'K';
-  const valSuffix = isFace ? ` (数值${value})` : '';
+  const valSuffix = isFace ? ` (${rank}数值为${value})` : '';
   switch (suit) {
-    case 'h': return { title: `♥ 治愈 ${value}`, desc: '从弃牌堆随机取' + value + '张牌，放回酒馆（牌库）底部' + valSuffix };
+    case 'h': return { title: `♥ 治愈 ${value}`, desc: '从弃牌堆随机取' + value + '张牌，放回酒馆底部' + valSuffix };
     case 'd': return { title: `♦ 增援 ${value}`, desc: '玩家轮流从酒馆摸1张牌，如持有手牌上限则跳过，累计摸' + value + '张牌' + valSuffix };
-    case 's': return { title: `♠ 虚弱 ${value}`, desc: 'Boss本回合攻击力减少' + value + '点' + valSuffix };
+    case 's': return { title: `♠ 虚弱 ${value}`, desc: 'Boss攻击力减少' + value + '点' + valSuffix };
     case 'c': return { title: `♣ 强力`, desc: '本次出牌造成的伤害翻倍' + valSuffix };
     case 'joker': return { title: '🃏 小丑牌', desc: '打出后Boss的震慑失效，指定一名玩家立即执行一个额外回合' };
     default: return { title: '', desc: '' };
@@ -1109,7 +1109,7 @@ function renderDamagePhase() {
   if (boss.hp < 0) {
     html += `<div class="skill-line" style="color:var(--danger)">Boss被击杀!</div>`;
   } else if (boss.hp === 0) {
-    html += `<div class="skill-line" style="color:var(--safe)">Boss被感化! 放回酒馆顶部</div>`;
+    html += `<div class="skill-line" style="color:var(--safe)">Boss被感化! 放入酒馆顶部</div>`;
   } else {
     html += `<div class="skill-line">Boss剩余血量: ${boss.hp}/${boss.maxHp}</div>`;
   }
