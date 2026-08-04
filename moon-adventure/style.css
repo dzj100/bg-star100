@@ -1,0 +1,1415 @@
+/* ========================================
+   月面探险 - Style Sheet
+   太空/月球主题配色
+   ======================================== */
+
+/* --- CSS Variables --- */
+:root {
+  --bg: #0a0a1a;
+  --surface: #1a1a3e;
+  --surface2: #222255;
+  --card-bg: #0f3460;
+  --accent: #e94560;
+  --gold: #f5c518;
+  --text: #eee;
+  --text-dim: #8899bb;
+  --danger: #f44336;
+  --safe: #4caf50;
+  --radius: 12px;
+  --btn-h: 56px;
+
+  /* 氧气卡 */
+  --o2: #1e88e5;
+  --o2-dark: #0d47a1;
+  --o2-light: #42a5f5;
+
+  /* 磁暴 */
+  --storm: #c62828;
+  --storm-light: #ef5350;
+
+  /* 物资 */
+  --supply: #ff9800;
+  --supply-dark: #e65100;
+  --supply-light: #ffb74d;
+
+  /* 区域颜色 */
+  --zone1: #66bb6a;
+  --zone2: #42a5f5;
+  --zone3: #ce93d8;
+
+  /* OGS */
+  --ogs: #ef5350;
+  --ogs-dead: #333;
+
+  /* 玩家颜色 */
+  --p1: #e94560;
+  --p2: #42a5f5;
+  --p3: #66bb6a;
+  --p4: #ffb74d;
+  --p5: #ce93d8;
+}
+
+/* --- Global Reset --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* --- Star Background --- */
+.stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  animation: twinkle var(--dur) ease-in-out infinite alternate;
+  opacity: 0.2;
+}
+
+@keyframes twinkle {
+  from { opacity: 0.1; }
+  to { opacity: 0.8; }
+}
+
+/* --- App Container --- */
+#app {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px;
+  /* padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(80px, env(safe-area-inset-bottom)); */
+}
+
+/* ========================================
+   Landing Page
+   ======================================== */
+.landing {
+  text-align: center;
+  padding-top: 16dvh;
+}
+
+.landing .moon-icon {
+  font-size: 72px;
+  display: block;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 20px rgba(245, 197, 24, 0.3));
+}
+
+.landing h1 {
+  font-size: 2.2em;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--gold), #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.landing .subtitle {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin-bottom: 36px;
+}
+
+.count-label {
+  color: var(--text-dim);
+  font-size: 0.8em;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.count-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 36px;
+}
+
+.count-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--text);
+  font-size: 1.4em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.count-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(233, 69, 96, 0.4);
+}
+
+.start-btn {
+  width: 100%;
+  max-width: 280px;
+  height: var(--btn-h);
+  border-radius: var(--radius);
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #ff6b81);
+  color: #fff;
+  font-size: 1.15em;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(233, 69, 96, 0.3);
+  transition: all 0.2s;
+}
+
+.start-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  box-shadow: none;
+}
+
+.credit {
+  color: var(--text-dim);
+  font-size: 0.65em;
+  margin-top: 28px;
+}
+
+/* ========================================
+   Game Layout
+   ======================================== */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.game-header h2 {
+  font-size: 1em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75em;
+  cursor: pointer;
+}
+
+/* ========================================
+   Player Strip (顶部玩家列表)
+   ======================================== */
+.player-strip {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.player-strip-title {
+  display: none;
+  font-size: 0.75em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.ps-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1.5px solid transparent;
+}
+
+.ps-player:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ps-player.active {
+  border-color: var(--gold);
+  background: rgba(245, 197, 24, 0.08);
+}
+
+.ps-player.returned {
+  opacity: 0.4;
+}
+
+.ps-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ps-name {
+  font-size: 0.82em;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.ps-role {
+  font-size: 0.7em;
+  color: var(--gold);
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(245, 197, 24, 0.1);
+  border: 1px solid rgba(245, 197, 24, 0.25);
+}
+
+.ps-slots {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.ps-slot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.45em;
+  font-weight: 700;
+}
+
+.ps-slot.filled-o2 {
+  background: var(--o2);
+  color: #fff;
+}
+
+.ps-slot.filled-sup {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 1px;
+  background:#eee;
+}
+.ps-slot.filled-sup svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ps-slot.empty {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   Dice Area (中部骰子区域)
+   ======================================== */
+.dice-area {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+  overflow: hidden;
+  margin-bottom: 10px;
+  transition: height 0.3s ease-in-out;
+}
+
+.dice-area h3 {
+  font-size: 0.78em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.dice-prompt {
+  font-size: 0.85em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.dice-o2-select {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dice-o2-card {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 2px solid transparent;
+}
+
+.dice-o2-card:active {
+  transform: scale(0.95);
+}
+
+.dice-o2-card.val2 {
+  background: linear-gradient(135deg, var(--o2-dark), var(--o2));
+  color: #fff;
+}
+
+.dice-o2-card.val3 {
+  background: linear-gradient(135deg, #01579b, var(--o2-dark));
+  color: #fff;
+  box-shadow: 0 0 8px rgba(30, 136, 229, 0.3);
+}
+
+.dice-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.die {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  position: relative;
+}
+
+.die .pip {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text);
+  transform: translate(-50%, -50%);
+}
+
+.die.rolling {
+  animation: diceRoll 0.1s linear infinite;
+}
+
+@keyframes diceRoll {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(5deg); }
+  75% { transform: rotate(-5deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.dice-total {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.dice-bonus {
+  font-size: 0.8em;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+.ap-display {
+  font-size: 0.9em;
+  margin-top: 6px;
+  color: var(--text-dim);
+}
+
+.ap-display strong {
+  color: var(--gold);
+  font-size: 1.2em;
+}
+
+/* ========================================
+   Action Panel (操作按钮区)
+   ======================================== */
+.action-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.action-panel h3 {
+  font-size: 0.78em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.act-btn {
+  flex: 1;
+  min-width: 45%;
+  height: 42px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.act-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.act-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.act-btn .cost {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+
+.act-btn.btn-end {
+  background: rgba(233, 69, 96, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.act-btn.btn-ogs {
+  background: rgba(30, 136, 229, 0.15);
+  border-color: var(--o2);
+  color: var(--o2-light);
+}
+
+/* ========================================
+   Board (月面地图)
+   ======================================== */
+.board-wrap {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 10px;
+  overflow: visible;
+}
+
+.board-wrap h3 {
+  font-size: 0.78em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.path-board {
+  position: relative;
+  width: 100%;
+}
+
+/* 板块 */
+.tile {
+  position: absolute;
+  width: 12%;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.75;
+  mix-blend-mode: overlay;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+.tile:active {
+  transform: scale(0.92);
+}
+
+.tile svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.tile.picked .tile-shape {
+  opacity: 0.3;
+}
+
+.tile .tile-x {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6em;
+  opacity: 0.5;
+  color: var(--text-dim);
+}
+
+.tile .tile-discarded {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20%;
+}
+.tile .tile-discarded svg {
+  width: 100%;
+  height: 100%;
+  opacity: 0.7;
+}
+
+.tile .tile-back-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tile .tile-tokens,
+.ogs-chip .tile-tokens {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  width: 27px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.tile .tile-tokens svg,
+.ogs-chip .tile-tokens svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tile.accel,
+.ogs-chip.accel {
+  background: rgba(255, 235, 59, 0.15);
+  border-radius: 8px;
+}
+
+.tile.current-pos,
+.ogs-chip.current-pos {
+  box-shadow: 0 0 0 2px var(--gold), 0 0 8px rgba(255, 213, 79, 0.5) !important;
+  border-radius: 8px;
+  z-index: 2;
+}
+
+.tile .accel-mark,
+.ogs-chip .accel-mark {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55em;
+  color: var(--gold);
+}
+
+/* 月球车板块 */
+.tile-rover {
+  border: 2px dashed rgba(144,164,174,.5);
+  border-radius: 8px;
+  aspect-ratio: 1 / 1;
+}
+
+.rover-icon-big {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10%;
+}
+
+.rover-icon-big svg {
+  width: 100%;
+  height: 100%;
+}
+
+.rover-combo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: scale(0.75);
+  transform-origin: center center;
+}
+
+.rover-combo-token {
+  width: 60%;
+  line-height: 0;
+}
+
+.rover-combo-token svg {
+  width: 100%;
+  height: auto;
+}
+
+.rover-combo-icon {
+  width: 80%;
+  line-height: 0;
+  margin-top: -4%;
+}
+
+.rover-combo-icon svg {
+  width: 100%;
+  height: auto;
+}
+
+.rover-float-marker {
+  position: absolute;
+  width: 8%;
+  opacity: 0.6;
+}
+
+.rover-float-marker svg {
+  width: 100%;
+  height: auto;
+}
+
+/* OGS芯片（与板块等大，正方形） */
+.ogs-chip {
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(239,83,80,0.25), var(--ogs));
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(239, 83, 80, 0.3);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.ogs-chip.dead {
+  background: linear-gradient(145deg, rgba(60,60,60,0.4), var(--ogs-dead));
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: none;
+}
+
+.ogs-chip .ogs-label {
+  font-size: clamp(8px, 1.5vw, 14px);
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.ogs-chip.dead .ogs-label {
+  color: var(--text-dim);
+}
+
+/* 基地标记 */
+.base-marker {
+  margin-bottom: -20px;
+  margin-left: -25px;
+  margin-top: -25px;
+}
+
+.base-marker .base-icon {
+  width: 120px;
+  height: 120px;
+  display: block;
+  color: #f2f2f2;
+}
+
+/* 月球车标记 */
+.rover-marker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.5em;
+  color: var(--o2-light);
+  font-weight: 600;
+  gap: 1px;
+}
+
+.rover-marker .rover-icon {
+  font-size: 1.5em;
+}
+
+/* 机器人标记 */
+.robot-marker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.5em;
+  color: var(--text-dim);
+  gap: 1px;
+}
+
+.robot-marker .robot-icon {
+  font-size: 1.3em;
+}
+
+/* 区域标签 */
+.zone-label {
+  position: absolute;
+  font-size: 0.5em;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ========================================
+   Player Cards (详细玩家信息)
+   ======================================== */
+.player-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 10px;
+  margin-bottom: 8px;
+}
+
+.player-card.active-card {
+  border: 1.5px solid var(--gold);
+}
+
+.pc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pc-name {
+  font-weight: 700;
+  font-size: 0.88em;
+}
+
+.pc-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: rgba(245, 197, 24, 0.12);
+  border: 1px solid rgba(245, 197, 24, 0.3);
+  font-size: 0.7em;
+  color: var(--gold);
+}
+
+.pc-section {
+  margin-bottom: 6px;
+}
+
+.pc-section:last-child {
+  margin-bottom: 0;
+}
+
+.pc-label {
+  font-size: 0.66em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pc-label .link {
+  color: var(--o2-light);
+  cursor: pointer;
+}
+
+.pc-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* 卡牌/物资 chip */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 0.76em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:active {
+  transform: scale(0.95);
+}
+
+.chip.o2 {
+  background: linear-gradient(135deg, var(--o2-dark), var(--o2));
+  color: #fff;
+}
+
+.chip.o2.val3 {
+  background: linear-gradient(135deg, #01579b, var(--o2-dark));
+  box-shadow: 0 0 6px rgba(30, 136, 229, 0.35);
+}
+
+.chip.supply {
+  background: linear-gradient(135deg, var(--supply-dark), var(--supply));
+  color: #fff;
+}
+
+.chip.supply-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 2px 8px 2px 4px;
+}
+.chip.supply-chip svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.chip.supply-chip .chip-label {
+  font-size: 0.75em;
+  color: var(--text-dim);
+}
+
+.chip.empty-slot {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  color: var(--text-dim);
+  cursor: default;
+  min-width: 32px;
+}
+
+/* 存储槽条 */
+.slot-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.slot-bar .slot {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5em;
+  font-weight: 700;
+}
+
+.slot-bar .slot.filled-o2 {
+  background: var(--o2);
+  color: #fff;
+}
+
+.slot-bar .slot.filled-sup {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 1px;
+}
+.slot-bar .slot.filled-sup svg {
+  width: 100%;
+  height: 100%;
+}
+
+.slot-bar .slot.empty {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.slot-info {
+  font-size: 0.66em;
+  color: var(--text-dim);
+  margin-left: 5px;
+}
+
+.pos-tag {
+  font-size: 0.65em;
+  color: var(--o2-light);
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+/* ========================================
+   OGS Draw Area
+   ======================================== */
+.ogs-draw-area {
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  text-align: center;
+  animation: slideUp 0.25s ease-out;
+}
+
+.ogs-draw-area .big-icon {
+  font-size: 40px;
+  margin-bottom: 4px;
+}
+
+.ogs-draw-area .card-label {
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.ogs-draw-area .card-sub {
+  font-size: 0.75em;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+.ogs-draw-area.storm-draw {
+  border: 2px solid var(--danger);
+  background: rgba(198, 40, 40, 0.12);
+}
+
+.ogs-draw-area.storm-draw .card-label {
+  color: var(--danger);
+}
+
+.ogs-draw-area.o2-draw {
+  border: 2px solid var(--o2);
+}
+
+.ogs-draw-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ogs-draw-btns button {
+  flex: 1;
+  height: 42px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.85em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-keep {
+  background: var(--o2);
+  color: #fff;
+}
+
+.btn-keep:disabled {
+  opacity: 0.3;
+}
+
+.btn-stop {
+  background: transparent;
+  border: 1px solid var(--text-dim) !important;
+  color: var(--text-dim);
+}
+
+/* ========================================
+   Discard / Stats Panel
+   ======================================== */
+.stats-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-bottom: 10px;
+}
+
+.stats-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.stats-log-last {
+  font-size: 0.72em;
+  color: var(--text-dim);
+  padding: 6px 4px 2px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  margin-top: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-log-last:active { opacity: 0.6; }
+
+.stat-box {
+  flex: 1;
+  text-align: center;
+  padding: 7px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stat-box .num {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+
+.stat-box .label {
+  font-size: 0.62em;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.stat-box.warn .num {
+  color: var(--danger);
+}
+
+/* ========================================
+   Event Log
+   ======================================== */
+.log-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 10px;
+  margin-bottom: 8px;
+}
+
+.log-panel h3 {
+  font-size: 0.78em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.log-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.log-item {
+  font-size: 0.7em;
+  color: var(--text-dim);
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  gap: 5px;
+}
+
+.log-item .log-time {
+  color: rgba(255, 255, 255, 0.2);
+  min-width: 36px;
+}
+
+.log-item.storm-log {
+  color: var(--danger);
+}
+
+.log-item.draw-log {
+  color: var(--o2-light);
+}
+
+.log-item.action-log {
+  color: var(--gold);
+}
+
+/* ========================================
+   Victory / Failure Banner
+   ======================================== */
+.victory-banner {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.05));
+  border: 2px solid var(--safe);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.victory-banner h2 {
+  color: var(--safe);
+  font-size: 1.2em;
+  margin-bottom: 8px;
+}
+
+.victory-banner p {
+  font-size: 0.85em;
+  color: var(--text-dim);
+}
+
+.failure-banner {
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(244, 67, 54, 0.05));
+  border: 2px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.failure-banner h2 {
+  color: var(--danger);
+  font-size: 1.2em;
+  margin-bottom: 8px;
+}
+
+.failure-banner p {
+  font-size: 0.85em;
+  color: var(--text-dim);
+}
+
+/* ========================================
+   Modals
+   ======================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-box {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 24px 18px;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  animation: popIn 0.3s ease-out;
+}
+
+.modal-box.danger {
+  border: 2px solid var(--danger);
+}
+
+.modal-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.modal-box h3 {
+  font-size: 1.1em;
+  margin-bottom: 6px;
+}
+
+.modal-box p {
+  font-size: 0.8em;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.discard-item {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  font-size: 0.85em;
+}
+.discard-item:last-child { border-bottom: none; }
+.discard-item span { color: var(--text-dim); margin-right: 6px; }
+
+.btn-full {
+  width: 100%;
+  height: var(--btn-h);
+  border-radius: var(--radius);
+  border: none;
+  font-size: 1em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-primary {
+  background: var(--o2);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--text-dim);
+  color: var(--text-dim);
+}
+
+/* ========================================
+   Bottom Sheet
+   ======================================== */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.sheet-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 18px 14px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.25s ease-out;
+}
+
+.sheet-overlay.show .sheet {
+  transform: translateY(0);
+}
+
+.sheet h3 {
+  font-size: 0.95em;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.sheet-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.sheet-card {
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 0.88em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sheet-card:active {
+  transform: scale(0.95);
+}
+
+.sheet-card.o2-card {
+  background: linear-gradient(135deg, var(--o2-dark), var(--o2));
+  color: #fff;
+}
+
+.sheet-card.o2-card.val3 {
+  background: linear-gradient(135deg, #01579b, var(--o2-dark));
+}
+
+.sheet-card.supply-card {
+  background: linear-gradient(135deg, var(--supply-dark), var(--supply));
+  color: #fff;
+}
+
+.sheet-cancel {
+  width: 100%;
+  height: 42px;
+  border-radius: 8px;
+  border: 1px solid var(--text-dim);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.88em;
+  cursor: pointer;
+}
+
+.sheet-confirm {
+  width: 100%;
+  height: 42px;
+  border-radius: 8px;
+  border: none;
+  background: var(--o2);
+  color: #fff;
+  font-size: 0.88em;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+.text-danger { color: var(--danger); }
+
+.rescue-link {
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.rescue-link:active { opacity: 0.6; }
+.text-safe { color: var(--safe); }
+.text-gold { color: var(--gold); }
+.text-dim { 
+  /* color: var(--text-dim);  */
+  font-size:0.65em;
+}
+.mt8 { margin-top: 8px; }
+.mb8 { margin-bottom: 8px; }
+
+/* ========================================
+   Animations
+   ======================================== */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.shake-anim {
+  animation: shake 0.4s ease-out;
+}

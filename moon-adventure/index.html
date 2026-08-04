@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>月面探险 - 发牌助手</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 星空背景 -->
+<div class="stars" id="stars"></div>
+
+<!-- 主应用容器 -->
+<div id="app"></div>
+
+<!-- 磁暴警告弹窗 -->
+<div class="modal-overlay" id="stormModal">
+  <div class="modal-box danger shake-anim">
+    <div class="modal-icon">💥</div>
+    <h3 class="text-danger">磁暴来袭</h3>
+    <p id="stormMsg"></p>
+    <button class="btn-full btn-danger" onclick="closeModal('stormModal')">确认</button>
+  </div>
+</div>
+
+<!-- 骰子结果弹窗 -->
+<div class="modal-overlay" id="diceModal">
+  <div class="modal-box">
+    <div class="modal-icon">🎲</div>
+    <h3>掷骰结果</h3>
+    <div id="diceResult"></div>
+    <button class="btn-full btn-primary" onclick="closeModal('diceModal')">确认</button>
+  </div>
+</div>
+
+<!-- 弃牌堆弹窗 -->
+<div class="modal-overlay" id="discardModal" onclick="if(event.target===this)closeModal('discardModal')">
+  <div class="modal-box">
+    <h3>🗑️ 弃牌堆</h3>
+    <div id="discardList"></div>
+    <button class="btn-full btn-primary" onclick="closeModal('discardModal')">关闭</button>
+  </div>
+</div>
+
+<!-- 游戏结束结算弹窗 -->
+<div class="modal-overlay" id="endModal">
+  <div class="modal-box" id="endModalContent"></div>
+</div>
+
+<!-- OGS补给确认弹窗（AP未用完时） -->
+<div class="modal-overlay" id="ogsConfirmModal" onclick="if(event.target===this)closeModal('ogsConfirmModal')">
+  <div class="modal-box">
+    <div class="modal-icon">🫧</div>
+    <h3>氧气补给</h3>
+    <p>当前仍有剩余AP，进行补给将自动清空AP并结束行动。确定要现在补给吗？</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-full btn-secondary" onclick="closeModal('ogsConfirmModal')">取消</button>
+      <button class="btn-full btn-primary" onclick="doOGSDraw()">确认补给</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认重开弹窗 -->
+<div class="modal-overlay" id="confirmModal" onclick="if(event.target===this)closeModal('confirmModal')">
+  <div class="modal-box">
+    <div class="modal-icon">🚀</div>
+    <h3>重新开始</h3>
+    <p>当前游戏进度将丢失，确定要重新开始吗？</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-full btn-secondary" onclick="closeModal('confirmModal')">取消</button>
+      <button class="btn-full btn-danger" onclick="doResetGame()">确认重开</button>
+    </div>
+  </div>
+</div>
+
+<!-- 返回基地确认弹窗 -->
+<div class="modal-overlay" id="returnModal" onclick="if(event.target===this)closeModal('returnModal')">
+  <div class="modal-box">
+    <div class="modal-icon">📡</div>
+    <h3>返回基地</h3>
+    <p id="returnMsg"></p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-full btn-secondary" onclick="closeModal('returnModal')">取消</button>
+      <button class="btn-full btn-primary" onclick="confirmReturnBase()">确认返回</button>
+    </div>
+  </div>
+</div>
+
+<!-- 底部操作面板 -->
+<div class="sheet-overlay" id="actionSheet" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet" id="sheetContent"></div>
+</div>
+
+<script src="game.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
