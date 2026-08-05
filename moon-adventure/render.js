@@ -388,6 +388,18 @@ function renderOGSDrawArea() {
 // 月面地图
 // ========================================
 
+/** 玩家站位标记：骑车的玩家显示"人+车"组合，其余仅显示token */
+function playerTokenHTML(p) {
+  if (p.onRover) {
+    // 已驾驶：玩家token在上，月球车SVG在下，等比例缩小至80%
+    return `<div class="rover-combo">
+      <div class="rover-combo-token">${tokenSVG(p.color)}</div>
+      <div class="rover-combo-icon">${roverSVG(p.color)}</div>
+    </div>`;
+  }
+  return `<div class="tile-tokens">${tokenSVG(p.color)}</div>`;
+}
+
 /** 渲染月面地图（路径序列方案：物资+OGS交错排列，每行7个元素） */
 function renderBoard() {
   let h = '<div class="board-wrap">';
@@ -432,13 +444,9 @@ function renderBoard() {
           // 未驾驶：显示大号月球车SVG
           h += `<div class="rover-icon-big">${roverSVG('#6C7A81')}</div>`;
         } else {
-          // 已驾驶：玩家token在上，月球车SVG在下，等比例缩小至75%
           S.players.forEach((p, pi) => {
             if (p.pos === pathIdx && !p.returned) {
-              h += `<div class="rover-combo">
-                <div class="rover-combo-token">${tokenSVG(p.color)}</div>
-                <div class="rover-combo-icon">${roverSVG('#6C7A81')}</div>
-              </div>`;
+              h += playerTokenHTML(p);
             }
           });
         }
@@ -462,7 +470,7 @@ function renderBoard() {
 
         S.players.forEach((p, pi) => {
           if (p.pos === pathIdx && !p.returned) {
-            h += `<div class="tile-tokens">${tokenSVG(p.color)}</div>`;
+            h += playerTokenHTML(p);
           }
         });
 
@@ -491,7 +499,7 @@ function renderBoard() {
 
       S.players.forEach((p, pi) => {
         if (p.pos === pathIdx && !p.returned) {
-          h += `<div class="tile-tokens">${tokenSVG(p.color)}</div>`;
+          h += playerTokenHTML(p);
         }
       });
 
@@ -507,7 +515,7 @@ function renderBoard() {
 
       S.players.forEach((p, pi) => {
         if (p.pos === pathIdx && !p.returned) {
-          h += `<div class="tile-tokens">${tokenSVG(p.color)}</div>`;
+          h += playerTokenHTML(p);
         }
       });
 
@@ -522,15 +530,6 @@ function renderBoard() {
     const robotTop = ((robotP.y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
     h += `<div class="robot-marker" style="left:${robotLeft}%;top:${robotTop}%;width:${BOARD.tileW}%;aspect-ratio:1/1">
       <span class="robot-icon">🤖</span></div>`;
-  }
-
-  // 月球车（已被使用时显示在驾驶者位置）
-  if (S.roverUsed) {
-    const roverPlayer = S.players.find(p => p.onRover);
-    if (roverPlayer && roverPlayer.pos >= 0) {
-      const rp = tilePos(roverPlayer.pos);
-      h += `<div class="rover-float-marker" style="left:${(rp.x + 5).toFixed(1)}%;top:${((rp.y - 2) / boardH * 100).toFixed(1)}%">${roverSVG('#6C7A81')}</div>`;
-    }
   }
 
   h += '</div></div>';
@@ -720,11 +719,10 @@ function openCollectSheet() {
     !(S.hasEngineer && pathToTileIdx(S.robotPos) === t));
 
   let h = '<h3>📦 选择要拾取的物资</h3><div class="sheet-cards">';
-  const playerTile = pathToTileIdx(p.pos);
   targets.forEach(t => {
-    const dir = t > playerTile ? '前方' : '后方';
+    const dir = tilePathIdx(t) > p.pos ? '前方' : '后方';
     h += `<div class="sheet-card supply-card" onclick="closeSheet();collectSupply(${t})">
-      ${dir} · 板块${t + 1} (${cost}AP)</div>`;
+      ${dir === '前方' ? '⬇️' : '⬆️'} ${dir} · 板块${t + 1}</div>`;
   });
   h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
 

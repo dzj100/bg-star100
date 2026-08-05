@@ -545,6 +545,9 @@ body {
   mix-blend-mode: overlay;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
 }
+.tile.current-pos::after, .ogs-chip.current-pos::after{
+  opacity: 0.35;
+}
 
 .tile:active {
   transform: scale(0.92);
@@ -592,8 +595,9 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 0.9em;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
+  /* font-weight: 700; */
+  /* color: rgba(255, 255, 255, 0.7);  */
+  color: rgb(255, 255, 255);
 }
 
 .tile .tile-tokens,
@@ -666,8 +670,10 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transform: scale(0.75);
+  /* transform: scale(0.75); */
   transform-origin: center center;
+  transform: scale(0.8) translateX(10px) translateY(-20px);
+  filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.7));
 }
 
 .rover-combo-token {
@@ -687,17 +693,6 @@ body {
 }
 
 .rover-combo-icon svg {
-  width: 100%;
-  height: auto;
-}
-
-.rover-float-marker {
-  position: absolute;
-  width: 8%;
-  opacity: 0.6;
-}
-
-.rover-float-marker svg {
   width: 100%;
   height: auto;
 }
