@@ -382,6 +382,7 @@ function dealGame(count) {
     rescueDebt: false,     // 救援后本回合需扣除1AP
     log: [],
     shareState: null,        // 共享会话快照（发起共享时保存，用于取消回滚）
+    rescueState: null,       // 紧急救援快照（开始救援时保存，用于取消回滚）
     gameOver: false,
     gameResult: null,
   };
@@ -814,6 +815,7 @@ function collectSupply(tileIdx) {
 function onDiscardedClick(pathIdx) {
   if (S.turnPhase !== 'spent' || S.isDrawing) return;
   const p = currentPlayer();
+  if (p.onRover) return;
   const el = S.path[pathIdx];
   if (!el || el.type !== 'discarded' || el.picked) return;
 
@@ -1290,7 +1292,7 @@ function showRescueSelect() {
 
   let h = '<h3>🆘 紧急救援</h3>';
   h += `<p style="font-size:.8em;color:var(--danger);text-align:center;margin-bottom:10px">
-    ${p.name} 氧气耗尽！选择相邻玩家进行救援（免费）</p>`;
+    ${p.name} 氧气耗尽！选择相邻玩家进行救援</p>`;
   h += '<div class="sheet-cards">';
   rescuers.forEach(r => {
     const idx = S.players.indexOf(r);
@@ -1304,22 +1306,34 @@ function showRescueSelect() {
   render();
 }
 
-/** 开始紧急救援（免费单向转移） */
+/** 开始紧急救援（双向转移） */
 function startRescue(rescuerIdx) {
+  const rescued = currentPlayer();
+  const rescuer = S.players[rescuerIdx];
+  // 保存快照（点击遮罩取消救援时回滚用）
+  S.rescueState = {
+    rescuerIdx,
+    rescuedIdx: S.currentPlayer,
+    rescuerOxygen: rescuer.oxygen.map(c => ({ ...c })),
+    rescuerSupplies: rescuer.supplies.map(s => ({ ...s })),
+    rescuedOxygen: rescued.oxygen.map(c => ({ ...c })),
+    rescuedSupplies: rescued.supplies.map(s => ({ ...s })),
+  };
   S.isRescue = true;
   renderRescueSheet(rescuerIdx, S.currentPlayer);
   saveState();
 }
 
-/** 渲染紧急救援面板（rescuer → rescued 单向转移，免费） */
+/** 渲染紧急救援面板（救援双方可互相转移氧气和物资，免费） */
 function renderRescueSheet(rescuerIdx, rescuedIdx) {
   const rescuer = S.players[rescuerIdx];
   const rescued = S.players[rescuedIdx];
 
   let h = `<h3>🆘 紧急救援</h3>`;
-  h += `<div style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">
-    从 ${rescuer.name} 获取氧气和物资（免费）</div>`;
+  h += '<div style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">' +
+    '救援双方可互相转移氧气和物资</div>';
 
+  // rescuer 的物品（可转给被救者）
   h += `<div style="font-size:.8em;margin-bottom:4px;color:${rescuer.color}">● ${rescuer.name} 的物品:</div>`;
   h += '<div class="sheet-cards">';
   rescuer.oxygen.forEach((c, i) => {
@@ -1335,19 +1349,20 @@ function renderRescueSheet(rescuerIdx, rescuedIdx) {
   });
   h += '</div>';
 
-  h += `<div style="font-size:.8em;margin:8px 0 4px;color:${rescued.color}">● ${rescued.name} 当前物品:</div>`;
+  // rescued 的物品（可反向转给救援者）
+  h += `<div style="font-size:.8em;margin:8px 0 4px;color:${rescued.color}">● ${rescued.name} 的物品:</div>`;
   h += '<div class="sheet-cards">';
-  rescued.oxygen.forEach(c => {
-    h += `<div class="sheet-card o2-card" style="opacity:.5">O₂×${c.val}</div>`;
+  rescued.oxygen.forEach((c, i) => {
+    h += `<div class="sheet-card o2-card ${c.val === 3 ? 'val3' : ''}"
+      onclick="transferItem(${rescuedIdx},${rescuerIdx},'o2',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
+      ← O₂×${c.val}</div>`;
   });
-  rescued.supplies.forEach((s) => {
+  rescued.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px;opacity:.5">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
+    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
+      onclick="transferItem(${rescuedIdx},${rescuerIdx},'supply',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
+      ← <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
   });
-  if (rescued.oxygen.length === 0 && rescued.supplies.length === 0) {
-    h += '<div style="font-size:.75em;color:var(--text-dim);padding:6px">空</div>';
-  }
   h += '</div>';
 
   h += `<button class="sheet-confirm" style="width:100%;margin-top:12px" onclick="finishRescue()">
@@ -1357,10 +1372,29 @@ function renderRescueSheet(rescuerIdx, rescuedIdx) {
   openSheet();
 }
 
+/** 取消紧急救援：回滚已转移物资，回到等待救援状态 */
+function cancelRescue() {
+  const snap = S.rescueState;
+  if (!snap) return;
+  const rescuer = S.players[snap.rescuerIdx];
+  const rescued = S.players[snap.rescuedIdx];
+  rescuer.oxygen = snap.rescuerOxygen;
+  rescuer.supplies = snap.rescuerSupplies;
+  rescued.oxygen = snap.rescuedOxygen;
+  rescued.supplies = snap.rescuedSupplies;
+  S.isRescue = false;
+  S.rescueState = null;
+  addLog(`↩️ ${rescued.name} 取消了紧急救援`, 'action-log');
+  document.getElementById('actionSheet').classList.remove('show');
+  saveState();
+  render();
+}
+
 /** 完成紧急救援 */
 function finishRescue() {
   const p = currentPlayer();
   S.isRescue = false;
+  S.rescueState = null;
 
   if (p.oxygen.length === 0) {
     // 救援后仍然没氧气 → 游戏失败
@@ -1453,6 +1487,11 @@ function openModal(id) {
   document.getElementById(id).classList.add('show');
 }
 
+/** 打开游戏规则弹窗 */
+function showRules() {
+  openModal('rulesModal');
+}
+
 /** 关闭模态弹窗 */
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
@@ -1465,8 +1504,11 @@ function openSheet() {
 
 /** 关闭底部操作面板 */
 function closeSheet() {
-  // 救援模式不允许关闭
-  if (S.isRescue) return;
+  // 救援进行中：关闭（点击遮罩）视为取消救援并回滚
+  if (S.isRescue) {
+    cancelRescue();
+    return;
+  }
   // 共享进行中关闭面板视为取消
   if (S.shareState) {
     cancelShare();
@@ -1544,7 +1586,7 @@ function doResetGame() {
     roverPos: -1, roverUsed: false, robotPos: -1, hasEngineer: false, robotMoved: false,
     accelMarks: [], accelPlacedThisTurn: false,
     drawnThisTurn: [], isDrawing: false, isRescue: false, rescueDebt: false,
-    log: [], shareState: null, gameOver: false, gameResult: null,
+    log: [], shareState: null, rescueState: null, gameOver: false, gameResult: null,
   };
   render();
 }

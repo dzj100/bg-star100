@@ -1212,6 +1212,61 @@ body {
   border: 2px solid var(--danger);
 }
 
+.rules-box {
+  max-width: 420px;
+  text-align: left;
+}
+
+.rules-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  text-align: left;
+  margin: 10px 0 14px;
+  padding-right: 4px;
+}
+
+.rules-section {
+  margin-bottom: 10px;
+}
+
+.rules-section h4 {
+  font-size: 0.85em;
+  color: var(--text-light);
+  margin-bottom: 3px;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 2px;
+  font-size: 0.75em;
+  color: var(--text-dim);
+}
+
+.rules-table th,
+.rules-table td {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.rules-table th:first-child,
+.rules-table td:first-child {
+  width: 8em;
+}
+
+.rules-table th {
+  color: var(--text-light);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rules-section p {
+  font-size: 0.75em;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
 .modal-icon {
   font-size: 48px;
   margin-bottom: 8px;
@@ -1226,7 +1281,7 @@ body {
   font-size: 0.8em;
   color: var(--text-dim);
   line-height: 1.5;
-  margin-bottom: 16px;
+  /* margin-bottom: 16px; */
 }
 
 .discard-item {

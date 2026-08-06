@@ -105,7 +105,8 @@ function renderHeader() {
     <div class="game-header">
       <h2>🌙 月面探险</h2>
       <div style="display:flex;gap:6px">
-        <button class="icon-btn" onclick="resetGame()">重新开始</button>
+        <button class="icon-btn" onclick="resetGame()">🔄 重置</button>
+        <button class="icon-btn" onclick="showRules()">📖 规则</button>
       </div>
     </div>`;
 }
@@ -540,6 +541,7 @@ function renderBoard() {
 function onTileClick(tileIdx) {
   if (S.turnPhase !== 'spent' || S.isDrawing) return;
   const p = currentPlayer();
+  if (p.onRover) return;
   const adj = getAdjacentTiles(p.pos);
 
   // 如果是相邻的未拾取板块 → 拾取物资

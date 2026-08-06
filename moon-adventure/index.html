@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>月面探险 - 发牌助手</title>
+<title>月面探险</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -84,6 +84,83 @@
       <button class="btn-full btn-secondary" onclick="closeModal('returnModal')">取消</button>
       <button class="btn-full btn-primary" onclick="confirmReturnBase()">确认返回</button>
     </div>
+  </div>
+</div>
+
+<!-- 游戏规则弹窗 -->
+<div class="modal-overlay" id="rulesModal" onclick="if(event.target===this)closeModal('rulesModal')">
+  <div class="modal-box rules-box">
+    <!-- <div class="modal-icon">📖</div> -->
+    <h3>游戏规则</h3>
+    <div class="rules-content">
+      <div class="rules-section">
+        <h4>🎯 目标</h4>
+        <p>收集完好物资并全员返回基地，目标完好物资数：</p>
+        <table class="rules-table">
+          <tr><th>人数</th><th>目标完好物资</th></tr>
+          <tr><td>2人</td><td>5个</td></tr>
+          <tr><td>3人</td><td>7个</td></tr>
+          <tr><td>4人</td><td>8个</td></tr>
+          <tr><td>5人</td><td>9个</td></tr>
+        </table>
+      </div>
+      <div class="rules-section">
+        <h4>🔄 回合流程</h4>
+        <p>打出一张氧气卡 → 掷骰获得AP（O₂×2掷2颗、O₂×3掷3颗，骰面1~3）→ 消耗AP执行行动 → 结束回合</p>
+      </div>
+      <div class="rules-section">
+        <h4>🎲 行动</h4>
+        <table class="rules-table">
+          <tr><th>行动</th><th>说明</th></tr>
+          <tr><td>↕️ 移动</td><td>前进/后退1格（1AP），越过其他玩家、机器人、加速标记（发明家可停在加速标记上）</td></tr>
+          <tr><td>📦 物资回收</td><td>拾取相邻板块物资（3AP，老兵2AP），需有空存储槽</td></tr>
+          <tr><td>⚡ 加速标记</td><td>放置在相邻板块/损毁OGS/丢弃物资上（2AP，发明家首次1AP）</td></tr>
+          <tr><td>🔴 建立OGS</td><td>可在相邻空隙建立（3AP，最多5个）</td></tr>
+          <tr><td>🤝 共享</td><td>与相邻玩家双向交换物资/氧气（1AP）</td></tr>
+          <tr><td>🗑️ 丢弃物资</td><td>丢弃1个物资到相邻空隙（1AP）</td></tr>
+          <tr><td>🫧 OGS补给</td><td>站在活跃OGS上可抽取任意数量氧气卡（免费但清空剩余AP）；抽到磁暴卡则该OGS被摧毁</td></tr>
+        </table>
+      </div>
+      <div class="rules-section">
+        <h4>💥 磁暴</h4>
+        <p>磁暴卡共4张，混入氧气抽牌堆。补给抽到磁暴时，当前OGS芯片被摧毁，磁暴卡进入弃牌堆</p>
+        <p>抽牌堆空时自动从弃牌堆洗回全部氧气卡+磁暴卡，并从备用磁暴中追加1张（整局最多4张）</p>
+      </div>
+      <div class="rules-section">
+        <h4>🗺️ 区域资源</h4>
+        <table class="rules-table">
+          <tr><th>物资形状</th><th>背面数字</th><th>完好</th><th>损坏</th></tr>
+          <tr><td>三边形</td><td>3</td><td>3个</td><td>4个</td></tr>
+          <tr><td>四边形</td><td>4</td><td>4个</td><td>3个</td></tr>
+          <tr><td>五边形</td><td>5</td><td>5个</td><td>2个</td></tr>
+        </table>
+        <p>每种资源7块，共21块。物资始终背面朝上（含背包内），仅游戏结束结算时翻开判定完好/损坏</p>
+      </div>
+      <div class="rules-section">
+        <h4>⭐ 角色技能</h4>
+        <table class="rules-table">
+          <tr><th>角色</th><th>能力</th></tr>
+          <tr><td>🔧 工程师</td><td>每回合可免费移动机器人0-2格（机器人提供加速）</td></tr>
+          <tr><td>📦 搬运工</td><td>拥有6个存储槽</td></tr>
+          <tr><td>💡 发明家</td><td>每回合首次放置加速标记仅1AP，且可停在加速标记上</td></tr>
+          <tr><td>🎉 气氛组</td><td>掷出相同点数+3AP</td></tr>
+          <tr><td>🎖️ 老兵</td><td>物资回收仅需2AP</td></tr>
+        </table>
+      </div>
+      <div class="rules-section">
+        <h4>🆘 紧急救援</h4>
+        <p>回合开始无氧气时，相邻有氧气玩家可发起救援（双方可互相转移物资）；救援后下次掷骰-1AP，无人可救则任务失败</p>
+      </div>
+      <div class="rules-section">
+        <h4>🚗 月球车</h4>
+        <p>移动到末端月球车板块即登上（AP清零）。驾驶后可消耗1AP移动2格</p>
+      </div>
+      <div class="rules-section">
+        <h4>🏁 胜负</h4>
+        <p>全员返回基地时结算：完好物资达到目标即胜利；氧气耗尽且无人可救则失败</p>
+      </div>
+    </div>
+    <button class="btn-full btn-primary" onclick="closeModal('rulesModal')">关闭</button>
   </div>
 </div>
 
