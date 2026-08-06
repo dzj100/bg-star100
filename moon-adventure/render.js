@@ -50,7 +50,7 @@ function renderLanding() {
   return `
     <div class="landing">
       <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
-      <span class="moon-icon">🌙</span>
+      <span class="moon-icon">🌕️</span>
       <h1>月面探险</h1>
       <p class="subtitle">Moon Adventure</p>
       <button class="start-btn" onclick="showSetup()">🚀 开始游戏</button>
@@ -75,7 +75,7 @@ function renderSetup() {
   return `
     <div class="setup">
       <div class="setup-header">
-        <h1>🌙 月面探险</h1>
+        <h1>🌕️ 月面探险</h1>
         <button class="back-btn" onclick="showLanding()">← 返回</button>
       </div>
       <h2>添加玩家</h2>
@@ -146,7 +146,7 @@ function renderGame() {
 function renderHeader() {
   return `
     <div class="game-header">
-      <h2>🌙 月面探险</h2>
+      <h2>🌕️ 月面探险</h2>
       <div style="display:flex;gap:6px">
         <button class="icon-btn" onclick="resetGame()">🔄 重置</button>
         <button class="icon-btn" onclick="showRules()">📖 规则</button>
@@ -418,8 +418,8 @@ function renderOGSDrawArea() {
   return `
     <div class="ogs-draw-area o2-draw">
       <div class="big-icon">🫧</div>
-      <div class="card-label">氧气卡 ×${last.val}</div>
-      <div class="card-sub">骰子数 ×${last.val}（已抽 ${totalOxygen}/${p.slots}）</div>
+      <div class="card-label">O₂ ×${last.val}</div>
+      <div class="card-sub">（放入存储槽后，存储槽使用 ${totalOxygen}/${p.slots}）</div>
       <div class="ogs-draw-btns">
         <button class="btn-keep" ${canContinue ? '' : 'disabled'} onclick="drawFromOGS()">
           ${canContinue ? '继续抽取' : '已满'}</button>
@@ -447,7 +447,6 @@ function playerTokenHTML(p) {
 /** 渲染月面地图（路径序列方案：物资+OGS交错排列，每行7个元素） */
 function renderBoard() {
   let h = '<div class="board-wrap">';
-  h += '<h3 style="float:right">月面地图</h3>';
 
   // 动态板高度（基于实际行数）
   const numRows = Math.ceil(S.path.length / COLS);
@@ -459,9 +458,14 @@ function renderBoard() {
     if (el.type === 'tile') tileSeqPos[el.tileIdx] = pathIdx;
   });
 
-  // 基地标记（独立一行，在地图板块上方）
+  // 基地标记 + 玩家token + 标题（水平一行）
+  const basePlayers = S.players.filter(p => p.pos === -1);
   h += `<div class="base-marker">
-    <svg class="base-icon" viewBox="0 0 800 800"><g transform="translate(175.137577,623.832200) scale(0.057655,-0.057655)" fill="currentColor" stroke="none"><path d="M2392 7363 c-36 -52 -317 -650 -458 -976 -190 -436 -375 -962 -497 -1407 -88 -318 -194 -809 -232 -1070 -3 -25 -13 -88 -21 -140 -69 -455 -106 -909 -120 -1491 l-7 -277 -125 -118 c-204 -193 -338 -368 -451 -589 -130 -254 -201 -510 -219 -790 -4 -64 -5 -118 -3 -121 2 -2 141 -4 307 -4 l303 0 61 53 c265 226 421 328 630 412 110 44 328 110 336 102 3 -3 9 -76 15 -163 11 -187 26 -345 34 -367 4 -8 15 -17 27 -20 11 -3 219 -3 464 0 l444 6 6 36 c3 20 7 47 10 61 2 14 11 121 19 239 8 118 17 216 18 217 4 4 181 -49 263 -79 227 -82 452 -220 665 -409 l66 -58 640 0 c352 0 883 3 1181 7 l542 6 0 238 c0 203 2 240 16 253 13 13 45 16 199 16 172 0 185 -1 195 -19 6 -12 10 -112 10 -255 l0 -236 345 0 346 0 19 44 c77 181 122 416 122 641 1 421 -148 781 -447 1080 -104 105 -177 162 -292 231 -46 27 -83 52 -83 55 0 3 23 9 51 12 103 12 219 89 219 144 0 20 -37 64 -165 193 -91 92 -165 170 -165 174 0 19 201 200 253 228 32 17 67 44 78 59 43 61 33 136 -27 189 -28 24 -44 30 -81 30 -79 0 -130 -44 -153 -131 -9 -36 -29 -61 -106 -137 -52 -50 -98 -92 -102 -92 -4 0 -83 75 -175 165 -196 192 -203 195 -261 119 -79 -103 -117 -220 -117 -359 -1 -149 37 -260 126 -369 25 -31 45 -57 45 -58 0 -2 -82 -3 -183 -4 -157 0 -199 -4 -308 -27 -567 -120 -1000 -495 -1173 -1017 -38 -114 -65 -237 -67 -297 -2 -91 -11 -90 -60 5 -102 197 -285 435 -445 579 -43 39 -93 84 -111 100 l-31 28 -11 420 c-17 643 -48 993 -137 1530 -58 353 -178 884 -265 1170 -188 615 -359 1064 -632 1656 -144 311 -283 596 -295 603 -6 3 -19 -6 -30 -21z m181 -4016 c79 -36 128 -77 170 -140 108 -162 83 -369 -60 -497 -204 -181 -532 -107 -637 145 -36 86 -29 220 16 309 24 48 99 129 145 157 105 65 258 76 366 26z"/></g></svg>
+      <svg class="base-icon" viewBox="0 0 800 800"><g transform="translate(175.137577,623.832200) scale(0.057655,-0.057655)" fill="currentColor" stroke="none"><path d="M2392 7363 c-36 -52 -317 -650 -458 -976 -190 -436 -375 -962 -497 -1407 -88 -318 -194 -809 -232 -1070 -3 -25 -13 -88 -21 -140 -69 -455 -106 -909 -120 -1491 l-7 -277 -125 -118 c-204 -193 -338 -368 -451 -589 -130 -254 -201 -510 -219 -790 -4 -64 -5 -118 -3 -121 2 -2 141 -4 307 -4 l303 0 61 53 c265 226 421 328 630 412 110 44 328 110 336 102 3 -3 9 -76 15 -163 11 -187 26 -345 34 -367 4 -8 15 -17 27 -20 11 -3 219 -3 464 0 l444 6 6 36 c3 20 7 47 10 61 2 14 11 121 19 239 8 118 17 216 18 217 4 4 181 -49 263 -79 227 -82 452 -220 665 -409 l66 -58 640 0 c352 0 883 3 1181 7 l542 6 0 238 c0 203 2 240 16 253 13 13 45 16 199 16 172 0 185 -1 195 -19 6 -12 10 -112 10 -255 l0 -236 345 0 346 0 19 44 c77 181 122 416 122 641 1 421 -148 781 -447 1080 -104 105 -177 162 -292 231 -46 27 -83 52 -83 55 0 3 23 9 51 12 103 12 219 89 219 144 0 20 -37 64 -165 193 -91 92 -165 170 -165 174 0 19 201 200 253 228 32 17 67 44 78 59 43 61 33 136 -27 189 -28 24 -44 30 -81 30 -79 0 -130 -44 -153 -131 -9 -36 -29 -61 -106 -137 -52 -50 -98 -92 -102 -92 -4 0 -83 75 -175 165 -196 192 -203 195 -261 119 -79 -103 -117 -220 -117 -359 -1 -149 37 -260 126 -369 25 -31 45 -57 45 -58 0 -2 -82 -3 -183 -4 -157 0 -199 -4 -308 -27 -567 -120 -1000 -495 -1173 -1017 -38 -114 -65 -237 -67 -297 -2 -91 -11 -90 -60 5 -102 197 -285 435 -445 579 -43 39 -93 84 -111 100 l-31 28 -11 420 c-17 643 -48 993 -137 1530 -58 353 -178 884 -265 1170 -188 615 -359 1064 -632 1656 -144 311 -283 596 -295 603 -6 3 -19 -6 -30 -21z m181 -4016 c79 -36 128 -77 170 -140 108 -162 83 -369 -60 -497 -204 -181 -532 -107 -637 145 -36 86 -29 220 16 309 24 48 99 129 145 157 105 65 258 76 366 26z"/></g></svg>
+      ${basePlayers.length ? `<div class="base-tokens">${basePlayers.map(p =>
+        `<span class="base-token${p.returned ? ' returned' : ''}" title="${p.name}${p.returned ? '（已返回基地）' : ''}">${tokenSVG(p.color)}</span>`
+      ).join('')}</div>` : ''}
+    <span class="base-title">月面地图</span>
   </div>`;
 
   h += `<div class="path-board" style="aspect-ratio:100/${boardH.toFixed(1)}">`;
@@ -473,13 +477,15 @@ function renderBoard() {
     const top = ((y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
     const cp = currentPlayer();
     const isCurrentPos = cp && cp.pos === pathIdx && !cp.returned;
+    // 第一/三/五行（奇数行）角色token垂直翻转
+    const flipTok = Math.floor(pathIdx / COLS) % 2 === 0;
 
     if (el.type === 'tile') {
       const tile = S.tiles[el.tileIdx];
 
       if (tile.isRover) {
         const hasAccel = S.accelMarks.includes(pathIdx);
-        h += `<div class="tile tile-rover${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}"
+        h += `<div class="tile tile-rover${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
                style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
                onclick="onTileClick(${el.tileIdx})">`;
         if (S.accelMarks.includes(pathIdx)) h += '<div class="accel-mark">⚡</div>';
@@ -503,7 +509,7 @@ function renderBoard() {
         const stroke = tile.picked ? 'rgba(255,255,255,.1)' : backColor;
         const hasAccel = S.accelMarks.includes(pathIdx);
 
-        h += `<div class="tile ${tile.picked ? 'picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}"
+        h += `<div class="tile ${tile.picked ? 'picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
                style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
                onclick="onTileClick(${el.tileIdx})">`;
         h += `<div class="tile-shape">${shapeSVG(tile.shape, fill, stroke)}</div>`;
@@ -527,7 +533,7 @@ function renderBoard() {
       const backColor = BACK_COLORS[zone.shape] || zone.color;
       const hasAccel = S.accelMarks.includes(pathIdx);
 
-      h += `<div class="tile discarded-supply-tile${el.picked ? ' picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}"
+      h += `<div class="tile discarded-supply-tile${el.picked ? ' picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
              style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
              onclick="onDiscardedClick(${pathIdx})">`;
 
@@ -551,7 +557,7 @@ function renderBoard() {
     } else if (el.type === 'ogs') {
       // OGS 芯片（与板块等大）
       const hasAccel = S.accelMarks.includes(pathIdx);
-      h += `<div class="ogs-chip ${!el.active ? 'dead' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}"
+      h += `<div class="ogs-chip ${!el.active ? 'dead' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
              style="left:${left}%;top:${top}%;width:${BOARD.tileW}%">
         <span class="ogs-label">${!el.active ? '❌️<br>OGS' : 'OGS'}</span>`;
 
@@ -782,7 +788,7 @@ function openOGSSheet() {
 
   let h = '<h3>🔴 选择OGS放置位置</h3><div class="sheet-cards">';
   available.forEach(insIdx => {
-    const dir = insIdx > p.pos ? '前方' : '后方';
+    const dir = insIdx > p.pos ? '⬇️ 前方' : '⬆️ 后方';
     h += `<div class="sheet-card o2-card" onclick="closeSheet();placeOGS(${insIdx})">
       ${dir} (3AP)</div>`;
   });
@@ -802,7 +808,7 @@ function openOGSSheet() {
  * @param {number[]} accelStops - 连续加速标记的序列位置数组
  */
 function openAccelChoiceSheet(direction, skipTarget, accelStops) {
-  const dirLabel = direction === 'forward' ? '前进' : '后退';
+  const dirLabel = direction === 'forward' ? '⬇️ 前进' : '⬆️ 后退';
   let h = `<h3>⚡ 发现加速标记</h3>`;
   h += `<p style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">
     发明家可选择停在加速标记上，或跳过全部</p>`;
@@ -817,7 +823,7 @@ function openAccelChoiceSheet(direction, skipTarget, accelStops) {
   if (skipTarget >= 0) {
     h += `<div class="sheet-card supply-card"
       onclick="closeSheet();executePlayerMove(${skipTarget},'${direction}')">
-      ⬇️ ${dirLabel}到${posLabel(skipTarget)}</div>`;
+      ${dirLabel}到${posLabel(skipTarget)}</div>`;
   } else if (direction === 'backward') {
     h += `<div class="sheet-card supply-card"
       onclick="closeSheet();showReturnBaseConfirm()">
@@ -931,7 +937,7 @@ function openDiscardGapSheet(supplyIdx) {
 
   let h = '<h3>📍 选择丢弃位置</h3><div class="sheet-cards">';
   insertPoints.forEach(insIdx => {
-    const dir = insIdx > p.pos ? '前方' : '后方';
+    const dir = insIdx > p.pos ? '⬇️ 前方' : '⬆️ 后方';
     h += `<div class="sheet-card supply-card"
       onclick="closeSheet();discardSupply(${supplyIdx},${insIdx})">
       ${dir}</div>`;

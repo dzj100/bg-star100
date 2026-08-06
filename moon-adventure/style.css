@@ -841,6 +841,12 @@ body {
   height: auto;
 }
 
+/* 奇数行（第一/三/五行）角色token垂直翻转 */
+.flip-tok .tile-tokens svg,
+.flip-tok .rover-combo svg {
+  transform: scaleX(-1);
+}
+
 /* OGS芯片（与板块等大，正方形） */
 .ogs-chip {
   position: absolute;
@@ -876,6 +882,9 @@ body {
 
 /* 基地标记 */
 .base-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: -20px;
   margin-left: -25px;
   margin-top: -25px;
@@ -886,6 +895,40 @@ body {
   height: 120px;
   display: block;
   color: #f2f2f2;
+  flex-shrink: 0;
+}
+
+.base-tokens {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex: 1;
+    top: 18px;
+    position: relative;
+    left: -27px;
+}
+
+.base-token {
+  width: 24px;
+  height: 24px;
+  line-height: 0;
+}
+
+.base-token svg {
+  width: 100%;
+  height: 100%;
+}
+
+.base-token.returned {
+  opacity: 0.4;
+}
+
+.base-title {
+  font-size: 0.78em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  margin-left: auto;    top: -26px;
+    position: relative;
 }
 
 /* 月球车标记 */
@@ -916,7 +959,7 @@ body {
 }
 
 .robot-marker .robot-icon {
-  font-size: 1.3em;
+  font-size: 2em;
 }
 
 /* 区域标签 */
@@ -1031,7 +1074,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: #eee;
   border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 2px 8px 2px 4px;
 }

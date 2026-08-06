@@ -17,10 +17,10 @@ const PLAYER_COLORS = ['#e94560', '#42a5f5', '#66bb6a', '#ffb74d', '#ce93d8'];
 
 /** 角色定义 */
 const ROLES = [
-  { id: 'engineer',    name: '工程师', icon: '🔧', ability: '每回合可让机器人移动0-2步', slots: 5 },
+  { id: 'engineer',    name: '工程师', icon: '🔧', ability: '每回合可免费移动机器人0-2格', slots: 5 },
   { id: 'laborer',     name: '搬运工', icon: '📦', ability: '拥有6个存储槽',             slots: 6 },
-  { id: 'inventor',    name: '发明家', icon: '💡', ability: '每回合首次放置加速标记仅需1AP',        slots: 5 },
-  { id: 'atmosphere',  name: '气氛组', icon: '🎉', ability: '掷出相同数字+3AP',          slots: 5 },
+  { id: 'inventor',    name: '发明家', icon: '💡', ability: '每回合首次放置加速标记仅需1AP，且可停在加速标记上',        slots: 5 },
+  { id: 'atmosphere',  name: '气氛组', icon: '🎉', ability: '掷出点数均相同+3AP',          slots: 5 },
   { id: 'veteran',     name: '老兵',   icon: '🎖️', ability: '资源回收仅需2AP',           slots: 5 },
 ];
 
@@ -39,8 +39,8 @@ const COLS = 7;
 
 /** 地图布局参数（坐标系：板块宽度百分比，与海底探险一致） */
 const BOARD = {
-  maxTilt: 4.5,   // 每行最大纵向倾斜
-  rowGap: 16,     // 行间距
+  maxTilt: 5.5,   // 每行最大纵向倾斜
+  rowGap: 15,     // 行间距
   y0: 6,          // 首行Y偏移
   tileW: 12,     // 板块宽度(%)
   margin: 5,     // 左右边距(%)
@@ -1061,7 +1061,9 @@ function cancelShare() {
   to.supplies = snap.toSupplies;
   S.ap = snap.savedAP;
   S.shareState = null;
+  addLog(`${from.name} 与${to.name}取消共享，物资已归还`, 'action-log');
   closeSheet();
+  saveState();
   render();
 }
 
@@ -1080,7 +1082,7 @@ function transferItem(fromIdx, toIdx, type, cardIdx) {
     if (freeSlots(to) <= 0) return;
     const card = from.oxygen.splice(cardIdx, 1)[0];
     to.oxygen.push(card);
-    addLog(`${from.name} → ${to.name}: 氧气卡×${card.val}`, 'draw-log');
+    addLog(`${from.name} → ${to.name}: O₂ ×${card.val}`, 'draw-log');
   } else {
     if (freeSlots(to) <= 0) return;
     const sup = from.supplies.splice(cardIdx, 1)[0];
