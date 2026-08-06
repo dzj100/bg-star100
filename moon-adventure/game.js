@@ -90,7 +90,7 @@ function timeStr() {
 
 /** @type {Object} 游戏状态对象 */
 let S = {
-  phase: 'landing',       // 'landing' | 'playing' | 'gameover'
+  phase: 'landing',       // 'landing' | 'setup' | 'playing' | 'gameover'
   playerCount: 0,         // 玩家人数 (2-5)
   players: [],            // 玩家数组
   drawPile: [],           // 抽牌堆（氧气卡）
@@ -303,11 +303,52 @@ function getAdjacentInsertPoints(pathPos) {
 // 发牌 / 游戏初始化
 // ========================================
 
+// ========================================
+// 玩家设置
+// ========================================
+
+/** @type {string[]} 设置阶段暂存的玩家昵称列表 */
+let setupNames = [];
+
+/** 打开玩家设置页面 */
+function showSetup() {
+  S.phase = 'setup';
+  render();
+}
+
+/** 添加玩家昵称 */
+function addPlayer() {
+  const inp = document.getElementById('name-input');
+  if (!inp) return;
+  const name = inp.value.trim();
+  if (!name) return;
+  if (setupNames.length >= 5) { console.warn('最多5名玩家'); return; }
+  setupNames.push(name);
+  inp.value = '';
+  render();
+  // 重新聚焦输入框
+  setTimeout(() => {
+    const el = document.getElementById('name-input');
+    if (el) el.focus();
+  }, 10);
+}
+
+/** 移除玩家昵称 */
+function removePlayer(idx) {
+  setupNames.splice(idx, 1);
+  render();
+}
+
+// ========================================
+// 游戏初始化
+// ========================================
+
 /**
  * 初始化新一局游戏
- * @param {number} count - 玩家人数 (2-5)
+ * @param {string[]} names - 玩家昵称数组 (2-5人)
  */
-function dealGame(count) {
+function dealGame(names) {
+  const count = names.length;
   // --- 构建氧气卡牌组 ---
   const oxygenCards = [];
   for (let i = 0; i < 10; i++) oxygenCards.push({ type: 'o2', val: 2 });
@@ -322,7 +363,7 @@ function dealGame(count) {
   for (let i = 0; i < count; i++) {
     const role = roles[i % roles.length];
     players.push({
-      name: '宇航员' + (i + 1),
+      name: names[i],
       role: { ...role },
       slots: role.slots,
       color: PLAYER_COLORS[i],
@@ -1577,6 +1618,7 @@ function resetGame() {
 function doResetGame() {
   closeModal('confirmModal');
   clearState();
+  setupNames = [];
   S = {
     phase: 'landing', playerCount: 0, players: [],
     drawPile: [], discardPile: [], stormReserve: 0,

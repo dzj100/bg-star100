@@ -19,6 +19,8 @@ function render() {
 
   if (S.phase === 'landing') {
     app.innerHTML = renderLanding();
+  } else if (S.phase === 'setup') {
+    app.innerHTML = renderSetup();
   } else {
     app.innerHTML = renderGame();
   }
@@ -45,22 +47,63 @@ function render() {
 
 /** 渲染着陆页 */
 function renderLanding() {
-  const countBtns = [2, 3, 4, 5].map(n =>
-    `<button class="count-btn ${S.playerCount === n ? 'selected' : ''}"
-       onclick="S.playerCount=${n};render()">${n}</button>`
-  ).join('');
-
   return `
     <div class="landing">
+      <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
       <span class="moon-icon">🌙</span>
       <h1>月面探险</h1>
       <p class="subtitle">Moon Adventure</p>
-      <div class="count-label">选择玩家人数</div>
-      <div class="count-btns">${countBtns}</div>
-      <button class="start-btn" ${S.playerCount < 2 ? 'disabled' : ''}
-        onclick="dealGame(S.playerCount);render()">🚀 开始发牌</button>
-      <p class="credit">@imStar100</p>
+      <button class="start-btn" onclick="showSetup()">🚀 开始游戏</button>
+      <div class="credit">@imStar100</div>
     </div>`;
+}
+
+// ========================================
+// 设置页（玩家昵称）
+// ========================================
+
+/** 渲染玩家设置页面 */
+function renderSetup() {
+  const chips = setupNames.map((n, i) =>
+    `<span class="setup-chip">
+      <span class="setup-dot" style="background:${PLAYER_COLORS[i]}"></span>
+      ${n}
+      <span class="setup-rm" onclick="removePlayer(${i})">✕</span>
+    </span>`
+  ).join('');
+
+  return `
+    <div class="setup">
+      <div class="setup-header">
+        <h1>🌙 月面探险</h1>
+        <button class="back-btn" onclick="showLanding()">← 返回</button>
+      </div>
+      <h2>添加玩家</h2>
+      <p class="setup-hint">2~5 名玩家，输入昵称后添加</p>
+      <div class="setup-input-row">
+        <input id="name-input" placeholder="玩家昵称" maxlength="8"
+          onkeydown="if(event.key==='Enter')addPlayer()">
+        <button onclick="addPlayer()">添加</button>
+      </div>
+      <div class="setup-chips">${chips}</div>
+      <button class="btn-full btn-primary" onclick="startGame()"
+        ${setupNames.length < 2 ? 'disabled style="opacity:.4"' : ''}>
+        开始探险（${setupNames.length}人）
+      </button>
+    </div>`;
+}
+
+/** 从设置页返回着陆页 */
+function showLanding() {
+  S.phase = 'landing';
+  render();
+}
+
+/** 开始游戏（从设置页） */
+function startGame() {
+  if (setupNames.length < 2) return;
+  dealGame([...setupNames]);
+  render();
 }
 
 // ========================================
