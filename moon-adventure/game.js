@@ -326,11 +326,7 @@ function addPlayer() {
   setupNames.push(name);
   inp.value = '';
   render();
-  // 重新聚焦输入框
-  setTimeout(() => {
-    const el = document.getElementById('name-input');
-    if (el) el.focus();
-  }, 10);
+  document.getElementById('name-input').focus();
 }
 
 /** 移除玩家昵称 */
