@@ -310,6 +310,9 @@ function getAdjacentInsertPoints(pathPos) {
 /** @type {string[]} 设置阶段暂存的玩家昵称列表 */
 let setupNames = [];
 
+/** 月球车乘坐确认弹窗中暂存的待执行移动 */
+let pendingRoverMove = null;
+
 /** 打开玩家设置页面 */
 function showSetup() {
   S.phase = 'setup';
@@ -503,10 +506,11 @@ function getAdjacentSeqPositions(pathPos) {
  */
 function getMoveTargets(pathPos) {
   if (pathPos < 0) {
-    // 基地：前进到S.path[0]，跳过玩家、机器人、加速标记
+    // 基地：前进到S.path[0]，跳过玩家、机器人、加速标记（发明家可停在加速标记上）
     const p = currentPlayer();
     const isInventor = p.role.id === 'inventor';
     const robotPathPos = S.hasEngineer ? S.robotPos : -999;
+    const accelStops = [];
     let target = 0;
     let changed = true;
     while (changed) {
@@ -519,11 +523,12 @@ function getMoveTargets(pathPos) {
         target++; changed = true; continue;
       }
       if (S.accelMarks.includes(target)) {
+        if (isInventor) accelStops.push(target);
         target++; changed = true; continue;
       }
     }
     if (target >= S.path.length) target = -1;
-    return { forward: target, backward: -1, forwardAccelStops: [], backwardAccelStops: [] };
+    return { forward: target, backward: -1, forwardAccelStops: accelStops, backwardAccelStops: [] };
   }
 
   const p = currentPlayer();
@@ -682,7 +687,25 @@ function moveStep(direction) {
     return;
   }
 
+  // 月球车 → 移动后仍有剩余AP时弹出确认（AP将清零）
+  const roverPathPos = tilePathIdx(S.roverPos);
+  if (target === roverPathPos && !S.roverUsed && S.ap > 1) {
+    pendingRoverMove = { target, direction };
+    document.getElementById('roverRemainAp').textContent = S.ap - 1;
+    openModal('roverConfirmModal');
+    return;
+  }
+
   // 执行移动
+  executePlayerMove(target, direction);
+}
+
+/** 确认乘坐月球车（清空AP，结束行动） */
+function confirmRoverBoard() {
+  closeModal('roverConfirmModal');
+  if (!pendingRoverMove) return;
+  const { target, direction } = pendingRoverMove;
+  pendingRoverMove = null;
   executePlayerMove(target, direction);
 }
 
@@ -905,18 +928,6 @@ function placeAccelMark() {
 
   const options = [];
 
-  // 前方
-  const fwdPos = p.pos + 1;
-  if (fwdPos < S.path.length && !S.accelMarks.includes(fwdPos)) {
-    if (isPathTile(fwdPos)) {
-      options.push({ pos: fwdPos, dir: '前方', label: `板块${pathToTileIdx(fwdPos) + 1}` });
-    } else if (isPathOGS(fwdPos) && !S.path[fwdPos].active) {
-      options.push({ pos: fwdPos, dir: '前方', label: '损毁OGS' });
-    } else if (isPathDiscarded(fwdPos)) {
-      options.push({ pos: fwdPos, dir: '前方', label: '丢弃物资' });
-    }
-  }
-
   // 后方
   const bwdPos = p.pos - 1;
   if (bwdPos >= 0 && !S.accelMarks.includes(bwdPos)) {
@@ -926,6 +937,18 @@ function placeAccelMark() {
       options.push({ pos: bwdPos, dir: '后方', label: '损毁OGS' });
     } else if (isPathDiscarded(bwdPos)) {
       options.push({ pos: bwdPos, dir: '后方', label: '丢弃物资' });
+    }
+  }
+
+  // 前方
+  const fwdPos = p.pos + 1;
+  if (fwdPos < S.path.length && !S.accelMarks.includes(fwdPos)) {
+    if (isPathTile(fwdPos)) {
+      options.push({ pos: fwdPos, dir: '前方', label: `板块${pathToTileIdx(fwdPos) + 1}` });
+    } else if (isPathOGS(fwdPos) && !S.path[fwdPos].active) {
+      options.push({ pos: fwdPos, dir: '前方', label: '损毁OGS' });
+    } else if (isPathDiscarded(fwdPos)) {
+      options.push({ pos: fwdPos, dir: '前方', label: '丢弃物资' });
     }
   }
 
@@ -1312,12 +1335,15 @@ function checkFailureCondition() {
     showRescueSelect();
   } else {
     addLog('💀 失败！无氧气且无法救援', 'storm-log');
-    endGame();
+    endGame(true);
   }
 }
 
 /** 显示紧急救援选择面板 */
 function showRescueSelect() {
+  // 联机模式：仅当前回合玩家（或被房主接管的离席玩家）可弹出救援面板
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
+
   const p = currentPlayer();
   const adjSeq = getAdjacentSeqPositions(p.pos);
   const rescuers = S.players.filter((other, i) => {
@@ -1347,6 +1373,9 @@ function showRescueSelect() {
 
 /** 开始紧急救援（双向转移） */
 function startRescue(rescuerIdx) {
+  // 联机模式：仅当前回合玩家（或被房主接管的离席玩家）可发起救援
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
+
   const rescued = currentPlayer();
   const rescuer = S.players[rescuerIdx];
   // 保存快照（点击遮罩取消救援时回滚用）
@@ -1439,7 +1468,7 @@ function finishRescue() {
     // 救援后仍然没氧气 → 游戏失败
     addLog('💀 救援后仍无氧气，任务失败', 'storm-log');
     closeSheet();
-    endGame();
+    endGame(true);
     return;
   }
 
@@ -1450,11 +1479,32 @@ function finishRescue() {
   render();
 }
 
-/** 游戏结束（全员返回基地），结算物资 */
-function endGame() {
+/** 游戏结束（全员返回基地），结算物资
+ *  @param {boolean} forcedLose - 因氧气耗尽等失败条件提前结束，强制判负 */
+function endGame(forcedLose) {
   const target = WIN_CONDITIONS[S.playerCount];
 
   // 按玩家统计完好物资
+  let intactCount = 0;
+  S.players.forEach(p => {
+    p.supplies.forEach(s => { if (s.intact) intactCount++; });
+  });
+
+  S.gameOver = true;
+  S.gameResult = intactCount >= target ? 'win' : 'lose';
+  if (forcedLose) S.gameResult = 'lose';
+
+  showEndModal();
+
+  addLog(`🏁 游戏结束！完好物资: ${intactCount}/${target}`, S.gameResult === 'win' ? 'draw-log' : 'storm-log');
+  saveState();
+  render();
+}
+
+/** 生成并填充结算弹窗内容并打开（联机接收方也会调用） */
+function showEndModal() {
+  const target = WIN_CONDITIONS[S.playerCount];
+
   let intactCount = 0;
   let detailHtml = '';
   S.players.forEach(p => {
@@ -1476,9 +1526,6 @@ function endGame() {
     </div>`;
   });
 
-  S.gameOver = true;
-  S.gameResult = intactCount >= target ? 'win' : 'lose';
-
   const icon = S.gameResult === 'win' ? '🎉' : '💀';
   const title = S.gameResult === 'win' ? '任务成功！' : '任务失败';
   const titleClass = S.gameResult === 'win' ? 'text-safe' : 'text-danger';
@@ -1493,9 +1540,6 @@ function endGame() {
     </div>
     <button class="btn-full btn-primary" onclick="closeModal('endModal')">确认</button>`;
 
-  addLog(`🏁 游戏结束！完好物资: ${intactCount}/${target}`, S.gameResult === 'win' ? 'draw-log' : 'storm-log');
-  saveState();
-  render();
   openModal('endModal');
 }
 
@@ -1560,6 +1604,13 @@ function closeSheet() {
 function showStormModal(playerName) {
   document.getElementById('stormMsg').textContent =
     `${playerName} 所在的OGS已被磁暴摧毁！该芯片无法再使用。`;
+  // 重新触发 shake 动画（CSS 动画只会在元素首次渲染时播放）
+  const box = document.querySelector('#stormModal .modal-box');
+  if (box) {
+    box.classList.remove('shake-anim');
+    void box.offsetWidth; // 强制重排
+    box.classList.add('shake-anim');
+  }
   openModal('stormModal');
 }
 

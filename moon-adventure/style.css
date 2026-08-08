@@ -33,12 +33,12 @@
   --supply-light: #ffb74d;
 
   /* 区域颜色 */
-  --zone1: #66bb6a;
-  --zone2: #42a5f5;
-  --zone3: #ce93d8;
+  /* --zone1: #66bb6a; */
+  /* --zone2: #42a5f5; */
+  /* --zone3: #ce93d8; */
 
   /* OGS */
-  --ogs: #ef5350;
+  --ogs: #1e88e5;
   --ogs-dead: #333;
 
   /* 玩家颜色 */
@@ -852,12 +852,12 @@ body {
   position: absolute;
   aspect-ratio: 1 / 1;
   border-radius: 8px;
-  background: linear-gradient(145deg, rgba(239,83,80,0.25), var(--ogs));
+  background: linear-gradient(145deg, rgba(30,136,229,0.25), var(--ogs));
   border: 2px solid rgba(255, 255, 255, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 10px rgba(239, 83, 80, 0.3);
+  box-shadow: 0 0 10px rgba(30, 136, 229, 0.3);
   z-index: 5;
   pointer-events: none;
 }

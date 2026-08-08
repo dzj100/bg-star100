@@ -3,16 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>月面探险</title>
+<title>月面探险 - 联机模式</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- 初始化加载遮罩 -->
+<div id="init-loading-overlay" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#0a0a1a;">
+  <div style="text-align:center;color:#e8e6e3;font-size:1rem;">
+    <div style="width:36px;height:36px;border:3px solid #444;border-top-color:#d4a843;border-radius:50%;animation:irl-spin .7s linear infinite;margin:0 auto 14px;"></div>
+    载入中...
+  </div>
+  <style>@keyframes irl-spin{to{transform:rotate(360deg)}}</style>
+</div>
 
 <!-- 星空背景 -->
 <div class="stars" id="stars"></div>
 
 <!-- 主应用容器 -->
 <div id="app"></div>
+
+<!-- 联机大厅 -->
+<div id="online" style="display:none"></div>
 
 <!-- 磁暴警告弹窗 -->
 <div class="modal-overlay" id="stormModal">
@@ -37,7 +49,8 @@
 <!-- 弃牌堆弹窗 -->
 <div class="modal-overlay" id="discardModal" onclick="if(event.target===this)closeModal('discardModal')">
   <div class="modal-box">
-    <h3>🗑️ 弃牌堆</h3>
+    <div class="modal-icon">🗑️</div>
+    <h3>弃牌堆</h3>
     <div id="discardList"></div>
     <button class="btn-full btn-primary" onclick="closeModal('discardModal')">关闭</button>
   </div>
@@ -48,7 +61,7 @@
   <div class="modal-box" id="endModalContent"></div>
 </div>
 
-<!-- OGS补给确认弹窗（AP未用完时） -->
+<!-- OGS补给确认弹窗 -->
 <div class="modal-overlay" id="ogsConfirmModal" onclick="if(event.target===this)closeModal('ogsConfirmModal')">
   <div class="modal-box">
     <div class="modal-icon">🫧</div>
@@ -103,7 +116,6 @@
 <!-- 游戏规则弹窗 -->
 <div class="modal-overlay" id="rulesModal" onclick="if(event.target===this)closeModal('rulesModal')">
   <div class="modal-box rules-box">
-    <!-- <div class="modal-icon">📖</div> -->
     <h3>游戏规则</h3>
     <div class="rules-content">
       <div class="rules-section">
@@ -182,7 +194,15 @@
   <div class="sheet" id="sheetContent"></div>
 </div>
 
+<!-- 通用弹窗 -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
 <script src="game.js"></script>
 <script src="render.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="net.js"></script>
+<script src="online.js"></script>
 </body>
 </html>

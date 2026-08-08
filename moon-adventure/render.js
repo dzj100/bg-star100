@@ -348,10 +348,12 @@ function renderActionPanel() {
     const accelSeq = S.path;
     const canPlaceFwd = p.pos + 1 < accelSeq.length &&
       !S.accelMarks.includes(p.pos + 1) &&
-      (isPathTile(p.pos + 1) || (isPathOGS(p.pos + 1) && !S.path[p.pos + 1].active));
+      (isPathTile(p.pos + 1) || (isPathOGS(p.pos + 1) && !S.path[p.pos + 1].active) ||
+        isPathDiscarded(p.pos + 1));
     const canPlaceBwd = p.pos - 1 >= 0 &&
       !S.accelMarks.includes(p.pos - 1) &&
-      (isPathTile(p.pos - 1) || (isPathOGS(p.pos - 1) && !S.path[p.pos - 1].active));
+      (isPathTile(p.pos - 1) || (isPathOGS(p.pos - 1) && !S.path[p.pos - 1].active) ||
+        isPathDiscarded(p.pos - 1));
     const canAccel = S.ap >= accelCost && p.pos >= 0 && !p.onRover && (canPlaceFwd || canPlaceBwd);
     h += `<button class="act-btn" ${canAccel ? '' : 'disabled'}
       onclick="placeAccelMark()">
