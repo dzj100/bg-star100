@@ -42,6 +42,9 @@ function render() {
 
   // 玩家条吸顶缩小监听（render重建DOM后重新绑定）
   observePlayerStrip();
+
+  // 悬浮窗保持打开时按新按钮位置重新摆放
+  if (moreOpen) positionMoreSheet();
 }
 
 // ========================================
@@ -362,17 +365,30 @@ function renderActionPanel() {
 
   let h = '<div class="action-panel"><div class="action-btns">';
 
-  // 前进
-  const stepLabel = onRover ? '2步' : '';
-  h += `<button class="act-btn" ${S.ap >= 1 && targets.forward >= 0 ? '' : 'disabled'}
-    onclick="moveStep('forward')">
-    ⬇️ 前进${stepLabel} <span class="cost">1AP</span></button>`;
-
   // 后退
   const canBack = S.ap >= 1 && p.pos >= 0;
   h += `<button class="act-btn" ${canBack ? '' : 'disabled'}
-    onclick="moveStep('backward')">
-    ⬆️ 后退${stepLabel} <span class="cost">1AP</span></button>`;
+    onclick="hideMoreSheet();moveStep('backward')">
+    ⬆️ 后退 <span class="cost">1AP</span></button>`;
+
+  // 更多（悬浮窗开关）
+  h += `<button class="act-btn${moreOpen ? ' active' : ''}" id="moreBtn" onclick="toggleMoreSheet()">
+    ⋯ 更多 <span class="cost">▾</span></button>`;
+
+  // 前进
+  const stepLabel = onRover ? '2步' : '';
+  h += `<button class="act-btn" ${S.ap >= 1 && targets.forward >= 0 ? '' : 'disabled'}
+    onclick="hideMoreSheet();moveStep('forward')">
+    ⬇️ 前进${stepLabel} <span class="cost">1AP</span></button>`;
+
+  // 结束回合
+  h += `<button class="act-btn btn-end" onclick="hideMoreSheet();endTurn()">
+    ✅ 结束回合</button>`;
+
+  h += '</div>';
+
+  // ===== 更多悬浮窗（低频行动，一行一个）=====
+  h += `<div class="more-sheet" id="moreSheet" style="display:${moreOpen ? 'block' : 'none'}">`;
 
   if (!onRover) {
     // 物资回收（仅非月球车状态）
@@ -385,7 +401,7 @@ function renderActionPanel() {
       onclick="openCollectSheet()">
       📦 物资回收 <span class="cost">${collectCost}AP</span></button>`;
 
-    // 放置加速标记（前/后的板块或损毁OGS上）
+    // 放置加速标记（前/后的板块、损毁OGS或丢弃物资上）
     const accelCost = (p.role.id === 'inventor' && !S.accelPlacedThisTurn) ? 1 : 2;
     const accelSeq = S.path;
     const canPlaceFwd = p.pos + 1 < accelSeq.length &&
@@ -436,13 +452,55 @@ function renderActionPanel() {
       🫧 OGS补给</button>`;
   }
 
-  // 结束回合
-  h += `<button class="act-btn btn-end" onclick="endTurn()">
-    ✅ 结束回合</button>`;
-
   h += '</div></div>';
   return h;
 }
+
+/** 更多悬浮窗是否打开（render重建后保持状态） */
+let moreOpen = false;
+
+/** 按更多按钮当前位置摆放悬浮窗（fixed跟随按钮，随滚动更新） */
+function positionMoreSheet() {
+  const sheet = document.getElementById('moreSheet');
+  const btn = document.getElementById('moreBtn');
+  if (!sheet || !btn) return;
+  const rect = btn.getBoundingClientRect();
+  sheet.style.position = 'fixed';
+  sheet.style.top = rect.bottom + 'px';
+  sheet.style.left = rect.left + 'px';
+  sheet.style.width = rect.width + 'px';
+  sheet.style.display = 'flex';
+  btn.classList.add('active');
+}
+
+/** 切换更多悬浮窗显隐 */
+function toggleMoreSheet() {
+  moreOpen = !moreOpen;
+  if (moreOpen) {
+    positionMoreSheet();
+  } else {
+    hideMoreSheet();
+  }
+}
+
+/** 收起更多悬浮窗 */
+function hideMoreSheet() {
+  moreOpen = false;
+  const sheet = document.getElementById('moreSheet');
+  if (sheet) sheet.style.display = 'none';
+  const btn = document.getElementById('moreBtn');
+  if (btn) btn.classList.remove('active');
+}
+
+// 点击面板外任意处收起悬浮窗
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.action-panel')) hideMoreSheet();
+});
+
+// 滚动时悬浮窗跟随更多按钮移动
+window.addEventListener('scroll', () => {
+  if (moreOpen) positionMoreSheet();
+}, { passive: true });
 
 // ========================================
 // OGS 抽取状态

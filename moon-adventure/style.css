@@ -592,6 +592,7 @@ body {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 12px 12px 2px;
+  position: relative;
   /* margin-bottom: 10px; */
 }
 
@@ -649,6 +650,34 @@ body {
   background: rgba(30, 136, 229, 0.15);
   border-color: var(--o2);
   color: var(--o2-light);
+}
+
+.act-btn.active {
+  background: rgba(245, 197, 24, 0.12);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* 更多悬浮窗：挂在按钮行下方，一行一个 */
+.more-sheet {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: linear-gradient(to bottom, rgba(32, 32, 74, 1), rgba(32, 32, 74, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.more-sheet .act-btn {
+  min-width: 100%;
+  height: 40px;
+  flex: none;
 }
 
 /* ========================================
