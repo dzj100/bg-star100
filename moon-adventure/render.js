@@ -445,12 +445,11 @@ function renderActionPanel() {
     onclick="openDiscardSheet()">
     🗑️ 丢弃物资 <span class="cost">1AP</span></button>`;
 
-  // OGS补给
-  if (ogsGap !== null && !S.isDrawing) {
-    h += `<button class="act-btn btn-ogs" ${freeSlots(p) > 0 ? '' : 'disabled'}
-      onclick="tryOGSDraw()">
-      🫧 OGS补给</button>`;
-  }
+  // OGS补给（始终展示，仅条件满足时可点击）
+  const canOGS = ogsGap !== null && !S.isDrawing && freeSlots(p) > 0;
+  h += `<button class="act-btn btn-ogs" ${canOGS ? '' : 'disabled'}
+    onclick="tryOGSDraw()">
+    🫧 OGS补给</button>`;
 
   h += '</div></div>';
   return h;
