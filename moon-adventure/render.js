@@ -39,6 +39,48 @@ function render() {
       });
     }
   }
+
+  // 玩家条吸顶缩小监听（render重建DOM后重新绑定）
+  observePlayerStrip();
+}
+
+// ========================================
+// 玩家条吸顶无极缩小（滚动驱动）
+// ========================================
+
+let psScrollHandler = null;
+
+/** 玩家条吸顶后随下滑距离连续缩小至50%（左上角），回滚恢复 */
+function observePlayerStrip() {
+  if (psScrollHandler) {
+    window.removeEventListener('scroll', psScrollHandler);
+    psScrollHandler = null;
+  }
+  const oldSentinel = document.getElementById('ps-sentinel');
+  if (oldSentinel) oldSentinel.remove();
+
+  const strip = document.querySelector('.player-strip');
+  if (!strip) return;
+
+  // 哨兵：贴在玩家条正上方（不吸顶），其视口位置反映玩家条文档位置
+  const sentinel = document.createElement('div');
+  sentinel.id = 'ps-sentinel';
+  sentinel.style.cssText = 'position:absolute;left:0;width:1px;height:1px;pointer-events:none;';
+  strip.parentElement.insertBefore(sentinel, strip);
+
+  function update() {
+    const range = Math.max(150, window.innerHeight * 0.25);
+    // 吸顶点：哨兵顶部距视口顶8px（与sticky top一致）
+    const p = Math.min(1, Math.max(0, (8 - sentinel.getBoundingClientRect().top) / range));
+    strip.style.transformOrigin = 'top left';
+    strip.style.transform = `scale(${1 - 0.5 * p})`;
+    strip.style.opacity = 1 - 0.5 * p;
+    strip.style.boxShadow = `0 4px 10px rgba(0,0,0,.35))`;
+  }
+
+  update();
+  psScrollHandler = update;
+  window.addEventListener('scroll', update, { passive: true });
 }
 
 // ========================================
@@ -366,7 +408,7 @@ function renderActionPanel() {
     const canOGS = S.ap >= 3 && (playerTile !== null || onOGS || onDiscarded) && S.ogsCount < 5;
     h += `<button class="act-btn" ${canOGS ? '' : 'disabled'}
       onclick="openOGSSheet()">
-      🔴 建立OGS <span class="cost">3AP</span></button>`;
+      🔵 建立OGS <span class="cost">3AP</span></button>`;
   }
 
   // 共享物资
@@ -788,7 +830,7 @@ function openOGSSheet() {
   const p = currentPlayer();
   const available = getAdjacentInsertPoints(p.pos);
 
-  let h = '<h3>🔴 选择OGS放置位置</h3><div class="sheet-cards">';
+  let h = '<h3>🔵 选择OGS放置位置</h3><div class="sheet-cards">';
   available.forEach(insIdx => {
     const dir = insIdx > p.pos ? '⬇️ 前方' : '⬆️ 后方';
     h += `<div class="sheet-card o2-card" onclick="closeSheet();placeOGS(${insIdx})">
@@ -849,7 +891,7 @@ function openShareSelectSheet() {
     if (i === S.currentPlayer || other.returned) return false;
     if (p.pos >= 0 && other.pos === p.pos) return true;
     return adjSeq.includes(other.pos);
-  });
+  }).sort((a, b) => a.pos - b.pos);
 
   let h = '<h3>🤝 选择共享对象</h3><div class="sheet-cards">';
   targets.forEach((t, i) => {
@@ -872,18 +914,18 @@ function renderShareSheet(fromIdx, toIdx) {
   h += '<div style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">点击物品进行转移</div>';
 
   // from的物品
-  h += `<div style="font-size:.8em;margin-bottom:4px;color:${from.color}">● ${from.name} 的物品:</div>`;
+  h += `<div style="font-size:.8em;margin-bottom:4px;color:${from.color}">● ${from.name}（发起人） 的物品:</div>`;
   h += '<div class="sheet-cards">';
   from.oxygen.forEach((c, i) => {
     h += `<div class="sheet-card o2-card ${c.val === 3 ? 'val3' : ''}"
       onclick="transferItem(${fromIdx},${toIdx},'o2',${i});renderShareSheet(${fromIdx},${toIdx})">
-      O₂×${c.val} →</div>`;
+      O₂×${c.val} ↓</div>`;
   });
   from.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
+    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="transferItem(${fromIdx},${toIdx},'supply',${i});renderShareSheet(${fromIdx},${toIdx})">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span> →</div>`;
+      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span> ↓</div>`;
   });
   h += '</div>';
 
@@ -893,13 +935,13 @@ function renderShareSheet(fromIdx, toIdx) {
   to.oxygen.forEach((c, i) => {
     h += `<div class="sheet-card o2-card ${c.val === 3 ? 'val3' : ''}"
       onclick="transferItem(${toIdx},${fromIdx},'o2',${i});renderShareSheet(${fromIdx},${toIdx})">
-      ← O₂×${c.val}</div>`;
+      ↑ O₂×${c.val}</div>`;
   });
   to.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
+    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="transferItem(${toIdx},${fromIdx},'supply',${i});renderShareSheet(${fromIdx},${toIdx})">
-      ← <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
+      ↑ <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
   });
   h += '</div>';
 
@@ -921,7 +963,7 @@ function openDiscardSheet() {
   let h = '<h3>🗑️ 选择要丢弃的物资</h3><div class="sheet-cards">';
   p.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
+    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="closeSheet();openDiscardGapSheet(${i})">
       <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
   });

@@ -371,6 +371,10 @@ body {
   border-radius: var(--radius);
   padding: 10px;
   margin-bottom: 10px;
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .player-strip-title {
@@ -587,8 +591,8 @@ body {
 .action-panel {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 12px;
-  margin-bottom: 10px;
+  padding: 12px 12px 2px;
+  /* margin-bottom: 10px; */
 }
 
 .action-panel h3 {
@@ -606,13 +610,13 @@ body {
 .act-btn {
   flex: 1;
   min-width: 45%;
-  height: 42px;
+  height: 36px;
   border-radius: 8px;
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   font-size: 0.78em;
-  font-weight: 600;
+  /* font-weight: 600; */
   cursor: pointer;
   transition: all 0.15s;
   display: flex;
@@ -814,10 +818,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* transform: scale(0.75); */
   transform-origin: center center;
   transform: scale(0.8) translateX(10px) translateY(-20px);
   filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.7));
+}
+
+/* 月球车板块上不缩放/偏移 */
+.tile-rover .rover-combo {
+  transform: none;
 }
 
 .rover-combo-token {
@@ -956,6 +964,7 @@ body {
   font-size: 0.5em;
   color: var(--text-dim);
   gap: 1px;
+  z-index: 6;
 }
 
 .robot-marker .robot-icon {
@@ -1565,6 +1574,8 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+  flex: 0 0 75%;
+  text-align: center;
 }
 
 .sheet-card:active {

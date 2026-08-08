@@ -801,7 +801,7 @@ function openRobotMoveSheet() {
   }
   options.forEach(o => {
     h += `<div class="sheet-card supply-card" onclick="closeSheet();moveRobot(${o.pathPos})">
-      ${o.label}<br><span class="text-dim">${o.desc}</span></div>`;
+      ${o.label} · ${o.desc}</div>`;
   });
   h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
   document.getElementById('sheetContent').innerHTML = h;
