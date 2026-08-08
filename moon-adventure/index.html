@@ -74,6 +74,19 @@
   </div>
 </div>
 
+<!-- 结束回合确认弹窗（AP未用完时） -->
+<div class="modal-overlay" id="endTurnConfirmModal" onclick="if(event.target===this)closeModal('endTurnConfirmModal')">
+  <div class="modal-box">
+    <div class="modal-icon">⏭️</div>
+    <h3>结束回合</h3>
+    <p>当前仍有剩余AP（<span id="endTurnRemainAp"></span>），确定要结束回合吗？</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-full btn-secondary" onclick="closeModal('endTurnConfirmModal')">取消</button>
+      <button class="btn-full btn-primary" onclick="confirmEndTurn()">确认结束</button>
+    </div>
+  </div>
+</div>
+
 <!-- 确认重开弹窗 -->
 <div class="modal-overlay" id="confirmModal" onclick="if(event.target===this)closeModal('confirmModal')">
   <div class="modal-box">

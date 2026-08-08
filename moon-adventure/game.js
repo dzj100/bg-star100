@@ -770,45 +770,6 @@ function stopOnAccelMark(accelPathPos, direction) {
 }
 
 /**
- * 工程师打开机器人移动选择面板（路径位置系统）
- * 机器人移动0-2个板块，不受任何限制
- */
-function openRobotMoveSheet() {
-  let h = '<h3>🤖 移动机器人</h3><div class="sheet-cards">';
-  const options = [];
-
-  if (S.robotPos === -1) {
-    for (let step = 1; step <= 2; step++) {
-      const targetPos = step - 1;
-      if (targetPos < S.path.length) {
-        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
-      }
-    }
-  } else {
-    for (let step = -2; step <= 2; step++) {
-      const targetPos = S.robotPos + step;
-      if (targetPos < -1 || targetPos >= S.path.length) continue;
-      if (targetPos === -1) {
-        options.push({ pathPos: -1, label: '⬆️ 返回基地', desc: '基地' });
-      } else if (step === 0) {
-        options.push({ pathPos: targetPos, label: '⏸ 原地不动', desc: `留在${posLabel(targetPos)}` });
-      } else if (step > 0) {
-        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
-      } else {
-        options.push({ pathPos: targetPos, label: `⬆️ 后退${Math.abs(step)}格`, desc: `到${posLabel(targetPos)}` });
-      }
-    }
-  }
-  options.forEach(o => {
-    h += `<div class="sheet-card supply-card" onclick="closeSheet();moveRobot(${o.pathPos})">
-      ${o.label} · ${o.desc}</div>`;
-  });
-  h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
-  document.getElementById('sheetContent').innerHTML = h;
-  openSheet();
-}
-
-/**
  * 执行机器人移动到目标路径位置
  * @param {number} targetPathPos - 目标路径位置（-1=返回基地）
  */
@@ -923,7 +884,6 @@ function placeAccelMark() {
   const cost = (p.role.id === 'inventor' && !S.accelPlacedThisTurn) ? 1 : 2;
 
   if (S.ap < cost) return;
-  if (p.pos < 0) return;
   if (p.onRover) return;
 
   const options = [];
@@ -1272,6 +1232,23 @@ function reshufflePile() {
 /** 结束当前玩家回合，推进到下一个玩家 */
 function endTurn() {
   const p = currentPlayer();
+  if (S.ap > 0 && !S.returning && !p.onRover) {
+    document.getElementById('endTurnRemainAp').textContent = S.ap;
+    openModal('endTurnConfirmModal');
+    return;
+  }
+  doEndTurn();
+}
+
+/** 确认结束回合（AP未用完弹窗确认后执行） */
+function confirmEndTurn() {
+  closeModal('endTurnConfirmModal');
+  doEndTurn();
+}
+
+/** 执行结束回合逻辑 */
+function doEndTurn() {
+  const p = currentPlayer();
   S.ap = 0;
   S.turnPhase = 'idle';
   S.dice = [];
@@ -1339,38 +1316,6 @@ function checkFailureCondition() {
   }
 }
 
-/** 显示紧急救援选择面板 */
-function showRescueSelect() {
-  // 联机模式：仅当前回合玩家（或被房主接管的离席玩家）可弹出救援面板
-  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
-
-  const p = currentPlayer();
-  const adjSeq = getAdjacentSeqPositions(p.pos);
-  const rescuers = S.players.filter((other, i) => {
-    if (i === S.currentPlayer || other.returned) return false;
-    if (other.oxygen.length === 0) return false;
-    if (p.pos >= 0 && other.pos === p.pos) return true;
-    return adjSeq.includes(other.pos);
-  });
-
-  addLog(`⚠️ ${p.name} 氧气耗尽！请求紧急救援`, 'storm-log');
-
-  let h = '<h3>🆘 紧急救援</h3>';
-  h += `<p style="font-size:.8em;color:var(--danger);text-align:center;margin-bottom:10px">
-    ${p.name} 氧气耗尽！选择相邻玩家进行救援</p>`;
-  h += '<div class="sheet-cards">';
-  rescuers.forEach(r => {
-    const idx = S.players.indexOf(r);
-    h += `<div class="sheet-card o2-card" onclick="closeSheet();startRescue(${idx})">
-      <span style="color:${r.color}">●</span> ${r.name}（${r.oxygen.length}张氧气）</div>`;
-  });
-  h += '</div>';
-
-  document.getElementById('sheetContent').innerHTML = h;
-  openSheet();
-  render();
-}
-
 /** 开始紧急救援（双向转移） */
 function startRescue(rescuerIdx) {
   // 联机模式：仅当前回合玩家（或被房主接管的离席玩家）可发起救援
@@ -1390,54 +1335,6 @@ function startRescue(rescuerIdx) {
   S.isRescue = true;
   renderRescueSheet(rescuerIdx, S.currentPlayer);
   saveState();
-}
-
-/** 渲染紧急救援面板（救援双方可互相转移氧气和物资，免费） */
-function renderRescueSheet(rescuerIdx, rescuedIdx) {
-  const rescuer = S.players[rescuerIdx];
-  const rescued = S.players[rescuedIdx];
-
-  let h = `<h3>🆘 紧急救援</h3>`;
-  h += '<div style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">' +
-    '救援双方可互相转移氧气和物资</div>';
-
-  // rescuer 的物品（可转给被救者）
-  h += `<div style="font-size:.8em;margin-bottom:4px;color:${rescuer.color}">● ${rescuer.name} 的物品:</div>`;
-  h += '<div class="sheet-cards">';
-  rescuer.oxygen.forEach((c, i) => {
-    h += `<div class="sheet-card o2-card ${c.val === 3 ? 'val3' : ''}"
-      onclick="transferItem(${rescuerIdx},${rescuedIdx},'o2',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      O₂×${c.val} →</div>`;
-  });
-  rescuer.supplies.forEach((s, i) => {
-    const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
-      onclick="transferItem(${rescuerIdx},${rescuedIdx},'supply',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span> →</div>`;
-  });
-  h += '</div>';
-
-  // rescued 的物品（可反向转给救援者）
-  h += `<div style="font-size:.8em;margin:8px 0 4px;color:${rescued.color}">● ${rescued.name} 的物品:</div>`;
-  h += '<div class="sheet-cards">';
-  rescued.oxygen.forEach((c, i) => {
-    h += `<div class="sheet-card o2-card ${c.val === 3 ? 'val3' : ''}"
-      onclick="transferItem(${rescuedIdx},${rescuerIdx},'o2',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      ← O₂×${c.val}</div>`;
-  });
-  rescued.supplies.forEach((s, i) => {
-    const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
-    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
-      onclick="transferItem(${rescuedIdx},${rescuerIdx},'supply',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      ← <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
-  });
-  h += '</div>';
-
-  h += `<button class="sheet-confirm" style="width:100%;margin-top:12px" onclick="finishRescue()">
-    完成救援</button>`;
-
-  document.getElementById('sheetContent').innerHTML = h;
-  openSheet();
 }
 
 /** 取消紧急救援：回滚已转移物资，回到等待救援状态 */
@@ -1501,48 +1398,6 @@ function endGame(forcedLose) {
   render();
 }
 
-/** 生成并填充结算弹窗内容并打开（联机接收方也会调用） */
-function showEndModal() {
-  const target = WIN_CONDITIONS[S.playerCount];
-
-  let intactCount = 0;
-  let detailHtml = '';
-  S.players.forEach(p => {
-    let playerIntact = 0;
-    const supplyIcons = p.supplies.map(s => {
-      if (s.intact) playerIntact++;
-      const z = ZONES.find(zone => zone.id === s.zone);
-      if (!z) return '';
-      const color = s.intact ? '#4caf50' : '#f44336';
-      return `<span style="width:18px;height:18px;display:inline-flex;vertical-align:middle">${shapeSVG(z.shape, color, color)}</span>`;
-    }).join('');
-    intactCount += playerIntact;
-    const supPart = p.supplies.length > 0
-      ? `<span style="display:inline-flex;gap:3px;margin-left:4px">${supplyIcons}</span>`
-      : '<span class="text-dim" style="margin-left:4px">· 无物资</span>';
-    detailHtml += `<div style="margin:8px 0;font-size:.85em;display:flex;align-items:center;gap:6px">
-      <span style="color:${p.color}">●</span> ${p.name} (${playerIntact}/${p.supplies.length})
-      ${supPart}
-    </div>`;
-  });
-
-  const icon = S.gameResult === 'win' ? '🎉' : '💀';
-  const title = S.gameResult === 'win' ? '任务成功！' : '任务失败';
-  const titleClass = S.gameResult === 'win' ? 'text-safe' : 'text-danger';
-
-  const content = document.getElementById('endModalContent');
-  content.innerHTML = `
-    <div class="modal-icon">${icon}</div>
-    <h3 class="${titleClass}">${title}</h3>
-    <p style="font-size:1.1em;font-weight:700">完好物资: ${intactCount} / ${target}</p>
-    <div style="text-align:left;padding:8px 0;border-top:1px solid rgba(255,255,255,.1);margin-top:8px">
-      ${detailHtml}
-    </div>
-    <button class="btn-full btn-primary" onclick="closeModal('endModal')">确认</button>`;
-
-  openModal('endModal');
-}
-
 /**
  * 获取当前完好物资总数（用于实时显示）
  * @returns {{ total: number, revealed: number, unrevealed: number }}
@@ -1559,99 +1414,6 @@ function countIntactSupplies() {
     unrevealed += p.supplies.length;
   });
   return { total, revealed, unrevealed };
-}
-
-// ========================================
-// 弹窗/面板管理
-// ========================================
-
-/** 打开模态弹窗 */
-function openModal(id) {
-  document.getElementById(id).classList.add('show');
-}
-
-/** 打开游戏规则弹窗 */
-function showRules() {
-  openModal('rulesModal');
-}
-
-/** 关闭模态弹窗 */
-function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
-}
-
-/** 打开底部操作面板 */
-function openSheet() {
-  document.getElementById('actionSheet').classList.add('show');
-}
-
-/** 关闭底部操作面板 */
-function closeSheet() {
-  // 救援进行中：关闭（点击遮罩）视为取消救援并回滚
-  if (S.isRescue) {
-    cancelRescue();
-    return;
-  }
-  // 共享进行中关闭面板视为取消
-  if (S.shareState) {
-    cancelShare();
-    return;
-  }
-  document.getElementById('actionSheet').classList.remove('show');
-}
-
-/** 显示磁暴弹窗 */
-function showStormModal(playerName) {
-  document.getElementById('stormMsg').textContent =
-    `${playerName} 所在的OGS已被磁暴摧毁！该芯片无法再使用。`;
-  // 重新触发 shake 动画（CSS 动画只会在元素首次渲染时播放）
-  const box = document.querySelector('#stormModal .modal-box');
-  if (box) {
-    box.classList.remove('shake-anim');
-    void box.offsetWidth; // 强制重排
-    box.classList.add('shake-anim');
-  }
-  openModal('stormModal');
-}
-
-/** 显示弃牌堆弹窗 */
-function showDrawPileInfo() {
-  const stormCount = S.drawPile.filter(c => c.type === 'storm').length;
-  const o2Count = S.drawPile.length - stormCount;
-  let h = '<h3>📋 抽牌堆</h3><div style="padding:8px 4px;font-size:0.95em">';
-  h += `<p>共 <b>${S.drawPile.length}</b> 张牌</p>`;
-  h += `<p style="color:var(--o2-light)">🫧 氧气卡：${o2Count} 张</p>`;
-  h += `<p style="color:var(--danger)">💥 磁暴卡：${stormCount} 张</p>`;
-  h += '</div><button class="sheet-cancel" onclick="closeSheet()">关闭</button>';
-  document.getElementById('sheetContent').innerHTML = h;
-  openSheet();
-}
-
-function showDiscardPile() {
-  let h = '<h3>📋 弃牌堆</h3><div style="padding:8px 4px;font-size:0.95em">';
-  if (S.discardPile.length === 0) {
-    h += '<p class="text-dim">弃牌堆为空</p>';
-  } else {
-    h += `<p>共 <b>${S.discardPile.length}</b> 张牌</p>`;
-    S.discardPile.forEach((c, i) => {
-      if (c.type === 'storm') {
-        h += `<p style="color:var(--danger)">${i + 1}. ⚡ 磁暴</p>`;
-      } else {
-        h += `<p style="color:var(--o2-light)">${i + 1}. O₂ ×${c.val}</p>`;
-      }
-    });
-  }
-  h += '</div><button class="sheet-cancel" onclick="closeSheet()">关闭</button>';
-  document.getElementById('sheetContent').innerHTML = h;
-  openSheet();
-}
-
-/** 显示共享交换面板 */
-function openShareSheet(fromIdx, toIdx) {
-  // 由 render.js 中的 renderShareSheet 实现
-  if (typeof renderShareSheet === 'function') {
-    renderShareSheet(fromIdx, toIdx);
-  }
 }
 
 // ========================================
@@ -1683,79 +1445,8 @@ function doResetGame() {
 }
 
 // ========================================
-// SVG 形状生成
-// ========================================
-
-/** 将十六进制颜色按比例变暗 */
-function darken(hex, f = 0.55) {
-  const r = Math.round(parseInt(hex.slice(1,3),16)*f);
-  const g = Math.round(parseInt(hex.slice(3,5),16)*f);
-  const b = Math.round(parseInt(hex.slice(5,7),16)*f);
-  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-}
-
-/** 人形 token SVG 路径 */
-const TOKEN_PATH = 'M539 290.8c-19 0-37-3.8-54-11.2-17-7.4-31.8-17.4-44.2-30-12.6-12.6-22.4-27.2-30-44.2-7.4-17-11.2-35-11.2-54s3.8-37 11.2-54c7.4-17 17.4-31.8 30-44.2s27.2-22.4 44.2-30C502 15.8 520 12 539 12s37 3.8 54 11.2c17 7.4 31.8 17.4 44.2 30 12.6 12.6 22.4 27.2 29.4 44.2 7.2 17 10.8 35 10.8 54s-3.6 37-10.8 54c-7.2 17-17 31.8-29.4 44.2-12.6 12.6-27.2 22.4-44.2 30-16.8 7.4-34.8 11.2-54 11.2z m198.4 125.2c16 12 29.4 25.8 39.8 41.6s15.6 31.8 15.6 47.8v88.4c0 10.2-5.8 17.8-17.4 23.2-11.6 5.4-24.4 8-38.4 8s-26.8-2.6-38.4-7.6c-11.6-5-17.4-13.2-17.4-24.6v-37.6c0-9-2.6-15.6-8-20.2-5.4-4.4-10.8-8.2-16-11.2-6-3-12.8-1.6-20.6 4-7.8 5.6-11.6 15.4-11.6 29v236c0 14.2 4.8 27.4 14.2 39.4s21.2 23 34.8 33c12 8.4 22 16.6 30.4 25l29.4 29.4c3.6 3.6 5 9 4 16.6-0.8 7.4-3.4 15.4-7.6 23.6-4.2 8.4-9.4 16.6-15.6 25-6.2 8.4-13.2 14.8-21 19.6-7.8 4.8-15.6 7.2-23.6 7.2-8 0-15.6-3.8-22.8-11.6-10.8-11.4-19.4-20.4-26-27.2-6.6-6.8-12.4-13-17.4-18.4-5-5.4-10.2-10.4-15.6-15.2-5.4-4.8-12-11.4-19.6-19.6-15.4-15.4-28.8-35.2-39.8-59.4s-16.6-48.2-16.6-72v-72.4c-7.2 9-13.2 16-18.4 21.4-5 5.4-10.8 14.2-17.4 26.8-2.4 4.8-4.8 11-7.2 18.8-2.4 7.8-4.6 15.8-6.8 24.2s-3.8 16.6-5 25c-1.2 8.4-1.8 15.4-1.8 21.4V928c0 11.4-5.8 19.8-17.4 25.4-11.6 5.6-24.4 8.4-38.4 8-14-0.2-26.8-3.6-38.4-9.8s-17.4-15.6-17.4-28.2v-65.2c0-23.2 3.6-43.8 10.8-61.6 7.2-17.8 15.2-37 24.2-57.2 12-27.4 20.8-49.4 26.4-66.2 5.6-16.6 10-28.2 13-34.8 6-13.8 9-26 9-36.6v-28.6c-6.6 4.2-12 8-16.6 11.6-4.4 3.6-10.6 10.2-18.4 19.6-7.8 9-15.6 14.8-23.6 17.4-8 2.6-20.8 4-38 4h-58c-14.2 0-24.8-5.8-31.8-17.4-6.8-11.6-10.2-24.2-9.8-38s4-26.4 11.2-38c7.2-11.6 17.6-17.4 31.2-17.4h53.6c7.2 0 13-0.8 17.4-2.6 4.4-1.8 8.6-4.4 12.6-8 3.8-3.6 8-7.8 12.6-12.6 4.4-4.8 10-10.2 16.6-16 8.4-7.2 16.8-17.8 25.4-31.8 8.6-14 16.8-28.2 24.6-42.4 9-16.6 17.6-34.6 26-53.6 12.6 0.6 24.2 1.2 34.8 1.8 9.6 0.6 19.2 1 29 1.4 9.8 0.2 18 0.4 24.6 0.4 6.6 0 14-0.2 22.4-0.4 8.4-0.2 16.4-0.8 24.2-1.4 9-0.6 18.2-1.2 27.8-1.8 16 10.2 31.6 19.4 46.4 27.8 12.6 7.8 25 15.2 37.6 22.4 12.2 7 21.6 13 28.2 17.8z';
-
-/** 人形 token SVG */
-function tokenSVG(c) {
-  return `<svg viewBox="0 0 1024 1024"><path fill="${c}" stroke="${darken(c)}" stroke-width="24" d="${TOKEN_PATH}"/></svg>`;
-}
-
-/**
- * 生成三角形SVG（区域1）
- * @param {string} fill - 填充颜色
- * @param {string} stroke - 描边颜色
- * @returns {string} SVG HTML字符串
- */
-function triSVG(fill, stroke) {
-  return `<svg viewBox="0 0 100 100"><polygon points="50,16 87,79 13,79" fill="${fill}" stroke="${stroke}" stroke-width="13" stroke-linejoin="round"/></svg>`;
-}
-
-/** 生成四边形SVG（区域2） */
-function sqSVG(fill, stroke) {
-  return `<svg viewBox="0 0 100 100"><polygon points="50,11 89,50 50,89 11,50" fill="${fill}" stroke="${stroke}" stroke-width="13" stroke-linejoin="round"/></svg>`;
-}
-
-/** 生成五边形SVG（区域3） */
-function pentSVG(fill, stroke) {
-  return `<svg viewBox="0 0 100 100"><polygon points="50,13 85,39 72,80 28,80 15,39" fill="${fill}" stroke="${stroke}" stroke-width="13" stroke-linejoin="round"/></svg>`;
-}
-
-/**
- * 根据形状名生成对应SVG
- * @param {string} shape - 'triangle' | 'square' | 'pentagon'
- * @param {string} fill - 填充色
- * @param {string} stroke - 描边色
- * @returns {string} SVG HTML
- */
-function shapeSVG(shape, fill, stroke) {
-  if (shape === 'triangle') return triSVG(fill, stroke);
-  if (shape === 'square') return sqSVG(fill, stroke);
-  return pentSVG(fill, stroke);
-}
-
-/** 月球车SVG */
-function roverSVG(fill) {
-  return `<svg viewBox="0 0 1641 1024"><path fill="${fill}" d="M292.864 442.368a290.816 290.816 0 1 0 293.888 290.816 291.84 291.84 0 0 0-293.888-290.816z m0 422.912a133.12 133.12 0 1 1 134.144-133.12 133.12 133.12 0 0 1-134.144 134.144zM1331.2 442.368a290.816 290.816 0 1 0 293.888 290.816A291.84 291.84 0 0 0 1331.2 442.368z m0 422.912a133.12 133.12 0 1 1 134.144-133.12A133.12 133.12 0 0 1 1331.2 866.304z m204.8-667.648h-283.648c-76.8 0-26.624 128-291.84 128s-122.88-128-358.4-128H375.808L512 66.56h161.792V0h-204.8L279.552 204.8C102.4 220.16 102.4 429.056 102.4 429.056s539.648-136.192 539.648 294.912h358.4a294.912 294.912 0 0 1 295.936-328.704H1638.4s31.744-196.608-102.4-196.608z"/></svg>`;
-}
-
-// ========================================
 // 初始化入口
 // ========================================
-
-/** 初始化星空背景 */
-function initStars() {
-  const container = document.getElementById('stars');
-  let html = '';
-  for (let i = 0; i < 50; i++) {
-    const x = Math.random() * 100;
-    const y = Math.random() * 100;
-    const dur = 1.5 + Math.random() * 3;
-    html += `<div class="star" style="left:${x}%;top:${y}%;--dur:${dur}s"></div>`;
-  }
-  container.innerHTML = html;
-}
 
 /** 应用启动入口 */
 document.addEventListener('DOMContentLoaded', () => {
