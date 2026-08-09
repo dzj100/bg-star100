@@ -347,6 +347,7 @@ function _subscribeToRoom(roomId) {
       const newState = row.state;
       const changed = JSON.stringify(S) !== JSON.stringify(newState);
       const alreadyOver = S && S.gameOver;
+      const oldStorm = S && S.stormEvent;
 
       _gameStarted = true;
       _pendingPushSeat = newState.currentPlayer;
@@ -365,6 +366,11 @@ function _subscribeToRoom(roomId) {
           showEndModal();
           _patchEndModalBtn();
         }
+      }
+      // 收到新的磁暴事件：非触发方补弹磁暴弹窗（seq增大才弹，避免重复）
+      const newStorm = S.stormEvent;
+      if (newStorm && (!oldStorm || newStorm.seq > oldStorm.seq)) {
+        showStormModal(newStorm.name);
       }
       _isReceiving = false;
     }
@@ -486,8 +492,18 @@ if (!document.getElementById(_onlineStyleId)) {
       pointer-events: none !important;
       opacity: 0.45 !important;
     }
+    .online-waiting #moreBtn.act-btn {
+      pointer-events: auto !important;
+    }
     .online-waiting h3 {
       color: var(--text-dim);
+    }
+    /* 观战方共享抽屉：只读展示，禁止点击 */
+    .sheet-readonly .sheet-card,
+    .sheet-readonly .sheet-cancel,
+    .sheet-readonly .sheet-confirm {
+      pointer-events: none !important;
+      opacity: 0.6 !important;
     }
   `;
   document.head.appendChild(style);
@@ -569,6 +585,20 @@ window.render = function() {
   } else {
     // 自己的回合
     diceArea.classList.remove('online-waiting');
+  }
+
+  // 共享进行中：观战方同步展示只读抽屉，操作方保持可交互
+  const sheetEl = document.getElementById('actionSheet');
+  if (sheetEl) {
+    if (S.shareState) {
+      renderShareSheet(S.shareState.fromIdx, S.shareState.toIdx);
+      openSheet();
+      sheetEl.classList.toggle('sheet-readonly', !isMyTurn);
+    } else if (!isMyTurn && sheetEl.classList.contains('show')) {
+      // 观战方：共享结束（确认/取消）自动关闭抽屉
+      sheetEl.classList.remove('show');
+      sheetEl.classList.remove('sheet-readonly');
+    }
   }
 };
 
@@ -788,6 +818,10 @@ async function _tryReconnect() {
     document.getElementById('online').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     render();
+    // 重连后补弹最近的磁暴弹窗
+    if (S.stormEvent) {
+      showStormModal(S.stormEvent.name);
+    }
     return true;
   } catch (e) {
     console.warn('[online] reconnect failed:', e);

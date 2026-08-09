@@ -365,21 +365,21 @@ function renderActionPanel() {
 
   let h = '<div class="action-panel"><div class="action-btns">';
 
-  // 后退
+  // 撤往基地（后退）
   const canBack = S.ap >= 1 && p.pos >= 0;
   h += `<button class="act-btn" ${canBack ? '' : 'disabled'}
     onclick="hideMoreSheet();moveStep('backward')">
-    ⬆️ 后退 <span class="cost">1AP</span></button>`;
+    ⬆️ 撤往基地 <span class="cost">1AP</span></button>`;
 
   // 更多（悬浮窗开关）
   h += `<button class="act-btn${moreOpen ? ' active' : ''}" id="moreBtn" onclick="toggleMoreSheet()">
     ⋯ 更多 <span class="cost">▾</span></button>`;
 
-  // 前进
+  // 深入探险（前进）
   const stepLabel = onRover ? '2步' : '';
   h += `<button class="act-btn" ${S.ap >= 1 && targets.forward >= 0 ? '' : 'disabled'}
     onclick="hideMoreSheet();moveStep('forward')">
-    ⬇️ 前进${stepLabel} <span class="cost">1AP</span></button>`;
+    ⬇️ 深入探险${stepLabel} <span class="cost">1AP</span></button>`;
 
   // 结束回合
   h += `<button class="act-btn btn-end" onclick="hideMoreSheet();endTurn()">
@@ -520,7 +520,7 @@ function renderOGSDrawArea() {
     <div class="ogs-draw-area o2-draw">
       <div class="big-icon">🫧</div>
       <div class="card-label">O₂ ×${last.val}</div>
-      <div class="card-sub">（放入存储槽后，存储槽使用 ${totalOxygen}/${p.slots}）</div>
+      <div class="card-sub">本轮已抽 ${drawn.length} 张，确认后将剩余 ${p.slots - p.oxygen.length - p.supplies.length - drawn.length} 个存储槽位置</div>
       <div class="ogs-draw-btns">
         <button class="btn-keep" ${canContinue ? '' : 'disabled'} onclick="drawFromOGS()">
           ${canContinue ? '继续抽取' : '已满'}</button>
@@ -909,7 +909,7 @@ function openOGSSheet() {
  * @param {number[]} accelStops - 连续加速标记的序列位置数组
  */
 function openAccelChoiceSheet(direction, skipTarget, accelStops) {
-  const dirLabel = direction === 'forward' ? '⬇️ 前进' : '⬆️ 后退';
+  const dirLabel = direction === 'forward' ? '⬇️ 深入探险' : '⬆️ 撤往基地';
   let h = `<h3>⚡ 发现加速标记</h3>`;
   h += `<p style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">
     发明家可选择停在加速标记上，或跳过全部</p>`;
@@ -1081,6 +1081,8 @@ function openSheet() {
 
 /** 关闭底部操作面板（救援/共享进行中视为取消并回滚） */
 function closeSheet() {
+  // 联机观战模式：共享抽屉只读，禁止通过遮罩关闭（共享结束时自动关闭）
+  if (S.shareState && typeof window._olIsActor === 'function' && !window._olIsActor()) return;
   // 救援进行中：关闭（点击遮罩）视为取消救援并回滚
   if (S.isRescue) {
     cancelRescue();
@@ -1299,7 +1301,7 @@ function openRobotMoveSheet() {
     for (let step = 1; step <= 2; step++) {
       const targetPos = step - 1;
       if (targetPos < S.path.length) {
-        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬇️ 深入探险${step}格`, desc: `到${posLabel(targetPos)}` });
       }
     }
   } else {
@@ -1311,9 +1313,9 @@ function openRobotMoveSheet() {
       } else if (step === 0) {
         options.push({ pathPos: targetPos, label: '⏸ 原地不动', desc: `留在${posLabel(targetPos)}` });
       } else if (step > 0) {
-        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬇️ 深入探险${step}格`, desc: `到${posLabel(targetPos)}` });
       } else {
-        options.push({ pathPos: targetPos, label: `⬆️ 后退${Math.abs(step)}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬆️ 撤往基地${Math.abs(step)}格`, desc: `到${posLabel(targetPos)}` });
       }
     }
   }

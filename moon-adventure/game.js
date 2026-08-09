@@ -506,7 +506,7 @@ function getAdjacentSeqPositions(pathPos) {
  */
 function getMoveTargets(pathPos) {
   if (pathPos < 0) {
-    // 基地：前进到S.path[0]，跳过玩家、机器人、加速标记（发明家可停在加速标记上）
+    // 基地：深入探险到S.path[0]，跳过玩家、机器人、加速标记（发明家可停在加速标记上）
     const p = currentPlayer();
     const isInventor = p.role.id === 'inventor';
     const robotPathPos = S.hasEngineer ? S.robotPos : -999;
@@ -749,7 +749,10 @@ function executePlayerMove(target, direction) {
   }
 
   const roverTag = p.onRover ? '🚗' : '';
-  addLog(`${p.name} ${roverTag}${direction === 'forward' ? '前进' : '后退'}到${posLabel(target)}`);
+  const moveText = direction === 'forward'
+    ? `深入探险到${posLabel(target)}`
+    : `撤往基地（至${posLabel(target)}）`;
+  addLog(`${p.name} ${roverTag}${moveText}`);
   saveState();
   render();
 }
@@ -764,7 +767,7 @@ function stopOnAccelMark(accelPathPos, direction) {
   const p = currentPlayer();
   p.pos = accelPathPos;
   S.ap--;
-  addLog(`${p.name} ${direction === 'forward' ? '前进' : '后退'}停在加速标记（${posLabel(accelPathPos)}）`, 'action-log');
+  addLog(`${p.name} ${direction === 'forward' ? '深入探险' : '撤往基地'}，停在加速标记（${posLabel(accelPathPos)}）`, 'action-log');
   saveState();
   render();
 }
@@ -785,7 +788,9 @@ function moveRobot(targetPathPos) {
     addLog(`🤖 机器人出发到${posLabel(targetPathPos)}`, 'action-log');
   } else {
     const diff = targetPathPos - oldPos;
-    addLog(`🤖 机器人${diff > 0 ? '前进' : '后退'}到${posLabel(targetPathPos)}`, 'action-log');
+    addLog(diff > 0
+      ? `🤖 机器人深入探险到${posLabel(targetPathPos)}`
+      : `🤖 机器人撤往基地（至${posLabel(targetPathPos)}）`, 'action-log');
   }
   saveState();
   render();
@@ -1014,10 +1019,13 @@ function shareWithPlayer(targetPlayerIdx) {
 
   addLog(`${p.name} 与${target.name}准备共享物资`);
   openShareSheet(S.currentPlayer, targetPlayerIdx);
+  saveState();
 }
 
 /** 确认交换：扣除AP，清除快照 */
 function confirmShare() {
+  // 联机观战模式：共享抽屉只读
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
   const from = S.players[S.shareState.fromIdx];
   const to = S.players[S.shareState.toIdx];
   S.ap -= 1;
@@ -1030,6 +1038,8 @@ function confirmShare() {
 
 /** 取消交换：恢复快照，不扣AP */
 function cancelShare() {
+  // 联机观战模式：共享抽屉只读
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
   if (!S.shareState) { closeSheet(); return; }
   const snap = S.shareState;
   const from = S.players[snap.fromIdx];
@@ -1054,6 +1064,8 @@ function cancelShare() {
  * @param {number} cardIdx - 卡牌索引
  */
 function transferItem(fromIdx, toIdx, type, cardIdx) {
+  // 联机观战模式：共享抽屉只读
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
   const from = S.players[fromIdx];
   const to = S.players[toIdx];
 
@@ -1164,6 +1176,8 @@ function drawFromOGS() {
     S.drawnThisTurn = [];
     S.isDrawing = false;
     addLog(`${p.name} 抽到磁暴！OGS损坏`, 'storm-log');
+    // 磁暴事件随状态同步，供联机其他客户端展示弹窗
+    S.stormEvent = { seq: (S.stormEvent ? S.stormEvent.seq : 0) + 1, name: p.name };
     saveState();
     render();
     showStormModal(p.name);
@@ -1172,7 +1186,7 @@ function drawFromOGS() {
 
   // 抽到氧气卡
   S.drawnThisTurn.push(card);
-  addLog(`${p.name} OGS抽取：${card.val}氧气`, 'draw-log');
+  addLog(`${p.name} OGS抽取：O₂×${card.val}`, 'draw-log');
 
   // 存储槽满则自动确认（drawnThisTurn中的卡尚未入背包，需一并计算）
   const pendingSlots = p.oxygen.length + p.supplies.length + S.drawnThisTurn.length;
@@ -1190,7 +1204,7 @@ function drawFromOGS() {
 function confirmOGSDraw() {
   const p = currentPlayer();
   p.oxygen.push(...S.drawnThisTurn);
-  addLog(`${p.name} 补氧完成，当前${p.oxygen.length}/${p.slots}`, 'draw-log');
+  addLog(`${p.name} 补氧完成，当前存储槽已使用 ${p.oxygen.length + p.supplies.length}/${p.slots}`, 'draw-log');
   S.drawnThisTurn = [];
   S.isDrawing = false;
   saveState();
@@ -1232,7 +1246,8 @@ function reshufflePile() {
 /** 结束当前玩家回合，推进到下一个玩家 */
 function endTurn() {
   const p = currentPlayer();
-  if (S.ap > 0 && !S.returning && !p.onRover) {
+  // 已返回基地的玩家无需提示剩余AP
+  if (S.ap > 0 && !S.returning && !p.onRover && !p.returned) {
     document.getElementById('endTurnRemainAp').textContent = S.ap;
     openModal('endTurnConfirmModal');
     return;
