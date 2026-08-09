@@ -417,6 +417,7 @@ function dealGame(names) {
     accelMarks: [],
     accelPlacedThisTurn: false,
     drawnThisTurn: [],
+    moveHistory: [],          // 撤回历史：move=可撤回的移动，other=阻断撤回的行动
     isDrawing: false,
     isRescue: false,       // 是否处于紧急救援模式
     rescueDebt: false,     // 救援后本回合需扣除1AP
@@ -712,6 +713,7 @@ function confirmRoverBoard() {
 /** 确认返回基地 */
 function confirmReturnBase() {
   closeModal('returnModal');
+  markAction('other');
   const p = currentPlayer();
   p.pos = -1;
   p.returned = true;
@@ -736,23 +738,58 @@ function showReturnBaseConfirm() {
  */
 function executePlayerMove(target, direction) {
   const p = currentPlayer();
+  const from = p.pos;
+  const apBefore = S.ap;
+  const roverPathPos = tilePathIdx(S.roverPos);
+  const boardedRover = target === roverPathPos && !S.roverUsed;
   p.pos = target;
   S.ap--;
 
   // 月球车检查（roverPos是板块索引，需转换）
-  const roverPathPos = tilePathIdx(S.roverPos);
-  if (target === roverPathPos && !S.roverUsed) {
+  if (boardedRover) {
     p.onRover = true;
     S.roverUsed = true;
     S.ap = 0;
     addLog(`${p.name} 登上月球车！AP清零`, 'action-log');
   }
+  markAction('move', { from, to: target, apBefore, boardedRover });
 
   const roverTag = p.onRover ? '🚗' : '';
   const moveText = direction === 'forward'
     ? `深入探险到${posLabel(target)}`
     : `撤往基地（至${posLabel(target)}）`;
   addLog(`${p.name} ${roverTag}${moveText}`);
+  saveState();
+  render();
+}
+
+/**
+ * 记录行动到撤回历史
+ * 'move' = 可撤回的移动；其他行动 push 标记，阻断后续撤回
+ */
+function markAction(type, data) {
+  if (!Array.isArray(S.moveHistory)) S.moveHistory = [];
+  S.moveHistory.push(type === 'move' ? { type, ...data } : { type });
+}
+
+/**
+ * 撤回最近一次移动（更多菜单）
+ * 仅当上一步是移动且玩家仍在该位置时可撤回，返还AP
+ */
+function undoMove() {
+  if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
+  const p = currentPlayer();
+  const last = S.moveHistory[S.moveHistory.length - 1];
+  if (!last || last.type !== 'move' || last.to !== p.pos) return;
+  if (p.returned) return;
+  S.moveHistory.pop();
+  p.pos = last.from;
+  S.ap = last.apBefore;
+  if (last.boardedRover) {
+    p.onRover = false;
+    S.roverUsed = false;
+  }
+  addLog(`${p.name} 撤回移动，回到${posLabel(last.from)}`, 'action-log');
   saveState();
   render();
 }
@@ -765,8 +802,11 @@ function executePlayerMove(target, direction) {
 function stopOnAccelMark(accelPathPos, direction) {
   closeSheet();
   const p = currentPlayer();
+  const from = p.pos;
+  const apBefore = S.ap;
   p.pos = accelPathPos;
   S.ap--;
+  markAction('move', { from, to: accelPathPos, apBefore, boardedRover: false });
   addLog(`${p.name} ${direction === 'forward' ? '深入探险' : '撤往基地'}，停在加速标记（${posLabel(accelPathPos)}）`, 'action-log');
   saveState();
   render();
@@ -777,6 +817,7 @@ function stopOnAccelMark(accelPathPos, direction) {
  * @param {number} targetPathPos - 目标路径位置（-1=返回基地）
  */
 function moveRobot(targetPathPos) {
+  markAction('other');
   const oldPos = S.robotPos;
   S.robotPos = targetPathPos;
   S.robotMoved = true;
@@ -831,6 +872,7 @@ function collectSupply(tileIdx) {
     intact: tile.intact,
   });
   S.ap -= cost;
+  markAction('other');
 
   addLog(`${p.name} 拾取区域${tile.zone}物资（${cost}AP）`, 'action-log');
   saveState();
@@ -873,6 +915,7 @@ function collectDiscardedSupply(pathIdx) {
   el.picked = true;
 
   S.ap -= cost;
+  markAction('other');
 
   addLog(`${p.name} 拾取丢弃物资（${cost}AP）`, 'action-log');
   saveState();
@@ -943,6 +986,7 @@ function doPlaceAccelMark(pathPos) {
   S.accelMarks.push(pathPos);
   S.accelPlacedThisTurn = true;
   S.ap -= cost;
+  markAction('other');
 
   addLog(`${p.name} 在${posLabel(pathPos)}放置加速标记（${cost}AP）`, 'action-log');
   saveState();
@@ -975,6 +1019,7 @@ function placeOGS(insertIdx) {
   shiftPositions(insertIdx, 1);
   S.ogsCount++;
   S.ap -= 3;
+  markAction('other');
 
   addLog(`${p.name} 建立OGS芯片（路径位置${insertIdx}）`, 'action-log');
   saveState();
@@ -1080,6 +1125,7 @@ function transferItem(fromIdx, toIdx, type, cardIdx) {
     to.supplies.push(sup);
     addLog(`${from.name} → ${to.name}: 物资×1`, 'draw-log');
   }
+  markAction('other');
   saveState();
   render();
 }
@@ -1106,6 +1152,7 @@ function discardSupply(supplyIdx, insertIdx) {
   shiftPositions(insertIdx, 1);
 
   S.ap -= 1;
+  markAction('other');
 
   addLog(`${p.name} 丢弃1个物资到路径（1AP）`);
   saveState();
@@ -1151,6 +1198,7 @@ function doOGSDraw() {
 /** 从OGS抽取一张氧气卡 */
 function drawFromOGS() {
   const p = currentPlayer();
+  markAction('other');
 
   // 抽牌堆空时先洗回
   if (S.drawPile.length === 0) {
@@ -1269,6 +1317,7 @@ function doEndTurn() {
   S.dice = [];
   S.diceTotal = 0;
   S.drawnThisTurn = [];
+  S.moveHistory = [];
   S.isDrawing = false;
   S.robotMoved = false;
   S.accelPlacedThisTurn = false;

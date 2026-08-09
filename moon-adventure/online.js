@@ -790,12 +790,14 @@ async function _tryReconnect() {
     if (!saved || !saved.roomId) return false;
 
     const room = await netGetRoom(saved.roomId);
-    if (room.status !== 'playing' || !room.state) {
+    if (!room || room.status === 'finished') {
       _clearSession();
       return false;
     }
 
-    if (saved.seatIndex >= (room.seats || []).length) {
+    // 座位校验：自己的座位必须还在（避免刷新后重复加入）
+    const mySeat = (room.seats || []).find(s => s.seatIndex === saved.seatIndex);
+    if (!mySeat || mySeat.name !== saved.playerName) {
       _clearSession();
       return false;
     }
@@ -806,21 +808,34 @@ async function _tryReconnect() {
     _myPlayerName = saved.playerName;
     _knownSeatCount = (room.seats || []).length;
     _departedHandled = false;
-    _gameStarted = true;
     _myPushSeq = 0;
     _myPushedIds = new Set();
     _pendingPushSeat = null;
     _lastPushedCurrentSeat = null;
-
-    S = room.state;
-    S.phase = 'playing';
     _subscribeToRoom(saved.roomId);
-    document.getElementById('online').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    render();
-    // 重连后补弹最近的磁暴弹窗
-    if (S.stormEvent) {
-      showStormModal(S.stormEvent.name);
+
+    if (room.status === 'playing' && room.state) {
+      // 游戏进行中：直接恢复对局
+      _gameStarted = true;
+      S = room.state;
+      S.phase = 'playing';
+      document.getElementById('online').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      render();
+      // 重连后补弹最近的磁暴弹窗
+      if (S.stormEvent) {
+        showStormModal(S.stormEvent.name);
+      }
+    } else {
+      // 等候室：恢复房间界面，等待房主开始
+      _gameStarted = false;
+      document.getElementById('online').style.display = 'flex';
+      document.getElementById('online').style.flexDirection = 'column';
+      document.getElementById('online').style.alignItems = 'center';
+      document.getElementById('online').style.minHeight = 'calc(100dvh - 24px)';
+      document.getElementById('online').style.padding = '28px';
+      document.getElementById('app').style.display = 'none';
+      renderWaitingRoom(room);
     }
     return true;
   } catch (e) {

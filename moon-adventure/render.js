@@ -451,6 +451,14 @@ function renderActionPanel() {
     onclick="tryOGSDraw()">
     🫧 OGS补给</button>`;
 
+  // 撤回移动（仅当上一步是移动且玩家仍在该位置时可撤回）
+  const lastMove = S.moveHistory && S.moveHistory.length
+    ? S.moveHistory[S.moveHistory.length - 1] : null;
+  const canUndo = !p.returned && !!lastMove && lastMove.type === 'move' && lastMove.to === p.pos;
+  h += `<button class="act-btn" ${canUndo ? '' : 'disabled'}
+    onclick="undoMove()">
+    ↩️ 撤回移动</button>`;
+
   h += '</div></div>';
   return h;
 }
