@@ -203,6 +203,7 @@ async function onJoinRoom() {
     _knownSeatCount = seats.length;
     if (room.status === 'playing' && room.state) {
       S = room.state;
+      initUidCounter();
       S.phase = 'playing';
       _gameStarted = true;
       document.getElementById('online').style.display = 'none';
@@ -297,6 +298,7 @@ function _subscribeToRoom(roomId) {
       if (row.state) {
         const alreadyOver = S && S.gameOver;
         S = row.state;
+        initUidCounter();
         S.phase = 'playing';
         if (S.gameOver && !alreadyOver) {
           if (document.getElementById('app').style.display === 'none') {
@@ -355,6 +357,7 @@ function _subscribeToRoom(roomId) {
       _pendingPushSeat = newState.currentPlayer;
 
       S = newState;
+      initUidCounter();
       S.phase = 'playing';
 
       if (changed) {
@@ -820,6 +823,7 @@ async function _tryReconnect() {
       // 游戏进行中：直接恢复对局
       _gameStarted = true;
       S = room.state;
+      initUidCounter();
       S.phase = 'playing';
       document.getElementById('online').style.display = 'none';
       document.getElementById('app').style.display = 'block';

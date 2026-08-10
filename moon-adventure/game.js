@@ -151,6 +151,35 @@ function clearState() {
 }
 
 // ========================================
+// 卡牌/物资唯一标识（供渲染层状态diff动画使用）
+// ========================================
+
+let _uidCounter = 0;
+
+/** 生成全局唯一ID（随状态同步，联机双方diff一致） */
+function nextUid() {
+  _uidCounter++;
+  if (S) S._uidCounter = _uidCounter;
+  return _uidCounter;
+}
+
+/** 从当前状态恢复uid计数器（读档/联机接收后调用，避免新uid冲突） */
+function initUidCounter() {
+  let max = (S && S._uidCounter) || 0;
+  if (S) {
+    (S.tiles || []).forEach(t => { if (t.uid > max) max = t.uid; });
+    (S.players || []).forEach(p => {
+      (p.supplies || []).forEach(s => { if (s.uid > max) max = s.uid; });
+      (p.oxygen || []).forEach(c => { if (c.uid > max) max = c.uid; });
+    });
+    (S.drawPile || []).forEach(c => { if (c.uid > max) max = c.uid; });
+    (S.discardPile || []).forEach(c => { if (c.uid > max) max = c.uid; });
+    (S.path || []).forEach(el => { if (el.uid > max) max = el.uid; });
+  }
+  _uidCounter = max;
+}
+
+// ========================================
 // 日志系统
 // ========================================
 
@@ -350,10 +379,12 @@ function removePlayer(idx) {
  */
 function dealGame(names) {
   const count = names.length;
+  // 延续上一局的uid计数，避免读档/重开后冲突
+  _uidCounter = (S && S._uidCounter) || 0;
   // --- 构建氧气卡牌组 ---
   const oxygenCards = [];
-  for (let i = 0; i < 10; i++) oxygenCards.push({ type: 'o2', val: 2 });
-  for (let i = 0; i < 5; i++) oxygenCards.push({ type: 'o2', val: 3 });
+  for (let i = 0; i < 10; i++) oxygenCards.push({ type: 'o2', val: 2, uid: nextUid() });
+  for (let i = 0; i < 5; i++) oxygenCards.push({ type: 'o2', val: 3, uid: nextUid() });
 
   // --- 随机分配角色 ---
   const roles = shuffle([...ROLES]);
@@ -385,8 +416,8 @@ function dealGame(names) {
   const remainingTwos = 10 - count * 2;   // 每人发2张O₂×2
   const remainingThrees = 5 - count;       // 每人发1张O₂×3
   const remainingOxygen = [];
-  for (let i = 0; i < remainingTwos; i++) remainingOxygen.push({ type: 'o2', val: 2 });
-  for (let i = 0; i < remainingThrees; i++) remainingOxygen.push({ type: 'o2', val: 3 });
+  for (let i = 0; i < remainingTwos; i++) remainingOxygen.push({ type: 'o2', val: 2, uid: nextUid() });
+  for (let i = 0; i < remainingThrees; i++) remainingOxygen.push({ type: 'o2', val: 3, uid: nextUid() });
 
   // --- 检查是否有工程师 ---
   const hasEngineer = players.some(p => p.role.id === 'engineer');
@@ -428,6 +459,7 @@ function dealGame(names) {
     rescueState: null,       // 紧急救援快照（开始救援时保存，用于取消回滚）
     gameOver: false,
     gameResult: null,
+    _uidCounter,
   };
 
   addLog(`${count}人局发牌完成 · 弃牌堆${S.discardPile.length}张待洗 · 胜利条件:${WIN_CONDITIONS[count]}+完好物资`);
@@ -802,15 +834,78 @@ function showReturnBaseConfirm(cost = 1) {
  * @param {number} cost - 本次移动消耗的AP（默认1，移动V2按目标格成本支付）
  */
 function executePlayerMove(target, direction, cost = 1) {
+  if (S._moveSteps) return; // 逐格动画进行中，禁止再次移动
   const p = currentPlayer();
   const from = p.pos;
   const apBefore = S.ap;
   const roverPathPos = tilePathIdx(S.roverPos);
   const boardedRover = target === roverPathPos && !S.roverUsed;
-  p.pos = target;
+
+  // 从基地出发：ghost 降落到第一个可落脚格，再逐格走到目标（tilePos(-1) 无意义，不能从基地起播）
+  if (from === -1) {
+    const isInventor = p.role.id === 'inventor' && !p.onRover;
+    const robotPathPos2 = S.hasEngineer ? S.robotPos : -999;
+    const steps = [];
+    for (let i = 0; i <= target; i++) {
+      const blockedByPlayer = S.players.some(pl => pl.pos === i && !pl.returned);
+      const blockedByRobot = S.hasEngineer && i === robotPathPos2;
+      const blockedByAccel = S.accelMarks.includes(i) && !isInventor;
+      if (!blockedByPlayer && !blockedByRobot && !blockedByAccel) steps.push(i);
+    }
+
+    // 一步都不需要走（如目标即第一格）：直接瞬移
+    if (steps.length < 2) {
+      p.pos = target;
+      S.ap -= cost;
+      if (boardedRover) {
+        p.onRover = true;
+        S.roverUsed = true;
+        S.ap = 0;
+        addLog(`${p.name} 登上月球车！AP清零`, 'action-log');
+      }
+      markAction('move', { from, to: target, apBefore, boardedRover });
+      const roverTag = p.onRover ? '🚗' : '';
+      addLog(`${p.name} ${roverTag}前进到${posLabel(target)}`);
+      saveState();
+      render();
+      return;
+    }
+
+    S.ap -= cost;
+    if (boardedRover) {
+      p.onRover = true;
+      S.roverUsed = true;
+      S.ap = 0;
+      addLog(`${p.name} 登上月球车！AP清零`, 'action-log');
+    }
+    markAction('move', { from, to: target, apBefore, boardedRover });
+    const roverTag = p.onRover ? '🚗' : '';
+    addLog(`${p.name} ${roverTag}前进到${posLabel(target)}`);
+
+    S._moveSteps = steps;
+    saveState();
+    render();
+    return;
+  }
+
+  // Build steps array (from → target, 跳过被占格/机器人/加速标记，与getMoveTargets一致)
+  const isInventor = p.role.id === 'inventor' && !p.onRover;
+  const robotPathPos2 = S.hasEngineer ? S.robotPos : -999;
+  const steps = [from];
+  const stepDir = target > from ? 1 : -1;
+  for (let i = from + stepDir; i !== target + stepDir; i += stepDir) {
+    const blockedByPlayer = S.players.some(pl => pl.pos === i && !pl.returned);
+    const blockedByRobot = S.hasEngineer && i === robotPathPos2;
+    const blockedByAccel = S.accelMarks.includes(i) && !isInventor;
+    if (!blockedByPlayer && !blockedByRobot && !blockedByAccel) {
+      steps.push(i);
+    }
+  }
+
+  // Update AP but NOT position yet
   S.ap -= cost;
 
-  // 月球车检查（roverPos是板块索引，需转换）
+  // 月球车检查
   if (boardedRover) {
     p.onRover = true;
     S.roverUsed = true;
@@ -824,6 +919,10 @@ function executePlayerMove(target, direction, cost = 1) {
     ? `前进到${posLabel(target)}`
     : `后退到${posLabel(target)}`;
   addLog(`${p.name} ${roverTag}${moveText}`);
+
+  // steps 随状态同步推送：操作端与观战端播放一致的逐格动画；
+  // 动画完成后由动画系统（render.js startMoveAnim）提交最终位置
+  S._moveSteps = steps;
   saveState();
   render();
 }
@@ -933,6 +1032,7 @@ function collectSupply(tileIdx) {
   // 执行拾取
   tile.picked = true;
   p.supplies.push({
+    uid: nextUid(),
     zone: tile.zone,
     intact: tile.intact,
   });
@@ -976,7 +1076,7 @@ function collectDiscardedSupply(pathIdx) {
   const adjSeq = getAdjacentSeqPositions(p.pos);
   if (!adjSeq.includes(pathIdx) && p.pos !== pathIdx) return;
 
-  p.supplies.push({ zone: el.zone, intact: el.intact });
+  p.supplies.push({ uid: nextUid(), zone: el.zone, intact: el.intact });
   el.picked = true;
 
   S.ap -= cost;
@@ -1213,7 +1313,7 @@ function discardSupply(supplyIdx, insertIdx) {
   if (p.pos !== insertIdx - 1 && p.pos !== insertIdx) return;
 
   const supply = p.supplies.splice(supplyIdx, 1)[0];
-  S.path.splice(insertIdx, 0, { type: 'discarded', zone: supply.zone, intact: supply.intact });
+  S.path.splice(insertIdx, 0, { type: 'discarded', uid: supply.uid, zone: supply.zone, intact: supply.intact });
   shiftPositions(insertIdx, 1);
 
   S.ap -= 1;
@@ -1585,6 +1685,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const cached = loadState();
   if (cached) {
     S = cached;
+    initUidCounter();
   }
 
   // 首次渲染

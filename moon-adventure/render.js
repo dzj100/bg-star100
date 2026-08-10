@@ -13,6 +13,9 @@
 function render() {
   const app = document.getElementById('app');
 
+  // 动画：渲染前捕获 token 旧位置 + 计算状态diff（FLIP首帧）
+  const animCtx = captureAnimState();
+
   // 捕获旧 dice-area 高度
   const oldDice = app.querySelector('.dice-area');
   const oldH = oldDice ? oldDice.offsetHeight : null;
@@ -45,6 +48,9 @@ function render() {
 
   // 悬浮窗保持打开时按新按钮位置重新摆放
   if (moreOpen) positionMoreSheet();
+
+  // 动画：播放 FLIP 位移 / AP反馈 / 拾取反馈 / 磁暴摧毁
+  playAnimEffects(animCtx);
 }
 
 // ========================================
@@ -229,7 +235,7 @@ function renderEndBanner() {
 function renderPlayerStrip() {
   const playerItems = S.players.map((p, i) => {
     const isActive = i === S.currentPlayer;
-    const slotsHtml = renderSlotBar(p);
+    const slotsHtml = renderSlotBar(p, i);
     return `
       <div class="ps-player ${isActive ? 'active' : ''} ${p.returned ? 'returned' : ''}"
            onclick="showPlayerDetail(${i})">
@@ -261,15 +267,21 @@ function supplyIcon(supply, size, colorOverride) {
 }
 
 /** 渲染单个玩家的存储槽指示器 */
-function renderSlotBar(player) {
+function renderSlotBar(player, pi) {
+  // 本次状态diff中该玩家新增的氧气/物资槽位（pop动画）
+  const anim = _animCtx && _animCtx.diff;
+  const popBar = anim ? new Set([
+    ...anim.newO2.filter(x => x.pi === pi).map(x => x.si),
+    ...anim.newSupplies.filter(x => x.pi === pi).map(x => player.oxygen.length + x.si),
+  ]) : new Set();
   let h = '';
   for (let i = 0; i < player.slots; i++) {
     if (i < player.oxygen.length) {
-      h += '<div class="ps-slot filled-o2">O</div>';
+      h += `<div class="ps-slot filled-o2${popBar.has(i) ? ' slot-pop' : ''}">O</div>`;
     } else if (i < player.oxygen.length + player.supplies.length) {
       const sup = player.supplies[i - player.oxygen.length];
       const color = S.gameOver ? (sup.intact ? '#4caf50' : '#f44336') : undefined;
-      h += `<div class="ps-slot filled-sup">${supplyIcon(sup, 14, color)}</div>`;
+      h += `<div class="ps-slot filled-sup${popBar.has(i) ? ' slot-pop' : ''}">${supplyIcon(sup, 14, color)}</div>`;
     } else {
       h += '<div class="ps-slot empty"></div>';
     }
@@ -387,10 +399,20 @@ function renderActionPanel() {
   if (!onRover) {
     // 物资回收（仅非月球车状态）
     const collectCost = p.role.id === 'veteran' ? 2 : 3;
-    const canCollect = S.ap >= collectCost && freeSlots(p) > 0 &&
+    const adjSeq = getAdjacentSeqPositions(p.pos);
+    const hasDiscardedAdj = adjSeq.some(pathIdx => {
+      const el = S.path[pathIdx];
+      return el && el.type === 'discarded' && !el.picked &&
+        !S.accelMarks.includes(pathIdx) &&
+        !S.players.some(pl => pl.pos === pathIdx && !pl.returned) &&
+        !(S.hasEngineer && S.robotPos === pathIdx);
+    });
+    const canCollect = (S.ap >= collectCost && freeSlots(p) > 0) && (
       adj.some(t => !S.tiles[t].picked && !S.accelMarks.includes(tilePathIdx(t)) &&
         !S.players.some(pl => pathToTileIdx(pl.pos) === t && !pl.returned) &&
-        !(S.hasEngineer && pathToTileIdx(S.robotPos) === t));
+        !(S.hasEngineer && pathToTileIdx(S.robotPos) === t)) ||
+      hasDiscardedAdj
+    );
     h += `<button class="act-btn" ${canCollect ? '' : 'disabled'}
       onclick="hideMoreSheet();exitMoveMode();openCollectSheet()">
       📦 物资回收 <span class="cost">${collectCost}AP</span></button>`;
@@ -583,15 +605,17 @@ function renderOGSDrawArea() {
 // ========================================
 
 /** 玩家站位标记：骑车的玩家显示"人+车"组合，其余仅显示token */
-function playerTokenHTML(p) {
+function playerTokenHTML(p, pi) {
   if (p.onRover) {
     // 已驾驶：玩家token在上，月球车SVG在下，等比例缩小至80%
-    return `<div class="rover-combo">
-      <div class="rover-combo-token">${tokenSVG(p.color)}</div>
-      <div class="rover-combo-icon">${roverSVG(p.color)}</div>
+    return `<div class="rover-combo-wrap token-anim" data-pid="${pi}">
+      <div class="rover-combo">
+        <div class="rover-combo-token">${tokenSVG(p.color)}</div>
+        <div class="rover-combo-icon">${roverSVG(p.color)}</div>
+      </div>
     </div>`;
   }
-  return `<div class="tile-tokens">${tokenSVG(p.color)}</div>`;
+  return `<div class="tile-tokens token-anim" data-pid="${pi}">${tokenSVG(p.color)}</div>`;
 }
 
 /** 渲染月面地图（路径序列方案：物资+OGS交错排列，每行7个元素） */
@@ -613,7 +637,7 @@ function renderBoard() {
   h += `<div class="base-marker">
       <svg class="base-icon" viewBox="0 0 800 800"><g transform="translate(175.137577,623.832200) scale(0.057655,-0.057655)" fill="currentColor" stroke="none"><path d="M2392 7363 c-36 -52 -317 -650 -458 -976 -190 -436 -375 -962 -497 -1407 -88 -318 -194 -809 -232 -1070 -3 -25 -13 -88 -21 -140 -69 -455 -106 -909 -120 -1491 l-7 -277 -125 -118 c-204 -193 -338 -368 -451 -589 -130 -254 -201 -510 -219 -790 -4 -64 -5 -118 -3 -121 2 -2 141 -4 307 -4 l303 0 61 53 c265 226 421 328 630 412 110 44 328 110 336 102 3 -3 9 -76 15 -163 11 -187 26 -345 34 -367 4 -8 15 -17 27 -20 11 -3 219 -3 464 0 l444 6 6 36 c3 20 7 47 10 61 2 14 11 121 19 239 8 118 17 216 18 217 4 4 181 -49 263 -79 227 -82 452 -220 665 -409 l66 -58 640 0 c352 0 883 3 1181 7 l542 6 0 238 c0 203 2 240 16 253 13 13 45 16 199 16 172 0 185 -1 195 -19 6 -12 10 -112 10 -255 l0 -236 345 0 346 0 19 44 c77 181 122 416 122 641 1 421 -148 781 -447 1080 -104 105 -177 162 -292 231 -46 27 -83 52 -83 55 0 3 23 9 51 12 103 12 219 89 219 144 0 20 -37 64 -165 193 -91 92 -165 170 -165 174 0 19 201 200 253 228 32 17 67 44 78 59 43 61 33 136 -27 189 -28 24 -44 30 -81 30 -79 0 -130 -44 -153 -131 -9 -36 -29 -61 -106 -137 -52 -50 -98 -92 -102 -92 -4 0 -83 75 -175 165 -196 192 -203 195 -261 119 -79 -103 -117 -220 -117 -359 -1 -149 37 -260 126 -369 25 -31 45 -57 45 -58 0 -2 -82 -3 -183 -4 -157 0 -199 -4 -308 -27 -567 -120 -1000 -495 -1173 -1017 -38 -114 -65 -237 -67 -297 -2 -91 -11 -90 -60 5 -102 197 -285 435 -445 579 -43 39 -93 84 -111 100 l-31 28 -11 420 c-17 643 -48 993 -137 1530 -58 353 -178 884 -265 1170 -188 615 -359 1064 -632 1656 -144 311 -283 596 -295 603 -6 3 -19 -6 -30 -21z m181 -4016 c79 -36 128 -77 170 -140 108 -162 83 -369 -60 -497 -204 -181 -532 -107 -637 145 -36 86 -29 220 16 309 24 48 99 129 145 157 105 65 258 76 366 26z"/></g></svg>
       <div class="base-tokens">${basePlayers.map(p =>
-        `<span class="base-token${p.returned ? ' returned' : ''}" title="${p.name}${p.returned ? '（已返回基地）' : ''}">${tokenSVG(p.color)}</span>`
+        `<span class="base-token${p.returned ? ' returned' : ''}" data-pid="${S.players.indexOf(p)}" title="${p.name}${p.returned ? '（已返回基地）' : ''}">${tokenSVG(p.color)}</span>`
       ).join('')}</div>
       ${moveMode && moveMode.base !== null && S.ap >= moveMode.base
         ? `<div class="move-target move-base" data-cost="${moveMode.base}"
@@ -649,7 +673,7 @@ function renderBoard() {
         } else {
           S.players.forEach((p, pi) => {
             if (p.pos === pathIdx && !p.returned) {
-              h += playerTokenHTML(p);
+              h += playerTokenHTML(p, pi);
             }
           });
         }
@@ -663,6 +687,7 @@ function renderBoard() {
         const hasAccel = S.accelMarks.includes(pathIdx);
 
         h += `<div class="tile ${tile.picked ? 'picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
+               data-tileidx="${el.tileIdx}"
                style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
                onclick="onTileClick(${el.tileIdx})">`;
         h += `<div class="tile-shape">${shapeSVG(tile.shape, fill, stroke)}</div>`;
@@ -673,7 +698,7 @@ function renderBoard() {
 
         S.players.forEach((p, pi) => {
           if (p.pos === pathIdx && !p.returned) {
-            h += playerTokenHTML(p);
+            h += playerTokenHTML(p, pi);
           }
         });
 
@@ -687,6 +712,7 @@ function renderBoard() {
       const hasAccel = S.accelMarks.includes(pathIdx);
 
       h += `<div class="tile discarded-supply-tile${el.picked ? ' picked' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
+             data-discidx="${pathIdx}"
              style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
              onclick="onDiscardedClick(${pathIdx})">`;
 
@@ -702,7 +728,7 @@ function renderBoard() {
 
       S.players.forEach((p, pi) => {
         if (p.pos === pathIdx && !p.returned) {
-          h += playerTokenHTML(p);
+          h += playerTokenHTML(p, pi);
         }
       });
 
@@ -711,6 +737,7 @@ function renderBoard() {
       // OGS 芯片（与板块等大）
       const hasAccel = S.accelMarks.includes(pathIdx);
       h += `<div class="ogs-chip ${!el.active ? 'dead' : ''}${hasAccel ? ' accel' : ''}${isCurrentPos ? ' current-pos' : ''}${flipTok ? ' flip-tok' : ''}"
+             data-ogspos="${pathIdx}"
              style="left:${left}%;top:${top}%;width:${BOARD.tileW}%">
         <span class="ogs-label">${!el.active ? '❌️<br>OGS' : 'OGS'}</span>`;
 
@@ -718,7 +745,7 @@ function renderBoard() {
 
       S.players.forEach((p, pi) => {
         if (p.pos === pathIdx && !p.returned) {
-          h += playerTokenHTML(p);
+          h += playerTokenHTML(p, pi);
         }
       });
 
@@ -744,7 +771,7 @@ function renderBoard() {
     const robotP = tilePos(S.robotPos);
     const robotLeft = (robotP.x - BOARD.tileW / 2).toFixed(1);
     const robotTop = ((robotP.y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
-    h += `<div class="robot-marker" style="left:${robotLeft}%;top:${robotTop}%;width:${BOARD.tileW}%;aspect-ratio:1/1">
+    h += `<div class="robot-marker token-anim" data-pid="robot" style="left:${robotLeft}%;top:${robotTop}%;width:${BOARD.tileW}%;aspect-ratio:1/1">
       <span class="robot-icon">🤖</span></div>`;
   }
 
@@ -834,6 +861,11 @@ function renderPlayerCard(player, idx) {
   const used = usedSlots(player);
   const free = freeSlots(player);
 
+  // 本次状态diff中该玩家新增的物资/氧气卡槽位索引（用于pop动画）
+  const anim = _animCtx && _animCtx.diff;
+  const popSupplies = anim ? new Set(anim.newSupplies.filter(x => x.pi === idx).map(x => x.si)) : new Set();
+  const popO2 = anim ? new Set(anim.newO2.filter(x => x.pi === idx).map(x => x.si)) : new Set();
+
   let h = `<div class="player-card ${isCurrent ? 'active-card' : ''}">`;
 
   // 头部
@@ -859,8 +891,8 @@ function renderPlayerCard(player, idx) {
   if (player.oxygen.length === 0) {
     h += '<span class="chip empty-slot">无氧气 ⚠</span>';
   } else {
-    player.oxygen.forEach(c => {
-      h += `<span class="chip o2 ${c.val === 3 ? 'val3' : ''}">O₂ ×${c.val}</span>`;
+    player.oxygen.forEach((c, i) => {
+      h += `<span class="chip o2 ${c.val === 3 ? 'val3' : ''}${popO2.has(i) ? ' chip-pop' : ''}">O₂ ×${c.val}</span>`;
     });
   }
   h += '</div></div>';
@@ -872,11 +904,11 @@ function renderPlayerCard(player, idx) {
   if (player.supplies.length === 0) {
     h += '<span class="chip empty-slot">空</span>';
   } else {
-    player.supplies.forEach(s => {
+    player.supplies.forEach((s, i) => {
       const z = ZONES.find(zone => zone.id === s.zone);
       const label = z ? `区域${s.zone}` : '?';
       const color = S.gameOver ? (s.intact ? '#4caf50' : '#f44336') : undefined;
-      h += `<span class="chip supply-chip">${supplyIcon(s, 18, color)}<!--<span class="chip-label">${label}</span>--></span>`;
+      h += `<span class="chip supply-chip${popSupplies.has(i) ? ' chip-pop' : ''}">${supplyIcon(s, 18, color)}<!--<span class="chip-label">${label}</span>--></span>`;
     });
   }
   h += '</div></div>';
@@ -936,12 +968,30 @@ function openCollectSheet() {
     !S.players.some(pl => pathToTileIdx(pl.pos) === t && !pl.returned) &&
     !(S.hasEngineer && pathToTileIdx(S.robotPos) === t));
 
+  // 相邻路径位置上的丢弃物资
+  const adjSeq = getAdjacentSeqPositions(p.pos);
+  const discardedTargets = adjSeq.filter(pathIdx => {
+    const el = S.path[pathIdx];
+    return el && el.type === 'discarded' && !el.picked &&
+      !S.accelMarks.includes(pathIdx) &&
+      !S.players.some(pl => pl.pos === pathIdx && !pl.returned) &&
+      !(S.hasEngineer && S.robotPos === pathIdx);
+  });
+
   let h = '<h3>📦 选择要拾取的物资</h3><div class="sheet-cards">';
   targets.forEach(t => {
     const dir = tilePathIdx(t) > p.pos ? '前方' : '后方';
     h += `<div class="sheet-card supply-card" onclick="closeSheet();collectSupply(${t})">
       ${dir === '前方' ? '⬇️' : '⬆️'} ${dir} · 板块${t + 1}</div>`;
   });
+  discardedTargets.forEach(pathIdx => {
+    const dir = pathIdx > p.pos ? '前方' : '后方';
+    h += `<div class="sheet-card supply-card" onclick="closeSheet();onDiscardedClick(${pathIdx})">
+      ${dir === '前方' ? '⬇️' : '⬆️'} ${dir} · 丢弃物资</div>`;
+  });
+  if (targets.length === 0 && discardedTargets.length === 0) {
+    h += '<p class="text-dim" style="padding:12px">附近没有可拾取的物资</p>';
+  }
   h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
 
   document.getElementById('sheetContent').innerHTML = h;
@@ -1164,19 +1214,22 @@ function closeSheet() {
 
 /**
  * 显示磁暴弹窗
+ * 延迟700ms出现：先让OGS芯片播放摧毁动画，形成"芯片损坏 → 弹窗"因果链
  * @param {string} playerName - 被磁暴摧毁OGS的玩家名称
  */
 function showStormModal(playerName) {
-  document.getElementById('stormMsg').textContent =
-    `${playerName} 所在的OGS已被磁暴摧毁！该芯片无法再使用。`;
-  // 重新触发 shake 动画（CSS 动画只会在元素首次渲染时播放）
-  const box = document.querySelector('#stormModal .modal-box');
-  if (box) {
-    box.classList.remove('shake-anim');
-    void box.offsetWidth; // 强制重排
-    box.classList.add('shake-anim');
-  }
-  openModal('stormModal');
+  setTimeout(() => {
+    document.getElementById('stormMsg').textContent =
+      `${playerName} 所在的OGS已被磁暴摧毁！该芯片无法再使用。`;
+    // 重新触发 shake 动画（CSS 动画只会在元素首次渲染时播放）
+    const box = document.querySelector('#stormModal .modal-box');
+    if (box) {
+      box.classList.remove('shake-anim');
+      void box.offsetWidth; // 强制重排
+      box.classList.add('shake-anim');
+    }
+    openModal('stormModal');
+  }, 700);
 }
 
 /** 生成并填充结算弹窗内容并打开（联机接收方也会调用） */
@@ -1486,4 +1539,276 @@ function initStars() {
     html += `<div class="star" style="left:${x}%;top:${y}%;--dur:${dur}s"></div>`;
   }
   container.innerHTML = html;
+}
+
+// ========================================
+// 动画系统（状态diff驱动，联机两端一致触发）
+// 原则：动画基于两次渲染间的状态变化计算，而非点击事件，
+// 因此操作者与旁观者走同一代码路径，无需额外同步。
+// ========================================
+
+let _animCtx = null;   // 当前渲染的动画上下文（渲染期间可读，如槽位pop）
+let _lastSnap = null;  // 上次渲染时的状态快照
+
+/** 渲染前调用：捕获token旧位置（FLIP首帧）+ 计算状态diff */
+function captureAnimState() {
+  // 上帧带逐格移动数据、本帧已提交最终位置：跳过 FLIP（ghost 已展示移动过程）
+  if (_lastMoveSteps && !S._moveSteps) _skipNextFlips = true;
+  const rects = new Map();
+  if (S.phase === 'playing') {
+    document.querySelectorAll('#app [data-pid]').forEach(el => {
+      const r = el.getBoundingClientRect();
+      rects.set(el.dataset.pid, { l: r.left, t: r.top });
+    });
+  }
+  const snap = snapState();
+  const diff = _lastSnap ? diffState(_lastSnap, snap) : null;
+  _lastSnap = snap;
+  _animCtx = { rects, diff, phase: S.phase };
+  return _animCtx;
+}
+
+/** 状态快照：动画依赖的最小状态集 */
+function snapState() {
+  return {
+    phase: S.phase,
+    ap: S.ap,
+    curPlayer: S.currentPlayer,
+    turnPhase: S.turnPhase,
+    picked: (S.tiles || []).map(t => !!t.picked),
+    pickedDisc: (S.path || []).map(el => el.type === 'discarded' ? !!el.picked : null),
+    discUids: (S.path || []).map(el => el.type === 'discarded' ? el.uid : null),
+    ogs: (S.path || []).map(el => el.type === 'ogs' ? !!el.active : null),
+    slots: (S.players || []).map(p => p.supplies.map(s => s.uid)),
+    o2: (S.players || []).map(p => p.oxygen.map(c => c.uid)),
+  };
+}
+
+/** 计算两次渲染之间的状态变化 */
+function diffState(a, b) {
+  if (a.phase !== 'playing' || b.phase !== 'playing') return null;
+  const d = {};
+  // AP变化：仅同一位玩家的行动回合内提示（跨回合/回基地不飘字）
+  if (a.curPlayer === b.curPlayer && b.turnPhase !== 'idle' && a.ap !== b.ap) {
+    d.apDelta = b.ap - a.ap;
+  }
+  // 板块被拾取
+  d.pickedTiles = [];
+  b.picked.forEach((v, i) => { if (v && !a.picked[i]) d.pickedTiles.push(i); });
+  // 路径上的丢弃物资被拾取（按uid识别，避免路径插入导致索引偏移误判）
+  d.pickedDiscs = [];
+  b.discUids.forEach((uid, i) => {
+    if (uid !== null && uid !== undefined && b.pickedDisc[i]) {
+      const oldIdx = a.discUids.indexOf(uid);
+      if (oldIdx !== -1 && !a.pickedDisc[oldIdx]) d.pickedDiscs.push(i);
+    }
+  });
+  // 新出现的丢弃物资（按uid识别，随路径插入位置无关）
+  d.newDiscarded = [];
+  b.discUids.forEach((uid, i) => {
+    if (uid !== null && uid !== undefined && !a.discUids.includes(uid)) d.newDiscarded.push(i);
+  });
+  // OGS 被磁暴摧毁
+  d.deadOGS = [];
+  b.ogs.forEach((v, i) => { if (!v && a.ogs[i]) d.deadOGS.push(i); });
+  // 槽位新增物资/氧气卡（按uid识别，避免元素错位误报）
+  d.newSupplies = [];
+  b.slots.forEach((slots, pi) => {
+    const oldSet = new Set(a.slots[pi] || []);
+    slots.forEach((uid, si) => { if (uid !== undefined && !oldSet.has(uid)) d.newSupplies.push({ pi, si }); });
+  });
+  d.newO2 = [];
+  b.o2.forEach((cards, pi) => {
+    const oldSet = new Set(a.o2[pi] || []);
+    cards.forEach((uid, si) => { if (uid !== undefined && !oldSet.has(uid)) d.newO2.push({ pi, si }); });
+  });
+  return d;
+}
+
+/** 渲染后调用：播放本次状态变化对应的动画 */
+function playAnimEffects(ctx) {
+  _animCtx = null;
+  _lastMoveSteps = S._moveSteps || null;
+  if (!ctx || ctx.phase !== 'playing') { _skipNextFlips = false; return; }
+  playTokenFlips(ctx.rects);
+
+  // 逐格移动动画：新steps到达（操作端首帧或观战端收到A）→ 启动；进行中 → 维持原token隐藏
+  if (S._moveSteps && S._moveSteps.length >= 2 && !_moveAnim) {
+    startMoveAnim(S._moveSteps, S.currentPlayer);
+  } else if (_moveAnim) {
+    const tok = document.querySelector(`#app [data-pid="${_moveAnim.pIdx}"]`);
+    if (tok) tok.style.display = 'none';
+  }
+
+  const d = ctx.diff;
+  if (!d) { _skipNextFlips = false; return; }
+
+  // AP变化：数字bump + 飘字（丢弃操作不飘字）
+  if (d.apDelta && d.newDiscarded.length === 0) {
+    const el = document.querySelector('.ap-display strong');
+    if (el) {
+      bump(el);
+      floatText(el, (d.apDelta > 0 ? '+' : '') + d.apDelta + ' AP',
+        d.apDelta > 0 ? 'float-gain' : 'float-cost', 60);
+    }
+  }
+
+  // 物资回收：板块闪光 + 飘字
+  d.pickedTiles.forEach(i => {
+    const tile = document.querySelector(`.tile[data-tileidx="${i}"]`);
+    if (tile) {
+      tile.classList.add('collect-flash');
+      floatText(tile, '📦 回收', 'float-supply');
+    }
+  });
+  d.pickedDiscs.forEach(i => {
+    const tile = document.querySelector(`.discarded-supply-tile[data-discidx="${i}"]`);
+    if (tile) {
+      tile.classList.add('collect-flash');
+      floatText(tile, '📦 回收', 'float-supply');
+    }
+  });
+
+  // 新丢弃的物资：原地pop出现
+  d.newDiscarded.forEach(i => {
+    const el = document.querySelector(`.discarded-supply-tile[data-discidx="${i}"]`);
+    if (el) el.classList.add('discard-pop');
+  });
+
+  // 磁暴摧毁：OGS芯片闪烁（弹窗已在showStormModal中延迟）
+  d.deadOGS.forEach(i => {
+    const chip = document.querySelector(`.ogs-chip[data-ogspos="${i}"]`);
+    if (chip) chip.classList.add('die-anim');
+  });
+  _skipNextFlips = false;
+}
+
+/** FLIP：token 从旧位置补间到新位置（逐格动画时跳过） */
+let _skipNextFlips = false;
+
+/** 逐格移动动画状态机（状态驱动，联机两端一致播放） */
+let _moveAnim = null;      // { steps, pIdx }：动画进行中
+let _lastMoveSteps = null; // 上一次渲染时的 S._moveSteps，用于抑制动画后的 FLIP
+
+function playTokenFlips(oldRects) {
+  if (!oldRects || oldRects.size === 0 || _skipNextFlips) return;
+  _skipNextFlips = false;
+  document.querySelectorAll('#app [data-pid]').forEach(el => {
+    const old = oldRects.get(el.dataset.pid);
+    if (!old) return;
+    const r = el.getBoundingClientRect();
+    const dx = old.l - r.left;
+    const dy = old.t - r.top;
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    el.classList.add('flipping');
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+    el.style.transition = 'none';
+    el.getBoundingClientRect(); // 锁定首帧
+    requestAnimationFrame(() => {
+      el.style.transition = 'transform 0.34s cubic-bezier(0.25, 0.7, 0.3, 1)';
+      el.style.transform = 'translate(0, 0)';
+    });
+    el.addEventListener('transitionend', function cleanup() {
+      el.removeEventListener('transitionend', cleanup);
+      el.style.transition = '';
+      el.style.transform = '';
+      el.classList.remove('flipping');
+    });
+  });
+}
+
+/** 数字跳动 */
+function bump(el) {
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+}
+
+/** 飘字：fixed定位在锚点元素上方，上浮淡出后移除 */
+function floatText(anchorEl, text, cls, offsetX = 0) {
+  const r = anchorEl.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'float-text ' + (cls || '');
+  el.textContent = text;
+  el.style.left = (r.left + r.width / 2 + offsetX) + 'px';
+  el.style.top = r.top + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+/** 逐格移动动画：ghost token 沿路径一步步前进/后退 */
+function animateTokenSteps(steps, pIdx) {
+  return new Promise(resolve => {
+    if (steps.length < 2) { resolve(); return; }
+    const board = document.querySelector('.path-board');
+    if (!board) { resolve(); return; }
+    const p = S.players[pIdx];
+    const ghost = document.createElement('div');
+    ghost.className = 'token-ghost';
+    ghost.innerHTML = tokenSVG(p.color);
+    board.appendChild(ghost);
+
+    const numRows = Math.ceil(S.path.length / COLS);
+    const boardH = BOARD.y0 + (numRows - 1) * (BOARD.maxTilt + BOARD.rowGap) + BOARD.tileW + 3;
+
+    // 定位 ghost 到 steps[0] 起点（无过渡）
+    function posStyle(idx) {
+      const { x, y } = tilePos(idx);
+      const left = (x + BOARD.tileW / 2).toFixed(1);
+      const top = ((y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
+      return { left: `calc(${left}% - 21px)`, top: `calc(${top}% - 10px)` };
+    }
+
+    ghost.style.transition = 'none';
+    const s0 = posStyle(steps[0]);
+    ghost.style.left = s0.left;
+    ghost.style.top = s0.top;
+    ghost.style.transform = Math.floor(steps[0] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+    ghost.getBoundingClientRect(); // 强制首帧
+
+    ghost.style.transition = 'left 240ms ease-in-out, top 240ms ease-in-out, transform 0ms';
+
+    let i = 1;
+    function step() {
+      if (i >= steps.length) { ghost.remove(); resolve(); return; }
+      const s = posStyle(steps[i]);
+      ghost.style.left = s.left;
+      ghost.style.top = s.top;
+      ghost.style.transform = Math.floor(steps[i] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+      i++;
+      if (i >= steps.length) {
+        setTimeout(() => { ghost.remove(); resolve(); }, 240);
+      } else {
+        setTimeout(step, 260);
+      }
+    }
+    step();
+  });
+}
+
+/**
+ * 启动逐格移动动画（状态驱动，联机两端一致）：
+ * 隐藏原token让ghost看起来是本尊在走；动画完成后仅操作端提交最终位置并同步。
+ */
+function startMoveAnim(steps, pIdx) {
+  const isActor = typeof window._olIsActor !== 'function' || window._olIsActor();
+  _moveAnim = { steps, pIdx, from: S.players[pIdx].pos };
+  const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
+  if (tok) tok.style.display = 'none';
+  animateTokenSteps(steps, pIdx).then(() => {
+    const anim = _moveAnim;
+    _moveAnim = null;
+    // 恢复原token可见（操作端随后render重建DOM；观战端直接恢复，位置已是同步后的目标位）
+    const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
+    if (tok) tok.style.display = '';
+    if (!isActor || !anim) return;
+    const p = S.players[pIdx];
+    // 动画期间位置被其他行动改动过（如返回基地）→ 放弃移动提交，仅清理动画数据
+    if (p.pos === anim.from && !p.returned) {
+      p.pos = anim.steps[anim.steps.length - 1];
+    }
+    delete S._moveSteps;
+    saveState();
+    render();
+  });
 }
