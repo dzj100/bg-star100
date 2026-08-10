@@ -34,7 +34,7 @@
 <!-- 游戏界面 -->
 <div id="game">
   <div id="game-header">
-    <h1>⚔️ 弑君者</h1>
+    <div class="title-wrap"><h1>⚔️ 弑君者</h1><button class="mute-btn" id="muteBtn" onclick="BGM.toggle()">🔊</button></div>
     <div class="header-btns">
       <button onclick="showReset()">🔄 重置</button>
       <button onclick="showRules()">📖 规则</button>
@@ -55,6 +55,7 @@
 
 <script src="boss-svg.js"></script>
 <script src="cinematic.js"></script>
+<script src="audio.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

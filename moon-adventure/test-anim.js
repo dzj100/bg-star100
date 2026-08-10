@@ -385,31 +385,44 @@ const URL = 'http://localhost:8123/index.html';
     });
     await page5.waitForSelector('.token-ghost', { timeout: 1000 });
     ok('base departure: ghost appears', true);
-    // 立即检查：ghost 中心在棋盘内（非屏幕外飞入）+ 基地token隐藏
+    // 立即检查：ghost 起步于基地标记区域（非直接出现在板块上）+ 基地token隐藏
     const early = await page5.evaluate(() => {
       const g = document.querySelector('.token-ghost');
-      const board = document.querySelector('.path-board');
-      if (!g || !board) return { inBoard: false, baseHidden: false };
+      const base = document.querySelector('.base-marker');
+      if (!g || !base) return { atBase: false, baseHidden: false };
       const gr = g.getBoundingClientRect();
-      const br = board.getBoundingClientRect();
+      const br = base.getBoundingClientRect();
       const cx = gr.left + gr.width / 2, cy = gr.top + gr.height / 2;
-      const inBoard = cx >= br.left && cx <= br.right && cy >= br.top && cy <= br.bottom;
-      const base = document.querySelector('.base-token[data-pid="0"]');
-      return { inBoard, baseHidden: base ? base.style.display === 'none' : false };
+      const atBase = cx >= br.left && cx <= br.right && cy >= br.top && cy <= br.bottom;
+      const tok = document.querySelector('.base-token[data-pid="0"]');
+      return { atBase, baseHidden: tok ? tok.style.display === 'none' : false };
     });
-    ok('base departure: ghost inside board (no fly-in)', early.inBoard);
+    ok('base departure: ghost starts at base (not on tile)', early.atBase);
     ok('base departure: base token hidden during anim', early.baseHidden);
+    // 降落：ghost 中心进入棋盘（越过棋盘上缘）
+    const landed = await page5.evaluate(() => {
+      const board = document.querySelector('.path-board');
+      const br = board.getBoundingClientRect();
+      return br.top + 1;
+    }).then(t => page5.waitForFunction(threshold => {
+      const g = document.querySelector('.token-ghost');
+      if (!g) return false;
+      const r = g.getBoundingClientRect();
+      return r.top + r.height / 2 > threshold;
+    }, t, { timeout: 900, polling: 100 }).then(() => true).catch(() => false));
+    ok('base departure: ghost lands onto board', landed);
     // 逐格移动：动态计算各格中心x，轮询验证 ghost 依次到达位置1、位置2
     const ghostMovedTo = n => page5.evaluate(n => {
       const board = document.querySelector('.path-board');
       const br = board.getBoundingClientRect();
       const { x } = tilePos(n);
-      return br.left + x / 100 * br.width - 7.5; // ghost 中心x（left偏移-21px+半宽13.5px）
+      return br.left + x / 100 * br.width - 1; // 位置中心x（略左）
     }, n).then(t => page5.waitForFunction(threshold => {
       const g = document.querySelector('.token-ghost');
       if (!g) return false;
-      return g.getBoundingClientRect().left > threshold;
-    }, t, { timeout: 900 }).then(() => true).catch(() => false));
+      const r = g.getBoundingClientRect();
+      return r.left + r.width / 2 > threshold;
+    }, t, { timeout: 900, polling: 100 }).then(() => true).catch(() => false));
     const moved = (await ghostMovedTo(1)) && (await ghostMovedTo(2));
     ok('base departure: ghost moves step by step', moved);
     // 等动画完成：位置更新、ghost移除、token恢复
@@ -420,5 +433,126 @@ const URL = 'http://localhost:8123/index.html';
     ok('base departure: ghost removed', ghostGone);
 
     await browser5.close();
+  }
+
+  // ================================================
+  // 9. 放置加速标记：板块电光弹入+光圈扩散+微震动，标记图标弹性弹入
+  // ================================================
+  {
+    const browser6 = await chromium.launch({ headless: true });
+    const page6 = await browser6.newPage();
+    page6.on('pageerror', e => console.error('pageerror:', e.message));
+    await page6.goto(URL);
+    await page6.waitForFunction(() => typeof dealGame === 'function');
+
+    step('9. accel mark placement anim');
+    await page6.evaluate(() => {
+      dealGame(['A', 'B']);
+      const p = S.players[0];
+      p.role = { ...ROLES.find(r => r.id === 'veteran') };
+      p.pos = 0;
+      p.onRover = false;
+      p.returned = false;
+      S.ap = 5;
+      S.turnPhase = 'spent';
+      S.dice = [5];
+      S.diceTotal = 5;
+      S.accelMarks = [];
+      moveMode = null;
+      render();
+    });
+
+    await page6.evaluate(() => doPlaceAccelMark(0));
+    await page6.waitForSelector('.tile.accel-place', { timeout: 1000 });
+    ok('accel: tile gets .accel-place', true);
+    const anims = await page6.evaluate(() => {
+      const t = document.querySelector('.tile.accel-place');
+      const m = document.querySelector('.tile.accel-place .accel-mark');
+      return {
+        tile: t ? getComputedStyle(t).animationName : null,
+        mark: m ? getComputedStyle(m).animationName : null,
+        accelSet: S.accelMarks.includes(0),
+      };
+    });
+    ok('accel: tile shake anim playing', anims.tile === 'accelPlaceKf');
+    ok('accel: mark pop anim playing', anims.mark === 'accelMarkPop');
+    ok('accel: mark actually placed', anims.accelSet);
+
+    // 等动画结束后的 no-op render：不再触发
+    await page6.waitForTimeout(600);
+    await page6.evaluate(() => render());
+    await page6.waitForTimeout(100);
+    const noAccelAnim = await page6.evaluate(() => !document.querySelector('.tile.accel-place'));
+    ok('accel: no anim on no-op render', noAccelAnim);
+
+    await browser6.close();
+  }
+
+  // ================================================
+  // 10. 观战端竞态：状态B晚于动画结束到达 → token 不闪现回起点
+  // ================================================
+  {
+    const browser7 = await chromium.launch({ headless: true });
+    const page7 = await browser7.newPage();
+    page7.on('pageerror', e => console.error('pageerror:', e.message));
+    await page7.goto(URL);
+    await page7.waitForFunction(() => typeof dealGame === 'function');
+
+    step('10. observer race: state B arrives after anim ends');
+    await page7.evaluate(() => {
+      dealGame(['A', 'B']);
+      const p = S.players[0];
+      p.role = { ...ROLES.find(r => r.id === 'veteran') };
+      p.pos = 0;
+      p.onRover = false;
+      p.returned = false;
+      S.ap = 5;
+      S.turnPhase = 'spent';
+      S.dice = [5];
+      S.diceTotal = 5;
+      S.accelMarks = [];
+      moveMode = null;
+      render();
+      window._olIsActor = () => false;
+    });
+
+    // 收到状态A（携带_moveSteps），动画全程播放
+    await page7.evaluate(() => {
+      S.ap = 4;
+      S._moveSteps = [0, 1, 2];
+      render();
+    });
+    await page7.waitForSelector('.token-ghost', { timeout: 1000 });
+
+    // 动画结束后、状态B到达前：token 必须保持隐藏（不闪现回起点）
+    await page7.waitForTimeout(950);
+    const ghostGone = await page7.evaluate(() => !document.querySelector('.token-ghost'));
+    ok('observer race: ghost removed after anim', ghostGone);
+    const noFlashBack = await page7.evaluate(() => {
+      const el = document.querySelector('#app [data-pid="0"]');
+      return el ? el.style.display === 'none' : false;
+    });
+    ok('observer race: token stays hidden (no flash-back to start)', noFlashBack);
+
+    // 状态B到达：位置提交 → token 直接出现在终点，无FLIP
+    await page7.evaluate(() => {
+      S.players[0].pos = 2;
+      delete S._moveSteps;
+      render();
+    });
+    await page7.waitForTimeout(100);
+    const raceOk = await page7.evaluate(() => {
+      const el = document.querySelector('#app [data-pid="0"]');
+      return {
+        visible: el ? el.style.display !== 'none' : false,
+        flipping: document.querySelectorAll('.token-anim.flipping').length === 0,
+        pos: S.players[0].pos,
+      };
+    });
+    ok('observer race: token visible at target after state B', raceOk.visible);
+    ok('observer race: no FLIP on state B render', raceOk.flipping);
+    ok('observer race: pos stays at target', raceOk.pos === 2);
+
+    await browser7.close();
   }
 })().catch(e => { console.error('FATAL:', e.message); process.exit(1); });

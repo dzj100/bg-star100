@@ -152,6 +152,7 @@ function showLanding() {
   document.getElementById('landing').style.display = 'flex';
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'none';
+  BGM.stop();
 }
 
 /**
@@ -171,6 +172,7 @@ function showGame() {
   document.getElementById('landing').style.display = 'none';
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'flex';
+  BGM.play();
   renderGame();
 }
 

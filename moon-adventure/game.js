@@ -853,8 +853,8 @@ function executePlayerMove(target, direction, cost = 1) {
       if (!blockedByPlayer && !blockedByRobot && !blockedByAccel) steps.push(i);
     }
 
-    // 一步都不需要走（如目标即第一格）：直接瞬移
-    if (steps.length < 2) {
+    // 防御：steps为空（目标不可达）时直接瞬移；正常情况至少1步（基地→第一格）
+    if (steps.length < 1) {
       p.pos = target;
       S.ap -= cost;
       if (boardedRover) {

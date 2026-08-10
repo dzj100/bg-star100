@@ -107,6 +107,12 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
   box-shadow: 0 1px 4px rgba(0,0,0,.3);
 }
 #game-header h1 { font-size: 1rem; }
+.title-wrap { display: flex; align-items: center; gap: 8px; line-height: 1rem; }
+.mute-btn {
+  background: var(--surface); border: 1px solid #2a2a32; border-radius: 8px;
+  padding: 4px 7px; font-size: .8rem; cursor: pointer; line-height: 1;
+}
+.mute-btn:active { background: #252530; }
 .header-btns { display: flex; gap: 6px; }
 .header-btns button {
   background: var(--surface); border: 1px solid #2a2a32; border-radius: 8px;

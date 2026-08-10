@@ -1528,7 +1528,7 @@ function roverSVG(fill) {
   return `<svg viewBox="0 0 1641 1024"><path fill="${fill}" d="M292.864 442.368a290.816 290.816 0 1 0 293.888 290.816 291.84 291.84 0 0 0-293.888-290.816z m0 422.912a133.12 133.12 0 1 1 134.144-133.12 133.12 133.12 0 0 1-134.144 134.144zM1331.2 442.368a290.816 290.816 0 1 0 293.888 290.816A291.84 291.84 0 0 0 1331.2 442.368z m0 422.912a133.12 133.12 0 1 1 134.144-133.12A133.12 133.12 0 0 1 1331.2 866.304z m204.8-667.648h-283.648c-76.8 0-26.624 128-291.84 128s-122.88-128-358.4-128H375.808L512 66.56h161.792V0h-204.8L279.552 204.8C102.4 220.16 102.4 429.056 102.4 429.056s539.648-136.192 539.648 294.912h358.4a294.912 294.912 0 0 1 295.936-328.704H1638.4s31.744-196.608-102.4-196.608z"/></svg>`;
 }
 
-/** 初始化星空背景 */
+/** 初始化星空背景（含低频流星） */
 function initStars() {
   const container = document.getElementById('stars');
   let html = '';
@@ -1537,6 +1537,21 @@ function initStars() {
     const y = Math.random() * 100;
     const dur = 1.5 + Math.random() * 3;
     html += `<div class="star" style="left:${x}%;top:${y}%;--dur:${dur}s"></div>`;
+  }
+  // 低频流星：右侧入屏，斜向左下划过（水平位移由起点反推，保证飞出左屏外）
+  for (let i = 0; i < 2; i++) {
+    const mx = 60 + Math.random() * 55;
+    const my = -5 + Math.random() * 25;
+    const ang = (25 + Math.random() * 20) * Math.PI / 180;           // 飞行俯角 25°~45°
+    const hNeed = (mx + 25) / 100 * window.innerWidth;               // 水平位移：必然越过左屏外 25%
+    const dist = hNeed / Math.cos(ang);                              // 沿俯角的斜向位移
+    const dx = -Math.cos(ang) * dist;
+    const dy = Math.sin(ang) * dist;
+    const rot = (180 + Math.atan2(dy, dx) * 180 / Math.PI) % 360;
+    const cyc = 9 + Math.random() * 5;
+    const delay = -(Math.random() * cyc);
+    const tail = 90 + Math.random() * 100;
+    html += `<div class="meteor" style="left:${mx}%;top:${my}%;--dx:${dx.toFixed(0)}px;--dy:${dy.toFixed(0)}px;--rot:${rot.toFixed(1)}deg;--cyc:${cyc.toFixed(1)}s;--delay:${delay.toFixed(1)}s;--tail:${tail.toFixed(0)}px"></div>`;
   }
   container.innerHTML = html;
 }
@@ -1579,6 +1594,7 @@ function snapState() {
     pickedDisc: (S.path || []).map(el => el.type === 'discarded' ? !!el.picked : null),
     discUids: (S.path || []).map(el => el.type === 'discarded' ? el.uid : null),
     ogs: (S.path || []).map(el => el.type === 'ogs' ? !!el.active : null),
+    accel: (S.path || []).map((_, i) => S.accelMarks.includes(i)),
     slots: (S.players || []).map(p => p.supplies.map(s => s.uid)),
     o2: (S.players || []).map(p => p.oxygen.map(c => c.uid)),
   };
@@ -1611,6 +1627,9 @@ function diffState(a, b) {
   // OGS 被磁暴摧毁
   d.deadOGS = [];
   b.ogs.forEach((v, i) => { if (!v && a.ogs[i]) d.deadOGS.push(i); });
+  // 新放置的加速标记
+  d.newAccels = [];
+  b.accel.forEach((v, i) => { if (v && !a.accel[i]) d.newAccels.push(i); });
   // 槽位新增物资/氧气卡（按uid识别，避免元素错位误报）
   d.newSupplies = [];
   b.slots.forEach((slots, pi) => {
@@ -1633,7 +1652,7 @@ function playAnimEffects(ctx) {
   playTokenFlips(ctx.rects);
 
   // 逐格移动动画：新steps到达（操作端首帧或观战端收到A）→ 启动；进行中 → 维持原token隐藏
-  if (S._moveSteps && S._moveSteps.length >= 2 && !_moveAnim) {
+  if (S._moveSteps && S._moveSteps.length >= 1 && !_moveAnim) {
     startMoveAnim(S._moveSteps, S.currentPlayer);
   } else if (_moveAnim) {
     const tok = document.querySelector(`#app [data-pid="${_moveAnim.pIdx}"]`);
@@ -1680,7 +1699,23 @@ function playAnimEffects(ctx) {
     const chip = document.querySelector(`.ogs-chip[data-ogspos="${i}"]`);
     if (chip) chip.classList.add('die-anim');
   });
+
+  // 新放置的加速标记：电光弹入 + 光圈扩散 + 微震动（标记可能落在板块/损毁OGS/丢弃物资上）
+  d.newAccels.forEach(i => {
+    const el = pathElByIndex(i);
+    if (el) el.classList.add('accel-place');
+  });
   _skipNextFlips = false;
+}
+
+/** 按路径位置定位板块元素（tile用tileIdx索引，OGS/丢弃物资用路径索引） */
+function pathElByIndex(pathIdx) {
+  const el = S.path[pathIdx];
+  if (!el) return null;
+  if (el.type === 'tile') return document.querySelector(`.tile[data-tileidx="${el.tileIdx}"]`);
+  if (el.type === 'ogs') return document.querySelector(`.ogs-chip[data-ogspos="${pathIdx}"]`);
+  if (el.type === 'discarded') return document.querySelector(`.discarded-supply-tile[data-discidx="${pathIdx}"]`);
+  return null;
 }
 
 /** FLIP：token 从旧位置补间到新位置（逐格动画时跳过） */
@@ -1736,10 +1771,12 @@ function floatText(anchorEl, text, cls, offsetX = 0) {
   setTimeout(() => el.remove(), 950);
 }
 
-/** 逐格移动动画：ghost token 沿路径一步步前进/后退 */
+/** 逐格移动动画：ghost token 沿路径一步步前进/后退（基地出发时先降落到第一格） */
 function animateTokenSteps(steps, pIdx) {
   return new Promise(resolve => {
-    if (steps.length < 2) { resolve(); return; }
+    const from = S.players[pIdx].pos;
+    // 基地出发至少1步（基地→第一格），普通移动至少2步才有动画
+    if (steps.length < (from === -1 ? 1 : 2)) { resolve(); return; }
     const board = document.querySelector('.path-board');
     if (!board) { resolve(); return; }
     const p = S.players[pIdx];
@@ -1751,7 +1788,7 @@ function animateTokenSteps(steps, pIdx) {
     const numRows = Math.ceil(S.path.length / COLS);
     const boardH = BOARD.y0 + (numRows - 1) * (BOARD.maxTilt + BOARD.rowGap) + BOARD.tileW + 3;
 
-    // 定位 ghost 到 steps[0] 起点（无过渡）
+    // 定位 ghost 到起点（无过渡）：基地出发 → 基地token位置；否则 steps[0]
     function posStyle(idx) {
       const { x, y } = tilePos(idx);
       const left = (x + BOARD.tileW / 2).toFixed(1);
@@ -1760,15 +1797,33 @@ function animateTokenSteps(steps, pIdx) {
     }
 
     ghost.style.transition = 'none';
-    const s0 = posStyle(steps[0]);
-    ghost.style.left = s0.left;
-    ghost.style.top = s0.top;
-    ghost.style.transform = Math.floor(steps[0] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+    if (from === -1) {
+      // 基地token坐标换算成path-board百分比（必须在token被隐藏前调用）
+      const baseTok = document.querySelector(`.base-token[data-pid="${pIdx}"]`);
+      const br = board.getBoundingClientRect();
+      if (baseTok) {
+        const tr = baseTok.getBoundingClientRect();
+        const bl = ((tr.left + tr.width / 2 - br.left) / br.width * 100).toFixed(1);
+        const bt = ((tr.top + tr.height / 2 - br.top) / br.height * 100).toFixed(1);
+        ghost.style.left = `calc(${bl}% - 21px)`;
+        ghost.style.top = `calc(${bt}% - 10px)`;
+        ghost.style.transform = 'scaleX(1)';
+      } else {
+        const s0 = posStyle(steps[0]);
+        ghost.style.left = s0.left;
+        ghost.style.top = s0.top;
+      }
+    } else {
+      const s0 = posStyle(steps[0]);
+      ghost.style.left = s0.left;
+      ghost.style.top = s0.top;
+      ghost.style.transform = Math.floor(steps[0] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+    }
     ghost.getBoundingClientRect(); // 强制首帧
 
     ghost.style.transition = 'left 240ms ease-in-out, top 240ms ease-in-out, transform 0ms';
 
-    let i = 1;
+    let i = from === -1 ? 0 : 1;
     function step() {
       if (i >= steps.length) { ghost.remove(); resolve(); return; }
       const s = posStyle(steps[i]);
@@ -1793,14 +1848,19 @@ function animateTokenSteps(steps, pIdx) {
 function startMoveAnim(steps, pIdx) {
   const isActor = typeof window._olIsActor !== 'function' || window._olIsActor();
   _moveAnim = { steps, pIdx, from: S.players[pIdx].pos };
+  // 先启动动画（同步完成ghost首帧定位，基地出发需读取base-token坐标），再隐藏原token
+  const animPromise = animateTokenSteps(steps, pIdx);
   const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
   if (tok) tok.style.display = 'none';
-  animateTokenSteps(steps, pIdx).then(() => {
+  animPromise.then(() => {
     const anim = _moveAnim;
     _moveAnim = null;
-    // 恢复原token可见（操作端随后render重建DOM；观战端直接恢复，位置已是同步后的目标位）
-    const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
-    if (tok) tok.style.display = '';
+    // 仅当已收到提交状态（S._moveSteps 清除、DOM中token已是终位）时恢复可见；
+    // 观战端若尚未收到状态B，保持隐藏，避免闪现回起点（随后render重建DOM即显示在终点）
+    if (!S._moveSteps) {
+      const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
+      if (tok) tok.style.display = '';
+    }
     if (!isActor || !anim) return;
     const p = S.players[pIdx];
     // 动画期间位置被其他行动改动过（如返回基地）→ 放弃移动提交，仅清理动画数据
