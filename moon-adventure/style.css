@@ -818,6 +818,56 @@ body {
   color: var(--gold);
 }
 
+/* 移动模式目标格覆盖层（白色虚线圆环，AP成本标在圆圈上方发光） */
+.move-target {
+  position: absolute;
+  z-index: 15;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, .85);
+  box-shadow: 0 0 8px rgba(255, 255, 255, .35);
+  background: rgba(255, 255, 255, .12);
+  cursor: pointer;
+}
+
+.move-target::after {
+  content: attr(data-cost) 'AP';
+  position: absolute;
+  bottom: 95%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  font-size: .75em;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, .95), 0 0 14px rgba(255, 255, 255, .6);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 返回基地：纯文字标签（两行），位于 base-tokens 上方 */
+.move-target.move-base {
+  left: 62px;
+  top: 30px;
+  text-align: center;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  font-size: .75em;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, .95), 0 0 14px rgba(255, 255, 255, .6);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.move-target.move-base::after {
+  content: none;
+}
+
 /* 月球车板块 */
 .tile-rover {
   border: 2px dashed rgba(144,164,174,.5);
@@ -918,10 +968,11 @@ body {
 
 /* 基地标记 */
 .base-marker {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: -20px;
+  margin-bottom: -15px;
   margin-left: -25px;
   margin-top: -25px;
 }

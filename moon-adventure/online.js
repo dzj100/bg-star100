@@ -55,8 +55,10 @@ function showOnlineLobby() {
   document.getElementById('online').style.flexDirection = 'column';
   document.getElementById('online').style.alignItems = 'center';
   document.getElementById('online').style.minHeight = 'calc(100dvh - 24px)';
-  document.getElementById('online').style.padding = '28px';
+  document.getElementById('online').style.padding = '28px 12px';
   document.getElementById('app').style.display = 'none';
+  document.getElementById('online').style.maxWidth = '480px';
+  document.getElementById('online').style.margin = 'auto';
   renderOnlineLobby();
 }
 
@@ -100,7 +102,7 @@ function _cleanupOnline() {
 
 function renderOnlineLobby() {
   document.getElementById('online').innerHTML = `
-    <div class="setup-header" style="width:100%;max-width:320px;">
+    <div class="setup-header" style="width:100%;padding:0 16px;">
       <h1>🌕 联机模式</h1>
       <button class="back-btn" onclick="onlineBackToLanding()">✕ 返回</button>
     </div>
@@ -833,7 +835,9 @@ async function _tryReconnect() {
       document.getElementById('online').style.flexDirection = 'column';
       document.getElementById('online').style.alignItems = 'center';
       document.getElementById('online').style.minHeight = 'calc(100dvh - 24px)';
-      document.getElementById('online').style.padding = '28px';
+      document.getElementById('online').style.padding = '28px 12px';
+      document.getElementById('online').style.maxWidth = '480px';
+      document.getElementById('online').style.margin = 'auto';
       document.getElementById('app').style.display = 'none';
       renderWaitingRoom(room);
     }

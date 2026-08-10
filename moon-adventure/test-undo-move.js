@@ -54,6 +54,7 @@ const URL = 'http://localhost:8123/index.html';
   if (s.pos !== 0 || s.ap !== 4 || s.hist.join(',') !== 'move') throw new Error('undo1 fail');
 
   step('undo 2');
+  await page.click('#moreBtn'); // undo 后悬浮窗自动收起，重新打开
   await undoBtn.click();
   s = await st();
   console.log('after undo2:', JSON.stringify(s));

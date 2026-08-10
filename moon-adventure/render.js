@@ -359,30 +359,24 @@ function renderDiceResult() {
 function renderActionPanel() {
   const p = currentPlayer();
   const onRover = p.onRover;
-  const targets = getMoveTargets(p.pos);
+  const reach = getMoveReach(p.pos);
   const ogsGap = getPlayerOGS();
   const adj = getAdjacentTiles(p.pos);
 
   let h = '<div class="action-panel"><div class="action-btns">';
 
-  // 撤往基地（后退）
-  const canBack = S.ap >= 1 && p.pos >= 0;
-  h += `<button class="act-btn" ${canBack ? '' : 'disabled'}
-    onclick="hideMoreSheet();moveStep('backward')">
-    ⬆️ 撤往基地 <span class="cost">1AP</span></button>`;
+  // 移动（点选地图可达格，支付AP直达；进入时收起更多悬浮窗）
+  const canMove = S.ap >= 1 && (reach.targets.length > 0 || reach.base !== null);
+  h += `<button class="act-btn${moveMode ? ' active' : ''}" ${canMove ? '' : 'disabled'}
+    onclick="hideMoreSheet();toggleMoveMode()">
+    🚶 移动 <span class="cost">1AP起</span></button>`;
 
   // 更多（悬浮窗开关）
-  h += `<button class="act-btn${moreOpen ? ' active' : ''}" id="moreBtn" onclick="toggleMoreSheet()">
+  h += `<button class="act-btn${moreOpen ? ' active' : ''}" id="moreBtn" onclick="exitMoveMode();toggleMoreSheet()">
     ⋯ 更多 <span class="cost">▾</span></button>`;
 
-  // 深入探险（前进）
-  const stepLabel = onRover ? '2步' : '';
-  h += `<button class="act-btn" ${S.ap >= 1 && targets.forward >= 0 ? '' : 'disabled'}
-    onclick="hideMoreSheet();moveStep('forward')">
-    ⬇️ 深入探险${stepLabel} <span class="cost">1AP</span></button>`;
-
   // 结束回合
-  h += `<button class="act-btn btn-end" onclick="hideMoreSheet();endTurn()">
+  h += `<button class="act-btn btn-end" onclick="exitMoveMode();endTurn()">
     ✅ 结束回合</button>`;
 
   h += '</div>';
@@ -398,7 +392,7 @@ function renderActionPanel() {
         !S.players.some(pl => pathToTileIdx(pl.pos) === t && !pl.returned) &&
         !(S.hasEngineer && pathToTileIdx(S.robotPos) === t));
     h += `<button class="act-btn" ${canCollect ? '' : 'disabled'}
-      onclick="openCollectSheet()">
+      onclick="hideMoreSheet();exitMoveMode();openCollectSheet()">
       📦 物资回收 <span class="cost">${collectCost}AP</span></button>`;
 
     // 放置加速标记（前/后的板块、损毁OGS或丢弃物资上）
@@ -414,7 +408,7 @@ function renderActionPanel() {
         isPathDiscarded(p.pos - 1));
     const canAccel = S.ap >= accelCost && !p.onRover && (canPlaceFwd || canPlaceBwd);
     h += `<button class="act-btn" ${canAccel ? '' : 'disabled'}
-      onclick="placeAccelMark()">
+      onclick="hideMoreSheet();exitMoveMode();placeAccelMark()">
       ⚡ 加速标记 <span class="cost">${accelCost}AP</span></button>`;
 
     // 建立OGS（必须在板块、损毁OGS芯片或丢弃物资上）
@@ -423,7 +417,7 @@ function renderActionPanel() {
     const onDiscarded = playerTile === null && isPathDiscarded(p.pos);
     const canOGS = S.ap >= 3 && (playerTile !== null || onOGS || onDiscarded) && S.ogsCount < 5;
     h += `<button class="act-btn" ${canOGS ? '' : 'disabled'}
-      onclick="openOGSSheet()">
+      onclick="hideMoreSheet();exitMoveMode();openOGSSheet()">
       🔵 建立OGS <span class="cost">3AP</span></button>`;
   }
 
@@ -436,19 +430,19 @@ function renderActionPanel() {
   });
   const canShare = S.ap >= 1 && adjPlayers.length > 0;
   h += `<button class="act-btn" ${canShare ? '' : 'disabled'}
-    onclick="openShareSelectSheet()">
+    onclick="hideMoreSheet();exitMoveMode();openShareSelectSheet()">
     🤝 共享 <span class="cost">1AP</span></button>`;
 
   // 丢弃物资
   const canDiscard = S.ap >= 1 && p.supplies.length > 0 && p.pos >= 0;
   h += `<button class="act-btn" ${canDiscard ? '' : 'disabled'}
-    onclick="openDiscardSheet()">
+    onclick="hideMoreSheet();exitMoveMode();openDiscardSheet()">
     🗑️ 丢弃物资 <span class="cost">1AP</span></button>`;
 
   // OGS补给（始终展示，仅条件满足时可点击）
   const canOGS = ogsGap !== null && !S.isDrawing && freeSlots(p) > 0;
   h += `<button class="act-btn btn-ogs" ${canOGS ? '' : 'disabled'}
-    onclick="tryOGSDraw()">
+    onclick="hideMoreSheet();exitMoveMode();tryOGSDraw()">
     🫧 OGS补给</button>`;
 
   // 撤回移动（仅当上一步是移动且玩家仍在该位置时可撤回）
@@ -456,7 +450,7 @@ function renderActionPanel() {
     ? S.moveHistory[S.moveHistory.length - 1] : null;
   const canUndo = !p.returned && !!lastMove && lastMove.type === 'move' && lastMove.to === p.pos;
   h += `<button class="act-btn" ${canUndo ? '' : 'disabled'}
-    onclick="undoMove()">
+    onclick="hideMoreSheet();exitMoveMode();undoMove()">
     ↩️ 撤回移动</button>`;
 
   h += '</div></div>';
@@ -465,6 +459,53 @@ function renderActionPanel() {
 
 /** 更多悬浮窗是否打开（render重建后保持状态） */
 let moreOpen = false;
+
+// ========================================
+// 移动模式（点选地图目标格，支付AP直达）
+// ========================================
+
+/** 移动模式状态：null 未激活；{ targets:[{pathPos,cost}], base:number|null } */
+let moveMode = null;
+
+/** 进入移动模式：计算当前玩家所有可达格 */
+function enterMoveMode() {
+  const p = currentPlayer();
+  if (S.turnPhase !== 'spent' || S.ap < 1) return;
+  moveMode = getMoveReach(p.pos);
+  if (!moveMode.targets.length && moveMode.base === null) { moveMode = null; return; }
+  render();
+}
+
+/** 退出移动模式 */
+function exitMoveMode() {
+  if (moveMode) { moveMode = null; render(); }
+}
+
+/** 切换移动模式 */
+function toggleMoveMode() {
+  moveMode ? exitMoveMode() : enterMoveMode();
+}
+
+/** 点击可达格：支付AP移动到该格（基地走原确认弹窗） */
+function onMoveTargetClick(targetPathPos) {
+  if (!moveMode) return;
+  const p = currentPlayer();
+  const t = moveMode.targets.find(x => x.pathPos === targetPathPos);
+  const cost = t ? t.cost : (targetPathPos === -1 ? moveMode.base : null);
+  if (cost === null || S.ap < cost) return;
+  const baseCost = moveMode.base;
+  moveMode = null;
+  if (targetPathPos === -1) { showReturnBaseConfirm(baseCost); return; }
+  const direction = targetPathPos > p.pos ? 'forward' : 'backward';
+  const roverPathPos = tilePathIdx(S.roverPos);
+  if (targetPathPos === roverPathPos && !S.roverUsed && S.ap > cost) {
+    pendingRoverMove = { target: targetPathPos, direction, cost };
+    document.getElementById('roverRemainAp').textContent = S.ap - cost;
+    openModal('roverConfirmModal');
+    return;
+  }
+  executePlayerMove(targetPathPos, direction, cost);
+}
 
 /** 按更多按钮当前位置摆放悬浮窗（fixed跟随按钮，随滚动更新） */
 function positionMoreSheet() {
@@ -567,13 +608,16 @@ function renderBoard() {
     if (el.type === 'tile') tileSeqPos[el.tileIdx] = pathIdx;
   });
 
-  // 基地标记 + 玩家token + 标题（水平一行）
+  // 基地标记 + 玩家token + 标题（水平一行）；移动模式的基地目标圈锚定在 tokens 正上方
   const basePlayers = S.players.filter(p => p.pos === -1);
   h += `<div class="base-marker">
       <svg class="base-icon" viewBox="0 0 800 800"><g transform="translate(175.137577,623.832200) scale(0.057655,-0.057655)" fill="currentColor" stroke="none"><path d="M2392 7363 c-36 -52 -317 -650 -458 -976 -190 -436 -375 -962 -497 -1407 -88 -318 -194 -809 -232 -1070 -3 -25 -13 -88 -21 -140 -69 -455 -106 -909 -120 -1491 l-7 -277 -125 -118 c-204 -193 -338 -368 -451 -589 -130 -254 -201 -510 -219 -790 -4 -64 -5 -118 -3 -121 2 -2 141 -4 307 -4 l303 0 61 53 c265 226 421 328 630 412 110 44 328 110 336 102 3 -3 9 -76 15 -163 11 -187 26 -345 34 -367 4 -8 15 -17 27 -20 11 -3 219 -3 464 0 l444 6 6 36 c3 20 7 47 10 61 2 14 11 121 19 239 8 118 17 216 18 217 4 4 181 -49 263 -79 227 -82 452 -220 665 -409 l66 -58 640 0 c352 0 883 3 1181 7 l542 6 0 238 c0 203 2 240 16 253 13 13 45 16 199 16 172 0 185 -1 195 -19 6 -12 10 -112 10 -255 l0 -236 345 0 346 0 19 44 c77 181 122 416 122 641 1 421 -148 781 -447 1080 -104 105 -177 162 -292 231 -46 27 -83 52 -83 55 0 3 23 9 51 12 103 12 219 89 219 144 0 20 -37 64 -165 193 -91 92 -165 170 -165 174 0 19 201 200 253 228 32 17 67 44 78 59 43 61 33 136 -27 189 -28 24 -44 30 -81 30 -79 0 -130 -44 -153 -131 -9 -36 -29 -61 -106 -137 -52 -50 -98 -92 -102 -92 -4 0 -83 75 -175 165 -196 192 -203 195 -261 119 -79 -103 -117 -220 -117 -359 -1 -149 37 -260 126 -369 25 -31 45 -57 45 -58 0 -2 -82 -3 -183 -4 -157 0 -199 -4 -308 -27 -567 -120 -1000 -495 -1173 -1017 -38 -114 -65 -237 -67 -297 -2 -91 -11 -90 -60 5 -102 197 -285 435 -445 579 -43 39 -93 84 -111 100 l-31 28 -11 420 c-17 643 -48 993 -137 1530 -58 353 -178 884 -265 1170 -188 615 -359 1064 -632 1656 -144 311 -283 596 -295 603 -6 3 -19 -6 -30 -21z m181 -4016 c79 -36 128 -77 170 -140 108 -162 83 -369 -60 -497 -204 -181 -532 -107 -637 145 -36 86 -29 220 16 309 24 48 99 129 145 157 105 65 258 76 366 26z"/></g></svg>
-      ${basePlayers.length ? `<div class="base-tokens">${basePlayers.map(p =>
+      <div class="base-tokens">${basePlayers.map(p =>
         `<span class="base-token${p.returned ? ' returned' : ''}" title="${p.name}${p.returned ? '（已返回基地）' : ''}">${tokenSVG(p.color)}</span>`
-      ).join('')}</div>` : ''}
+      ).join('')}</div>
+      ${moveMode && moveMode.base !== null && S.ap >= moveMode.base
+        ? `<div class="move-target move-base" data-cost="${moveMode.base}"
+          onclick="onMoveTargetClick(-1)">返回基地<br>${moveMode.base}AP</div>` : ''}
     <span class="base-title">月面地图</span>
   </div>`;
 
@@ -682,6 +726,19 @@ function renderBoard() {
     }
   });
 
+  // 移动模式覆盖层：高亮可达格（费用不足的不显示），AP成本标在圈外下方
+  if (moveMode) {
+    moveMode.targets.forEach(t => {
+      if (t.cost > S.ap) return;
+      const { x, y } = tilePos(t.pathPos);
+      const left = (x - BOARD.tileW / 2).toFixed(1);
+      const top = ((y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
+      h += `<div class="move-target" data-cost="${t.cost}"
+        style="left:${left}%;top:${top}%;width:${BOARD.tileW}%"
+        onclick="onMoveTargetClick(${t.pathPos})"></div>`;
+    });
+  }
+
   // 机器人标记（在板块上时显示）
   if (S.hasEngineer && S.robotPos >= 0) {
     const robotP = tilePos(S.robotPos);
@@ -697,6 +754,7 @@ function renderBoard() {
 
 /** 板块点击处理 */
 function onTileClick(tileIdx) {
+  if (moveMode) { exitMoveMode(); return; }
   if (S.turnPhase !== 'spent' || S.isDrawing) return;
   const p = currentPlayer();
   if (p.onRover) return;
@@ -917,7 +975,7 @@ function openOGSSheet() {
  * @param {number[]} accelStops - 连续加速标记的序列位置数组
  */
 function openAccelChoiceSheet(direction, skipTarget, accelStops) {
-  const dirLabel = direction === 'forward' ? '⬇️ 深入探险' : '⬆️ 撤往基地';
+  const dirLabel = direction === 'forward' ? '⬇️ 前进' : '⬆️ 后退';
   let h = `<h3>⚡ 发现加速标记</h3>`;
   h += `<p style="font-size:.75em;color:var(--text-dim);text-align:center;margin-bottom:10px">
     发明家可选择停在加速标记上，或跳过全部</p>`;
@@ -1309,7 +1367,7 @@ function openRobotMoveSheet() {
     for (let step = 1; step <= 2; step++) {
       const targetPos = step - 1;
       if (targetPos < S.path.length) {
-        options.push({ pathPos: targetPos, label: `⬇️ 深入探险${step}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
       }
     }
   } else {
@@ -1321,9 +1379,9 @@ function openRobotMoveSheet() {
       } else if (step === 0) {
         options.push({ pathPos: targetPos, label: '⏸ 原地不动', desc: `留在${posLabel(targetPos)}` });
       } else if (step > 0) {
-        options.push({ pathPos: targetPos, label: `⬇️ 深入探险${step}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬇️ 前进${step}格`, desc: `到${posLabel(targetPos)}` });
       } else {
-        options.push({ pathPos: targetPos, label: `⬆️ 撤往基地${Math.abs(step)}格`, desc: `到${posLabel(targetPos)}` });
+        options.push({ pathPos: targetPos, label: `⬆️ 后退${Math.abs(step)}格`, desc: `到${posLabel(targetPos)}` });
       }
     }
   }

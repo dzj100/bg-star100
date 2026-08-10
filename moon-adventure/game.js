@@ -310,8 +310,10 @@ function getAdjacentInsertPoints(pathPos) {
 /** @type {string[]} 设置阶段暂存的玩家昵称列表 */
 let setupNames = [];
 
-/** 月球车乘坐确认弹窗中暂存的待执行移动 */
+/** 月球车乘坐确认弹窗中暂存的待执行移动（含成本） */
 let pendingRoverMove = null;
+/** 返回基地确认中记录的AP成本（V2移动模式可能>1，V1固定1） */
+let pendingReturnCost = 1;
 
 /** 打开玩家设置页面 */
 function showSetup() {
@@ -599,6 +601,66 @@ function getMoveTargets(pathPos) {
   };
 }
 
+/**
+ * 计算当前位置所有可达格及AP成本（移动V2）
+ * 每步1AP：走1格并跳过占用格/机器人/加速标记（发明家可停在任意加速标记上），
+ * 月球车每1AP走2格；后退越过第0格时基地可达。
+ * @param {number} pathPos - 玩家当前路径位置（-1=基地）
+ * @returns {{ targets: Array<{pathPos: number, cost: number}>, base: number|null }}
+ */
+function getMoveReach(pathPos) {
+  const p = currentPlayer();
+  const isInventor = p.role.id === 'inventor';
+  const isRover = p.onRover;
+  const maxPos = S.path.length - 1;
+  const robotPathPos = S.hasEngineer ? S.robotPos : -999;
+  const targets = [];
+  let base = null;
+
+  function occupied(pos) {
+    return S.players.some(pl => pl.pos === pos && !pl.returned)
+      || (S.hasEngineer && pos === robotPathPos);
+  }
+
+  function walk(dir) {
+    let pos = pathPos;
+    let cost = 0;
+    while (true) {
+      let cur = pos;
+      let stepOk = true;
+      for (let i = 0; i < (isRover ? 2 : 1); i++) {
+        cur += dir;
+        // 跳过占用格（玩家/机器人）
+        while (cur >= 0 && cur <= maxPos && occupied(cur)) cur += dir;
+        if (cur < 0 || cur > maxPos) { stepOk = false; break; }
+        // 跳过加速标记（发明家可停在任意标记上）；标记后方遇占用格同样跳过
+        while (cur >= 0 && cur <= maxPos && S.accelMarks.includes(cur)) {
+          if (isInventor && !isRover) targets.push({ pathPos: cur, cost: cost + 1 });
+          cur += dir;
+          while (cur >= 0 && cur <= maxPos && occupied(cur)) cur += dir;
+        }
+        if (cur < 0 || cur > maxPos) { stepOk = false; break; }
+      }
+      if (!stepOk) {
+        // 后退越过第0格 → 返回基地可达
+        if (dir === -1 && base === null) base = cost + 1;
+        break;
+      }
+      targets.push({ pathPos: cur, cost: cost + 1 });
+      pos = cur;
+      cost += 1;
+    }
+  }
+
+  if (pathPos < 0) {
+    walk(1);   // 基地出发只能前进
+  } else {
+    walk(1);
+    walk(-1);
+  }
+  return { targets, base };
+}
+
 // ========================================
 // 行动：打出氧气卡 → 掷骰子
 // ========================================
@@ -705,9 +767,9 @@ function moveStep(direction) {
 function confirmRoverBoard() {
   closeModal('roverConfirmModal');
   if (!pendingRoverMove) return;
-  const { target, direction } = pendingRoverMove;
+  const { target, direction, cost } = pendingRoverMove;
   pendingRoverMove = null;
-  executePlayerMove(target, direction);
+  executePlayerMove(target, direction, cost || 1);
 }
 
 /** 确认返回基地 */
@@ -717,15 +779,17 @@ function confirmReturnBase() {
   const p = currentPlayer();
   p.pos = -1;
   p.returned = true;
-  S.ap--;
+  S.ap -= pendingReturnCost;
+  pendingReturnCost = 1;
   addLog(`${p.name} 返回基地！不再行动`, 'action-log');
   saveState();
   render();
 }
 
 /** 从加速选择面板直接触发返回基地确认（绕过moveStep避免发明家循环） */
-function showReturnBaseConfirm() {
+function showReturnBaseConfirm(cost = 1) {
   const p = currentPlayer();
+  pendingReturnCost = cost;
   document.getElementById('returnMsg').textContent =
     `${p.name} 确定要返回基地吗？返回后后续回合均会跳过，无法再行动。`;
   openModal('returnModal');
@@ -735,15 +799,16 @@ function showReturnBaseConfirm() {
  * 执行移动并处理月球车/日志（路径位置系统）
  * @param {number} target - 目标路径位置
  * @param {'forward'|'backward'} direction - 移动方向
+ * @param {number} cost - 本次移动消耗的AP（默认1，移动V2按目标格成本支付）
  */
-function executePlayerMove(target, direction) {
+function executePlayerMove(target, direction, cost = 1) {
   const p = currentPlayer();
   const from = p.pos;
   const apBefore = S.ap;
   const roverPathPos = tilePathIdx(S.roverPos);
   const boardedRover = target === roverPathPos && !S.roverUsed;
   p.pos = target;
-  S.ap--;
+  S.ap -= cost;
 
   // 月球车检查（roverPos是板块索引，需转换）
   if (boardedRover) {
@@ -756,8 +821,8 @@ function executePlayerMove(target, direction) {
 
   const roverTag = p.onRover ? '🚗' : '';
   const moveText = direction === 'forward'
-    ? `深入探险到${posLabel(target)}`
-    : `撤往基地（至${posLabel(target)}）`;
+    ? `前进到${posLabel(target)}`
+    : `后退到${posLabel(target)}`;
   addLog(`${p.name} ${roverTag}${moveText}`);
   saveState();
   render();
@@ -807,7 +872,7 @@ function stopOnAccelMark(accelPathPos, direction) {
   p.pos = accelPathPos;
   S.ap--;
   markAction('move', { from, to: accelPathPos, apBefore, boardedRover: false });
-  addLog(`${p.name} ${direction === 'forward' ? '深入探险' : '撤往基地'}，停在加速标记（${posLabel(accelPathPos)}）`, 'action-log');
+  addLog(`${p.name} ${direction === 'forward' ? '前进' : '后退'}，停在加速标记（${posLabel(accelPathPos)}）`, 'action-log');
   saveState();
   render();
 }
@@ -830,8 +895,8 @@ function moveRobot(targetPathPos) {
   } else {
     const diff = targetPathPos - oldPos;
     addLog(diff > 0
-      ? `🤖 机器人深入探险到${posLabel(targetPathPos)}`
-      : `🤖 机器人撤往基地（至${posLabel(targetPathPos)}）`, 'action-log');
+      ? `🤖 机器人前进到${posLabel(targetPathPos)}`
+      : `🤖 机器人后退到${posLabel(targetPathPos)}`, 'action-log');
   }
   saveState();
   render();
