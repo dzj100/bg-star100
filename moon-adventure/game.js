@@ -798,6 +798,7 @@ function moveStep(direction) {
 /** 确认乘坐月球车（清空AP，结束行动） */
 function confirmRoverBoard() {
   closeModal('roverConfirmModal');
+  moveMode = null;
   if (!pendingRoverMove) return;
   const { target, direction, cost } = pendingRoverMove;
   pendingRoverMove = null;
@@ -807,6 +808,7 @@ function confirmRoverBoard() {
 /** 确认返回基地 */
 function confirmReturnBase() {
   closeModal('returnModal');
+  moveMode = null;
   markAction('other');
   const p = currentPlayer();
   p.pos = -1;

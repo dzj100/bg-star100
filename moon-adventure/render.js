@@ -277,7 +277,8 @@ function renderSlotBar(player, pi) {
   let h = '';
   for (let i = 0; i < player.slots; i++) {
     if (i < player.oxygen.length) {
-      h += `<div class="ps-slot filled-o2${popBar.has(i) ? ' slot-pop' : ''}">O</div>`;
+      const card = player.oxygen[i];
+      h += `<div class="ps-slot filled-o2${card.val === 3 ? ' val3' : ''}${popBar.has(i) ? ' slot-pop' : ''}">O</div>`;
     } else if (i < player.oxygen.length + player.supplies.length) {
       const sup = player.supplies[i - player.oxygen.length];
       const color = S.gameOver ? (sup.intact ? '#4caf50' : '#f44336') : undefined;
@@ -516,7 +517,7 @@ function onMoveTargetClick(targetPathPos) {
   const cost = t ? t.cost : (targetPathPos === -1 ? moveMode.base : null);
   if (cost === null || S.ap < cost) return;
   const baseCost = moveMode.base;
-  moveMode = null;
+  // 确认弹窗（返回基地/月球车）：保留moveMode，取消后仍可继续选择其他目标
   if (targetPathPos === -1) { showReturnBaseConfirm(baseCost); return; }
   const direction = targetPathPos > p.pos ? 'forward' : 'backward';
   const roverPathPos = tilePathIdx(S.roverPos);
@@ -526,6 +527,7 @@ function onMoveTargetClick(targetPathPos) {
     openModal('roverConfirmModal');
     return;
   }
+  moveMode = null;
   executePlayerMove(targetPathPos, direction, cost);
 }
 

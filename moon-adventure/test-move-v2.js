@@ -35,6 +35,10 @@ const URL = 'http://localhost:8123/index.html';
     [...document.querySelectorAll('.move-target')]
       .find(el => (el.getAttribute('onclick') || '').includes(`(${p})`))
       .click(), pos);
+  // 等待逐格移动动画落定（操作端提交位置并清理 ghost）
+  const waitMoveSettled = () => page.waitForFunction(
+    () => !S._moveSteps && !document.querySelector('.token-ghost'),
+    null, { timeout: 5000 });
   // 重置单机状态
   const setup = (pos, ap, roleId, accelMarks) => page.evaluate(({ pos, ap, roleId, accelMarks }) => {
     dealGame(['A']);
@@ -52,6 +56,7 @@ const URL = 'http://localhost:8123/index.html';
     S.hasEngineer = false;
     S.robotPos = -1;
     moveMode = null;
+    closeSheet();
     render();
   }, { pos, ap, roleId, accelMarks });
 
@@ -72,6 +77,7 @@ const URL = 'http://localhost:8123/index.html';
   }
   if (os.some(o => o.cost > 1)) throw new Error('over-budget targets must not be rendered');
   await clickOverlay(4);
+  await waitMoveSettled();
   let s = await st();
   console.log('after click pos4:', JSON.stringify(s));
   if (s.pos !== 4 || s.ap !== 0) throw new Error('move to pos4 fail');
@@ -97,6 +103,7 @@ const URL = 'http://localhost:8123/index.html';
   await setup(1, 3, 'veteran', []);
   await moveBtn.click();
   await clickOverlay(3); // 2AP 直达
+  await waitMoveSettled();
   s = await st();
   console.log('after click pos3 (2AP):', JSON.stringify(s));
   if (s.pos !== 3 || s.ap !== 1) throw new Error('2AP move fail');
@@ -214,6 +221,29 @@ const URL = 'http://localhost:8123/index.html';
     document.getElementById('moreSheet').style.display !== 'none');
   console.log('more sheet visible after discard click (expect false):', sheetVisible);
   if (sheetVisible) throw new Error('more sheet action must close the sheet');
+
+  step('10. cancel return-base modal keeps move mode');
+  await setup(0, 3, 'veteran', []);
+  await moveBtn.click();
+  await page.evaluate(() => document.querySelector('.move-target.move-base').click());
+  await page.evaluate(() => closeModal('returnModal'));
+  const overlaysAfterCancel = await page.evaluate(() => document.querySelectorAll('.move-target').length);
+  console.log('overlays after cancel (expect >0):', overlaysAfterCancel);
+  if (overlaysAfterCancel === 0) throw new Error('move mode must stay active after cancelling return modal');
+  await clickOverlay(1);
+  await waitMoveSettled();
+  s = await st();
+  console.log('after move to pos1 post-cancel:', JSON.stringify(s));
+  if (s.pos !== 1 || s.ap !== 2) throw new Error('move after cancelling return modal fail');
+
+  step('11. confirm return clears highlights');
+  await setup(0, 3, 'veteran', []);
+  await moveBtn.click();
+  await page.evaluate(() => document.querySelector('.move-target.move-base').click());
+  await page.evaluate(() => confirmReturnBase());
+  const overlaysAfterConfirm = await page.evaluate(() => document.querySelectorAll('.move-target').length);
+  console.log('overlays after confirm (expect 0):', overlaysAfterConfirm);
+  if (overlaysAfterConfirm !== 0) throw new Error('move highlights must clear after confirming return');
 
   console.log('JS errors:', errors.length ? errors : 'none');
   await browser.close();

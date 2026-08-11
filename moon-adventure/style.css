@@ -484,6 +484,11 @@ body {
   color: #fff;
 }
 
+.ps-slot.filled-o2.val3 {
+  background: linear-gradient(135deg, #01579b, var(--o2-dark));
+  box-shadow: 0 0 4px rgba(30, 136, 229, 0.4);
+}
+
 .ps-slot.filled-sup {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
