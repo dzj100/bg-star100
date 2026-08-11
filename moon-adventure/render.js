@@ -13,6 +13,14 @@
 function render() {
   const app = document.getElementById('app');
 
+  // 观战端：逐格移动动画播放中收到最终位置状态（S._moveSteps 已被清除）时，
+  // 延迟到动画播完再重建 DOM，避免 ghost 未走完就被替换、token 提前瞬移到终位
+  if (S && S.phase === 'playing' && _moveAnim && !S._moveSteps) {
+    _deferRender = true;
+    return;
+  }
+  _deferRender = false;
+
   // 动画：渲染前捕获 token 旧位置 + 计算状态diff（FLIP首帧）
   const animCtx = captureAnimState();
 
@@ -103,7 +111,7 @@ function renderLanding() {
       <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
       <span class="moon-icon">🌕️</span>
       <h1>月面探险</h1>
-      <p class="subtitle">Moon Adventure</p>
+      <p class="subtitle">2~5人 · 合作角色扮演</p>
       <button class="start-btn" onclick="showSetup()">🚀 开始游戏</button>
       <div class="credit">@imStar100</div>
     </div>`;
@@ -1726,6 +1734,26 @@ let _skipNextFlips = false;
 /** 逐格移动动画状态机（状态驱动，联机两端一致播放） */
 let _moveAnim = null;      // { steps, pIdx }：动画进行中
 let _lastMoveSteps = null; // 上一次渲染时的 S._moveSteps，用于抑制动画后的 FLIP
+let _moveGhost = null;     // 动画 ghost：播完后保留在终位，等待最终状态渲染时自然替换
+let _ghostCleanupTimer = null; // ghost 保留期间的超时兜底（网络异常防残留）
+let _deferRender = false;  // 观战端：动画播放中收到最终状态，渲染延迟到动画播完
+
+/** 移除动画 ghost（并清理兜底定时器） */
+function _removeMoveGhost() {
+  if (_ghostCleanupTimer) { clearTimeout(_ghostCleanupTimer); _ghostCleanupTimer = null; }
+  if (_moveGhost) { _moveGhost.remove(); _moveGhost = null; }
+}
+
+/** 兜底：最终状态迟迟未到（网络异常）时强制移除 ghost、恢复 token 可见 */
+function _scheduleGhostCleanup(pIdx) {
+  if (_ghostCleanupTimer) clearTimeout(_ghostCleanupTimer);
+  _ghostCleanupTimer = setTimeout(() => {
+    _ghostCleanupTimer = null;
+    _removeMoveGhost();
+    const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
+    if (tok) tok.style.display = '';
+  }, 3000);
+}
 
 function playTokenFlips(oldRects) {
   if (!oldRects || oldRects.size === 0 || _skipNextFlips) return;
@@ -1786,6 +1814,7 @@ function animateTokenSteps(steps, pIdx) {
     ghost.className = 'token-ghost';
     ghost.innerHTML = tokenSVG(p.color);
     board.appendChild(ghost);
+    _moveGhost = ghost;
 
     const numRows = Math.ceil(S.path.length / COLS);
     const boardH = BOARD.y0 + (numRows - 1) * (BOARD.maxTilt + BOARD.rowGap) + BOARD.tileW + 3;
@@ -1827,14 +1856,15 @@ function animateTokenSteps(steps, pIdx) {
 
     let i = from === -1 ? 0 : 1;
     function step() {
-      if (i >= steps.length) { ghost.remove(); resolve(); return; }
+      // 播完不 remove ghost：由 startMoveAnim 决定移除时机（未提交状态时保留在终位）
+      if (i >= steps.length) { resolve(); return; }
       const s = posStyle(steps[i]);
       ghost.style.left = s.left;
       ghost.style.top = s.top;
       ghost.style.transform = Math.floor(steps[i] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
       i++;
       if (i >= steps.length) {
-        setTimeout(() => { ghost.remove(); resolve(); }, 240);
+        setTimeout(step, 240);
       } else {
         setTimeout(step, 260);
       }
@@ -1857,13 +1887,23 @@ function startMoveAnim(steps, pIdx) {
   animPromise.then(() => {
     const anim = _moveAnim;
     _moveAnim = null;
-    // 仅当已收到提交状态（S._moveSteps 清除、DOM中token已是终位）时恢复可见；
-    // 观战端若尚未收到状态B，保持隐藏，避免闪现回起点（随后render重建DOM即显示在终点）
+    // 最终位置状态已提交（操作端 delete 后 / 观战端收到状态B）：移除 ghost、恢复真实 token
     if (!S._moveSteps) {
+      _removeMoveGhost();
       const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
       if (tok) tok.style.display = '';
+    } else {
+      // 状态未提交（操作端随后 delete+render；观战端等 B 推送后 render）：
+      // ghost 保留在终位，render 重建 DOM 时自然替换为同位置的真实 token；
+      // 超时兜底，防止网络异常导致 ghost 永久残留
+      _scheduleGhostCleanup(pIdx);
     }
-    if (!isActor || !anim) return;
+    if (!isActor || !anim) {
+      // 动画播放期间收到过最终状态、渲染被延迟（_deferRender）：
+      // 动画播完这一刻 ghost 已在终位，补一次 render 换成同位置的真实 token
+      if (_deferRender) { _deferRender = false; render(); }
+      return;
+    }
     const p = S.players[pIdx];
     // 动画期间位置被其他行动改动过（如返回基地）→ 放弃移动提交，仅清理动画数据
     if (p.pos === anim.from && !p.returned) {

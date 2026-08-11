@@ -888,11 +888,6 @@ async function _tryReconnect() {
     if (!saved || !saved.roomId) return false;
 
     const room = await netGetRoom(saved.roomId);
-    if (room.status !== 'playing' || !room.state) {
-      _clearSession();
-      return false;
-    }
-
     if (saved.seatIndex >= (room.seats || []).length) {
       _clearSession();
       return false;
@@ -904,14 +899,34 @@ async function _tryReconnect() {
     _myPlayerName = saved.playerName;
     _knownSeatCount = (room.seats || []).length;
     _departedHandled = false;
+    _myPushSeq = 0;
+    _myPushedIds = new Set();
+    _pendingPushSeat = null;
+    _lastPushedCurrentSeat = null;
+
+    // 等候室阶段：玩家与房主刷新都恢复会话并回到等候室。
+    // 必须显式隐藏 landing（showOnlineLobby 会做同样的事，这里不能直接调用，
+    // 否则 renderOnlineLobby 会把等候室覆盖回大厅列表）。
+    if (room.status === 'waiting') {
+      _subscribeToRoom(saved.roomId);
+      document.getElementById('landing').style.display = 'none';
+      document.getElementById('setup').style.display   = 'none';
+      document.getElementById('game').style.display    = 'none';
+      document.getElementById('online').style.display  = 'flex';
+      renderWaitingRoom(room);
+      return true;
+    }
+
+    if (room.status !== 'playing' || !room.state) {
+      _clearSession();
+      return false;
+    }
+
     _myBossAnimVersion = 0;
     _prevBossAnimState = null;
     _bossAnimVersion = 0;
     _bossAnimRendered = false;
     _lastCinematicBossId = null;
-    _myPushSeq = 0;
-    _myPushedIds = new Set();
-    _pendingPushSeat = null;
 
     state = room.state;
     _subscribeToRoom(saved.roomId);
