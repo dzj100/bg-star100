@@ -210,7 +210,7 @@ async function onJoinRoom() {
       document.getElementById('app').style.display = 'block';
       render();
     } else {
-      renderWaitingRoom({ seats });
+      renderWaitingRoom({ ...room, seats });
     }
   } catch (e) {
     alert(e.message || '加入失败');
@@ -232,11 +232,22 @@ function renderWaitingRoom(room) {
     </div>`
   ).join('');
 
+  const useExt = !!(room.state && room.state.useExtension);
+  const extHTML = _isHost
+    ? `<label class="setup-ext" style="margin:12px 0;justify-content:center;width:auto;">
+        <input type="checkbox" ${useExt ? 'checked' : ''} onchange="onlineSetExtension(this.checked)">
+        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+      </label>`
+    : `<label class="setup-ext" style="margin:12px 0;justify-content:center;width:auto;opacity:.6;cursor:default;">
+        <input type="checkbox" ${useExt ? 'checked' : ''} disabled>
+        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+      </label>`;
+
   const canStart = _isHost && seats.length >= 2;
   const startBtnHTML = _isHost
     ? `<button class="start-btn" onclick="startOnlineGame()"
-         ${canStart ? '' : 'disabled'} style="margin-top:16px;">开始游戏 (${seats.length}/5人)</button>`
-    : `<div style="text-align:center;color:var(--text-dim);padding:16px;margin-top:16px;">
+         ${canStart ? '' : 'disabled'} style="margin-top:8px;">开始游戏 (${seats.length}/5人)</button>`
+    : `<div style="text-align:center;color:var(--text-dim);padding:16px;margin-top:8px;">
          等待房主开始游戏...
        </div>`;
 
@@ -254,7 +265,8 @@ function renderWaitingRoom(room) {
         ${_onlineRoomId}
       </div>
       ${seatsHTML}
-      <div style="margin-top:16px;text-align:center;">${startBtnHTML}</div>
+      ${extHTML}
+      <div style="text-align:center;">${startBtnHTML}</div>
     </div>`;
 }
 
@@ -383,6 +395,19 @@ function _subscribeToRoom(roomId) {
 }
 
 /* ============================================================
+   扩展角色开关（仅房主）
+   ============================================================ */
+
+async function onlineSetExtension(checked) {
+  if (!_isHost) return;
+  try {
+    await netUpdateGameState(_onlineRoomId, { useExtension: !!checked }, 'waiting');
+  } catch (e) {
+    console.error('[online] setExtension error:', e);
+  }
+}
+
+/* ============================================================
    房主开始游戏
    ============================================================ */
 
@@ -396,7 +421,8 @@ async function startOnlineGame() {
     _departedHandled = false;
     _gameStarted = true;
     const names = seats.map(s => s.name);
-    dealGame(names);
+    const useExt = !!(room.state && room.state.useExtension);
+    dealGame(names, useExt);
     S.phase = 'playing';
     document.getElementById('online').style.display = 'none';
     document.getElementById('app').style.display = 'block';

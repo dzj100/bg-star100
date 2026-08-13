@@ -24,6 +24,15 @@ const ROLES = [
   { id: 'veteran',     name: '老兵',   icon: '🎖️', ability: '资源回收仅需2AP',           slots: 5 },
 ];
 
+/** 扩展角色（勾选「使用扩展角色」后加入随机池） */
+const EXTRA_ROLES = [
+  { id: 'technician',  name: '技术员', icon: '🎲', ability: '每回合1次，行动前可重掷全部骰子', slots: 5 },
+  { id: 'appraiser',   name: '鉴定师', icon: '🔍', ability: '每回合1次，消耗1AP翻开自己1张物资牌', slots: 5 },
+  { id: 'logistician', name: '后勤',   icon: '🚚', ability: '每回合首次共享物资不消耗AP',    slots: 5 },
+  { id: 'builder',     name: '建造师', icon: '🏗️', ability: '每回合首次建立OGS仅需1AP',      slots: 5 },
+  { id: 'pioneer',     name: '先锋',   icon: '🚩', ability: '回合开始时身处活跃OGS上额外+2AP', slots: 5 },
+];
+
 /** 区域定义（形状、完好/损坏物资数量、背面数字） */
 const ZONES = [
   { id: 1, shape: 'triangle', intact: 3, broken: 4, backNum: 3, color: '#928694', fill: 'rgba(146, 134, 148,.3)' },
@@ -339,6 +348,15 @@ function getAdjacentInsertPoints(pathPos) {
 /** @type {string[]} 设置阶段暂存的玩家昵称列表 */
 let setupNames = [];
 
+/** 设置阶段是否启用扩展角色（勾选后从10名角色中随机分配） */
+let useExtension = false;
+
+/** 切换是否使用扩展角色 */
+function setUseExtension(on) {
+  useExtension = !!on;
+  render();
+}
+
 /** 月球车乘坐确认弹窗中暂存的待执行移动（含成本） */
 let pendingRoverMove = null;
 /** 返回基地确认中记录的AP成本（V2移动模式可能>1，V1固定1） */
@@ -376,8 +394,9 @@ function removePlayer(idx) {
 /**
  * 初始化新一局游戏
  * @param {string[]} names - 玩家昵称数组 (2-5人)
+ * @param {boolean} [useExt=false] - 是否启用扩展角色（从10名角色中随机分配）
  */
-function dealGame(names) {
+function dealGame(names, useExt) {
   const count = names.length;
   // 延续上一局的uid计数，避免读档/重开后冲突
   _uidCounter = (S && S._uidCounter) || 0;
@@ -386,8 +405,8 @@ function dealGame(names) {
   for (let i = 0; i < 10; i++) oxygenCards.push({ type: 'o2', val: 2, uid: nextUid() });
   for (let i = 0; i < 5; i++) oxygenCards.push({ type: 'o2', val: 3, uid: nextUid() });
 
-  // --- 随机分配角色 ---
-  const roles = shuffle([...ROLES]);
+  // --- 随机分配角色（扩展池10人，一人一个不重复） ---
+  const roles = shuffle(useExt ? [...ROLES, ...EXTRA_ROLES] : [...ROLES]);
 
   // --- 构建玩家数组 ---
   // 每人固定：2张2氧气 + 1张3氧气
@@ -449,6 +468,11 @@ function dealGame(names) {
     robotMoved: false,       // 本回合是否已移动机器人
     accelMarks: [],
     accelPlacedThisTurn: false,
+    pioneerBonusApplied: false,  // 先锋：本回合是否已在掷骰时获得+2AP加成
+    rerollUsed: false,       // 技术员：本回合是否已重掷骰子
+    appraiseUsed: false,     // 鉴定师：本回合是否已鉴定物资
+    shareUsed: false,        // 后勤：本回合是否已免费共享
+    ogsBuilt: false,         // 建造师：本回合是否已低价建立OGS
     drawnThisTurn: [],
     moveHistory: [],          // 撤回历史：move=可撤回的移动，other=阻断撤回的行动
     isDrawing: false,
@@ -720,6 +744,14 @@ function discardOxygen(cardIdx) {
     }
   }
 
+  // 先锋技能：身处活跃OGS上额外+2AP
+  if (p.role.id === 'pioneer' && p.pos >= 0 &&
+      S.path[p.pos] && S.path[p.pos].type === 'ogs' && S.path[p.pos].active) {
+    bonus += 2;
+    S.pioneerBonusApplied = true;
+    addLog(`${p.name} 🚩先锋技能触发！+2AP`, 'action-log');
+  }
+
   S.dice = dice;
   S.diceTotal = total + bonus;
   S.ap = S.diceTotal;
@@ -733,6 +765,27 @@ function discardOxygen(cardIdx) {
   S.turnPhase = 'spent';
 
   addLog(`${p.name} 打出${card.val}氧气 → 骰子[${dice.join(',')}] = ${S.ap}AP`);
+  saveState();
+  render();
+}
+
+/** 技术员技能：每回合1次，行动前重掷全部骰子 */
+function rerollDice() {
+  const p = currentPlayer();
+  if (p.role.id !== 'technician') return;
+  if (S.rerollUsed) return;
+  if (S.turnPhase !== 'spent' || S.isDrawing || S.isRescue) return;
+  // 一旦行动过（移动/回收/共享/建OGS等）就不能重投
+  if (S.moveHistory && S.moveHistory.length > 0) return;
+  if (S.shareState || S.rescueState) return;
+
+  S.rerollUsed = true;
+  S.dice = rollDice(S.dice.length);
+  const total = S.dice.reduce((sum, d) => sum + d, 0);
+  S.diceTotal = total;
+  S.ap = total;
+
+  addLog(`${p.name} 🎲技术员重掷骰子 → 骰子[${S.dice.join(',')}] = ${S.ap}AP`, 'action-log');
   saveState();
   render();
 }
@@ -1089,6 +1142,26 @@ function collectDiscardedSupply(pathIdx) {
   render();
 }
 
+/** 鉴定师技能：每回合1次，消耗1AP翻开自己1张物资牌 */
+function appraiseSupply(supplyIdx) {
+  const p = currentPlayer();
+  if (p.role.id !== 'appraiser') return;
+  if (S.appraiseUsed) return;
+  if (S.ap < 1) return;
+  if (supplyIdx >= p.supplies.length) return;
+  if (p.supplies[supplyIdx].revealed) return;
+
+  p.supplies[supplyIdx].revealed = true;
+  S.appraiseUsed = true;
+  S.ap -= 1;
+  markAction('other');
+
+  const s = p.supplies[supplyIdx];
+  addLog(`${p.name} 🔍鉴定物资：区域${s.zone}（${s.intact ? '完好✓' : '损坏✗'}，1AP）`, 'action-log');
+  saveState();
+  render();
+}
+
 // ========================================
 // 行动：放置加速标记
 // ========================================
@@ -1171,7 +1244,9 @@ function doPlaceAccelMark(pathPos) {
 function placeOGS(insertIdx) {
   const p = currentPlayer();
 
-  if (S.ap < 3) return;
+  // 建造师技能：每回合首次建立OGS仅需1AP
+  const cost = (p.role.id === 'builder' && !S.ogsBuilt) ? 1 : 3;
+  if (S.ap < cost) return;
   if (p.onRover) return;
   if (S.ogsCount >= 5) return;
 
@@ -1185,10 +1260,11 @@ function placeOGS(insertIdx) {
   S.path.splice(insertIdx, 0, { type: 'ogs', active: true });
   shiftPositions(insertIdx, 1);
   S.ogsCount++;
-  S.ap -= 3;
+  S.ap -= cost;
+  if (p.role.id === 'builder') S.ogsBuilt = true;
   markAction('other');
 
-  addLog(`${p.name} 建立OGS芯片（路径位置${insertIdx}）`, 'action-log');
+  addLog(`${p.name} 建立OGS芯片（路径位置${insertIdx}，${cost}AP）`, 'action-log');
   saveState();
   render();
 }
@@ -1206,7 +1282,9 @@ function shareWithPlayer(targetPlayerIdx) {
   const p = currentPlayer();
   const target = S.players[targetPlayerIdx];
 
-  if (S.ap < 1) return;
+  // 后勤技能：每回合首次共享不消耗AP
+  const shareCost = (p.role.id === 'logistician' && !S.shareUsed) ? 0 : 1;
+  if (S.ap < shareCost) return;
   if (targetPlayerIdx === S.currentPlayer) return;
   if (target.returned) return;
 
@@ -1240,9 +1318,11 @@ function confirmShare() {
   if (typeof window._olIsActor === 'function' && !window._olIsActor()) return;
   const from = S.players[S.shareState.fromIdx];
   const to = S.players[S.shareState.toIdx];
-  S.ap -= 1;
+  const cost = (from.role.id === 'logistician' && !S.shareUsed) ? 0 : 1;
+  S.ap -= cost;
+  if (cost === 0) S.shareUsed = true;
   S.shareState = null;
-  addLog(`${from.name} 与${to.name}共享物资完成（1AP）`, 'action-log');
+  addLog(`${from.name} 与${to.name}共享物资完成（${cost === 0 ? '免费' : '1AP'}）`, 'action-log');
   closeSheet();
   saveState();
   render();
@@ -1488,6 +1568,11 @@ function doEndTurn() {
   S.isDrawing = false;
   S.robotMoved = false;
   S.accelPlacedThisTurn = false;
+  S.rerollUsed = false;
+  S.appraiseUsed = false;
+  S.shareUsed = false;
+  S.ogsBuilt = false;
+  S.pioneerBonusApplied = false;
 
   addLog(`${p.name} 回合结束`);
 

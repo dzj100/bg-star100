@@ -145,6 +145,10 @@ function renderSetup() {
         <button onclick="addPlayer()">添加</button>
       </div>
       <div class="setup-chips">${chips}</div>
+      <label class="setup-ext">
+        <input type="checkbox" ${useExtension ? 'checked' : ''} onchange="setUseExtension(this.checked)">
+        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+      </label>
       <button class="btn-full btn-primary" onclick="startGame()"
         ${setupNames.length < 2 ? 'disabled style="opacity:.4"' : ''}>
         开始探险（${setupNames.length}人）
@@ -161,7 +165,7 @@ function showLanding() {
 /** 开始游戏（从设置页） */
 function startGame() {
   if (setupNames.length < 2) return;
-  dealGame([...setupNames]);
+  dealGame([...setupNames], useExtension);
   render();
 }
 
@@ -289,7 +293,7 @@ function renderSlotBar(player, pi) {
       h += `<div class="ps-slot filled-o2${card.val === 3 ? ' val3' : ''}${popBar.has(i) ? ' slot-pop' : ''}">O</div>`;
     } else if (i < player.oxygen.length + player.supplies.length) {
       const sup = player.supplies[i - player.oxygen.length];
-      const color = S.gameOver ? (sup.intact ? '#4caf50' : '#f44336') : undefined;
+      const color = (S.gameOver || sup.revealed) ? (sup.intact ? '#4caf50' : '#f44336') : undefined;
       h += `<div class="ps-slot filled-sup${popBar.has(i) ? ' slot-pop' : ''}">${supplyIcon(sup, 14, color)}</div>`;
     } else {
       h += '<div class="ps-slot empty"></div>';
@@ -364,11 +368,19 @@ function renderDiceResult() {
   const diceHtml = S.dice.map(d => dieSVG(d)).join('');
   const p = currentPlayer();
   const hasBonus = p.role.id === 'atmosphere' && S.ap > S.dice.reduce((a, b) => a + b, 0);
+  // 先锋：活跃OGS上加成（仅掷骰时标记，防止回合中途走到OGS上误显示）
+  const hasPioneerBonus = !!S.pioneerBonusApplied;
+  // 技术员：行动前可重掷（本回合未重掷过且尚未执行任何行动）
+  const canReroll = p.role.id === 'technician' && !S.rerollUsed &&
+    (!S.moveHistory || S.moveHistory.length === 0);
 
   return `
     <div class="dice-row">${diceHtml}</div>
     <!-- <div class="dice-total">行动点: ${S.diceTotal} AP</div> -->
     ${hasBonus ? '<div class="dice-bonus">🎉 气氛组加成 +3 !</div>' : ''}
+    ${hasPioneerBonus ? '<div class="dice-bonus">🚩 先锋加成 +2 !</div>' : ''}
+    ${canReroll ? `<button class="act-btn btn-reroll" style="width:100%;margin-top:6px;background:linear-gradient(135deg,#4a148c,#6a1b9a);border:2px solid #ab47bc"
+      onclick="rerollDice()">🎲 技术员·重掷骰子</button>` : ''}
     <div class="ap-display">剩余 AP: <strong>${S.ap}</strong></div>`;
 }
 
@@ -443,26 +455,35 @@ function renderActionPanel() {
       ⚡ 加速标记 <span class="cost">${accelCost}AP</span></button>`;
 
     // 建立OGS（必须在板块、损毁OGS芯片或丢弃物资上）
+    const ogsCost = (p.role.id === 'builder' && !S.ogsBuilt) ? 1 : 3;
     const playerTile = pathToTileIdx(p.pos);
     const onOGS = playerTile === null && isPathOGS(p.pos);
     const onDiscarded = playerTile === null && isPathDiscarded(p.pos);
-    const canOGS = S.ap >= 3 && (playerTile !== null || onOGS || onDiscarded) && S.ogsCount < 5;
+    const canOGS = S.ap >= ogsCost && (playerTile !== null || onOGS || onDiscarded) && S.ogsCount < 5;
     h += `<button class="act-btn" ${canOGS ? '' : 'disabled'}
       onclick="hideMoreSheet();exitMoveMode();openOGSSheet()">
-      🔵 建立OGS <span class="cost">3AP</span></button>`;
+      🔵 建立OGS <span class="cost">${ogsCost}AP</span></button>`;
+
+    // 鉴定师：翻开自己1张物资牌
+    if (p.role.id === 'appraiser' && !S.appraiseUsed && p.supplies.length > 0) {
+      h += `<button class="act-btn" ${S.ap >= 1 ? '' : 'disabled'}
+        onclick="hideMoreSheet();exitMoveMode();openAppraiseSheet()">
+        🔍 鉴定物资 <span class="cost">1AP</span></button>`;
+    }
   }
 
-  // 共享物资
+  // 共享物资（后勤：每回合首次免费）
   const adjSeq = getAdjacentSeqPositions(p.pos);
   const adjPlayers = S.players.filter((other, i) => {
     if (i === S.currentPlayer || other.returned) return false;
     if (p.pos >= 0 && other.pos === p.pos) return true;
     return adjSeq.includes(other.pos);
   });
-  const canShare = S.ap >= 1 && adjPlayers.length > 0;
+  const shareCost = (p.role.id === 'logistician' && !S.shareUsed) ? 0 : 1;
+  const canShare = S.ap >= shareCost && adjPlayers.length > 0;
   h += `<button class="act-btn" ${canShare ? '' : 'disabled'}
     onclick="hideMoreSheet();exitMoveMode();openShareSelectSheet()">
-    🤝 共享 <span class="cost">1AP</span></button>`;
+    🤝 共享 <span class="cost">${shareCost === 0 ? '免费' : '1AP'}</span></button>`;
 
   // 丢弃物资
   const canDiscard = S.ap >= 1 && p.supplies.length > 0 && p.pos >= 0;
@@ -917,7 +938,7 @@ function renderPlayerCard(player, idx) {
     player.supplies.forEach((s, i) => {
       const z = ZONES.find(zone => zone.id === s.zone);
       const label = z ? `区域${s.zone}` : '?';
-      const color = S.gameOver ? (s.intact ? '#4caf50' : '#f44336') : undefined;
+      const color = (S.gameOver || s.revealed) ? (s.intact ? '#4caf50' : '#f44336') : undefined;
       h += `<span class="chip supply-chip${popSupplies.has(i) ? ' chip-pop' : ''}">${supplyIcon(s, 18, color)}<!--<span class="chip-label">${label}</span>--></span>`;
     });
   }
@@ -1012,12 +1033,13 @@ function openCollectSheet() {
 function openOGSSheet() {
   const p = currentPlayer();
   const available = getAdjacentInsertPoints(p.pos);
+  const ogsCost = (p.role.id === 'builder' && !S.ogsBuilt) ? 1 : 3;
 
   let h = '<h3>🔵 选择OGS放置位置</h3><div class="sheet-cards">';
   available.forEach(insIdx => {
     const dir = insIdx > p.pos ? '⬇️ 前方' : '⬆️ 后方';
     h += `<div class="sheet-card o2-card" onclick="closeSheet();placeOGS(${insIdx})">
-      ${dir} (3AP)</div>`;
+      ${dir} (${ogsCost}AP)</div>`;
   });
   if (available.length === 0) {
     h += '<p class="text-dim" style="padding:12px">没有可用的放置位置</p>';
@@ -1106,9 +1128,10 @@ function renderShareSheet(fromIdx, toIdx) {
   });
   from.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
     h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="transferItem(${fromIdx},${toIdx},'supply',${i});renderShareSheet(${fromIdx},${toIdx})">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span> ↓</div>`;
+      <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span> ↓</div>`;
   });
   h += '</div>';
 
@@ -1122,9 +1145,10 @@ function renderShareSheet(fromIdx, toIdx) {
   });
   to.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
     h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="transferItem(${toIdx},${fromIdx},'supply',${i});renderShareSheet(${fromIdx},${toIdx})">
-      ↑ <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
+      ↑ <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span></div>`;
   });
   h += '</div>';
 
@@ -1132,6 +1156,29 @@ function renderShareSheet(fromIdx, toIdx) {
   h += '<button class="sheet-cancel" style="flex:1" onclick="cancelShare()">取消</button>';
   h += '<button class="sheet-confirm" style="flex:1" onclick="confirmShare()">完成交换</button>';
   h += '</div>';
+
+  document.getElementById('sheetContent').innerHTML = h;
+  openSheet();
+}
+
+/** 打开鉴定物资选择面板（鉴定师技能） */
+function openAppraiseSheet() {
+  const p = currentPlayer();
+  if (p.role.id !== 'appraiser') return;
+  if (S.appraiseUsed) return;
+  if (S.ap < 1) return;
+  if (p.supplies.length === 0) return;
+
+  let h = '<h3>🔍 选择要鉴定的物资（1AP）</h3><div class="sheet-cards">';
+  p.supplies.forEach((s, i) => {
+    const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
+    h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
+      onclick="closeSheet();appraiseSupply(${i})">
+      <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span>
+      ${s.revealed ? '<span style="font-size:.75em">已翻开</span>' : ''}</div>`;
+  });
+  h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
 
   document.getElementById('sheetContent').innerHTML = h;
   openSheet();
@@ -1146,9 +1193,10 @@ function openDiscardSheet() {
   let h = '<h3>🗑️ 选择要丢弃的物资</h3><div class="sheet-cards">';
   p.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
     h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;justify-content:center;gap:8px"
       onclick="closeSheet();openDiscardGapSheet(${i})">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
+      <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span></div>`;
   });
   h += '</div><button class="sheet-cancel" onclick="closeSheet()">取消</button>';
 
@@ -1385,9 +1433,10 @@ function renderRescueSheet(rescuerIdx, rescuedIdx) {
   });
   rescuer.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
     h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
       onclick="transferItem(${rescuerIdx},${rescuedIdx},'supply',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span> →</div>`;
+      <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span> →</div>`;
   });
   h += '</div>';
 
@@ -1401,9 +1450,10 @@ function renderRescueSheet(rescuerIdx, rescuedIdx) {
   });
   rescued.supplies.forEach((s, i) => {
     const z = ZONES.find(zone => zone.id === s.zone) || ZONES[0];
+    const color = s.revealed ? (s.intact ? '#4caf50' : '#f44336') : undefined;
     h += `<div class="sheet-card supply-card" style="display:flex;align-items:center;gap:8px"
       onclick="transferItem(${rescuedIdx},${rescuerIdx},'supply',${i});renderRescueSheet(${rescuerIdx},${rescuedIdx})">
-      ← <span style="width:20px;height:20px;display:inline-flex">${shapeSVG(z.shape, z.fill, darken(z.color))}</span></div>`;
+      ← <span style="width:20px;height:20px;display:inline-flex">${supplyIcon(s, 20, color)}</span></div>`;
   });
   h += '</div>';
 
@@ -1810,9 +1860,18 @@ function animateTokenSteps(steps, pIdx) {
     const board = document.querySelector('.path-board');
     if (!board) { resolve(); return; }
     const p = S.players[pIdx];
+    const onRover = p.onRover;
     const ghost = document.createElement('div');
-    ghost.className = 'token-ghost';
-    ghost.innerHTML = tokenSVG(p.color);
+    ghost.className = 'token-ghost' + (onRover ? ' rover-ghost' : '');
+    // 骑月球车移动：ghost 复刻"人+车"组合，与地图静态渲染一致
+    ghost.innerHTML = onRover
+      ? `<div class="rover-combo-wrap">
+          <div class="rover-combo">
+            <div class="rover-combo-token">${tokenSVG(p.color)}</div>
+            <div class="rover-combo-icon">${roverSVG(p.color)}</div>
+          </div>
+        </div>`
+      : tokenSVG(p.color);
     board.appendChild(ghost);
     _moveGhost = ghost;
 
@@ -1822,9 +1881,26 @@ function animateTokenSteps(steps, pIdx) {
     // 定位 ghost 到起点（无过渡）：基地出发 → 基地token位置；否则 steps[0]
     function posStyle(idx) {
       const { x, y } = tilePos(idx);
+      if (onRover) {
+        // 组合ghost与板块等大，且与板块完全同位置（板块left/top是其中心坐标）
+        const left = (x - BOARD.tileW / 2).toFixed(1);
+        const top = ((y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
+        return { left: `${left}%`, top: `${top}%` };
+      }
       const left = (x + BOARD.tileW / 2).toFixed(1);
       const top = ((y - BOARD.tileW / 2) / boardH * 100).toFixed(1);
       return { left: `calc(${left}% - 21px)`, top: `calc(${top}% - 10px)` };
+    }
+
+    // 每步视觉：奇数行翻转；骑车组合在月球车板块上不缩放（与静态渲染一致）
+    function applyStepVisual(idx) {
+      const flip = Math.floor(idx / COLS) % 2 === 0;
+      if (onRover) {
+        ghost.classList.toggle('flip-tok', flip);
+        ghost.classList.toggle('tile-rover', idx === tilePathIdx(S.roverPos));
+      } else {
+        ghost.style.transform = flip ? 'scaleX(-1)' : 'scaleX(1)';
+      }
     }
 
     ghost.style.transition = 'none';
@@ -1838,17 +1914,18 @@ function animateTokenSteps(steps, pIdx) {
         const bt = ((tr.top + tr.height / 2 - br.top) / br.height * 100).toFixed(1);
         ghost.style.left = `calc(${bl}% - 21px)`;
         ghost.style.top = `calc(${bt}% - 10px)`;
-        ghost.style.transform = 'scaleX(1)';
+        applyStepVisual(steps[0]);
       } else {
         const s0 = posStyle(steps[0]);
         ghost.style.left = s0.left;
         ghost.style.top = s0.top;
+        applyStepVisual(steps[0]);
       }
     } else {
       const s0 = posStyle(steps[0]);
       ghost.style.left = s0.left;
       ghost.style.top = s0.top;
-      ghost.style.transform = Math.floor(steps[0] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+      applyStepVisual(steps[0]);
     }
     ghost.getBoundingClientRect(); // 强制首帧
 
@@ -1861,7 +1938,7 @@ function animateTokenSteps(steps, pIdx) {
       const s = posStyle(steps[i]);
       ghost.style.left = s.left;
       ghost.style.top = s.top;
-      ghost.style.transform = Math.floor(steps[i] / COLS) % 2 === 0 ? 'scaleX(-1)' : 'scaleX(1)';
+      applyStepVisual(steps[i]);
       i++;
       if (i >= steps.length) {
         setTimeout(step, 240);
