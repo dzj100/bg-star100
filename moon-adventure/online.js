@@ -236,11 +236,11 @@ function renderWaitingRoom(room) {
   const extHTML = _isHost
     ? `<label class="setup-ext" style="margin:12px 0;justify-content:center;width:auto;">
         <input type="checkbox" ${useExt ? 'checked' : ''} onchange="onlineSetExtension(this.checked)">
-        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+        <span class="setup-ext-mark" style="display:none;">🌙</span> 使用扩展角色
       </label>`
     : `<label class="setup-ext" style="margin:12px 0;justify-content:center;width:auto;opacity:.6;cursor:default;">
         <input type="checkbox" ${useExt ? 'checked' : ''} disabled>
-        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+        <span class="setup-ext-mark" style="display:none;">🌙</span> 使用扩展角色
       </label>`;
 
   const canStart = _isHost && seats.length >= 2;

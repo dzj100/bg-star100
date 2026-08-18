@@ -39,6 +39,10 @@ const URL = 'http://localhost:8123/index.html';
   const waitMoveSettled = () => page.waitForFunction(
     () => !S._moveSteps && !document.querySelector('.token-ghost'),
     null, { timeout: 5000 });
+  // 等待返回基地动画落定（操作端提交 returned 并清理 ghost）
+  const waitReturnSettled = () => page.waitForFunction(
+    () => !S._returnSteps && !document.querySelector('.token-ghost'),
+    null, { timeout: 5000 });
   // 重置单机状态
   const setup = (pos, ap, roleId, accelMarks) => page.evaluate(({ pos, ap, roleId, accelMarks }) => {
     dealGame(['A']);
@@ -148,9 +152,22 @@ const URL = 'http://localhost:8123/index.html';
   console.log('return modal visible:', modalVisible);
   if (!modalVisible) throw new Error('return modal must open');
   await page.evaluate(() => confirmReturnBase());
+  // 动画进行中：尚未标记返回，且结束回合被守卫拦截
+  await page.waitForSelector('.token-ghost', { timeout: 1000 });
+  const mid = await page.evaluate(() => {
+    endTurn();
+    return { pos: S.players[0].pos, returned: S.players[0].returned, cp: S.currentPlayer, anim: document.body.classList.contains('anim-moving') };
+  });
+  console.log('mid return anim:', JSON.stringify(mid));
+  if (mid.returned || mid.pos !== 0 || mid.cp !== 0 || !mid.anim) throw new Error('return must commit only after anim; endTurn blocked');
+  // 动画落定：位置/返回状态提交，基地token出现
+  await waitReturnSettled();
   s = await st();
   console.log('after confirm return:', JSON.stringify(s));
   if (!s.returned || s.pos !== -1 || s.ap !== 2) throw new Error('return base fail');
+  const baseTok = await page.evaluate(() => !!document.querySelector('.base-token[data-pid="0"]'));
+  console.log('base token shown:', baseTok);
+  if (!baseTok) throw new Error('base token must show after return anim');
 
   step('5. return base from pos2 costs 3AP');
   await setup(2, 4, 'veteran', []);
@@ -160,6 +177,7 @@ const URL = 'http://localhost:8123/index.html';
   if (baseCost !== 3) throw new Error('base cost from pos2 must be 3AP');
   await page.evaluate(() => document.querySelector('.move-target.move-base').click());
   await page.evaluate(() => confirmReturnBase());
+  await waitReturnSettled();
   s = await st();
   console.log('after return from pos2:', JSON.stringify(s));
   if (!s.returned || s.ap !== 1) throw new Error('return from pos2 must cost 3AP');

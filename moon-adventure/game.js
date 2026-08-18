@@ -858,17 +858,34 @@ function confirmRoverBoard() {
   executePlayerMove(target, direction, cost || 1);
 }
 
-/** 确认返回基地 */
+/** 确认返回基地：播放走回动画，动画结束才标记返回 */
 function confirmReturnBase() {
   closeModal('returnModal');
   moveMode = null;
   markAction('other');
   const p = currentPlayer();
-  p.pos = -1;
-  p.returned = true;
   S.ap -= pendingReturnCost;
   pendingReturnCost = 1;
   addLog(`${p.name} 返回基地！不再行动`, 'action-log');
+  // 逐格走回基地（跳过被占格/机器人/加速标记，与后退移动一致）；动画结束才提交 returned
+  if (p.pos >= 0) {
+    const isInventor = p.role.id === 'inventor' && !p.onRover;
+    const robotPathPos = S.hasEngineer ? S.robotPos : -999;
+    const steps = [p.pos];
+    for (let i = p.pos - 1; i >= 0; i--) {
+      const blockedByPlayer = S.players.some(pl => pl.pos === i && !pl.returned);
+      const blockedByRobot = S.hasEngineer && i === robotPathPos;
+      const blockedByAccel = S.accelMarks.includes(i) && !isInventor;
+      if (!blockedByPlayer && !blockedByRobot && !blockedByAccel) steps.push(i);
+    }
+    steps.push(-1);
+    S._returnSteps = steps;
+    saveState();
+    render();
+    return;
+  }
+  p.pos = -1;
+  p.returned = true;
   saveState();
   render();
 }
@@ -889,7 +906,7 @@ function showReturnBaseConfirm(cost = 1) {
  * @param {number} cost - 本次移动消耗的AP（默认1，移动V2按目标格成本支付）
  */
 function executePlayerMove(target, direction, cost = 1) {
-  if (S._moveSteps) return; // 逐格动画进行中，禁止再次移动
+  if (S._moveSteps || S._returnSteps) return; // 逐格动画进行中，禁止再次移动
   const p = currentPlayer();
   const from = p.pos;
   const apBefore = S.ap;
@@ -1540,6 +1557,8 @@ function reshufflePile() {
 
 /** 结束当前玩家回合，推进到下一个玩家 */
 function endTurn() {
+  // 移格动画播放中禁止结束回合：动画结束提交位置时按"当前回合玩家"处理，提前交接会让移动者错位
+  if (_moveAnim || S._moveSteps || S._returnSteps) return;
   const p = currentPlayer();
   // 已返回基地的玩家无需提示剩余AP
   if (S.ap > 0 && !S.returning && !p.onRover && !p.returned) {

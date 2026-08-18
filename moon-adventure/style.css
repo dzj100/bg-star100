@@ -736,6 +736,12 @@ body {
   color: var(--accent);
 }
 
+/* 移格动画播放中：禁用结束回合按钮（防止回合交接先于位置提交） */
+.anim-moving .btn-end {
+  pointer-events: none !important;
+  opacity: 0.45;
+}
+
 .act-btn.btn-ogs {
   background: rgba(30, 136, 229, 0.15);
   border-color: var(--o2);

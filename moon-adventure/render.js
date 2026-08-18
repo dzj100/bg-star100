@@ -13,9 +13,9 @@
 function render() {
   const app = document.getElementById('app');
 
-  // 观战端：逐格移动动画播放中收到最终位置状态（S._moveSteps 已被清除）时，
+  // 观战端：逐格移动/返回动画播放中收到最终位置状态（S._moveSteps/S._returnSteps 已被清除）时，
   // 延迟到动画播完再重建 DOM，避免 ghost 未走完就被替换、token 提前瞬移到终位
-  if (S && S.phase === 'playing' && _moveAnim && !S._moveSteps) {
+  if (S && S.phase === 'playing' && _moveAnim && !S._moveSteps && !S._returnSteps) {
     _deferRender = true;
     return;
   }
@@ -147,7 +147,7 @@ function renderSetup() {
       <div class="setup-chips">${chips}</div>
       <label class="setup-ext">
         <input type="checkbox" ${useExtension ? 'checked' : ''} onchange="setUseExtension(this.checked)">
-        <span class="setup-ext-mark">🌙</span> 使用扩展角色
+        <span class="setup-ext-mark" style="display:none;">🌙</span> 使用扩展角色
       </label>
       <button class="btn-full btn-primary" onclick="startGame()"
         ${setupNames.length < 2 ? 'disabled style="opacity:.4"' : ''}>
@@ -1627,8 +1627,8 @@ let _lastSnap = null;  // 上次渲染时的状态快照
 
 /** 渲染前调用：捕获token旧位置（FLIP首帧）+ 计算状态diff */
 function captureAnimState() {
-  // 上帧带逐格移动数据、本帧已提交最终位置：跳过 FLIP（ghost 已展示移动过程）
-  if (_lastMoveSteps && !S._moveSteps) _skipNextFlips = true;
+  // 上帧带逐格移动/返回数据、本帧已提交最终位置：跳过 FLIP（ghost 已展示移动过程）
+  if ((_lastMoveSteps && !S._moveSteps) || (_lastReturnSteps && !S._returnSteps)) _skipNextFlips = true;
   const rects = new Map();
   if (S.phase === 'playing') {
     document.querySelectorAll('#app [data-pid]').forEach(el => {
@@ -1708,11 +1708,14 @@ function diffState(a, b) {
 function playAnimEffects(ctx) {
   _animCtx = null;
   _lastMoveSteps = S._moveSteps || null;
+  _lastReturnSteps = S._returnSteps || null;
   if (!ctx || ctx.phase !== 'playing') { _skipNextFlips = false; return; }
   playTokenFlips(ctx.rects);
 
-  // 逐格移动动画：新steps到达（操作端首帧或观战端收到A）→ 启动；进行中 → 维持原token隐藏
-  if (S._moveSteps && S._moveSteps.length >= 1 && !_moveAnim) {
+  // 逐格动画：返回基地动画优先；新steps到达（操作端首帧或观战端收到A）→ 启动；进行中 → 维持原token隐藏
+  if (S._returnSteps && S._returnSteps.length >= 1 && !_moveAnim) {
+    startMoveAnim(S._returnSteps, S.currentPlayer, true);
+  } else if (S._moveSteps && S._moveSteps.length >= 1 && !_moveAnim) {
     startMoveAnim(S._moveSteps, S.currentPlayer);
   } else if (_moveAnim) {
     const tok = document.querySelector(`#app [data-pid="${_moveAnim.pIdx}"]`);
@@ -1782,8 +1785,9 @@ function pathElByIndex(pathIdx) {
 let _skipNextFlips = false;
 
 /** 逐格移动动画状态机（状态驱动，联机两端一致播放） */
-let _moveAnim = null;      // { steps, pIdx }：动画进行中
+let _moveAnim = null;      // { steps, pIdx, returning }：动画进行中
 let _lastMoveSteps = null; // 上一次渲染时的 S._moveSteps，用于抑制动画后的 FLIP
+let _lastReturnSteps = null; // 上一次渲染时的 S._returnSteps，用于抑制返回后的 FLIP
 let _moveGhost = null;     // 动画 ghost：播完后保留在终位，等待最终状态渲染时自然替换
 let _ghostCleanupTimer = null; // ghost 保留期间的超时兜底（网络异常防残留）
 let _deferRender = false;  // 观战端：动画播放中收到最终状态，渲染延迟到动画播完
@@ -1797,8 +1801,11 @@ function _removeMoveGhost() {
 /** 兜底：最终状态迟迟未到（网络异常）时强制移除 ghost、恢复 token 可见 */
 function _scheduleGhostCleanup(pIdx) {
   if (_ghostCleanupTimer) clearTimeout(_ghostCleanupTimer);
+  const ghostEl = _moveGhost;
   _ghostCleanupTimer = setTimeout(() => {
     _ghostCleanupTimer = null;
+    // 只清理自己记下的 ghost；若已被新动画的 ghost 替换（如下一玩家快速行动），不能误删
+    if (_moveGhost !== ghostEl) return;
     _removeMoveGhost();
     const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
     if (tok) tok.style.display = '';
@@ -1851,6 +1858,22 @@ function floatText(anchorEl, text, cls, offsetX = 0) {
   setTimeout(() => el.remove(), 950);
 }
 
+/** 基地落点（相对 path-board 的百分比坐标）：该玩家基地token将出现的槽位（已有token之后） */
+function baseSlotPos() {
+  const board = document.querySelector('.path-board');
+  const slots = document.querySelector('.base-tokens');
+  const br = board.getBoundingClientRect();
+  const sr = slots.getBoundingClientRect();
+  let x = sr.left;
+  const toks = slots.querySelectorAll('.base-token');
+  if (toks.length) {
+    x = toks[toks.length - 1].getBoundingClientRect().right + 2;
+  }
+  const bl = ((x + 12 - br.left) / br.width * 100).toFixed(1);
+  const bt = ((sr.top + 12 - br.top) / br.height * 100).toFixed(1);
+  return { bl, bt };
+}
+
 /** 逐格移动动画：ghost token 沿路径一步步前进/后退（基地出发时先降落到第一格） */
 function animateTokenSteps(steps, pIdx) {
   return new Promise(resolve => {
@@ -1880,6 +1903,12 @@ function animateTokenSteps(steps, pIdx) {
 
     // 定位 ghost 到起点（无过渡）：基地出发 → 基地token位置；否则 steps[0]
     function posStyle(idx) {
+      if (idx === -1) {
+        // 返回基地：落到该玩家基地token将出现的位置（已有token之后）
+        const { bl, bt } = baseSlotPos();
+        if (onRover) return { left: bl, top: bt };
+        return { left: `calc(${bl}% - 21px)`, top: `calc(${bt}% - 10px)` };
+      }
       const { x, y } = tilePos(idx);
       if (onRover) {
         // 组合ghost与板块等大，且与板块完全同位置（板块left/top是其中心坐标）
@@ -1951,12 +1980,14 @@ function animateTokenSteps(steps, pIdx) {
 }
 
 /**
- * 启动逐格移动动画（状态驱动，联机两端一致）：
+ * 启动逐格移动/返回动画（状态驱动，联机两端一致）：
  * 隐藏原token让ghost看起来是本尊在走；动画完成后仅操作端提交最终位置并同步。
+ * @param {boolean} [returning] - 返回基地动画：提交时置 returned、pos=-1
  */
-function startMoveAnim(steps, pIdx) {
+function startMoveAnim(steps, pIdx, returning = false) {
   const isActor = typeof window._olIsActor !== 'function' || window._olIsActor();
-  _moveAnim = { steps, pIdx, from: S.players[pIdx].pos };
+  _moveAnim = { steps, pIdx, from: S.players[pIdx].pos, returning };
+  document.body.classList.add('anim-moving');
   // 先启动动画（同步完成ghost首帧定位，基地出发需读取base-token坐标），再隐藏原token
   const animPromise = animateTokenSteps(steps, pIdx);
   const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
@@ -1964,8 +1995,10 @@ function startMoveAnim(steps, pIdx) {
   animPromise.then(() => {
     const anim = _moveAnim;
     _moveAnim = null;
+    document.body.classList.remove('anim-moving');
+    const stepsKey = anim && anim.returning ? '_returnSteps' : '_moveSteps';
     // 最终位置状态已提交（操作端 delete 后 / 观战端收到状态B）：移除 ghost、恢复真实 token
-    if (!S._moveSteps) {
+    if (!S[stepsKey]) {
       _removeMoveGhost();
       const tok = document.querySelector(`#app [data-pid="${pIdx}"]`);
       if (tok) tok.style.display = '';
@@ -1984,10 +2017,18 @@ function startMoveAnim(steps, pIdx) {
     const p = S.players[pIdx];
     // 动画期间位置被其他行动改动过（如返回基地）→ 放弃移动提交，仅清理动画数据
     if (p.pos === anim.from && !p.returned) {
-      p.pos = anim.steps[anim.steps.length - 1];
+      if (anim.returning) {
+        p.pos = -1;
+        p.returned = true;
+      } else {
+        p.pos = anim.steps[anim.steps.length - 1];
+      }
     }
-    delete S._moveSteps;
+    delete S[stepsKey];
     saveState();
     render();
+    // 提交完成：清掉本动画的兜底定时器与已随 render 销毁的 ghost，
+    // 否则残留定时器会在下一玩家动画播放时误删其 ghost
+    _removeMoveGhost();
   });
 }
