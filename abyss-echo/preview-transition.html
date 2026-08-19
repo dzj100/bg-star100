@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>转场动画预览</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #01040c; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif; }
+.wrap { position: relative; width: 390px; height: 844px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #041025 0%, #01040c 100%); border: 1px solid rgba(77,166,255,0.15); border-radius: 12px; }
+/* 直接从 style.css 复制的转场样式 */
+.transition-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 50%, rgba(4,16,37,0.95) 0%, #01040c 100%); z-index: 10; }
+.transition-scroll { max-width: 640px; padding: 0 32px; text-align: center; animation: transScroll 4.2s ease-out forwards; }
+.transition-scroll p { margin: 0 0 22px; font-size: 1.25rem; line-height: 2; letter-spacing: 3px; color: rgba(228,244,255,0.94); text-shadow: 0 0 18px rgba(77,166,255,0.65), 0 0 40px rgba(77,166,255,0.35); }
+.transition-scroll .trans-floor { margin-top: 34px; font-size: 2rem; font-weight: 900; letter-spacing: 12px; color: #e8f4ff; text-shadow: 0 0 10px rgba(77,166,255,0.95), 0 0 34px rgba(77,166,255,0.6), 0 2px 0 rgba(0,6,18,0.9); }
+.transition-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(120,200,255,0.5) 0%, rgba(30,80,160,0.28) 34%, transparent 68%); opacity: 0; animation: transFlash 4.2s ease forwards; pointer-events: none; }
+.transition-hint { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; letter-spacing: 6px; color: rgba(120,180,240,0.45); text-shadow: 0 0 8px rgba(77,166,255,0.2); animation: transHintPulse 4.2s ease forwards; pointer-events: none; }
+@keyframes transScroll { 0% { opacity: 0; transform: translateY(46px) scale(0.96); filter: blur(3px); } 10% { opacity: 1; filter: blur(0); } 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(-60px) scale(1.04); } }
+@keyframes transFlash { 0%,86% { opacity: 0; } 92% { opacity: 1; } 96% { opacity: 0.9; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes transHintPulse { 0%,75% { opacity: 0.45; } 85% { opacity: 0.9; } 100% { opacity: 0.3; } }
+
+/* 移动端 */
+@media (max-width: 720px) { .transition-scroll p { font-size: 1.05rem; letter-spacing: 2px; margin-bottom: 18px; } .transition-scroll .trans-floor { font-size: 1.5rem; letter-spacing: 8px; } }
+
+.btn { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 20; padding: 10px 32px; background: rgba(77,166,255,0.2); border: 1px solid rgba(77,166,255,0.4); color: #b8d8ff; font-size: 1rem; border-radius: 6px; cursor: pointer; }
+.btn:hover { background: rgba(77,166,255,0.35); }
+</style></head><body>
+<div class="wrap" id="root">
+  <div class="transition-screen" id="transScreen">
+    <div class="transition-scroll">
+      <p>"深潜者永不孤单，"</p>
+      <p>古老的碑文在黑暗中低语。</p>
+      <p>"他们只是……被遗忘。"</p>
+      <p class="trans-floor">第二层</p>
+      <p>——深渊回廊——</p>
+    </div>
+    <div class="transition-flash"></div>
+    <div class="transition-hint">下潜中……</div>
+  </div>
+  <button class="btn" onclick="replay()">重放动画</button>
+</div>
+<script>
+function replay() {
+  const s = document.getElementById('transScreen');
+  const clone = s.cloneNode(true);
+  s.parentNode.replaceChild(clone, s);
+  clone.id = 'transScreen';
+  // 强制重排触发 animation restart
+  void clone.offsetWidth;
+}
+// 自动重放
+setInterval(replay, 4800);
+</script>
+</body></html>

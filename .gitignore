@@ -4,3 +4,6 @@ vibe_images/
 og-icon_backup.png
 regicide/icon/
 *.zip
+skills-lock.json
+test-results/*
+.qoder/*
