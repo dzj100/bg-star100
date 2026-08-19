@@ -945,17 +945,16 @@ function executePlayerMove(target, direction, cost = 1) {
 
     S.ap -= cost;
     if (boardedRover) {
-      p.onRover = true;
-      S.roverUsed = true;
       S.ap = 0;
       addLog(`${p.name} 登上月球车！AP清零`, 'action-log');
     }
     markAction('move', { from, to: target, apBefore, boardedRover });
-    const roverTag = p.onRover ? '🚗' : '';
-    addLog(`${p.name} ${roverTag}前进到${posLabel(target)}`);
+    const roverTag2 = boardedRover ? '🚗' : '';
+    addLog(`${p.name} ${roverTag2}前进到${posLabel(target)}`);
 
     S._moveSteps = steps;
     saveState();
+    if (boardedRover) S._pendingBoardRover = true;
     render();
     return;
   }
@@ -979,14 +978,12 @@ function executePlayerMove(target, direction, cost = 1) {
 
   // 月球车检查
   if (boardedRover) {
-    p.onRover = true;
-    S.roverUsed = true;
     S.ap = 0;
     addLog(`${p.name} 登上月球车！AP清零`, 'action-log');
   }
   markAction('move', { from, to: target, apBefore, boardedRover });
 
-  const roverTag = p.onRover ? '🚗' : '';
+  const roverTag = boardedRover ? '🚗' : '';
   const moveText = direction === 'forward'
     ? `前进到${posLabel(target)}`
     : `后退到${posLabel(target)}`;
@@ -996,6 +993,7 @@ function executePlayerMove(target, direction, cost = 1) {
   // 动画完成后由动画系统（render.js startMoveAnim）提交最终位置
   S._moveSteps = steps;
   saveState();
+  if (boardedRover) S._pendingBoardRover = true;
   render();
 }
 

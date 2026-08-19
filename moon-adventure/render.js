@@ -1716,7 +1716,9 @@ function playAnimEffects(ctx) {
   if (S._returnSteps && S._returnSteps.length >= 1 && !_moveAnim) {
     startMoveAnim(S._returnSteps, S.currentPlayer, true);
   } else if (S._moveSteps && S._moveSteps.length >= 1 && !_moveAnim) {
-    startMoveAnim(S._moveSteps, S.currentPlayer);
+    const boardRover = !!S._pendingBoardRover;
+    delete S._pendingBoardRover;
+    startMoveAnim(S._moveSteps, S.currentPlayer, false, boardRover);
   } else if (_moveAnim) {
     const tok = document.querySelector(`#app [data-pid="${_moveAnim.pIdx}"]`);
     if (tok) tok.style.display = 'none';
@@ -1984,9 +1986,9 @@ function animateTokenSteps(steps, pIdx) {
  * 隐藏原token让ghost看起来是本尊在走；动画完成后仅操作端提交最终位置并同步。
  * @param {boolean} [returning] - 返回基地动画：提交时置 returned、pos=-1
  */
-function startMoveAnim(steps, pIdx, returning = false) {
+function startMoveAnim(steps, pIdx, returning = false, boardRover = false) {
   const isActor = typeof window._olIsActor !== 'function' || window._olIsActor();
-  _moveAnim = { steps, pIdx, from: S.players[pIdx].pos, returning };
+  _moveAnim = { steps, pIdx, from: S.players[pIdx].pos, returning, boardRover };
   document.body.classList.add('anim-moving');
   // 先启动动画（同步完成ghost首帧定位，基地出发需读取base-token坐标），再隐藏原token
   const animPromise = animateTokenSteps(steps, pIdx);
@@ -2022,6 +2024,8 @@ function startMoveAnim(steps, pIdx, returning = false) {
         p.returned = true;
       } else {
         p.pos = anim.steps[anim.steps.length - 1];
+        // 登上月球车：动画期间 ghost/地图不展示车，提交时才真正标记（与 executePlayerMove 同步）
+        if (anim.boardRover) { p.onRover = true; S.roverUsed = true; }
       }
     }
     delete S[stepsKey];
