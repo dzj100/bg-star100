@@ -449,7 +449,8 @@ function renderActionPanel() {
       !S.accelMarks.includes(p.pos - 1) &&
       (isPathTile(p.pos - 1) || (isPathOGS(p.pos - 1) && !S.path[p.pos - 1].active) ||
         isPathDiscarded(p.pos - 1));
-    const canAccel = S.ap >= accelCost && !p.onRover && (canPlaceFwd || canPlaceBwd);
+    const canAccel = S.ap >= accelCost && !p.onRover && S.accelMarks.length < 10 &&
+      (canPlaceFwd || canPlaceBwd);
     h += `<button class="act-btn" ${canAccel ? '' : 'disabled'}
       onclick="hideMoreSheet();exitMoveMode();placeAccelMark()">
       ⚡ 加速标记 <span class="cost">${accelCost}AP</span></button>`;

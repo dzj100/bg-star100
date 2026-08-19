@@ -1184,6 +1184,11 @@ function appraiseSupply(supplyIdx) {
 /** 打开加速标记放置选择面板（前/后方向） */
 function placeAccelMark() {
   const p = currentPlayer();
+  // 整局至多放置10个加速标记
+  if (S.accelMarks.length >= 10) {
+    addLog(`${p.name} 无法放置加速标记（整局已达10个上限）`);
+    return;
+  }
   const cost = (p.role.id === 'inventor' && !S.accelPlacedThisTurn) ? 1 : 2;
 
   if (S.ap < cost) return;
@@ -1236,6 +1241,7 @@ function doPlaceAccelMark(pathPos) {
   const cost = (p.role.id === 'inventor' && !S.accelPlacedThisTurn) ? 1 : 2;
 
   if (S.ap < cost) return;
+  if (S.accelMarks.length >= 10) return; // 整局至多10个
   if (S.accelMarks.includes(pathPos)) return;
 
   S.accelMarks.push(pathPos);
@@ -1243,7 +1249,7 @@ function doPlaceAccelMark(pathPos) {
   S.ap -= cost;
   markAction('other');
 
-  addLog(`${p.name} 在${posLabel(pathPos)}放置加速标记（${cost}AP）`, 'action-log');
+  addLog(`${p.name} 在${posLabel(pathPos)}放置加速标记（${cost}AP），当前已放置${S.accelMarks.length}/10`, 'action-log');
   saveState();
   render();
 }
