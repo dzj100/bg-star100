@@ -1,0 +1,521 @@
+/* ============================================================
+   无赖勇者 Scoundrel - 样式表（深色地牢桌游风）
+   ============================================================ */
+:root {
+  --bg: #0d0b16;
+  --bg2: #171326;
+  --surface: #1d1830;
+  --surface2: #251f3d;
+  --border: #332a52;
+  --gold: #e8b64c;
+  --gold-dim: #a8823a;
+  --red: #e14a4a;
+  --red-deep: #a83232;
+  --green: #58c96a;
+  --blue: #7aa8e8;
+  --text: #e8e0d0;
+  --text-dim: #8d83a8;
+  --card-ivory: #f2ead6;
+  --card-red: #c8342a;
+  --card-black: #232838;
+  --radius: 14px;
+  --btn-h: 52px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #2a2150 0%, transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, #3a1f33 0%, transparent 55%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+
+#shakeRoot { min-height: 100dvh; will-change: transform; }
+#app { max-width: 480px; margin: 0 auto; min-height: 100dvh; position: relative; }
+
+.screen { display: flex; flex-direction: column; min-height: 100dvh; padding: 16px; }
+
+/* ============================================================
+   按钮
+   ============================================================ */
+.btn {
+  height: var(--btn-h);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 20px;
+  transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+  user-select: none;
+}
+.btn:active { transform: scale(.96); }
+.btn:disabled { opacity: .38; pointer-events: none; }
+.btn-primary {
+  background: linear-gradient(180deg, #c98f2e, #a86e1c);
+  border-color: #8a5a14;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(200, 140, 40, .35);
+}
+.btn-danger {
+  background: linear-gradient(180deg, #d64545, #a12b2b);
+  border-color: #7e1f1f;
+  color: #fff;
+}
+
+/* ============================================================
+   首页
+   ============================================================ */
+#landing { align-items: center; justify-content: center; text-align: center; gap: 14px; position: relative; }
+.landing-badge {
+  font-size: 3.4rem;
+  filter: drop-shadow(0 0 18px rgba(232, 182, 76, .45));
+  animation: badgeFloat 3.2s ease-in-out infinite;
+}
+.landing-title {
+  font-size: 2.2rem;
+  letter-spacing: .12em;
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(232, 182, 76, .35);
+}
+.landing-sub { color: var(--text-dim); font-size: .95rem; letter-spacing: .2em; margin-top: -6px; }
+.landing-desc { color: var(--text-dim); font-size: .82rem; line-height: 1.7; margin: 8px 0 22px; }
+#landing .btn { width: min(280px, 78vw); }
+.credit { position: absolute; bottom: 12px; font-size: .72rem; color: var(--text-dim); opacity: .7; }
+
+/* ============================================================
+   游戏界面
+   ============================================================ */
+#game { padding: 0; }
+.game-header {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: linear-gradient(180deg, rgba(20, 16, 38, .95), rgba(20, 16, 38, .75));
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.header-title { font-size: .95rem; font-weight: 700; letter-spacing: .08em; color: var(--gold); }
+.header-btns { display: flex; gap: 8px; }
+.icon-btn {
+  width: 36px; height: 36px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: .9rem; cursor: pointer;
+  transition: transform .08s ease;
+}
+.icon-btn:active { transform: scale(.9); }
+
+/* --- 血量条 --- */
+.game-main {
+  flex: 1;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+.bottom-area {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+}
+.hp-wrap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0;
+}
+.hp-icon { font-size: 1.15rem; filter: drop-shadow(0 0 6px rgba(225, 74, 74, .5)); }
+.hp-bar {
+  flex: 1; height: 22px;
+  background: #0a0812;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6);
+}
+.hp-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(180deg, #6fe07c, #3aa94b);
+  border-radius: 12px;
+  transition: width .35s cubic-bezier(.34, 1.4, .64, 1);
+  position: relative;
+}
+.hp-fill.mid { background: linear-gradient(180deg, #e8c84c, #c9912e); }
+.hp-fill.low { background: linear-gradient(180deg, #e86a4c, #c12f2f); }
+.hp-shine {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.22), transparent 45%);
+  pointer-events: none;
+}
+.hp-text {
+  min-width: 52px; text-align: right;
+  font-weight: 800; font-size: .95rem; font-variant-numeric: tabular-nums;
+}
+.hp-bar.damaged .hp-fill { animation: hpDamage .5s ease; }
+.hp-bar.healed .hp-fill { animation: hpHeal .5s ease; }
+
+/* --- 房间 --- */
+.room-label {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 12px 18px 6px;
+  color: var(--text-dim); font-size: .8rem;
+}
+.room-label b { color: var(--gold); font-size: 1rem; }
+.room-stats { margin-left: auto; font-size: .75rem; color: var(--text-dim); }
+
+.room {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px 14px;
+  justify-items: center;
+}
+.room.jolt { animation: roomJolt .22s ease-out; }
+
+/* --- 牌 --- */
+.card {
+  width: 100%;
+  max-width: 96px;
+  aspect-ratio: 5 / 7;
+  background: linear-gradient(160deg, #faf4e2 0%, #efe6cd 60%, #e2d6b6 100%);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .45), inset 0 0 0 1.5px rgba(120, 100, 60, .25);
+  transition: transform .1s ease, box-shadow .1s ease;
+  user-select: none;
+  overflow: hidden;
+}
+.card.deal { animation: dealIn .38s cubic-bezier(.34, 1.3, .64, 1) backwards; }
+.card.kick-out { animation: kickOut .3s ease-in forwards; }
+.card.dim { opacity: .55; filter: saturate(.7); }
+
+.card.red { color: var(--card-red); }
+.card.black { color: var(--card-black); }
+.card .corner {
+  position: absolute; top: 6px; left: 8px;
+  display: flex; flex-direction: column; align-items: center; line-height: 1;
+}
+.card .corner .crank { font-size: 1.05rem; font-weight: 800; }
+.card .corner .csuit { font-size: .85rem; }
+.card .cface {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+}
+.card .cface .fsuit { width: 52%; max-width: 64px; height: auto; filter: drop-shadow(0 2px 2px rgba(0,0,0,.18)); }
+.card .cface .fsuit.fsuit-t1 { width: 46%; }
+.card .cface .fsuit.fsuit-t3 { width: 58%; }
+.card .cface .frank { font-size: 1.1rem; font-weight: 800; }
+.card .ctype {
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+  font-size: .58rem; font-weight: 700; letter-spacing: .06em;
+  padding: 1px 7px; border-radius: 7px;
+  color: #fff; background: rgba(0, 0, 0, .62);
+  white-space: nowrap;
+}
+.card.red .ctype { background: rgba(168, 50, 50, .85); }
+.card.black .ctype { background: rgba(30, 34, 52, .85); }
+.card .unarmed-badge {
+  position: absolute; top: 6px; right: 6px;
+  font-size: .5rem; font-weight: 700;
+  color: var(--red); border: 1px dashed var(--red);
+  border-radius: 6px; padding: 1px 4px;
+  background: rgba(20, 14, 30, .75);
+}
+.card:hover { box-shadow: 0 6px 14px rgba(0, 0, 0, .55), 0 0 0 2px rgba(232, 182, 76, .35); }
+.card.pressing { transform: scale(.94) translateY(2px); }
+.card.slot-shift { animation: slotShift .32s cubic-bezier(.34, 1.2, .64, 1); }
+
+.hint-line {
+  min-height: 20px;
+  padding: 2px 18px 6px;
+  font-size: .75rem; color: var(--text-dim);
+  text-align: center;
+}
+
+/* --- 底部面板 --- */
+.bottom-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.weapon-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 64px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+.weapon-panel.empty { justify-content: center; color: var(--text-dim); font-size: .8rem; }
+
+.weapon-card {
+  width: 44px; aspect-ratio: 5/7;
+  background: linear-gradient(160deg, #faf4e2, #e2d6b6);
+  border-radius: 7px;
+  position: relative;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .4);
+  flex-shrink: 0;
+}
+.weapon-card .w-corner { position: absolute; top: 4px; left: 5px; line-height: 1; }
+.weapon-card .w-corner .crank { font-size: .8rem; font-weight: 800; color: var(--card-red); }
+.weapon-card .w-corner .csuit { font-size: .65rem; color: var(--card-red); }
+.weapon-card .w-face {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; color: var(--card-red);
+}
+.weapon-card.sheathed { filter: grayscale(.85); opacity: .6; }
+.weapon-card.pop { animation: popIn .4s cubic-bezier(.34, 1.5, .64, 1); }
+
+.weapon-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.weapon-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weapon-name { font-size: .82rem; font-weight: 700; color: var(--text); }
+.weapon-row { display: flex; align-items: center; gap: 10px; }
+.weapon-record {
+  font-size: .72rem; color: var(--text-dim);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+.weapon-record .rec-line { display: block; }
+.weapon-record.ready { color: var(--green); border-color: rgba(88, 201, 106, .4); }
+.weapon-record.dead { color: var(--red); border-color: rgba(225, 74, 74, .4); }
+
+.kill-row {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  margin-top: 5px;
+}
+.kill-card {
+  display: inline-flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  width: 20px; aspect-ratio: 5 / 7;
+  background: linear-gradient(160deg, #faf4e2, #e2d6b6);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+  line-height: 1;
+}
+.kill-card b { font-size: .68rem; font-weight: 800; }
+.kill-card i { font-style: normal; font-size: .58rem; }
+.kill-card.kc-red { color: var(--card-red); }
+.kill-card.kc-black { color: var(--card-black); }
+.kill-card.pop { animation: popIn .35s cubic-bezier(.34, 1.5, .64, 1); }
+
+/* 开关 */
+.switch { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .75rem; color: var(--text-dim); }
+.switch input { display: none; }
+.switch .track {
+  width: 40px; height: 22px;
+  background: #0a0812; border: 1px solid var(--border);
+  border-radius: 12px; position: relative; transition: background .18s;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #8d83a8;
+  transition: transform .18s cubic-bezier(.34, 1.4, .64, 1), background .18s;
+}
+.switch input:checked + .track { background: rgba(88, 201, 106, .25); border-color: rgba(88, 201, 106, .5); }
+.switch input:checked + .track::after { transform: translateX(18px); background: var(--green); }
+
+/* --- 踢门与牌堆 --- */
+.deck-row { display: flex; align-items: center; gap: 10px; }
+.kick-btn { flex: 1; }
+.kick-btn:disabled { background: var(--surface); }
+.deck-count {
+  font-size: .8rem; color: var(--text-dim);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px 14px;
+  white-space: nowrap;
+}
+.deck-count b { color: var(--gold); font-size: 1rem; }
+
+/* ============================================================
+   弹窗
+   ============================================================ */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8, 6, 16, .72);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s ease;
+}
+.overlay.show { opacity: 1; pointer-events: auto; }
+.modal {
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 20px;
+  width: min(400px, 92vw);
+  max-height: 84dvh;
+  overflow-y: auto;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .6);
+  transform: scale(.92) translateY(10px);
+  transition: transform .24s cubic-bezier(.34, 1.3, .64, 1);
+}
+.overlay.show .modal { transform: scale(1) translateY(0); }
+.modal h2 { font-size: 1.2rem; color: var(--gold); margin-bottom: 12px; text-align: center; }
+.modal p { font-size: .84rem; line-height: 1.75; color: var(--text); margin-bottom: 8px; }
+.modal p b { color: var(--gold); }
+.modal-close { width: 100%; margin-top: 12px; }
+.modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+.modal-btns .btn { flex: 1; }
+#confirmText { font-size: .92rem; line-height: 1.6; text-align: center; }
+
+/* 结算 */
+#overModal { text-align: center; }
+.over-icon { font-size: 3.2rem; margin-bottom: 6px; }
+.over-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+.over-title.win { color: var(--gold); }
+.over-title.lose { color: var(--red); }
+.over-stats { color: var(--text-dim); font-size: .85rem; line-height: 1.8; margin-bottom: 16px; }
+.over-stats b { color: var(--text); }
+
+/* ============================================================
+   特效层
+   ============================================================ */
+#fxLayer { position: fixed; inset: 0; z-index: 200; pointer-events: none; overflow: hidden; }
+#flashOverlay {
+  position: fixed; inset: 0; z-index: 150;
+  pointer-events: none; opacity: 0;
+}
+#flashOverlay.red { background: radial-gradient(circle at 50% 45%, rgba(225, 74, 74, .35), rgba(120, 20, 20, .5)); animation: flashFade .28s ease-out; }
+#flashOverlay.gold { background: radial-gradient(circle at 50% 45%, rgba(232, 182, 76, .3), rgba(160, 110, 20, .35)); animation: flashFade .26s ease-out; }
+#flashOverlay.green { background: radial-gradient(circle at 50% 45%, rgba(88, 201, 106, .28), rgba(30, 110, 50, .35)); animation: flashFade .3s ease-out; }
+
+.fx-float {
+  position: fixed;
+  font-weight: 900;
+  font-size: 1.25rem;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, .8);
+  transform: translate(-50%, 0);
+  animation: floatUp .85s ease-out forwards;
+  will-change: transform, opacity;
+}
+.fx-float.dmg { color: #ff6b5e; font-size: 1.45rem; }
+.fx-float.block { color: var(--gold); font-size: 1.1rem; }
+.fx-float.heal { color: #6ee77e; }
+.fx-float.info { color: var(--gold); font-size: .95rem; }
+.fx-float.small { color: var(--text); font-size: .85rem; }
+
+.fx-particle {
+  position: fixed;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  animation: particleFly .6s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+.fx-ghost {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .5);
+  animation: ghostFly .45s cubic-bezier(.5, -0.3, .8, 1) forwards;
+  z-index: 210;
+}
+
+.fx-toast {
+  position: fixed;
+  left: 50%; top: 18%;
+  transform: translate(-50%, 0);
+  background: rgba(20, 14, 34, .92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: .8rem;
+  color: var(--text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+  animation: toastLife 1.6s ease forwards;
+  z-index: 220;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   动画关键帧
+   ============================================================ */
+@keyframes badgeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes dealIn {
+  from { transform: translateY(-34px) scale(.82) rotate(-6deg); opacity: 0; }
+  to { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+@keyframes slotShift {
+  from { transform: translateX(var(--sx, -100px)); }
+  to { transform: translateX(0); }
+}
+@keyframes kickOut {
+  from { transform: translateY(0) scale(1); opacity: 1; }
+  to { transform: translateY(90px) scale(.7) rotate(8deg); opacity: 0; }
+}
+@keyframes popIn {
+  0% { transform: scale(.5); }
+  65% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@keyframes roomJolt {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-7px, 3px); }
+  40% { transform: translate(6px, -4px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(3px, -1px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes floatUp {
+  from { opacity: 1; margin-top: 0; }
+  to { opacity: 0; margin-top: -48px; }
+}
+@keyframes particleFly {
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to { transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; }
+}
+@keyframes ghostFly {
+  from { transform: translate(0, 0) rotate(0) scale(1); opacity: 1; }
+  to { transform: translate(var(--gx, 70px), var(--gy, 110px)) rotate(14deg) scale(.45); opacity: 0; }
+}
+@keyframes flashFade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes hpDamage {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(2.4) saturate(1.6); }
+  100% { filter: brightness(1); }
+}
+@keyframes hpHeal {
+  0% { filter: brightness(1); }
+  40% { filter: brightness(1.8) saturate(1.4) drop-shadow(0 0 8px rgba(88, 201, 106, .8)); }
+  100% { filter: brightness(1); }
+}
+@keyframes toastLife {
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+@keyframes overlayWin {
+  from { filter: brightness(1); }
+  to { filter: brightness(1); }
+}
+
+/* ============================================================
+   小屏适配
+   ============================================================ */
+@media (max-width: 360px) {
+  .card .cface .fsuit { width: 46%; }
+  .card .corner .crank { font-size: .9rem; }
+  .hp-text { font-size: .85rem; min-width: 46px; }
+  .bottom-area { gap: 8px; padding-left: 10px; padding-right: 10px; }
+  .kill-card { width: 17px; }
+}

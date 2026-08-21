@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>无赖勇者 Scoundrel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="shakeRoot">
+  <div id="app">
+
+    <!-- ============ 首页 ============ -->
+    <div id="landing" class="screen">
+      <div class="landing-badge">🗡️</div>
+      <h1 class="landing-title">无赖勇者</h1>
+      <div class="landing-sub">Scoundrel · 单人扑克闯关</div>
+      <div class="landing-desc">44 张牌的冒险：斩杀怪物、装备武器、痛饮血瓶，<br>一路闯到牌堆尽头。</div>
+      <button class="btn btn-primary" id="btnStart">⚔️ 开始游戏</button>
+      <button class="btn" id="btnContinue" style="display:none">🔄 继续冒险</button>
+      <button class="btn" onclick="UI.showRules()">📖 规则</button>
+      <div class="credit">@imStar100</div>
+    </div>
+
+    <!-- ============ 游戏界面 ============ -->
+    <div id="game" class="screen" style="display:none">
+      <header class="game-header">
+        <button class="icon-btn" onclick="UI.quit()">←</button>
+        <div class="header-title">🗡️ 无赖勇者</div>
+        <div class="header-btns">
+          <button class="icon-btn" id="muteBtn" onclick="SFX.toggle()">🔊</button>
+          <button class="icon-btn" onclick="UI.confirmReset()">🔄</button>
+        </div>
+      </header>
+
+      <div class="game-main">
+        <div class="room-label"><span>房间</span><b id="roomNum">1</b><span class="room-stats" id="roomStats"></span></div>
+
+        <div class="room" id="room"></div>
+
+        <div class="hint-line" id="hintLine"></div>
+      </div>
+
+      <div class="bottom-area">
+        <div class="hp-wrap">
+          <div class="hp-icon">❤️</div>
+          <div class="hp-bar" id="hpBar"><div class="hp-fill" id="hpFill"></div><div class="hp-shine"></div></div>
+          <div class="hp-text" id="hpText">20/20</div>
+        </div>
+        <div class="bottom-panel">
+          <div class="weapon-panel" id="weaponPanel"></div>
+          <div class="deck-row">
+            <button class="btn kick-btn" id="kickBtn" onclick="UI.doKick()">🚪 踢门</button>
+            <div class="deck-count">牌堆 <b id="deckCount">40</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 浮动特效层 / 闪光层 -->
+<div id="fxLayer"></div>
+<div id="flashOverlay"></div>
+
+<!-- ============ 规则弹窗 ============ -->
+<div class="overlay" id="rulesOverlay" onclick="if(event.target===this)UI.hideRules()">
+  <div class="modal">
+    <h2>🃏 规则</h2>
+    <p><b>牌组 44 张：</b>红桃2~10 = 血瓶，方片2~10 = 装备，黑桃/梅花2~A = 怪物（2~K = 2~13，A = 14）。</p>
+    <p><b>❤️ 血瓶：</b>点击喝下回复对应血量；每个房间只有第一瓶生效，第二瓶及之后回复 0。</p>
+    <p><b>🗡️ 对决怪物：</b>空手损失 = 怪物点数。装备点数 ≥ 怪物则无损；不敌时损失 = 怪物 − 装备（部分减伤）。</p>
+    <p><b>🛡️ 武器递减：</b>每把武器只能对决<b>严格小于</b>上次对决记录的怪物（新武器首击无限制）；违反时武器不生效，只能空手迎战。</p>
+    <p><b>🔧 装备：</b>同时只持一把，可勾选启用 / 收起；装备新方片时替换旧武器并清空记录（收起再启用不清空）。</p>
+    <p><b>🚪 踢门：</b>房间满 4 张时可选择踢门：将 4 张牌洗混放回牌堆底，再重翻 4 张；不能连续使用。</p>
+    <p><b>⏳ 房间剩 1 张自动补牌。</b>血量 ≤ 0 闯关失败；牌堆清空且房间耗尽则通关！</p>
+    <button class="btn btn-primary modal-close" onclick="UI.hideRules()">知道了</button>
+  </div>
+</div>
+
+<!-- ============ 结算弹窗 ============ -->
+<div class="overlay" id="overOverlay">
+  <div class="modal" id="overModal"></div>
+</div>
+
+<!-- ============ 确认弹窗 ============ -->
+<div class="overlay" id="confirmOverlay" onclick="if(event.target===this)UI.closeConfirm()">
+  <div class="modal">
+    <div id="confirmText"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="UI.closeConfirm()">取消</button>
+      <button class="btn btn-danger" id="confirmYes">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
