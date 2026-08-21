@@ -15,14 +15,19 @@
     return { suit: suit, rank: rank };
   }
 
-  // 54 张中去掉红桃/方片 JQKA 与大小王，剩 44 张
-  function buildDeck() {
+  // 54 张中去掉红桃/方片 JQKA 与大小王，剩 44 张；简易模式再加入红桃/方片 JQKA（52 张）
+  function buildDeck(easy) {
     var deck = [];
     for (var r = 2; r <= 10; r++) {
       deck.push(makeCard('H', r), makeCard('D', r));
     }
     for (var r2 = 2; r2 <= 14; r2++) {
       deck.push(makeCard('S', r2), makeCard('C', r2));
+    }
+    if (easy) {
+      for (var r3 = 11; r3 <= 14; r3++) {
+        deck.push(makeCard('H', r3), makeCard('D', r3));
+      }
     }
     return deck;
   }
@@ -46,12 +51,13 @@
     return arr;
   }
 
-  function freshState() {
+  function freshState(maxHp) {
     return {
-      hp: MAX_HP,
+      hp: 20,
+      maxHp: maxHp || MAX_HP,
       deck: [],
       room: [],
-      weapon: null,          // { card, enabled, lastFight: number|null }
+      weapon: null,          // { card, enabled, lastFight, kills }
       potionUsed: false,     // 本房间是否已喝过有效血瓶
       kickBanned: false,     // 踢门后，下一个房间禁止踢门
       phase: 'playing',      // playing | won | lost
@@ -69,10 +75,10 @@
     state.stats.rooms++;
   }
 
-  function newGame(seed) {
+  function newGame(seed, easy) {
     var state = freshState();
     var rng = (seed !== undefined && seed !== null) ? mulberry32(seed) : Math.random;
-    state.deck = shuffle(buildDeck(), rng);
+    state.deck = shuffle(buildDeck(easy), rng);
     enterRoom(state); // 开局即第一间房，可踢门（kickBanned 初始 false）
     return state;
   }
@@ -122,7 +128,7 @@
       result.action = 'potion';
       var before = state.hp;
       var heal = state.potionUsed ? 0 : card.rank;
-      state.hp = Math.min(MAX_HP, state.hp + heal);
+      state.hp = Math.min(state.maxHp || MAX_HP, state.hp + heal);
       result.hpGain = state.hp - before;
       state.potionUsed = true;
       state.room.splice(index, 1);
@@ -167,6 +173,8 @@
     s.phase = s.phase || 'playing';
     s.potionUsed = !!s.potionUsed;
     s.kickBanned = !!s.kickBanned;
+    s.maxHp = MAX_HP;
+    if (s.hp > s.maxHp) s.hp = s.maxHp;
     if (s.weapon && !Array.isArray(s.weapon.kills)) s.weapon.kills = [];
     s.stats = s.stats || { kills: 0, rooms: 1, kicks: 0 };
     return s;

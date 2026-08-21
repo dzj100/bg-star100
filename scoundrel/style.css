@@ -89,6 +89,13 @@ body {
 .landing-sub { color: var(--text-dim); font-size: .95rem; letter-spacing: .2em; margin-top: -6px; }
 .landing-desc { color: var(--text-dim); font-size: .82rem; line-height: 1.7; margin: 8px 0 22px; }
 #landing .btn { width: min(280px, 78vw); }
+.easy-switch {
+  width: min(280px, 78vw);
+  font-size: .78rem;
+  justify-content: flex-start;
+  text-align: left;
+  line-height: 1.4;
+}
 .credit { position: absolute; bottom: 12px; font-size: .72rem; color: var(--text-dim); opacity: .7; }
 
 /* ============================================================
@@ -378,6 +385,7 @@ body {
 .over-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
 .over-title.win { color: var(--gold); }
 .over-title.lose { color: var(--red); }
+.over-desc { font-size: .86rem; color: var(--text-dim); line-height: 1.5; margin: 0 auto 10px; max-width: 280px; min-height: 2.2em; display: flex; align-items: center; justify-content: center; }
 .over-stats { color: var(--text-dim); font-size: .85rem; line-height: 1.8; margin-bottom: 16px; }
 .over-stats b { color: var(--text); }
 

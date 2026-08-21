@@ -297,11 +297,12 @@
   }
 
   function renderHP() {
-    var pct = Math.max(0, Math.round(state.hp / G.MAX_HP * 100));
+    var maxHp = state.maxHp || G.MAX_HP;
+    var pct = Math.max(0, Math.round(state.hp / maxHp * 100));
     var fill = $('hpFill');
     fill.style.width = pct + '%';
     fill.className = 'hp-fill' + (pct > 50 ? '' : pct > 25 ? ' mid' : ' low');
-    $('hpText').textContent = state.hp + '/' + G.MAX_HP;
+    $('hpText').textContent = state.hp + '/' + maxHp;
   }
 
   function renderBottom() {
@@ -493,7 +494,7 @@
   function startNew() {
     busy = false;
     prevSlotRefs = [null, null, null, null];
-    state = G.newGame();
+    state = G.newGame(null, $('easyMode').checked);
     showGame();
     render(0);
     save();
@@ -515,6 +516,35 @@
     }
   }
 
+  var WIN_TITLES = ['闯关成功！', '胜利凯旋！', '深渊见底，勇者不败！', '清空牌堆，全身而退！'];
+  var LOSE_TITLES = ['冒险失败…', '勇者倒下了…', '命丧于此，再接再厉！', '血量归零，故事暂歇…'];
+
+  var WIN_DESC = [
+    '斩尽了所有敌人，你的英勇将载入史册！',
+    '每个敌人都倒在你的剑下，和平重归大地…',
+    '血与火的试炼落幕，你是真正的传奇！',
+    '最后一声哀嚎在黑暗中消散，你赢得了胜利！',
+    '从此酒馆的吟游诗人将传唱你的名字…',
+    '敌人尽数倒下，你是无可争议的冠军！',
+    '以勇气为盾、利刃为笔，你写下了自己的史诗！',
+    '敌人灰飞烟灭，你带着荣耀凯旋而归！',
+    '满身伤痕是你荣耀的勋章，恭喜你，勇者！',
+    '这场战斗结束了，但你的传奇才刚刚开始…'
+  ];
+
+  var LOSE_DESC = [
+    '斩落了无数怪物，但邪恶终究还是吞没了你…',
+    '黑暗淹没了最后的喘息，冒险在此落幕…',
+    '剑刃崩断，你的传说留在了地牢深处…',
+    '离胜利只差一步，命运却没有眷顾你…',
+    '鲜血染红了牌桌，你倒在冰冷的石板地上…',
+    '耳边的怪物低语渐渐模糊，你闭上了眼睛…',
+    '英雄也会倒下，今天恰好轮到了你…',
+    '胜败乃兵家常事，勇士请重新来过…'
+  ];
+
+  function randomPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
   function showOver() {
     var win = state.phase === 'won';
     if (win) {
@@ -530,7 +560,8 @@
     var m = $('overModal');
     m.innerHTML =
       '<div class="over-icon">' + (win ? '🎉' : '💀') + '</div>' +
-      '<div class="over-title ' + (win ? 'win' : 'lose') + '">' + (win ? '闯关成功！' : '冒险失败…') + '</div>' +
+      '<div class="over-title ' + (win ? 'win' : 'lose') + '">' + (win ? randomPick(WIN_TITLES) : randomPick(LOSE_TITLES)) + '</div>' +
+      '<div class="over-desc">' + (win ? randomPick(WIN_DESC) : randomPick(LOSE_DESC)) + '</div>' +
       '<div class="over-stats">' +
         (win ? '剩余血量 <b>' + state.hp + '</b><br>' : '') +
         '击杀怪物 <b>' + state.stats.kills + '</b><br>' +
@@ -576,7 +607,11 @@
     confirmBox('重新开始？当前进度将丢失。', startNew);
   }
 
-  /* ================= 初始化 ================= */
+  function toggleMute() {
+    SFX.unlock();
+    SFX.toggle();
+    $('muteBtn').textContent = SFX.muted ? '🔇' : '🔊';
+  }
 
   function init() {
     $('btnStart').addEventListener('click', function () {
@@ -587,6 +622,11 @@
     });
     $('btnContinue').addEventListener('click', function () { SFX.unlock(); continueGame(); });
     $('muteBtn').textContent = SFX.muted ? '🔇' : '🔊';
+    var easyEl = $('easyMode');
+    easyEl.checked = localStorage.getItem('scoundrel-easy') === '1';
+    easyEl.addEventListener('change', function () {
+      try { localStorage.setItem('scoundrel-easy', easyEl.checked ? '1' : '0'); } catch (e) {}
+    });
     goLanding();
   }
 
@@ -597,6 +637,7 @@
     doKick: doKick,
     quit: quit,
     confirmReset: confirmReset,
+    toggleMute: toggleMute,
     confirm: confirmBox,
     closeConfirm: closeConfirm,
     showRules: showRules,
@@ -613,6 +654,7 @@
       render: render,
       doAct: doAct,
       doKick: doKick,
+      checkEnd: checkEnd,
       startNew: startNew
     };
   }

@@ -20,17 +20,25 @@
       <button class="btn btn-primary" id="btnStart">⚔️ 开始游戏</button>
       <button class="btn" id="btnContinue" style="display:none">🔄 继续冒险</button>
       <button class="btn" onclick="UI.showRules()">📖 规则</button>
+      <label class="switch easy-switch">
+        <input type="checkbox" id="easyMode">
+        <span class="track"></span>
+        <span>简易模式：卡组加入 ♥♦ JQKA（52 张）</span>
+      </label>
       <div class="credit">@imStar100</div>
     </div>
 
     <!-- ============ 游戏界面 ============ -->
     <div id="game" class="screen" style="display:none">
       <header class="game-header">
-        <button class="icon-btn" onclick="UI.quit()">←</button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button class="icon-btn" onclick="UI.quit()">←</button>
+          <button class="icon-btn" id="muteBtn" onclick="UI.toggleMute()">🔊</button>
+        </div>
         <div class="header-title">🗡️ 无赖勇者</div>
         <div class="header-btns">
-          <button class="icon-btn" id="muteBtn" onclick="SFX.toggle()">🔊</button>
           <button class="icon-btn" onclick="UI.confirmReset()">🔄</button>
+          <button class="icon-btn" onclick="UI.showRules()">📖</button>
         </div>
       </header>
 
@@ -76,6 +84,7 @@
     <p><b>🔧 装备：</b>同时只持一把，可勾选启用 / 收起；装备新方片时替换旧武器并清空记录（收起再启用不清空）。</p>
     <p><b>🚪 踢门：</b>房间满 4 张时可选择踢门：将 4 张牌洗混放回牌堆底，再重翻 4 张；不能连续使用。</p>
     <p><b>⏳ 房间剩 1 张自动补牌。</b>血量 ≤ 0 闯关失败；牌堆清空且房间耗尽则通关！</p>
+    <p><b>✨ 简易模式：</b>首页勾选后开启新冒险：卡组加入 ♥JQKA 与 ♦JQKA（共 52 张），血量规则与常规模式一致。</p>
     <button class="btn btn-primary modal-close" onclick="UI.hideRules()">知道了</button>
   </div>
 </div>

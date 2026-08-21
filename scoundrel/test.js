@@ -177,6 +177,49 @@ section('武器击杀记录');
   eq(restored.weapon.kills.length, 0, '老存档击杀为空');
 })();
 
+/* ---------- 简易模式 ---------- */
+section('简易模式');
+(function () {
+  // 卡组扩容
+  let d = G.buildDeck(true);
+  eq(d.length, 52, '简易模式 52 张');
+  eq(d.filter(c => c.suit === 'H' && c.rank >= 11).length, 4, '含 ♥JQKA');
+  eq(d.filter(c => c.suit === 'D' && c.rank >= 11).length, 4, '含 ♦JQKA');
+  eq(d.filter(c => c.suit === 'S').length, 13, '黑桃仍13张');
+  eq(G.buildDeck(false).length, 44, '普通模式 44 张');
+
+  // 开局状态
+  let s = G.newGame(1, true);
+  eq(s.hp, 20, '简易初始血量 20');
+  eq(s.maxHp, 20, '简易血量上限与常规一致 20');
+  eq(s.deck.length, 48, '简易牌堆 48（52-4房）');
+  eq(G.newGame(1, false).maxHp, 20, '普通上限 20');
+
+  // 恢复上限 20（与常规一致）
+  s = craft(1, { hp: 19, room: [C('H', 5)], deck: [] });
+  let r = G.act(s, 0);
+  eq(s.hp, 20, '简易可恢复到 20');
+  eq(r.hpGain, 1, '恢复量正确');
+  s = craft(1, { hp: 19, maxHp: 20, room: [C('H', 6)], deck: [] });
+  G.act(s, 0);
+  eq(s.hp, 20, '恢复不超 20');
+
+  // 普通模式仍以 20 为上限
+  s = craft(1, { hp: 19, room: [C('H', 5)], deck: [] });
+  G.act(s, 0);
+  eq(s.hp, 20, '普通模式上限仍 20');
+
+  // 老存档反序列化补 maxHp
+  let old = JSON.stringify({ hp: 15, deck: [], room: [], weapon: null, potionUsed: false, kickBanned: false, phase: 'playing', stats: { kills: 0, rooms: 1, kicks: 0 } });
+  let restored = G.deserialize(old);
+  eq(restored.maxHp, 20, '老存档 maxHp 默认 20');
+  // 旧简易存档（曾有过更高上限）也被统一为 20
+  old = JSON.stringify({ hp: 25, maxHp: 30, deck: [], room: [], weapon: null, potionUsed: false, kickBanned: false, phase: 'playing', stats: { kills: 0, rooms: 1, kicks: 0 } });
+  restored = G.deserialize(old);
+  eq(restored.maxHp, 20, '旧简易存档 maxHp 修正为 20');
+  eq(restored.hp, 20, '血量钳制到 20');
+})();
+
 /* ---------- 血瓶 ---------- */
 section('血瓶');
 (function () {
