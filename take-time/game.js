@@ -1,0 +1,635 @@
+/**
+ * 时序谜局 (Take Time) - 游戏逻辑
+ * 负责：状态管理、发牌、看牌、聚光灯选先手、出牌、眼标记、结算判定、进度存储
+ * 依赖：render.js（渲染函数）、net.js + online.js（联机层）
+ */
+
+// ========================================
+// 常量
+// ========================================
+
+const STORAGE_KEY = 'taketime-state';
+const PROGRESS_KEY = 'taketime-progress';
+const SEG_COUNT = 6;
+const MAX_EYE_BONUS = 3;
+const CH_PER_CHAPTER = 4;
+
+/** 玩家颜色（按座位顺序） */
+const PLAYER_COLORS = ['#e94560', '#42a5f5', '#66bb6a', '#ffb74d'];
+
+/** 每局每人手牌数 */
+function cardsPerPlayer(n) {
+  return n === 2 ? 6 : n === 3 ? 4 : 3;
+}
+
+// ========================================
+// 关卡库：id = (章-1)*4 + 关
+// check(sums, segments) 返回 { segOK, sumOK, ascOK, pass, items?, segBad? }
+//   items  可选：自定义检查项展示 [{label, ok}]（缺省用默认三项）
+//   segBad 可选：扇区不满足高亮 [bool×6]（缺省 = 该扇区不满足基础检查）
+// 基础规则（无自定义 check 时）：每扇区≥1张、每扇区≤24、扇区1→6递增
+// ========================================
+
+const CHALLENGE_LIB = {
+  // ── 第1章 ──
+  1: {
+    name: '孤阳', chapter: 1, test: 1,
+    desc: '1号位只能放1张太阳牌；6号位必须3张牌；本关无总和≤24限制',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(() => true); // 本关无 ≤24 限制
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const okS1 = segs[0].cards.length === 1 && segs[0].cards[0].color === 'sun';
+      const okS6 = segs[5].cards.length === 3;
+      const items = [
+        { label: '1号位：恰好1张太阳牌', ok: okS1 },
+        { label: '6号位：恰好3张牌', ok: okS6 },
+        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
+        { label: '扇区1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i === 0 ? !okS1 : i === 5 ? !okS6 : !segOK[i]);
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: okS1 && okS6 && segOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  2: {
+    name: '枢衡', chapter: 1, test: 2,
+    desc: '3号位数字总和8~12；4号位必须3张牌；本关无总和≤24限制',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(() => true);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const okS3 = sums[2] >= 8 && sums[2] <= 12;
+      const okS4 = segs[3].cards.length === 3;
+      const items = [
+        { label: '3号位总和在8~12之间', ok: okS3 },
+        { label: '4号位：恰好3张牌', ok: okS4 },
+        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
+        { label: '扇区1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i === 2 ? !okS3 : i === 3 ? !okS4 : !segOK[i]);
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: okS3 && okS4 && segOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  3: {
+    name: '序引', chapter: 1, test: 3,
+    desc: '第1张牌放3号位、第2张牌放2号位；6号位总和20~30；本关无总和≤24限制',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(() => true);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const firstInS3 = segs[2].cards.some(c => c.order === 1);
+      const secondInS2 = segs[1].cards.some(c => c.order === 2);
+      const okS6 = sums[5] >= 20 && sums[5] <= 30;
+      const items = [
+        { label: '第1张牌放在3号位', ok: firstInS3 },
+        { label: '第2张牌放在2号位', ok: secondInS2 },
+        { label: '6号位总和在20~30之间', ok: okS6 },
+        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
+        { label: '扇区1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i === 2 ? !firstInS3 : i === 1 ? !secondInS2 : i === 5 ? !okS6 : !segOK[i]);
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: firstInS3 && secondInS2 && okS6 && segOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  4: {
+    name: '近六', chapter: 1, test: 4,
+    desc: '1号位总和比其他位次更接近6；4号位必须1张太阳+1张月亮',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const d1 = Math.abs(sums[0] - 6);
+      const okClosest = segs.every((_, i) => i === 0 || Math.abs(sums[i] - 6) > d1);
+      const s4 = segs[3].cards;
+      const okS4 = s4.length === 2 && s4.some(c => c.color === 'sun') && s4.some(c => c.color === 'moon');
+      const items = [
+        { label: '1号位总和最接近6', ok: okClosest },
+        { label: '4号位：1张太阳+1张月亮', ok: okS4 },
+        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
+        { label: '扇区1→6总和递增', ok: ascOK },
+        { label: '每扇区总和≤24', ok: sumOK.every(Boolean) },
+      ];
+      const segBad = segs.map((_, i) => i === 0 ? !okClosest : i === 3 ? !okS4 : !(segOK[i] && sumOK[i]));
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: okClosest && okS4 && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+};
+/** 通过 window 暴露（测试扩展用） */
+Object.defineProperty(window, 'CHALLENGE_LIB', { get: () => CHALLENGE_LIB });
+
+function defaultCheck(sums, segments) {
+  const segOK = segments.map(seg => seg.cards.length >= 1);
+  const sumOK = sums.map(s => s <= 24);
+  const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+  return {
+    segOK, sumOK, ascOK,
+    pass: segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+  };
+}
+
+/** 关卡规则文案（未收录的关卡用默认规则描述） */
+function challengeDesc(ch) {
+  const lib = CHALLENGE_LIB[ch.id];
+  if (lib && lib.desc) return lib.desc;
+  return '每扇区至少1张；每扇区总和≤24；扇区1→6总和递增';
+}
+
+/** 按关卡规则结算（未收录的关卡用默认规则） */
+function challengeCheck(ch, sums, segments) {
+  const lib = CHALLENGE_LIB[ch.id];
+  if (lib && lib.check) return lib.check(sums, segments);
+  return defaultCheck(sums, segments);
+}
+
+let S = { phase: 'landing', players: [] };
+/** 通过 window.S 暴露（联机层与测试均依赖） */
+Object.defineProperty(window, 'S', { get: () => S, set: (v) => { S = v; } });
+
+/** 等候室选关（房主本地） */
+let pendingChallenge = { chapter: 1, test: 1 };
+
+/** 出牌弹层本地状态（不共享） */
+let pendingPlay = null;
+/** 通过 window 暴露（测试/调试用） */
+Object.defineProperty(window, '_pendingPlay', { get: () => pendingPlay, set: (v) => { pendingPlay = v; } });
+
+/** 聚光灯本地定时器（不共享） */
+let spinTimer = null;
+
+// ========================================
+// 工具
+// ========================================
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function mySeat() {
+  if (typeof window._olSeatIndex === 'function') {
+    const s = window._olSeatIndex();
+    if (typeof s === 'number') return s;
+  }
+  return null;
+}
+
+function isHost() {
+  return typeof window._olIsHost === 'function' ? window._olIsHost() : false;
+}
+
+/** 联机模式下是否为合法操作者 */
+function isActor() {
+  return typeof window._olIsActor !== 'function' || window._olIsActor();
+}
+
+function eyeLeft() {
+  return S.eyeBase + S.eyeBonus - S.eyeUsed;
+}
+
+/** 已打出的牌总数 */
+function placedCount() {
+  return S.segments.reduce((a, seg) => a + seg.cards.length, 0);
+}
+
+/**
+ * 2人局特殊规则：看牌后只展示前4张，双方各打出2张牌（共4张）后解锁后2张。
+ * 返回当前被锁定（不可查看/选择）的手牌索引集合。
+ * 锁定基于发牌时的 lock 标记（随 splice 移动），保证出牌后仍指向原后2张。
+ */
+function handLockedIndexes() {
+  if (S.players.length !== 2) return new Set();
+  if (S.phase === 'discuss' || placedCount() >= 4) return new Set();
+  const me = mySeat();
+  if (me === null) return new Set();
+  return new Set(S.players[me].hand.map((c, i) => c.lock ? i : -1).filter(i => i >= 0));
+}
+
+// ========================================
+// 进度存储（关卡赠送眼标记 / 通过状态）
+// ========================================
+
+function loadProgress() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+    return p && typeof p === 'object' ? p : {};
+  } catch (e) { return {}; }
+}
+
+function saveProgress(p) {
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) {}
+}
+
+/** 幂等更新本地进度（settleStamp 防重复累加） */
+function updateLocalProgress(id, pass, stamp) {
+  const prog = loadProgress();
+  const cur = prog[id] || {};
+  if (cur.lastStamp === stamp) return;
+  if (pass) {
+    prog[id] = { bonus: 0, passed: true, lastStamp: stamp };
+  } else {
+    prog[id] = { bonus: Math.min((cur.bonus || 0) + 1, MAX_EYE_BONUS), passed: false, lastStamp: stamp };
+  }
+  saveProgress(prog);
+  console.log('[taketime] progress updated:', id, pass ? 'PASS' : 'FAIL', prog[id].bonus);
+}
+
+// ========================================
+// 日志
+// ========================================
+
+function addLog(msg, cls) {
+  S.log = S.log || [];
+  S.log.push({ t: Date.now(), msg, cls: cls || '' });
+  if (S.log.length > 40) S.log = S.log.slice(-40);
+  console.log('[taketime]', msg);
+}
+
+// ========================================
+// 状态持久化（联机钩子：saveState 末尾推送）
+// ========================================
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
+  if (typeof onlinePushState === 'function') onlinePushState();
+}
+
+function clearState() {
+  clearSpinTimer();
+  pendingPlay = null;
+  S = { phase: 'landing', players: [], log: [], gameOver: false };
+}
+
+// ========================================
+// 发牌
+// ========================================
+
+function dealGame(names, challenge) {
+  const n = names.length;
+  const per = cardsPerPlayer(n);
+  const deck = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    .map(v => ({ v, color: Math.random() < 0.5 ? 'sun' : 'moon' }));
+
+  const ch = challenge || {
+    ...pendingChallenge,
+    id: (pendingChallenge.chapter - 1) * CH_PER_CHAPTER + pendingChallenge.test,
+  };
+  ch.desc = challengeDesc(ch);
+
+  const progress = loadProgress();
+  const bonus = (progress[ch.id] || {}).bonus || 0;
+
+  const players = names.map((name, i) => ({
+    name,
+    hand: deck.slice(i * per, (i + 1) * per),
+  }));
+  // 2人局：后2张标记锁定（随出牌 splice 移动，解锁前始终指向原后2张）
+  if (n === 2 && per === 6) {
+    players.forEach(p => p.hand.forEach((c, i) => { if (i >= 4) c.lock = true; }));
+  }
+
+  S = {
+    players,
+    phase: 'discuss',
+    challenge: ch,
+    segments: Array.from({ length: SEG_COUNT }, () => ({ cards: [] })),
+    firstSeat: null,
+    currentSeat: 0,
+    turnNo: 0,
+    eyeBase: n,
+    eyeBonus: bonus,
+    eyeUsed: 0,
+    spin: { running: false, seat: 0, tick: 0 },
+    allPlaced: false,
+    settled: false,
+    pass: null,
+    sums: null,
+    check: null,
+    settleStamp: 0,
+    log: [],
+    gameOver: false,
+  };
+  pendingPlay = null;
+
+  const ruleNote = ch.desc ? `（${ch.desc}）` : '';
+  addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始 ${ruleNote}`);
+  console.log(`[taketime] deal ${n} players x ${per} cards, eyeBase=${n}, eyeBonus=${bonus}`);
+  saveState();
+  render();
+}
+
+// ========================================
+// 看牌（仅房主）
+// ========================================
+
+function hostReveal() {
+  if (!isHost() || !isActor()) return;
+  if (S.phase !== 'discuss') return;
+  S.phase = 'reveal';
+  addLog('房主点击看牌，所有人可以查看自己的手牌');
+  saveState();
+  render();
+}
+
+// ========================================
+// 聚光灯选先手
+// ========================================
+
+function clearSpinTimer() {
+  if (spinTimer) { clearInterval(spinTimer); spinTimer = null; }
+}
+
+/** 房主启动聚光灯（所有客户端播放本地动画） */
+function hostStartSpin() {
+  if (!isHost() || !isActor()) return;
+  if (S.phase !== 'reveal') return;
+  S.phase = 'spin';
+  S.spin = { running: true, seat: Math.floor(Math.random() * S.players.length), tick: 0 };
+  addLog('聚光灯转动中…');
+  saveState();
+  render();
+}
+
+/** 房主停止聚光灯，确定先手 */
+function hostStopSpin() {
+  clearSpinTimer();
+  if (!isHost() || !isActor()) return;
+  if (S.phase !== 'spin') return;
+  S.phase = 'play';
+  S.spin.running = false;
+  S.firstSeat = S.spin.seat;
+  S.currentSeat = S.spin.seat;
+  addLog(`${S.players[S.firstSeat].name} 成为先手，轮到他出牌`);
+  saveState();
+  render();
+}
+
+/** 聚光灯动画 tick（本地执行，不推送） */
+function spinTick() {
+  if (S.phase !== 'spin' || !S.spin.running) return;
+  S.spin.seat = (S.spin.seat + 1) % S.players.length;
+  S.spin.tick++;
+  const rounds = Math.floor(S.spin.tick / S.players.length);
+  if (rounds >= 3 && isHost()) {
+    hostStopSpin();
+  } else {
+    render();
+  }
+}
+
+// ========================================
+// 出牌
+// ========================================
+
+function isMyTurn() {
+  if (S.phase !== 'play') return false;
+  const me = mySeat();
+  return me !== null && S.currentSeat === me;
+}
+
+function selectCard(i) {
+  if (!isMyTurn() || !isActor()) return;
+  if (!S.players[mySeat()].hand[i]) return;
+  if (handLockedIndexes().has(i)) return; // 2人局后2张未解锁，不可选择
+  pendingPlay = { cardIndex: i, seg: -1, useEye: false };
+  render();
+}
+
+function pickSeg(i) {
+  if (!pendingPlay) return;
+  if (i < 0 || i >= SEG_COUNT) return;
+  pendingPlay.seg = i;
+  render();
+}
+
+function toggleEye() {
+  if (!pendingPlay) return;
+  if (eyeLeft() <= 0) return;
+  pendingPlay.useEye = !pendingPlay.useEye;
+  render();
+}
+
+function closePlaySheet() {
+  pendingPlay = null;
+  render();
+}
+
+/** 当前玩家放置选中的牌到扇区 */
+function placeCard() {
+  if (!isMyTurn() || !isActor()) return;
+  if (!pendingPlay || pendingPlay.seg === -1) return;
+  if (pendingPlay.useEye && eyeLeft() <= 0) return;
+
+  const me = mySeat();
+  const card = S.players[me].hand.splice(pendingPlay.cardIndex, 1)[0];
+  if (!card) return;
+  card.revealed = pendingPlay.useEye;
+  card.by = me;
+  card.fresh = true; // 新放置的牌：扇区渲染时播放入场动效
+  card.order = S.turnNo + 1; // 全局放置序号（第3关「第1张/第2张」规则用）
+  S.segments[pendingPlay.seg].cards.push(card);
+  if (pendingPlay.useEye) S.eyeUsed++;
+
+  addLog(
+    pendingPlay.useEye
+      ? `${S.players[me].name} 明置 ☀${card.v} 到扇区${pendingPlay.seg + 1}（用1眼标记）`
+      : `${S.players[me].name} 暗置1张牌到扇区${pendingPlay.seg + 1}`
+  );
+  console.log('[taketime] place:', card.v, '-> seg', pendingPlay.seg, 'revealed', pendingPlay.useEye);
+
+  pendingPlay = null;
+  S.turnNo++;
+
+  if (S.players.every(p => p.hand.length === 0)) {
+    S.allPlaced = true;
+    addLog('所有手牌已放置，可以翻开结算');
+  } else {
+    S.currentSeat = (S.currentSeat + 1) % S.players.length;
+  }
+  saveState();
+  render();
+}
+
+// ========================================
+// 结算（任意玩家可点）
+// ========================================
+
+function settle() {
+  if (!S.allPlaced || S.settled) return;
+  const me = mySeat();
+  if (me === null) return;
+
+  // 让结算者成为 currentSeat，保证联机 canPush 通过
+  S.currentSeat = me;
+  S.phase = 'result';
+  S.settled = true;
+  S.settleStamp = Date.now();
+
+  // 翻开全部牌（全部播放翻开动效）
+  S.segments.forEach(seg => seg.cards.forEach(c => { c.revealed = true; c.fresh = true; }));
+
+  S.sums = S.segments.map(seg => seg.cards.reduce((a, c) => a + c.v, 0));
+  S.check = challengeCheck(S.challenge, S.sums, S.segments);
+  S.pass = S.check.pass;
+
+  if (S.pass) {
+    S.eyeBonus = 0;
+    addLog('🎉 挑战成功！所有扇区满足要求');
+  } else {
+    S.eyeBonus = Math.min(S.eyeBonus + 1, MAX_EYE_BONUS);
+    addLog('❌ 未通关，获赠 1 个眼标记（下次挑战本关可用）');
+  }
+  updateLocalProgress(S.challenge.id, S.pass, S.settleStamp);
+  console.log('[taketime] settle:', S.sums, 'pass=', S.pass);
+  saveState();
+  render();
+}
+
+// ========================================
+// 再来一局（仅房主，同关卡重发牌）
+// ========================================
+
+function restartChallenge() {
+  if (!isHost()) return;
+  if (S.phase !== 'result') return;
+  // 先把 currentSeat 改为自己，保证联机 isActor/canPush 通过
+  // （结算后 currentSeat 是结算者，可能不是房主）
+  const seat = mySeat();
+  if (seat !== null) S.currentSeat = seat;
+  if (!isActor()) return;
+  const names = S.players.map(p => p.name);
+  const ch = { ...S.challenge };
+  dealGame(names, ch);
+}
+
+// ========================================
+// 联机状态应用
+// ========================================
+
+function applyOnlineState(state) {
+  const wasSettled = S.settled;
+  S = state;
+  pendingPlay = null;
+  clearSpinTimer();
+  if (state.settled && state.challenge && !wasSettled) {
+    updateLocalProgress(state.challenge.id, state.pass, state.settleStamp);
+  }
+  render();
+}
+
+function getOnlineState() {
+  // 联机模板读取 state.currentPlayer，本游戏用 currentSeat，推送时镜像一份
+  if (typeof S.currentSeat === 'number') S.currentPlayer = S.currentSeat;
+  return S;
+}
+
+// ========================================
+// 等候室选关（房主本地）
+// ========================================
+
+function chStep(kind, delta) {
+  if (kind === 'chapter') {
+    if (delta > 0) { // 章节暂时只开放第 1 章
+      showToast('敬请期待');
+      return;
+    }
+    pendingChallenge.chapter = Math.max(1, pendingChallenge.chapter + delta);
+  } else {
+    pendingChallenge.test = Math.min(CH_PER_CHAPTER, Math.max(1, pendingChallenge.test + delta));
+  }
+  if (typeof window._olRefreshWaitingRoom === 'function') window._olRefreshWaitingRoom();
+}
+
+/** 轻量吐司提示（1.6s 自动消失） */
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/** 联机层推送当前选关用 */
+window._olGetPendingChallenge = () => ({ chapter: pendingChallenge.chapter, test: pendingChallenge.test });
+
+function waitingExtrasHTML() {
+  const ch = pendingChallenge;
+  const id = (ch.chapter - 1) * CH_PER_CHAPTER + ch.test;
+  const cur = loadProgress()[id] || {};
+  const progressLine = `本关进度：${cur.passed ? '已通过 ✓' : '未通过'} · 赠送眼标记 <b>${cur.bonus || 0}/${MAX_EYE_BONUS}</b>`;
+  const lib = CHALLENGE_LIB[id];
+  const descLine = lib && lib.name ? `📜 ${lib.name}：${challengeDesc({ id })}` : `📜 ${challengeDesc({ id })}`;
+  if (!isHost()) {
+    // 成员端：只读展示房主选择的章节/关卡/规则（经房间状态同步）
+    const remote = window._olPendingChallenge || ch;
+    const rid = (remote.chapter - 1) * CH_PER_CHAPTER + remote.test;
+    const rcur = loadProgress()[rid] || {};
+    const rprogress = `本关进度：${rcur.passed ? '已通过 ✓' : '未通过'} · 赠送眼标记 <b>${rcur.bonus || 0}/${MAX_EYE_BONUS}</b>`;
+    const rlib = CHALLENGE_LIB[rid];
+    const rdesc = rlib && rlib.name ? `📜 ${rlib.name}：${challengeDesc({ id: rid })}` : `📜 ${challengeDesc({ id: rid })}`;
+    return `
+    <div class="ch-select">
+      <div class="ch-row"><label>章节</label><div class="ch-step"><b>${remote.chapter}</b></div></div>
+      <div class="ch-row"><label>关卡</label><div class="ch-step"><b>${remote.test}</b></div></div>
+      <div class="ch-rule-desc">${esc(rdesc)}</div>
+      <div class="ch-progress">房主选择：第${remote.chapter}章·第${remote.test}关（第${rid}关）<br>${rprogress}</div>
+    </div>`;
+  }
+  return `
+  <div class="ch-select">
+    <div class="ch-row">
+      <label>章节</label>
+      <div class="ch-step">
+        <button onclick="chStep('chapter',-1)">−</button>
+        <b>${ch.chapter}</b>
+        <button onclick="chStep('chapter',1)">+</button>
+      </div>
+    </div>
+    <div class="ch-row">
+      <label>关卡</label>
+      <div class="ch-step">
+        <button onclick="chStep('test',-1)">−</button>
+        <b>${ch.test}</b>
+        <button onclick="chStep('test',1)">+</button>
+      </div>
+    </div>
+    <div class="ch-rule-desc">${esc(descLine)}</div>
+    <div class="ch-progress">当前选择：第${ch.chapter}章·第${ch.test}关（第${id}关）<br>${progressLine}</div>
+  </div>`;
+}
+
+// ========================================
+// 初始化入口（联机启动见 index.html 内联脚本）
+// ========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  clearState();
+  render();
+});
+

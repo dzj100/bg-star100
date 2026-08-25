@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>时序谜局 · Take Time 桌游助手</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app"></div>
+
+<!-- 联机大厅容器（online.js 使用） -->
+<div id="online" style="display:none"></div>
+
+<!-- 通用弹窗（online.js 退出确认/玩家离开处理） -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal('modalOverlay')">
+  <div class="modal-box" id="modalContent"></div>
+</div>
+
+<!-- 出牌弹层 -->
+<div class="sheet-overlay" id="playSheet" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet" id="playSheetContent"></div>
+</div>
+
+<div id="init-loading-overlay">⏳ 加载中…</div>
+
+<script src="game.js"></script>
+<script src="render.js"></script>
+<script src="supabase.min.js"></script>
+<script src="net.js"></script>
+<script src="online.js"></script>
+<script>
+initOnline({
+  dealGame: (names) => { dealGame(names); },
+  render: () => render(),
+  renderLanding: () => renderLandingHTML(),
+  clearState: () => clearState(),
+  getOnlineState: () => getOnlineState(),
+  applyOnlineState: (state) => applyOnlineState(state),
+  addLog: (msg, cls) => addLog(msg, cls),
+  getPlayers: () => S.players,
+  getCurrentPlayer: () => (S && typeof S.currentSeat === 'number' ? S.currentSeat : 0),
+  getPlayerColors: () => PLAYER_COLORS,
+  showLanding: () => { clearState(); render(); },
+  waitingExtras: () => waitingExtrasHTML(),
+  updateDiceAreaUI: () => {},
+});
+</script>
+</body>
+</html>
