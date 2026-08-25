@@ -26,8 +26,8 @@ function cardsPerPlayer(n) {
 // 关卡库：id = (章-1)*4 + 关
 // check(sums, segments) 返回 { segOK, sumOK, ascOK, pass, items?, segBad? }
 //   items  可选：自定义检查项展示 [{label, ok}]（缺省用默认三项）
-//   segBad 可选：扇区不满足高亮 [bool×6]（缺省 = 该扇区不满足基础检查）
-// 基础规则（无自定义 check 时）：每扇区≥1张、每扇区≤24、扇区1→6递增
+//   segBad 可选：区域不满足高亮 [bool×6]（缺省 = 该区域不满足基础检查）
+// 基础规则（无自定义 check 时）：每区域≥1张、每区域≤24、区域1→6递增
 // ========================================
 
 const CHALLENGE_LIB = {
@@ -44,8 +44,8 @@ const CHALLENGE_LIB = {
       const items = [
         { label: '1号位：恰好1张太阳牌', ok: okS1 },
         { label: '6号位：恰好3张牌', ok: okS6 },
-        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
-        { label: '扇区1→6总和递增', ok: ascOK },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
       ];
       const segBad = segs.map((_, i) => i === 0 ? !okS1 : i === 5 ? !okS6 : !segOK[i]);
       return {
@@ -66,8 +66,8 @@ const CHALLENGE_LIB = {
       const items = [
         { label: '3号位总和在8~12之间', ok: okS3 },
         { label: '4号位：恰好3张牌', ok: okS4 },
-        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
-        { label: '扇区1→6总和递增', ok: ascOK },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
       ];
       const segBad = segs.map((_, i) => i === 2 ? !okS3 : i === 3 ? !okS4 : !segOK[i]);
       return {
@@ -90,8 +90,8 @@ const CHALLENGE_LIB = {
         { label: '第1张牌放在3号位', ok: firstInS3 },
         { label: '第2张牌放在2号位', ok: secondInS2 },
         { label: '6号位总和在20~30之间', ok: okS6 },
-        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
-        { label: '扇区1→6总和递增', ok: ascOK },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
       ];
       const segBad = segs.map((_, i) => i === 2 ? !firstInS3 : i === 1 ? !secondInS2 : i === 5 ? !okS6 : !segOK[i]);
       return {
@@ -114,9 +114,9 @@ const CHALLENGE_LIB = {
       const items = [
         { label: '1号位总和最接近6', ok: okClosest },
         { label: '4号位：1张太阳+1张月亮', ok: okS4 },
-        { label: '每扇区至少1张', ok: segOK.every(Boolean) },
-        { label: '扇区1→6总和递增', ok: ascOK },
-        { label: '每扇区总和≤24', ok: sumOK.every(Boolean) },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
       ];
       const segBad = segs.map((_, i) => i === 0 ? !okClosest : i === 3 ? !okS4 : !(segOK[i] && sumOK[i]));
       return {
@@ -143,7 +143,7 @@ function defaultCheck(sums, segments) {
 function challengeDesc(ch) {
   const lib = CHALLENGE_LIB[ch.id];
   if (lib && lib.desc) return lib.desc;
-  return '每扇区至少1张；每扇区总和≤24；扇区1→6总和递增';
+  return '每区域至少1张；每区域总和≤24；区域1→6总和递增';
 }
 
 /** 按关卡规则结算（未收录的关卡用默认规则） */
@@ -204,6 +204,18 @@ function isActor() {
   return typeof window._olIsActor !== 'function' || window._olIsActor();
 }
 
+/**
+ * 当前有效操作座位：本人；若轮到已离席玩家且本人是房主（接管中），
+ * 返回离席座位，使房主能查看/拖拽/放置被接管玩家的手牌。
+ */
+function actionSeat() {
+  const me = mySeat();
+  if (me === null) return null;
+  if (S.currentSeat === me) return me;
+  if (isHost() && (S.departedPlayers || []).includes(S.currentSeat)) return S.currentSeat;
+  return me;
+}
+
 function eyeLeft() {
   return S.eyeBase + S.eyeBonus - S.eyeUsed;
 }
@@ -217,11 +229,12 @@ function placedCount() {
  * 2人局特殊规则：看牌后只展示前4张，双方各打出2张牌（共4张）后解锁后2张。
  * 返回当前被锁定（不可查看/选择）的手牌索引集合。
  * 锁定基于发牌时的 lock 标记（随 splice 移动），保证出牌后仍指向原后2张。
+ * 接管时以被接管玩家的手牌为准（actionSeat）。
  */
 function handLockedIndexes() {
   if (S.players.length !== 2) return new Set();
   if (S.phase === 'discuss' || placedCount() >= 4) return new Set();
-  const me = mySeat();
+  const me = actionSeat();
   if (me === null) return new Set();
   return new Set(S.players[me].hand.map((c, i) => c.lock ? i : -1).filter(i => i >= 0));
 }
@@ -405,12 +418,16 @@ function spinTick() {
 function isMyTurn() {
   if (S.phase !== 'play') return false;
   const me = mySeat();
-  return me !== null && S.currentSeat === me;
+  if (me === null) return false;
+  if (S.currentSeat === me) return true;
+  // 轮到已离席玩家时，房主可代其操作
+  return isHost() && (S.departedPlayers || []).includes(S.currentSeat);
 }
 
 function selectCard(i) {
   if (!isMyTurn() || !isActor()) return;
-  if (!S.players[mySeat()].hand[i]) return;
+  const seat = actionSeat();
+  if (seat === null || !S.players[seat].hand[i]) return;
   if (handLockedIndexes().has(i)) return; // 2人局后2张未解锁，不可选择
   pendingPlay = { cardIndex: i, seg: -1, useEye: false };
   render();
@@ -435,26 +452,27 @@ function closePlaySheet() {
   render();
 }
 
-/** 当前玩家放置选中的牌到扇区 */
+/** 当前玩家放置选中的牌到区域（接管时放置被接管玩家的牌） */
 function placeCard() {
   if (!isMyTurn() || !isActor()) return;
   if (!pendingPlay || pendingPlay.seg === -1) return;
   if (pendingPlay.useEye && eyeLeft() <= 0) return;
 
-  const me = mySeat();
+  const me = actionSeat();
+  if (me === null) return;
   const card = S.players[me].hand.splice(pendingPlay.cardIndex, 1)[0];
   if (!card) return;
   card.revealed = pendingPlay.useEye;
   card.by = me;
-  card.fresh = true; // 新放置的牌：扇区渲染时播放入场动效
+  card.fresh = true; // 新放置的牌：区域渲染时播放入场动效
   card.order = S.turnNo + 1; // 全局放置序号（第3关「第1张/第2张」规则用）
   S.segments[pendingPlay.seg].cards.push(card);
   if (pendingPlay.useEye) S.eyeUsed++;
 
   addLog(
     pendingPlay.useEye
-      ? `${S.players[me].name} 明置 ☀${card.v} 到扇区${pendingPlay.seg + 1}（用1眼标记）`
-      : `${S.players[me].name} 暗置1张牌到扇区${pendingPlay.seg + 1}`
+      ? `${S.players[me].name} 明置 ☀${card.v} 到区域${pendingPlay.seg + 1}（用1眼标记）`
+      : `${S.players[me].name} 暗置1张牌到区域${pendingPlay.seg + 1}`
   );
   console.log('[taketime] place:', card.v, '-> seg', pendingPlay.seg, 'revealed', pendingPlay.useEye);
 
@@ -495,7 +513,7 @@ function settle() {
 
   if (S.pass) {
     S.eyeBonus = 0;
-    addLog('🎉 挑战成功！所有扇区满足要求');
+    addLog('🎉 挑战成功！所有区域满足要求');
   } else {
     S.eyeBonus = Math.min(S.eyeBonus + 1, MAX_EYE_BONUS);
     addLog('❌ 未通关，获赠 1 个眼标记（下次挑战本关可用）');

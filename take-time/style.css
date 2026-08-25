@@ -59,7 +59,7 @@ input { font-family:inherit; }
 .header-btns { display:flex; gap:8px; flex:0 0 auto; }
 .header-title { font-size:1.15rem; font-weight:700; flex:1; text-align:left; overflow:hidden; white-space:nowrap; }
 .ch-tag {
-  display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px;
+  display:none; margin-left:6px; padding:2px 8px; border-radius:6px;
   background:var(--card-bg); color:var(--gold); font-size:.72rem; font-weight:600;
   vertical-align:middle;
 }
@@ -122,7 +122,7 @@ input { font-family:inherit; }
 .cc-eye { font-size:1rem; margin-top:2px; }
 .cc-eye-sub { font-size:.62rem; color:var(--text-dim); margin-left:4px; }
 .clock-rule {
-  max-width:400px; margin:0 auto 6px; text-align:center;
+  max-width:400px; margin:10px auto 6px; text-align:center;
   font-size:.72rem; color:#ffd54f; line-height:1.4;
   background:rgba(0,0,0,.3); border-radius:8px; padding:5px 10px;
 }
@@ -171,6 +171,7 @@ input { font-family:inherit; }
   flex:0 0 auto; width:56px; height:84px; border-radius:8px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:2px; scroll-snap-align:start; transition:transform .12s, box-shadow .12s;
+  touch-action:none; user-select:none; -webkit-user-select:none;
 }
 /* 太阳牌：米金底黑字 */
 .card.sun { background:linear-gradient(160deg,#f2e4b8,#e3cf8e); border:2px solid var(--gold); color:#111; }
@@ -181,8 +182,29 @@ input { font-family:inherit; }
 .card.back.moon { background:linear-gradient(160deg,#242c46,#131a2e); border:2px solid #3f6ea8; }
 .card.back .c-icon { font-size:1.45rem; opacity:.85; }
 .card.sel { transform:translateY(-6px) scale(1.08); box-shadow:0 0 12px rgba(245,197,24,.7); border-color:#fff; }
+.card.dragging { opacity:.3; transform:scale(.85); box-shadow:none; }
 .card .c-icon { font-size:.8rem; }
 .card .c-num { font-size:1.3rem; font-weight:700; }
+
+/* 拖拽中的浮动卡片：跟随手指，略放大 + 金色光晕 */
+.drag-ghost {
+  position:fixed; left:0; top:0; z-index:300; pointer-events:none; width:64px; height:96px;
+  border-radius:10px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:2px;
+  box-shadow:0 10px 24px rgba(0,0,0,.5), 0 0 18px rgba(245,197,24,.65);
+  will-change:transform; /* GPU 合成层，transform 定位不触发布局 */
+}
+.drag-ghost.sun { background:linear-gradient(160deg,#f2e4b8,#e3cf8e); border:2px solid var(--gold); color:#111; }
+.drag-ghost.moon { background:linear-gradient(160deg,#242c46,#131a2e); border:2px solid #4a90d9; color:#fff; }
+.drag-ghost .c-icon { font-size:.9rem; }
+.drag-ghost .c-num { font-size:1.5rem; font-weight:700; }
+
+/* 拖拽悬停的目标区域：金色高亮 + 轻微放大 */
+.seg.drag-hover {
+  border-color:var(--gold); background:rgba(245,197,24,.14);
+  box-shadow:0 0 18px rgba(245,197,24,.7), inset 0 0 12px rgba(245,197,24,.25);
+  transform:scale(1.07); transition:transform .12s, box-shadow .12s, border-color .12s;
+}
 
 /* ── 操作区 ── */
 .action-box { margin-bottom:10px; }
@@ -228,7 +250,7 @@ input { font-family:inherit; }
   cursor:pointer; text-align:center; user-select:none;
 }
 .log-box .log-item { text-align:left; }
-.log-more { font-size:.62rem; color:var(--text-dim); opacity:.75; margin-top:2px; }
+.log-more { display:none; font-size:.62rem; color:var(--text-dim); opacity:.75; margin-top:2px; }
 .log-list { display:flex; flex-direction:column; gap:6px; }
 .log-list .log-item { font-size:.8rem; color:var(--text-dim); line-height:1.6; }
 .log-item { font-size:.7rem; color:var(--text-dim); line-height:1.7; }

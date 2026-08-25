@@ -13,10 +13,11 @@ function closeSheet() {
   const sheet = document.getElementById('playSheet');
   if (sheet) sheet.classList.remove('show');
   pendingPlay = null;
+  render(); // 清除手牌上的 sel 高亮
 }
 
 // ========================================
-// 扇区定位（6扇区环形，扇区1在正上方，顺时针）
+// 区域定位（6区域环形，区域1在正上方，顺时针）
 // ========================================
 
 function segPos(i) {
@@ -58,7 +59,7 @@ function segHTML(i) {
     // 自定义关卡用 check.segBad，否则用基础检查
     cls = S.check.segBad ? (S.check.segBad[i] ? ' seg-bad' : '') : (!(S.check.segOK[i] && S.check.sumOK[i]) ? ' seg-bad' : '');
   }
-  return `<div class="seg${cls}" style="left:${pos.x}%;top:${pos.y}%">
+  return `<div class="seg${cls}" data-i="${i}" style="left:${pos.x}%;top:${pos.y}%">
     <div class="seg-idx">${i + 1}</div>
     ${body}
   </div>`;
@@ -106,14 +107,15 @@ function playersBarHTML() {
 // ========================================
 
 function handHTML() {
-  const me = mySeat();
+  const me = actionSeat();
   if (me === null) return '';
   const p = S.players[me];
   if (!p.hand.length) return ''; // 已全部打出（进入结算环节），隐藏手牌区
   const canSee = S.phase === 'reveal' || S.phase === 'spin' || S.phase === 'play' || S.phase === 'result';
   const myTurn = isMyTurn();
   const locked = handLockedIndexes();
-  let title = '我的手牌';
+  const taking = me !== mySeat();
+  let title = taking ? `⚑ 接管 ${esc(p.name)} 的手牌` : '我的手牌';
   if (S.phase === 'discuss') title = '我的手牌（未看牌，牌面向下）';
   else if (locked.size > 0) title = '我的手牌（后2张暂锁定：双方各出2张后解锁）';
 
@@ -121,8 +123,8 @@ function handHTML() {
     // 牌背：按日/月显示 ☀/☾ 与对应底色（隐藏数字）
     if (!canSee || locked.has(i)) return `<div class="card back ${c.color}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span></div>`;
     const sel = pendingPlay && pendingPlay.cardIndex === i ? ' sel' : '';
-    const clickable = myTurn ? `onclick="selectCard(${i})"` : '';
-    return `<div class="card ${c.color}${sel}" ${clickable}>
+    const draggable = myTurn ? `onpointerdown="cardDragStart(event, ${i})"` : '';
+    return `<div class="card ${c.color}${sel}" ${draggable}>
       <span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span>
       <span class="c-num">${c.v}</span>
     </div>`;
@@ -147,9 +149,9 @@ function resultHTML() {
   const checks = (chk.items && chk.items.length)
     ? chk.items
     : [
-        { label: '每扇区至少1张', ok: chk.segOK.every(Boolean) },
-        { label: '每扇区总和≤24', ok: chk.sumOK.every(Boolean) },
-        { label: '扇区1→6递增', ok: chk.ascOK },
+        { label: '每区域至少1张', ok: chk.segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: chk.sumOK.every(Boolean) },
+        { label: '区域1→6递增', ok: chk.ascOK },
       ];
   const checkRow = checks.map(c =>
     `<div class="check-item ${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'} ${esc(c.label)}</div>`).join('');
@@ -208,7 +210,8 @@ function actionHTML() {
           <div class="wait-text">所有手牌已放置，点击按钮翻开结算</div>`;
       }
       if (isMyTurn()) {
-        return `<div class="turn-tip">👆 轮到你出牌：点击下方手牌选择一张<br><span class="forbid">🔇 已看牌，禁止交流</span></div>`;
+        const taking = actionSeat() !== mySeat();
+        return `<div class="turn-tip">${taking ? `⚑ 已接管 ${esc(S.players[actionSeat()].name)}，代其` : '👆 轮到你出牌，'}拖拽下方手牌到钟面区域<br><span class="forbid">🔇 已看牌，禁止交流</span></div>`;
       }
       return `<div class="wait-text forbid">🔇 已看牌，禁止交流<br>等待 <b>${esc(S.players[S.currentSeat].name)}</b> 出牌…</div>`;
     case 'result':
@@ -237,6 +240,7 @@ function showLogModal() {
     ov = document.createElement('div');
     ov.id = 'logModalOverlay';
     ov.className = 'modal-overlay';
+    ov.setAttribute('onclick', "if(event.target===this)closeModal('logModalOverlay')");
     ov.innerHTML = `
       <div class="modal-box">
         <h2>📜 对局日志</h2>
@@ -258,32 +262,115 @@ function cardBigHTML(c) {
   return `<span class="card-big ${c.color}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span><span class="c-num">${c.v}</span></span>`;
 }
 
+// ========================================
+// 拖拽出牌（按住手牌拖到区域，松开弹确认）
+// ========================================
+
+let _drag = null;
+const DRAG_THRESHOLD = 8;
+const GHOST_W = 64, GHOST_H = 96; // 与 .drag-ghost 尺寸一致
+
+function dragGhostHTML(c) {
+  return `<div class="drag-ghost ${c.color}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span><span class="c-num">${c.v}</span></div>`;
+}
+
+function cardDragStart(e, i) {
+  if (!isMyTurn() || !isActor()) return;
+  const seat = actionSeat();
+  if (seat === null || !S.players[seat].hand[i]) return;
+  if (handLockedIndexes().has(i)) return;
+  e.preventDefault();
+  // 缓存 6 个区域圆（屏内固定），拖拽中用纯几何命中检测，避免每帧 DOM 查询
+  const segs = document.querySelectorAll('.seg');
+  const circles = [];
+  for (const s of segs) {
+    const r = s.getBoundingClientRect();
+    circles.push({ cx: r.left + r.width / 2, cy: r.top + r.height / 2, r: r.width / 2 });
+  }
+  _drag = { cardIndex: i, startX: e.clientX, startY: e.clientY, moved: false, seg: -1, ghost: null, circles };
+  document.addEventListener('pointermove', cardDragMove);
+  document.addEventListener('pointerup', cardDragEnd);
+  document.addEventListener('pointercancel', cardDragEnd);
+}
+
+function cardDragMove(e) {
+  if (!_drag) return;
+  const dx = e.clientX - _drag.startX;
+  const dy = e.clientY - _drag.startY;
+  if (!_drag.moved) {
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    _drag.moved = true;
+    const me = actionSeat();
+    const card = S.players[me].hand[_drag.cardIndex];
+    _drag.ghost = document.createElement('div');
+    _drag.ghost.innerHTML = dragGhostHTML(card);
+    _drag.ghost = _drag.ghost.firstElementChild;
+    document.body.appendChild(_drag.ghost);
+    const src = document.querySelectorAll('.hand-row .card')[_drag.cardIndex];
+    if (src) src.classList.add('dragging');
+  }
+  // transform 定位（像素偏移，不用百分比）：合成层移动，不触发布局
+  _drag.ghost.style.transform = `translate(${e.clientX - GHOST_W / 2}px, ${e.clientY - GHOST_H / 2}px) rotate(-4deg)`;
+  // 几何命中：指针在哪个区域圆内
+  let segIdx = -1;
+  for (let k = _drag.circles.length - 1; k >= 0; k--) {
+    const c = _drag.circles[k];
+    const d = Math.hypot(e.clientX - c.cx, e.clientY - c.cy);
+    if (d <= c.r * 1.1) { segIdx = k; break; }
+  }
+  if (segIdx !== _drag.seg) {
+    const segs = document.querySelectorAll('.seg');
+    if (_drag.seg >= 0 && segs[_drag.seg]) segs[_drag.seg].classList.remove('drag-hover');
+    _drag.seg = segIdx;
+    if (segIdx >= 0 && segs[segIdx]) segs[segIdx].classList.add('drag-hover');
+  }
+}
+
+function cardDragEnd() {
+  if (!_drag) return;
+  document.removeEventListener('pointermove', cardDragMove);
+  document.removeEventListener('pointerup', cardDragEnd);
+  document.removeEventListener('pointercancel', cardDragEnd);
+  const drag = _drag;
+  _drag = null;
+  if (drag.ghost) drag.ghost.remove();
+  const segs = document.querySelectorAll('.seg');
+  if (drag.seg >= 0 && segs[drag.seg]) segs[drag.seg].classList.remove('drag-hover');
+  if (!drag.moved || drag.seg < 0) { render(); return; } // 落空/轻触：牌保持手牌区
+  selectCard(drag.cardIndex);
+  if (pendingPlay) pendingPlay.seg = drag.seg;
+  render();
+}
+
 function renderPlaySheet() {
   const sheet = document.getElementById('playSheet');
   if (!sheet) return;
   const content = document.getElementById('playSheetContent');
   if (!pendingPlay) { sheet.classList.remove('show'); return; }
-  const me = mySeat();
+  const me = actionSeat();
   if (me === null) { sheet.classList.remove('show'); return; }
   const card = S.players[me].hand[pendingPlay.cardIndex];
   if (!card) { sheet.classList.remove('show'); return; }
 
   const left = eyeLeft();
-  const segBtns = S.segments.map((seg, i) => {
+  const segGrid = pendingPlay.seg >= 0 ? '' : `<div class="seg-grid">${S.segments.map((seg, i) => {
     const visibleSum = seg.cards.filter(c => c.revealed).reduce((a, c) => a + c.v, 0);
     const sel = pendingPlay.seg === i ? ' sel' : '';
     return `<button class="seg-btn${sel}" onclick="pickSeg(${i})">
-      扇区${i + 1}<span class="sg-sub">${seg.cards.length}张${visibleSum ? '·' + visibleSum : ''}</span>
+      区域${i + 1}<span class="sg-sub">${seg.cards.length}张${visibleSum ? '·' + visibleSum : ''}</span>
     </button>`;
-  }).join('');
+  }).join('')}</div>`;
+  const title = pendingPlay.seg >= 0
+    ? `是否将 ${cardBigHTML(card)} 放置到 <b>${pendingPlay.seg + 1}号区域</b>？`
+    : `将 ${cardBigHTML(card)} 放置到哪个区域？`;
 
   const eyeChip = left > 0
     ? `<label class="eye-opt" onclick="toggleEye()"><span class="eye-box">${pendingPlay.useEye ? '☑' : '☐'}</span> 明置此牌（消耗1眼标记，剩${left}）</label>`
     : `<div class="eye-opt off">👁 眼标记已用完，此牌将暗置打出</div>`;
 
   content.innerHTML = `
-    <h3>将 ${cardBigHTML(card)} 放置到哪个扇区？</h3>
-    <div class="seg-grid">${segBtns}</div>
+    <h3>${title}</h3>
+    ${segGrid}
     ${eyeChip}
     <button class="btn-full btn-primary" onclick="placeCard()" ${pendingPlay.seg === -1 ? 'disabled' : ''}>确认放置</button>
     <button class="btn-full btn-secondary" onclick="closePlaySheet()">取消</button>`;
@@ -355,11 +442,11 @@ function render() {
     <div class="header-title">⏳ 时序谜局 <span class="ch-tag">第${ch.chapter}章·第${ch.test}关</span></div>
     <div class="header-btns"><button class="icon-btn" onclick="showRulesModal()">📖 规则</button></div>
   </div>
+  ${logHTML()}
   ${clockHTML()}
   ${playersBarHTML()}
   ${handHTML()}
   <div class="action-box">${actionHTML()}</div>
-  ${logHTML()}
   `;
 
   renderPlaySheet();

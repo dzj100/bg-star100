@@ -95,7 +95,7 @@ for (const n of [2, 3, 4]) {
   assert(g.S.players.every(p => p.hand.length === per), `${n}人局每人${per}张`);
   assert(new Set(allCards.map(c => c.v)).size === 12, `${n}人局数字1-12无重复`);
   assert(allCards.every(c => c.color === 'sun' || c.color === 'moon'), '牌色合法');
-  assert(g.S.segments.length === 6 && g.S.segments.every(s => s.cards.length === 0), '6个空扇区');
+  assert(g.S.segments.length === 6 && g.S.segments.every(s => s.cards.length === 0), '6个空区域');
   assert(g.S.eyeBase === n && g.S.eyeBonus === 0, `基础眼标记=${n}`);
   assert(g.S.phase === 'discuss', '初始阶段 discuss');
 }
@@ -123,7 +123,7 @@ assert(g._pendingPlay && g._pendingPlay.cardIndex === 0, '选中手牌');
 g.pickSeg(2);
 g._pendingPlay.useEye = true;
 g.placeCard();
-assert(g.S.segments[2].cards.length === seg0Before + 1, '牌已放置到扇区3');
+assert(g.S.segments[2].cards.length === seg0Before + 1, '牌已放置到区域3');
 const placed = g.S.segments[2].cards[g.S.segments[2].cards.length - 1];
 assert(placed.revealed === true, '眼标记出牌为明置');
 assert(g.eyeLeft() === eye0 - 1, '眼标记消耗1', { eye0, left: g.eyeLeft() });
@@ -145,7 +145,7 @@ g.S.eyeUsed = 0;
 console.log('\n[结算]');
 g.dealGame(g.S.players.map(p => p.name), { chapter: 1, test: 1, id: 1, rule: '' });
 g.hostReveal(); g.hostStartSpin(); g.hostStopSpin(); // 推进到 play 阶段
-// 先手0，所有玩家依次出牌：全部暗置，按放置计数循环分配到扇区
+// 先手0，所有玩家依次出牌：全部暗置，按放置计数循环分配到区域
 let seat = 0, segIdx = 0;
 const nPlayers = g.S.players.length;
 while (g.S.players.some(p => p.hand.length > 0)) {
@@ -161,18 +161,18 @@ assert(g.S.allPlaced === true, '全部打出后 allPlaced=true');
 g.settle();
 assert(g.S.settled === true && g.S.phase === 'result', '结算完成');
 assert(g.S.sums && g.S.sums.length === 6, 'sums 计算');
-assert(g.S.check.segOK.every(Boolean), '每扇区≥1张检查');
+assert(g.S.check.segOK.every(Boolean), '每区域≥1张检查');
 assert(g.S.check.ascOK === g.S.sums.every((s, i) => i === 0 || s >= g.S.sums[i - 1]), '递增检查与手算一致');
 const progFail = g.loadProgress()[1];
 assert(progFail && (progFail.passed === g.S.pass) && typeof progFail.bonus === 'number', '进度已写入');
 
-// 失败场景：清空扇区3 → 破坏「每扇区≥1张」，确定性失败
+// 失败场景：清空区域3 → 破坏「每区域≥1张」，确定性失败
 const bonusBefore = g.S.eyeBonus;
 g.S.settled = false; g.S.phase = 'play'; g.S.allPlaced = true;
 g.S.segments[2].cards = [];
 g.settle();
 assert(g.S.pass === false, '构造失败场景 pass=false');
-assert(g.S.check.segOK[2] === false, '失败原因：扇区3无牌');
+assert(g.S.check.segOK[2] === false, '失败原因：区域3无牌');
 assert(g.S.eyeBonus === Math.min(bonusBefore + 1, 3) && g.S.eyeBonus >= 1, '失败后赠送1眼标记', { before: bonusBefore, after: g.S.eyeBonus });
 const progFail2 = g.loadProgress()[1];
 assert(progFail2.bonus >= 1 && progFail2.bonus <= 3, '失败后赠送眼标记上限3', progFail2.bonus);
@@ -225,15 +225,15 @@ assert(g.handLockedIndexes().size === 0, '3人局无锁定');
 
 // ── 7. 关卡库 ──
 console.log('\n[关卡库]');
-assert(g.challengeDesc({ id: 99 }) === '每扇区至少1张；每扇区总和≤24；扇区1→6总和递增', '未收录关卡用默认规则文案');
+assert(g.challengeDesc({ id: 99 }) === '每区域至少1张；每区域总和≤24；区域1→6总和递增', '未收录关卡用默认规则文案');
 const dflt = g.challengeCheck({ id: 99 }, [1, 2, 3, 4, 5, 6], [{ cards: [1] }]);
 assert(dflt.pass === true, '默认规则判定通过');
 const dfltFail = g.challengeCheck({ id: 99 }, [25, 2, 3, 4, 5, 6], [{ cards: [1] }]);
-assert(dfltFail.pass === false && dfltFail.sumOK[0] === false, '默认规则 扇区>24 判失败');
+assert(dfltFail.pass === false && dfltFail.sumOK[0] === false, '默认规则 区域>24 判失败');
 
 g.CHALLENGE_LIB[42] = {
   chapter: 1, test: 2, name: '测试关',
-  desc: '扇区1总和必须为偶数',
+  desc: '区域1总和必须为偶数',
   check: (sums) => {
     const segOK = [true, true, true, true, true, true];
     const sumOK = sums.map(s => s <= 24);
@@ -242,13 +242,13 @@ g.CHALLENGE_LIB[42] = {
     return { segOK, sumOK, ascOK, pass: segOK.every(Boolean) && sumOK.every(Boolean) && ascOK && extra };
   },
 };
-assert(g.challengeDesc({ id: 42 }) === '扇区1总和必须为偶数', '关卡库规则文案');
+assert(g.challengeDesc({ id: 42 }) === '区域1总和必须为偶数', '关卡库规则文案');
 const libPass = g.challengeCheck({ id: 42 }, [4, 0, 0, 0, 0, 0], [{ cards: [1] }]);
 assert(libPass.pass === true, '关卡库规则：偶数通过');
 const libFail = g.challengeCheck({ id: 42 }, [3, 0, 0, 0, 0, 0], [{ cards: [1] }]);
 assert(libFail.pass === false, '关卡库规则：奇数失败');
 g.dealGame(['A', 'B'], { chapter: 1, test: 2, id: 42 });
-assert(g.S.challenge.desc === '扇区1总和必须为偶数', 'dealGame 携带关卡规则文案');
+assert(g.S.challenge.desc === '区域1总和必须为偶数', 'dealGame 携带关卡规则文案');
 delete g.CHALLENGE_LIB[42]; // 清理临时关卡，不碰内置关卡
 
 // ── 8. 第1章4关内置规则 ──
@@ -335,6 +335,48 @@ g._pendingPlay = { cardIndex: 0, seg: 1, useEye: false }; // 第2张 → 2号位
 g.placeCard();
 assert(g.S.segments[2].cards[0].order === 1, '第1张牌 order=1');
 assert(g.S.segments[1].cards[0].order === 2, '第2张牌 order=2');
+
+// ── 9. 房主接管离席玩家（轮到离席玩家时房主代操作） ──
+console.log('\n[房主接管离席玩家]');
+g._olSeatIndex = () => 0;
+g.dealGame(['房主', '小明'], { chapter: 1, test: 1, id: 1 });
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 1;          // 轮到离席玩家
+g.S.departedPlayers = [1];    // 房主已点击「接管操作」
+g.S.players[0].hand = [];     // 房主自己的牌已出完
+const depHand = g.S.players[1].hand.length;
+assert(depHand > 0, `离席玩家有手牌 ${depHand} 张`);
+assert(g.isMyTurn() === true, '轮到离席玩家时房主 isMyTurn=true');
+assert(g.actionSeat() === 1, 'actionSeat 返回离席座位');
+g.selectCard(0);
+assert(g._pendingPlay && g._pendingPlay.cardIndex === 0, '可选中离席玩家手牌');
+g._pendingPlay.seg = 2;
+g.placeCard();
+assert(g.S.players[1].hand.length === depHand - 1, '离席玩家手牌减少1');
+assert(g.S.segments[2].cards.length === 1, '代打牌放入区域3');
+assert(g.S.segments[2].cards[0].by === 1, '牌归属记录为离席座位');
+assert(g.S.currentSeat === 0, '代打出牌后轮转回房主');
+assert(g.S.log[g.S.log.length - 1].msg.includes('小明'), '日志记录离席玩家名字');
+
+// 轮到房主自己时仍正常操作自己的手牌
+g.S.players[0].hand = [{ v: 9, color: 'sun' }];
+assert(g.isMyTurn() === true && g.actionSeat() === 0, '轮到自己 actionSeat=自己');
+g.selectCard(0);
+g._pendingPlay.seg = 0;
+g.placeCard();
+assert(g.S.players[0].hand.length === 0, '房主自己的牌正常打出');
+assert(g.S.segments[0].cards[0].by === 0, '房主的牌归属自己');
+
+// 非房主成员端（座位2 观察者）在轮到离席玩家时不可操作
+g._olSeatIndex = () => 2;
+g._olIsHost = () => false;
+g.S.currentSeat = 1;
+g.S.departedPlayers = [1];
+assert(g.isMyTurn() === false, '成员端轮到离席玩家时不可代操作');
+assert(g.actionSeat() === 2, '成员端 actionSeat 仍为自己');
+g._olSeatIndex = () => 0;
+g._olIsHost = () => true;
 
 console.log(`\n结果: ${passCount} 通过 / ${failCount} 失败`);
 process.exit(failCount ? 1 : 0);
