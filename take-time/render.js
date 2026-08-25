@@ -109,6 +109,7 @@ function handHTML() {
   const me = mySeat();
   if (me === null) return '';
   const p = S.players[me];
+  if (!p.hand.length) return ''; // 已全部打出（进入结算环节），隐藏手牌区
   const canSee = S.phase === 'reveal' || S.phase === 'spin' || S.phase === 'play' || S.phase === 'result';
   const myTurn = isMyTurn();
   const locked = handLockedIndexes();
@@ -161,9 +162,23 @@ function resultHTML() {
       ? '👁 赠送眼标记已回收'
       : `👁 获赠 1 个眼标记（累计 ${S.eyeBonus}/${3}），下次挑战本关可用`}</div>
     ${isHost()
-      ? `<button class="btn-full btn-primary" onclick="restartChallenge()" style="margin-top:12px;">🔄 再来一局</button>`
+      ? `<div class="result-actions">${pass
+          ? `<button class="btn-full btn-primary" onclick="restartChallenge()">🔄 重试本关</button>
+             <button class="btn-full btn-secondary" onclick="nextChallenge()">⏭ 下一关</button>`
+          : `<button class="btn-full btn-primary" onclick="restartChallenge()">🔄 重试本关</button>`}
+      </div>`
       : `<div class="wait-text" style="margin-top:12px;">等待房主开始下一局…</div>`}
   </div>`;
+}
+
+/** 通关所有章节提示弹窗 */
+function showAllDoneModal() {
+  const box = document.getElementById('modalContent');
+  box.innerHTML = `
+    <h2>🎉 恭喜通关！</h2>
+    <div class="rules-body"><p style="text-align:center;">你已通关所有章节，后续内容敬请期待！</p></div>
+    <button class="btn-full btn-secondary" onclick="closeModal('modalOverlay')" style="margin-top:14px;">知道了</button>`;
+  document.getElementById('modalOverlay').classList.add('show');
 }
 
 // ========================================
@@ -285,8 +300,8 @@ function showRulesModal() {
   box.innerHTML = `
     <h2>📖 游戏规则</h2>
     <div class="rules-body">
-      <p>🕰️ 支持 2~4 人合作的游戏，桌上有一个 1~6 号的钟面，玩家轮流将手牌一张张放进区域，最后翻开结算——只要满足关卡规则，则本关通关。</p>
-      <p>🃏 <b>牌库</b>：☀ 太阳牌、☾ 月亮牌数字各 1~12，每局随机抽 12 张均分给玩家（2人各6张 / 3人各4张 / 4人各3张）。</p>
+      <p>🕰️ 支持 2~4 人合作的游戏，桌上有一个 1~6 号的钟面，玩家轮流将手牌的一张放进区域，所有手牌打出后翻开结算</p>
+      <p>🃏 <b>牌库</b>：☀ 太阳牌、☾ 月亮牌数字各 1~12，每局随机抽 12 张均分给玩家（2人各6张 / 3人各4张 / 4人各3张）</p>
       <h3>🎮 玩法流程</h3>
       <table class="rules-table">
         <tr><td>1. 发牌后先<b>讨论</b>策略（此时看不到自己的牌）</td></tr>
@@ -348,6 +363,9 @@ function render() {
   `;
 
   renderPlaySheet();
+
+  // 入场动效只播一次：渲染后清除 fresh，避免后续 render（点选手牌等）重播动画
+  S.segments.forEach(seg => seg.cards.forEach(c => { c.fresh = false; }));
 
   // 聚光灯本地动画（不推送）
   if (S.phase === 'spin' && S.spin.running) {

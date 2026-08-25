@@ -192,7 +192,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
     return { seat: s.currentSeat, hostSeat: window._olSeatIndex(), phase: s.phase };
   });
   console.log('结算后 currentSeat:', curSeatAfterSettle.seat, '房主座位:', curSeatAfterSettle.hostSeat);
-  await p1.click('button:has-text("再来一局")');
+  await p1.click('button:has-text("重试本关")');
   await p1.waitForTimeout(2500);
   await p2.waitForTimeout(2500);
   const restartP1 = await p1.evaluate(() => {

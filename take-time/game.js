@@ -523,6 +523,23 @@ function restartChallenge() {
   dealGame(names, ch);
 }
 
+/** 下一关（仅房主，通关后进入后一关；跨章自动衔接；无下一关时弹窗提示） */
+function nextChallenge() {
+  if (!isHost()) return;
+  if (S.phase !== 'result' || !S.pass) return;
+  const seat = mySeat();
+  if (seat !== null) S.currentSeat = seat;
+  if (!isActor()) return;
+  const nextId = S.challenge.id + 1;
+  const lib = CHALLENGE_LIB[nextId];
+  if (!lib) {
+    if (typeof showAllDoneModal === 'function') showAllDoneModal();
+    return;
+  }
+  const names = S.players.map(p => p.name);
+  dealGame(names, { chapter: lib.chapter, test: lib.test, id: nextId });
+}
+
 // ========================================
 // 联机状态应用
 // ========================================

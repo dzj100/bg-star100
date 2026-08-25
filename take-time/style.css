@@ -75,7 +75,7 @@ input { font-family:inherit; }
   background:radial-gradient(circle, rgba(15,52,96,.45) 0%, rgba(22,33,62,.6) 55%, transparent 70%);
 }
 .seg {
-  position:absolute; width:30%; aspect-ratio:1; border-radius:50%;
+  position:absolute; width:30%; height:30%; border-radius:50%;
   background:var(--card-bg); border:2px solid #2a4a7a;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:2px; padding:6% 2%; text-align:center;
@@ -219,6 +219,8 @@ input { font-family:inherit; }
 .check-item.ok { color:var(--safe); }
 .check-item.bad { color:var(--danger); }
 .result-note { text-align:center; font-size:.85rem; color:var(--gold); }
+.result-actions { display:flex; gap:8px; margin-top:12px; }
+.result-actions .btn-full { margin-top:0; flex:1; }
 
 /* ── 日志 ── */
 .log-box {
