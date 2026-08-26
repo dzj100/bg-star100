@@ -387,7 +387,7 @@ function renderPlaySheet() {
 function showRulesModal() {
   const box = document.getElementById('modalContent');
   box.innerHTML = `
-    <h2>📖 游戏规则</h2>
+    <h2 class="log-modal-title">📖 游戏规则</h2>
     <div class="rules-body">
       <p>🕰️ 支持 2~4 人合作的游戏，桌上有一个 1~6 号的钟面，玩家轮流将手牌的一张放进区域，所有手牌打出后翻开结算</p>
       <p>🃏 <b>牌库</b>：☀ 太阳牌、☾ 月亮牌数字各 1~12，每局随机抽 12 张均分给玩家（2人各6张 / 3人各4张 / 4人各3张）</p>
@@ -402,7 +402,7 @@ function showRulesModal() {
       <table class="rules-table">
         <tr><td>1. 每个区域都<b>至少 1 张牌</b></td></tr>
         <tr><td>2. 各区域总和从 1 号到 6 号<b>相等或递增</b></td></tr>
-        <tr><td>3. 各区域总和<b>不大于 24</b>（第 1 章入门关除外）</td></tr>
+        <tr><td>3. 各区域总和<b>不大于 24</b>（第 1 章前三关除外）</td></tr>
       </table>
       <p>👁 <b>眼标记</b>：初始数量 = 玩家人数；未通关则额外增加 1 个（至多 3 个），通关后清零。</p>
       <p class="rules-note"> 2 人局特殊规则：每人 6 张牌，看牌时只展示前 4 张；双方各打出 2 张后，后 2 张才解锁可见。</p>

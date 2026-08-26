@@ -115,14 +115,100 @@ const CHALLENGE_LIB = {
         { label: '1号位：总和最接近6', ok: okClosest },
         { label: '4号位：1张太阳+1张月亮', ok: okS4 },
         { label: '每区域至少1张', ok: segOK.every(Boolean) },
-        { label: '区域1→6总和递增', ok: ascOK },
         { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
       ];
       const segBad = segs.map((_, i) => i === 0 ? !okClosest : i === 3 ? !okS4 : !(segOK[i] && sumOK[i]));
       return {
         segOK, sumOK, ascOK, items, segBad,
         pass: okClosest && okS4 && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
       };
+    },
+  },
+  // ── 第2章 ──
+  5: {
+    name: '禁三', chapter: 2, test: 1,
+    desc: '1号位不能放1/2/3；2号位不能放1/2/3；3号位不能放1/2/3',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const forbid123 = seg => seg.cards.every(c => c.v > 3);
+      const okS0 = forbid123(segs[0]);
+      const okS1 = forbid123(segs[1]);
+      const okS2 = forbid123(segs[2]);
+      const items = [
+        { label: '1号位：没有1/2/3', ok: okS0 },
+        { label: '2号位：没有1/2/3', ok: okS1 },
+        { label: '3号位：没有1/2/3', ok: okS2 },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i <= 2 ? (i === 0 ? !okS0 : i === 1 ? !okS1 : !okS2) : !(segOK[i] && sumOK[i]));
+      return { segOK, sumOK, ascOK, items, segBad, pass: okS0 && okS1 && okS2 && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK };
+    },
+  },
+  6: {
+    name: '禁高', chapter: 2, test: 2,
+    desc: '3号位不能放7/8/9；4号位不能放7/8/9',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const forbid789 = seg => seg.cards.every(c => c.v < 7 || c.v > 9);
+      const okS2 = forbid789(segs[2]);
+      const okS3 = forbid789(segs[3]);
+      const items = [
+        { label: '3号位：没有7/8/9', ok: okS2 },
+        { label: '4号位：没有7/8/9', ok: okS3 },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i === 2 ? !okS2 : i === 3 ? !okS3 : !(segOK[i] && sumOK[i]));
+      return { segOK, sumOK, ascOK, items, segBad, pass: okS2 && okS3 && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK };
+    },
+  },
+  7: {
+    name: '四禁', chapter: 2, test: 3,
+    desc: '1号位不能放1/2/3；3号位不能放4/5/6；4号位不能放7/8/9；6号位不能放10/11/12',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const okS0 = segs[0].cards.every(c => c.v > 3);
+      const okS2 = segs[2].cards.every(c => c.v < 4 || c.v > 6);
+      const okS3 = segs[3].cards.every(c => c.v < 7 || c.v > 9);
+      const okS5 = segs[5].cards.every(c => c.v < 10 || c.v > 12);
+      const items = [
+        { label: '1号位：没有1/2/3', ok: okS0 },
+        { label: '3号位：没有4/5/6', ok: okS2 },
+        { label: '4号位：没有7/8/9', ok: okS3 },
+        { label: '6号位：没有10/11/12', ok: okS5 },
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => i === 0 ? !okS0 : i === 2 ? !okS2 : i === 3 ? !okS3 : i === 5 ? !okS5 : !(segOK[i] && sumOK[i]));
+      return { segOK, sumOK, ascOK, items, segBad, pass: okS0 && okS2 && okS3 && okS5 && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK };
+    },
+  },
+  8: {
+    name: '无眼', chapter: 2, test: 4,
+    desc: '不能使用眼标记',
+    noEye: true,
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      return { segOK, sumOK, ascOK, items, segBad, pass: segOK.every(Boolean) && sumOK.every(Boolean) && ascOK };
     },
   },
 };
@@ -361,8 +447,13 @@ function dealGame(names, challenge) {
   };
   pendingPlay = null;
 
-  addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${n + bonus}个眼标记`);
-  console.log(`[taketime] deal ${n} players x ${per} cards, eyeBase=${n}, eyeBonus=${bonus}`);
+  // 关卡覆盖：禁止使用眼标记
+  const lib = CHALLENGE_LIB[ch.id];
+  if (lib && lib.noEye) { S.eyeBase = 0; S.eyeBonus = 0; }
+
+  const eyeTotal = S.eyeBase + S.eyeBonus;
+  addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${eyeTotal}个眼标记`);
+  console.log(`[taketime] deal ${n} players x ${per} cards, eyeBase=${S.eyeBase}, eyeBonus=${S.eyeBonus}`);
   saveState();
   render();
 }
