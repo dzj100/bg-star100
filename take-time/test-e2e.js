@@ -188,10 +188,14 @@ fs.mkdirSync(SHOTS, { recursive: true });
   await p1.screenshot({ path: SHOTS + '/e2e-14-all-placed.png' });
   await p2.screenshot({ path: SHOTS + '/e2e-15-all-placed-p2.png' });
 
-  // ── 结算（任意玩家：P2 结算，currentSeat 变为 P2）──
-  await p2.click('button:has-text("翻开所有牌")');
-  await p2.waitForTimeout(2000);
+  // ── 结算（仅房主：P2 成员侧看不到按钮，P1 房主点击）──
+  const settleBtnP2 = await p2.locator('button:has-text("翻开所有牌")').count();
+  if (settleBtnP2 !== 0) throw new Error('成员侧仍显示结算按钮');
+  const waitTextP2 = await p2.evaluate(() => document.querySelector('.action-box')?.textContent || '');
+  if (!waitTextP2.includes('等待房主')) throw new Error('成员侧缺少「等待房主」提示');
+  await p1.click('button:has-text("翻开所有牌")');
   await p1.waitForTimeout(2000);
+  await p2.waitForTimeout(2000);
   await p1.screenshot({ path: SHOTS + '/e2e-16-result-host.png' });
   await p2.screenshot({ path: SHOTS + '/e2e-17-result-p2.png' });
 

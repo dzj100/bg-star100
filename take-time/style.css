@@ -37,7 +37,7 @@ input { font-family:inherit; }
 .btn-secondary { background:var(--surface); color:var(--text); border:1px solid #24365a; }
 .btn-danger { background:var(--danger); color:#fff; }
 .icon-btn {
-  min-height:36px; padding:0 12px; border-radius:8px; font-size:.85rem;
+  min-height:31px; padding:0 10px; border-radius:8px; font-size:.78rem;
   background:var(--surface); color:var(--text); border:1px solid #24365a;
 }
 .back-btn {
@@ -57,7 +57,7 @@ input { font-family:inherit; }
   margin-bottom:10px; gap:8px;
 }
 .header-btns { display:flex; gap:8px; flex:0 0 auto; }
-.header-title { font-size:1.15rem; font-weight:700; flex:1; text-align:left; overflow:hidden; white-space:nowrap; }
+.header-title { font-size:1.0rem; font-weight:700; flex:1; text-align:left; overflow:hidden; white-space:nowrap; }
 .ch-tag {
   display:none; margin-left:6px; padding:2px 8px; border-radius:6px;
   background:var(--card-bg); color:var(--gold); font-size:.72rem; font-weight:600;
@@ -271,9 +271,10 @@ input { font-family:inherit; }
 }
 .modal-overlay.show .modal-box { transform:translateY(0); }
 .modal-box h2, .modal-box h3 { text-align:center; margin-bottom:10px; }
+.modal-box h2.log-modal-title { font-size:1.02rem; }
 .modal-box p { text-align:center; color:var(--text-dim); font-size:.9rem; }
 .rules-body p {
-  text-align:left; color:var(--text); font-size:.88rem; line-height:1.8;
+  text-align:left; color:var(--text); font-size:.88rem; line-height:1.6;
   margin-bottom:10px;
 }
 .rules-body h3 { text-align:left; font-size:.95rem; margin:16px 0 8px; color:var(--gold); }
@@ -283,7 +284,7 @@ input { font-family:inherit; }
   background:var(--card-bg); font-size:.88rem; line-height:1.7;
 }
 .rules-table td {
-  text-align:left; padding:9px 12px; color:var(--text);
+  text-align:left; padding:6px 10px; color:var(--text);
   border-bottom:1px solid rgba(255,255,255,.07);
 }
 .rules-table tr:last-child td { border-bottom:none; }

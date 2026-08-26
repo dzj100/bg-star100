@@ -378,5 +378,32 @@ assert(g.actionSeat() === 2, '成员端 actionSeat 仍为自己');
 g._olSeatIndex = () => 0;
 g._olIsHost = () => true;
 
+// 非房主不能结算（「翻开所有牌」仅房主可点）
+g._olSeatIndex = () => 2;
+g._olIsHost = () => false;
+g.S.allPlaced = true;
+g.S.settled = false;
+g.settle();
+assert(g.S.settled === false && g.S.phase !== 'result', '非房主 settle 被拒');
+g._olSeatIndex = () => 0;
+g._olIsHost = () => true;
+g.S.allPlaced = false;
+
+// ── 10. 退出房间重置本关进度 ──
+console.log('\n[退出重置进度]');
+g.updateLocalProgress(1, false, 999);
+assert((g.loadProgress()[1] || {}).bonus >= 1, '失败结算写入进度');
+g.S.challenge = { id: 1 };
+g._olResetProgress();
+assert(!g.loadProgress()[1], '退出房间后本关进度（赠送标记）已清除');
+g.updateLocalProgress(1, true, 1000);
+assert(g.loadProgress()[1].passed === true, '通关进度写入');
+g._olResetProgress();
+assert(!g.loadProgress()[1], '退出房间后通关进度也已清除');
+g.updateLocalProgress(1, false, 1001);
+g._olResetProgress();
+g.dealGame(['A', 'B'], { chapter: 1, test: 1, id: 1 });
+assert(g.S.eyeBonus === 0, '重置后重建房间重开同关 eyeBonus=0');
+
 console.log(`\n结果: ${passCount} 通过 / ${failCount} 失败`);
 process.exit(failCount ? 1 : 0);

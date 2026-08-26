@@ -656,7 +656,7 @@ function onlineAfterRender() {
     btn.textContent = '🚪 退出';
     btn.className = 'icon-btn';
     btn.onclick = exitOnlineRoom;
-    headerBtns.appendChild(btn);
+    headerBtns.insertBefore(btn, headerBtns.firstChild);
   }
 
   // 游戏已结束则跳过
@@ -693,6 +693,8 @@ async function confirmExitRoom() {
   const wasHost = _isHost;
   const modal = document.getElementById('modalOverlay');
   if (modal) modal.classList.remove('show');
+  // 退出即重置本关进度（需在 clearState 之前读取当前关卡）
+  if (typeof window._olResetProgress === 'function') window._olResetProgress();
   _cleanupOnline();
   if (typeof HOOK_clearState === 'function') HOOK_clearState();
   document.getElementById('online').style.display = 'none';
@@ -850,6 +852,9 @@ async function _tryReconnect() {
     if (room.status === 'playing' && room.state) {
       // 游戏进行中：直接恢复对局
       _gameStarted = true;
+      // 恢复「上一手推送上下文」：否则刷新后轮到自己出牌时 canPush 全 false，推送被吞
+      _lastPushedCurrentSeat = (typeof room.state.currentPlayer === 'number')
+        ? room.state.currentPlayer : null;
       _applyRemoteState(room.state);
       document.getElementById('online').style.display = 'none';
       document.getElementById('app').style.display = 'block';

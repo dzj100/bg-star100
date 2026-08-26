@@ -52,7 +52,7 @@ function segHTML(i) {
     if (seg.cards.length) {
       body += `<div class="seg-cards">${seg.cards.map(c => c.revealed ? cardMiniHTML(c) : cardBackMiniHTML(c)).join('')}</div>`;
     }
-    if (visibleSum > 0) body += `<div class="seg-vis">${visibleSum}</div>`;
+    //if (visibleSum > 0) body += `<div class="seg-vis">${visibleSum}</div>`;
   }
   let cls = '';
   if (S.settled) {
@@ -206,8 +206,10 @@ function actionHTML() {
         : `<div class="wait-text forbid">聚光灯转动中…🎯<br>🔇 已看牌，禁止交流</div>`;
     case 'play':
       if (S.allPlaced) {
-        return `<button class="btn-full btn-primary" onclick="settle()">🧮 翻开所有牌结算</button>
-          <div class="wait-text">所有手牌已放置，点击按钮翻开结算</div>`;
+        return isHost()
+          ? `<button class="btn-full btn-primary" onclick="settle()">🧮 翻开所有牌结算</button>
+             <div class="wait-text">所有手牌已放置，点击按钮翻开结算</div>`
+          : `<div class="wait-text">所有手牌已放置，等待房主翻开结算…</div>`;
       }
       if (isMyTurn()) {
         const taking = actionSeat() !== mySeat();
@@ -243,13 +245,13 @@ function showLogModal() {
     ov.setAttribute('onclick', "if(event.target===this)closeModal('logModalOverlay')");
     ov.innerHTML = `
       <div class="modal-box">
-        <h2>📜 对局日志</h2>
+        <h2 class="log-modal-title">📋 对局日志</h2>
         <div id="logModalList" class="log-list"></div>
         <button class="btn-full btn-secondary" onclick="closeModal('logModalOverlay')" style="margin-top:14px;">关闭</button>
       </div>`;
     document.body.appendChild(ov);
   }
-  document.getElementById('logModalList').innerHTML = S.log.map(l =>
+  document.getElementById('logModalList').innerHTML = [...S.log].reverse().map(l =>
     `<div class="log-item ${l.cls}">${esc(l.msg)}</div>`).join('');
   ov.classList.add('show');
 }
@@ -415,7 +417,7 @@ function renderLandingHTML() {
     <div class="rules-corner"><button class="icon-btn" onclick="showRulesModal()">📖 规则</button></div>
     <div class="landing-icon">⏳</div>
     <h1>时序谜局</h1>
-    <p class="subtitle">Take Time · 2~4人合作无声解谜</p>
+    <p class="subtitle">Take Time · 2~4人合作默契配合</p>
     <!--ONLINE_BTN-->
     <div class="credit">@imStar100</div>
   </div>`;

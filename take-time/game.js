@@ -64,7 +64,7 @@ const CHALLENGE_LIB = {
       const okS3 = sums[2] >= 8 && sums[2] <= 12;
       const okS4 = segs[3].cards.length === 3;
       const items = [
-        { label: '3号位总和在8~12之间', ok: okS3 },
+        { label: '3号位：总和在8~12之间', ok: okS3 },
         { label: '4号位：恰好3张牌', ok: okS4 },
         { label: '每区域至少1张', ok: segOK.every(Boolean) },
         { label: '区域1→6总和递增', ok: ascOK },
@@ -89,7 +89,7 @@ const CHALLENGE_LIB = {
       const items = [
         { label: '第1张牌放在3号位', ok: firstInS3 },
         { label: '第2张牌放在2号位', ok: secondInS2 },
-        { label: '6号位总和在20~30之间', ok: okS6 },
+        { label: '6号位：总和在20~30之间', ok: okS6 },
         { label: '每区域至少1张', ok: segOK.every(Boolean) },
         { label: '区域1→6总和递增', ok: ascOK },
       ];
@@ -102,7 +102,7 @@ const CHALLENGE_LIB = {
   },
   4: {
     name: '近六', chapter: 1, test: 4,
-    desc: '1号位总和比其他位次更接近6；4号位必须1张太阳+1张月亮',
+    desc: '1号位总和比其他位置更接近6；4号位必须1张太阳+1张月亮；每个位置的总和必须≤24',
     check(sums, segs) {
       const segOK = segs.map(seg => seg.cards.length >= 1);
       const sumOK = sums.map(s => s <= 24);
@@ -112,7 +112,7 @@ const CHALLENGE_LIB = {
       const s4 = segs[3].cards;
       const okS4 = s4.length === 2 && s4.some(c => c.color === 'sun') && s4.some(c => c.color === 'moon');
       const items = [
-        { label: '1号位总和最接近6', ok: okClosest },
+        { label: '1号位：总和最接近6', ok: okClosest },
         { label: '4号位：1张太阳+1张月亮', ok: okS4 },
         { label: '每区域至少1张', ok: segOK.every(Boolean) },
         { label: '区域1→6总和递增', ok: ascOK },
@@ -268,6 +268,22 @@ function updateLocalProgress(id, pass, stamp) {
   console.log('[taketime] progress updated:', id, pass ? 'PASS' : 'FAIL', prog[id].bonus);
 }
 
+/** 清除某关卡进度（退出房间时调用：重建房间后从全新挑战开始） */
+function resetChallengeProgress(id) {
+  const prog = loadProgress();
+  if (!prog[id]) return;
+  delete prog[id];
+  saveProgress(prog);
+  console.log('[taketime] progress reset:', id);
+}
+
+/** 联机层退出房间前调用：重置本关（当前 S.challenge）的进度与赠送标记 */
+window._olResetProgress = function() {
+  if (S && S.challenge && typeof S.challenge.id === 'number') {
+    resetChallengeProgress(S.challenge.id);
+  }
+};
+
 // ========================================
 // 日志
 // ========================================
@@ -345,8 +361,7 @@ function dealGame(names, challenge) {
   };
   pendingPlay = null;
 
-  const ruleNote = ch.desc ? `（${ch.desc}）` : '';
-  addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始 ${ruleNote}`);
+  addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${n + bonus}个眼标记`);
   console.log(`[taketime] deal ${n} players x ${per} cards, eyeBase=${n}, eyeBonus=${bonus}`);
   saveState();
   render();
@@ -490,11 +505,12 @@ function placeCard() {
 }
 
 // ========================================
-// 结算（任意玩家可点）
+// 结算（仅房主）
 // ========================================
 
 function settle() {
   if (!S.allPlaced || S.settled) return;
+  if (!isHost()) return;
   const me = mySeat();
   if (me === null) return;
 
