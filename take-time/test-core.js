@@ -97,7 +97,10 @@ for (const n of [2, 3, 4]) {
   const allCards = g.S.players.flatMap(p => p.hand);
   assert(allCards.length === 12, `${n}人局共12张`, allCards.length);
   assert(g.S.players.every(p => p.hand.length === per), `${n}人局每人${per}张`);
-  assert(new Set(allCards.map(c => c.v)).size === 12, `${n}人局数字1-12无重复`);
+  const counts = {};
+  allCards.forEach(c => counts[c.v] = (counts[c.v] || 0) + 1);
+  assert(Object.values(counts).every(cnt => cnt <= 2), `${n}人局每数字最多2张（太阳/月亮各一）`);
+  assert(allCards.every(c => c.v >= 1 && c.v <= 12), `${n}人局数字在1-12`);
   assert(allCards.every(c => c.color === 'sun' || c.color === 'moon'), '牌色合法');
   assert(g.S.segments.length === 6 && g.S.segments.every(s => s.cards.length === 0), '6个空区域');
   assert(g.S.eyeBase === n && g.S.eyeBonus === 0, `基础眼标记=${n}`);
@@ -440,6 +443,197 @@ const c9Over = g.challengeCheck({ id: 9 }, [12, 25, 16, 18, 19, 22], [
   mkSeg([cd(18, 'moon')]), mkSeg([cd(19, 'sun')]), mkSeg([cd(22, 'moon')]),
 ]);
 assert(c9Over.pass === false && c9Over.sumOK[1] === false, '第9关：硬规则≤24仍生效');
+
+// ── 8c. 第三章第二关「双锚」：含最小牌 + 最后一张牌 ──
+console.log('\n[第三章·双锚]');
+g.dealGame(['A', 'B'], { chapter: 3, test: 2, id: 10 });
+assert(g.S.phase === 'discuss', '第10关初始 discuss');
+assert(g.S.segCond === null, '第10关 segCond 未定');
+
+// 循环顺延：选 idx=2（无限制）→ [free, min, free, free, min, last]
+g.chooseFirstCond(2);
+const conds10 = g.S.segCond;
+assert(conds10.length === 6, '第10关 segCond 6项');
+assert(conds10[0].key === 'free' && conds10[1].key === 'min' && conds10[2].key === 'free' && conds10[3].key === 'free' && conds10[4].key === 'min' && conds10[5].key === 'last', '第10关循环顺延含 min/last', conds10.map(c => c.key));
+
+// 结算判定：选 idx=0 → [min, last, free, min, free, free]
+g.S.segCond = [
+  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'last', label: '最后一张牌放这里', short: '最后一张牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c10 = g.challengeCheck({ id: 10 }, [8, 10, 12, 14, 16, 18], [
+  mkSeg([cd(1, 'sun', 1), cd(7, 'moon', 2)]),                 // 8，含1 → min@1 ✓
+  mkSeg([cd(4, 'sun', 12), cd(6, 'moon', 5)]),                // 10，order=12 在这 → last@2 ✓
+  mkSeg([cd(12, 'sun', 3)]),                                  // 12
+  mkSeg([cd(11, 'moon', 4), cd(3, 'sun', 6)]),                // 14，不含1 → min@4 ✗
+  mkSeg([cd(9, 'sun', 7), cd(5, 'moon', 8), cd(2, 'sun', 9)]),// 16
+  mkSeg([cd(8, 'moon', 10), cd(10, 'sun', 11)]),              // 18
+]);
+assert(c10.items[3].label.includes('最小数字牌') && c10.items[3].ok === true, '第10关：1号位含最小牌通过');
+assert(c10.items[4].label.includes('最后一张牌') && c10.items[4].ok === true, '第10关：2号位最后一张牌通过');
+assert(c10.items[5].label.includes('最小数字牌') && c10.items[5].ok === false, '第10关：4号位无最小牌失败（双min严格判定）');
+assert(c10.pass === false, '第10关：双min严格判定下无解（用户确认保留）');
+
+// 有解：牌组24张（1~12×太阳/月亮），两张1各放一个min区域 → 通关
+const c10Solve = g.challengeCheck({ id: 10 }, [8, 9, 10, 12, 13, 15], [
+  mkSeg([cd(1, 'sun', 1), cd(7, 'moon', 2)]),                 // 8，含1 → min@1 ✓
+  mkSeg([cd(4, 'sun', 12), cd(5, 'moon', 3)]),                // 9，order=12 → last@2 ✓
+  mkSeg([cd(10, 'sun', 4)]),                                  // 10
+  mkSeg([cd(1, 'moon', 5), cd(11, 'sun', 6)]),                // 12，含另一张1 → min@4 ✓
+  mkSeg([cd(3, 'sun', 7), cd(2, 'moon', 8), cd(8, 'sun', 9)]),// 13
+  mkSeg([cd(9, 'moon', 10), cd(6, 'sun', 11)]),               // 15
+]);
+assert(c10Solve.pass === true, '第10关：两张最小牌（太阳/月亮）各占一个min区域 → 通过', c10Solve);
+
+// last 失败：最后一张牌（order=12）不在条件区域
+const c10LastFail = g.challengeCheck({ id: 10 }, [8, 10, 12, 14, 16, 18], [
+  mkSeg([cd(1, 'sun', 1), cd(7, 'moon', 2)]),
+  mkSeg([cd(4, 'sun', 5), cd(6, 'moon', 6)]),
+  mkSeg([cd(12, 'sun', 12)]),                                 // 最后一张在 free 的3号位
+  mkSeg([cd(11, 'moon', 3), cd(3, 'sun', 4)]),
+  mkSeg([cd(9, 'sun', 7), cd(5, 'moon', 8), cd(2, 'sun', 9)]),
+  mkSeg([cd(8, 'moon', 10), cd(10, 'sun', 11)]),
+]);
+assert(c10LastFail.items[4].ok === false && c10LastFail.pass === false, '第10关：最后一张牌不在2号位失败');
+
+// ── 8d. 第三章第三关「前二」：含最小牌 + 第1/2张牌同区 + 含最大牌 ──
+console.log('\n[第三章·前二]');
+g.dealGame(['A', 'B'], { chapter: 3, test: 3, id: 11 });
+assert(g.S.phase === 'discuss', '第11关初始 discuss');
+assert(g.S.segCond === null, '第11关 segCond 未定');
+
+// 循环顺延：选 idx=1（第1、2张牌）→ [first2, free, free, max, free, min]
+g.chooseFirstCond(1);
+const conds11 = g.S.segCond;
+assert(conds11.length === 6, '第11关 segCond 6项');
+assert(conds11[0].key === 'first2' && conds11[1].key === 'free' && conds11[2].key === 'free' && conds11[3].key === 'max' && conds11[4].key === 'free' && conds11[5].key === 'min', '第11关循环顺延含 first2/max/min', conds11.map(c => c.key));
+
+// 结算判定：segCond [min, first2, free, free, max, free]
+g.S.segCond = [
+  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'first2', label: '第1张、第2张牌放这里', short: '第1、2张牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c11 = g.challengeCheck({ id: 11 }, [6, 9, 10, 11, 18, 24], [
+  mkSeg([cd(1, 'sun', 5), cd(5, 'moon', 6)]),                 // 6，含1 → min@1 ✓
+  mkSeg([cd(2, 'sun', 1), cd(3, 'moon', 2), cd(4, 'sun', 3)]),// 9，order1+2 → first2@2 ✓
+  mkSeg([cd(7, 'moon', 4)]),                                  // 10
+  mkSeg([cd(8, 'sun', 7), cd(3, 'sun', 8)]),                  // 11
+  mkSeg([cd(12, 'moon', 9), cd(6, 'sun', 10)]),               // 18，含12 → max@5 ✓
+  mkSeg([cd(9, 'sun', 11), cd(10, 'moon', 12), cd(5, 'sun', 13)]), // 24
+]);
+assert(c11.items[3].label.includes('最小数字牌') && c11.items[3].ok === true, '第11关：1号位含最小牌通过');
+assert(c11.items[4].label.includes('第1张') && c11.items[4].ok === true, '第11关：2号位含第1、2张牌通过');
+assert(c11.items[5].label.includes('最大数字牌') && c11.items[5].ok === true, '第11关：5号位含最大牌通过');
+assert(c11.pass === true, '第11关：min+first2+max 全满足 → 通过', c11);
+
+// first2 失败：order=1 与 order=2 不在同一区域
+const c11First2Fail = g.challengeCheck({ id: 11 }, [6, 9, 10, 11, 18, 24], [
+  mkSeg([cd(1, 'sun', 1), cd(5, 'moon', 6)]),                 // order1 在这里
+  mkSeg([cd(2, 'sun', 2), cd(3, 'moon', 3), cd(4, 'sun', 4)]),// order2 在这里（不同区）
+  mkSeg([cd(7, 'moon', 5)]),
+  mkSeg([cd(8, 'sun', 7), cd(3, 'sun', 8)]),
+  mkSeg([cd(12, 'moon', 9), cd(6, 'sun', 10)]),               // 含12 → max@5 ✓
+  mkSeg([cd(9, 'sun', 11), cd(10, 'moon', 12), cd(5, 'sun', 13)]),
+]);
+assert(c11First2Fail.items[4].ok === false && c11First2Fail.pass === false, '第11关：第1、2张牌不同区失败');
+
+// max 失败：最大牌（12）不在条件区域
+const c11MaxFail = g.challengeCheck({ id: 11 }, [6, 9, 10, 11, 18, 24], [
+  mkSeg([cd(1, 'sun', 5), cd(5, 'moon', 6)]),                 // 含1 → min@1 ✓
+  mkSeg([cd(2, 'sun', 1), cd(3, 'moon', 2), cd(4, 'sun', 3)]),// first2@2 ✓
+  mkSeg([cd(7, 'moon', 4), cd(12, 'moon', 9)]),               // 12 在 free 的3号位
+  mkSeg([cd(8, 'sun', 7), cd(3, 'sun', 8)]),
+  mkSeg([cd(6, 'sun', 10)]),                                  // 5号位无12 → max@5 ✗
+  mkSeg([cd(9, 'sun', 11), cd(10, 'moon', 12), cd(5, 'sun', 13)]),
+]);
+assert(c11MaxFail.items[5].ok === false && c11MaxFail.pass === false, '第11关：最大牌不在5号位失败');
+
+// ── 8e. 第三章第四关「双曜」：最接近6 + 最小太阳/最大月亮 + 恰好2张 ──
+console.log('\n[第三章·双曜]');
+g.dealGame(['A', 'B'], { chapter: 3, test: 4, id: 12 });
+assert(g.S.phase === 'discuss', '第12关初始 discuss');
+assert(g.S.segCond === null, '第12关 segCond 未定');
+
+// 循环顺延：选 idx=2（无限制）→ [free, maxMoon, free, exact2, close6, minSun]
+g.chooseFirstCond(2);
+const conds12 = g.S.segCond;
+assert(conds12.length === 6, '第12关 segCond 6项');
+assert(conds12[0].key === 'free' && conds12[1].key === 'maxMoon' && conds12[2].key === 'free' && conds12[3].key === 'exact2' && conds12[4].key === 'close6' && conds12[5].key === 'minSun', '第12关循环顺延含 close6/minSun/maxMoon/exact2', conds12.map(c => c.key));
+
+// 结算判定：segCond [close6, minSun, free, maxMoon, free, exact2]
+g.S.segCond = [
+  { key: 'close6', label: '总和最接近6', short: '最接近6' },
+  { key: 'minSun', label: '含1张数字最小的太阳牌', short: '最小太阳' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'maxMoon', label: '含1张数字最大的月亮牌', short: '最大月亮' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'exact2', label: '必须放2张牌', short: '放2张牌' },
+];
+const c12 = g.challengeCheck({ id: 12 }, [6, 8, 9, 12, 18, 20], [
+  mkSeg([cd(2, 'sun', 1), cd(4, 'moon', 2)]),                 // 6，最接近6（距离0）
+  mkSeg([cd(1, 'sun', 3), cd(7, 'moon', 4)]),                 // 8，含最小太阳1
+  mkSeg([cd(3, 'sun', 5), cd(6, 'moon', 6)]),                 // 9
+  mkSeg([cd(12, 'moon', 7)]),                                 // 12，含最大月亮12
+  mkSeg([cd(10, 'sun', 8), cd(8, 'moon', 9)]),                // 18
+  mkSeg([cd(9, 'moon', 10), cd(11, 'sun', 11)]),              // 20，恰好2张
+]);
+assert(c12.items[3].label.includes('最接近6') && c12.items[3].ok === true, '第12关：1号位总和最接近6通过');
+assert(c12.items[4].label.includes('最小太阳牌') && c12.items[4].ok === true, '第12关：2号位含最小太阳牌通过');
+assert(c12.items[5].label.includes('最大月亮牌') && c12.items[5].ok === true, '第12关：4号位含最大月亮牌通过');
+assert(c12.items[6].label.includes('恰好放2张牌') && c12.items[6].ok === true, '第12关：6号位恰好2张通过');
+assert(c12.pass === true, '第12关：close6+minSun+maxMoon+exact2 全满足 → 通过', c12);
+
+// minSun 失败：最小太阳（1）不在2号位
+const c12MinSunFail = g.challengeCheck({ id: 12 }, [6, 8, 9, 12, 18, 20], [
+  mkSeg([cd(2, 'sun', 1), cd(4, 'moon', 2)]),
+  mkSeg([cd(7, 'moon', 4), cd(3, 'sun', 5)]),                 // 2号位无太阳1
+  mkSeg([cd(1, 'sun', 3), cd(6, 'moon', 6)]),                 // 最小太阳移到3号位
+  mkSeg([cd(12, 'moon', 7)]),
+  mkSeg([cd(10, 'sun', 8), cd(8, 'moon', 9)]),
+  mkSeg([cd(9, 'moon', 10), cd(11, 'sun', 11)]),
+]);
+assert(c12MinSunFail.items[4].ok === false && c12MinSunFail.pass === false, '第12关：最小太阳牌不在2号位失败');
+
+// maxMoon 失败：最大月亮（12）不在4号位
+const c12MaxMoonFail = g.challengeCheck({ id: 12 }, [6, 8, 9, 12, 18, 20], [
+  mkSeg([cd(2, 'sun', 1), cd(4, 'moon', 2)]),
+  mkSeg([cd(1, 'sun', 3), cd(7, 'moon', 4)]),
+  mkSeg([cd(3, 'sun', 5), cd(6, 'moon', 6)]),
+  mkSeg([cd(11, 'sun', 11)]),                                 // 4号位无月亮
+  mkSeg([cd(12, 'moon', 7), cd(8, 'moon', 9)]),               // 最大月亮移到5号位
+  mkSeg([cd(9, 'moon', 10), cd(10, 'sun', 8)]),
+]);
+assert(c12MaxMoonFail.items[5].ok === false && c12MaxMoonFail.pass === false, '第12关：最大月亮牌不在4号位失败');
+
+// close6 失败：2号位与1号位距离相同（均为2），非唯一最接近6
+const c12Close6Fail = g.challengeCheck({ id: 12 }, [8, 8, 9, 12, 18, 20], [
+  mkSeg([cd(2, 'sun', 1), cd(6, 'moon', 6)]),                 // 8，距离2
+  mkSeg([cd(1, 'sun', 3), cd(7, 'moon', 4)]),                 // 8，距离2 → 并列
+  mkSeg([cd(3, 'sun', 5), cd(6, 'sun', 2)]),
+  mkSeg([cd(12, 'moon', 7)]),
+  mkSeg([cd(10, 'sun', 8), cd(8, 'moon', 9)]),
+  mkSeg([cd(9, 'moon', 10), cd(11, 'sun', 11)]),
+]);
+assert(c12Close6Fail.items[3].ok === false && c12Close6Fail.pass === false, '第12关：1号位非唯一最接近6失败（并列距离）');
+
+// exact2 失败：6号位放了3张牌
+const c12Exact2Fail = g.challengeCheck({ id: 12 }, [6, 8, 9, 12, 18, 24], [
+  mkSeg([cd(2, 'sun', 1), cd(4, 'moon', 2)]),
+  mkSeg([cd(1, 'sun', 3), cd(7, 'moon', 4)]),
+  mkSeg([cd(3, 'sun', 5), cd(6, 'moon', 6)]),
+  mkSeg([cd(12, 'moon', 7)]),
+  mkSeg([cd(10, 'sun', 8), cd(8, 'moon', 9)]),
+  mkSeg([cd(9, 'moon', 10), cd(11, 'sun', 11), cd(4, 'sun', 12)]), // 3张，24
+]);
+assert(c12Exact2Fail.items[6].ok === false && c12Exact2Fail.pass === false, '第12关：6号位3张牌不满足恰好2张失败');
 
 // ── 9. 房主接管离席玩家（轮到离席玩家时房主代操作） ──
 console.log('\n[房主接管离席玩家]');

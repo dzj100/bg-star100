@@ -223,12 +223,12 @@ const CHALLENGE_LIB = {
     conds: [
       { key: 'free', label: '无限制', short: '无限制' },
       { key: 'free', label: '无限制', short: '无限制' },
-      { key: 'max', label: '含一张数字最大的牌', short: '含最大牌' },
+      { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
       { key: 'free', label: '无限制', short: '无限制' },
       { key: 'close20', label: '总和最接近20', short: '最接近20' },
       { key: 'free', label: '无限制', short: '无限制' },
     ],
-    desc: '区域规则为[无限制->无限制->无限制->含一张数字最大的牌->无限制->最接近20]；房主在看牌前，可随意将限制条件按顺序设置到对应区域',
+    desc: '区域规则为“无限制->无限制->无限制->含1张数字最大的牌->无限制->总和最接近20”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
     check(sums, segs) {
       const segOK = segs.map(seg => seg.cards.length >= 1);
       const sumOK = sums.map(s => s <= 24);
@@ -251,6 +251,161 @@ const CHALLENGE_LIB = {
           const d = Math.abs(sums[i] - 20);
           const ok = segs.every((_, j) => j === i || Math.abs(sums[j] - 20) > d);
           items.push({ label: `${i + 1}号位：总和最接近20（${sums[i]}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 双锚（第3章第2关）：含最小牌 + 最后一张牌两个锚点条件，与定首一样
+   * 由房主在看牌前指定 1 号位条件，其余循环顺延。
+   */
+  10: {
+    name: '双锚', chapter: 3, test: 2,
+    rotate: true,
+    conds: [
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'last', label: '最后1张牌放这里', short: '最后1张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“含1张数字最小的牌->最后1张牌放这里->无限制->含1张数字最小的牌->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'min') {
+          const minV = Math.min(...segs.flatMap(s => s.cards.map(c => c.v)));
+          const ok = segs[i].cards.some(c => c.v === minV);
+          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'last') {
+          const lastOrder = Math.max(...segs.flatMap(s => s.cards.map(c => c.order || 0)));
+          const ok = segs[i].cards.some(c => c.order === lastOrder);
+          items.push({ label: `${i + 1}号位：最后一张牌（第${lastOrder}张）放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 前二（第3章第3关）：第1张、第2张牌必须放在同一区域，外加最小/最大牌锚点。
+   */
+  11: {
+    name: '前二', chapter: 3, test: 3,
+    rotate: true,
+    conds: [
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'first2', label: '第1张、第2张牌放这里', short: '第1、2张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“含1张数字最小的牌->第1张、第2张牌放这里->无限制->无限制->含1张数字最大的牌->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'min') {
+          const minV = Math.min(...segs.flatMap(s => s.cards.map(c => c.v)));
+          const ok = segs[i].cards.some(c => c.v === minV);
+          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'max') {
+          const maxV = Math.max(...segs.flatMap(s => s.cards.map(c => c.v)));
+          const ok = segs[i].cards.some(c => c.v === maxV);
+          items.push({ label: `${i + 1}号位：包含全场最大数字牌（${maxV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'first2') {
+          const ok = segs[i].cards.some(c => c.order === 1) && segs[i].cards.some(c => c.order === 2);
+          items.push({ label: `${i + 1}号位：第1张、第2张牌放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 双曜（第3章第4关）：总和最接近6 + 最小太阳牌/最大月亮牌锚点 + 某区域恰好2张。
+   */
+  12: {
+    name: '双曜', chapter: 3, test: 4,
+    rotate: true,
+    conds: [
+      { key: 'close6', label: '总和最接近6', short: '最接近6' },
+      { key: 'minSun', label: '含1张数字最小的太阳牌', short: '最小太阳' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'maxMoon', label: '含1张数字最大的月亮牌', short: '最大月亮' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'exact2', label: '必须放2张牌', short: '放2张牌' },
+    ],
+    desc: '区域规则为“总和最接近6->含1张数字最小的太阳牌->无限制->含1张数字最大的月亮牌->无限制->必须放2张牌”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      const allCards = segs.flatMap(s => s.cards);
+      const suns = allCards.filter(c => c.color === 'sun');
+      const moons = allCards.filter(c => c.color === 'moon');
+      const minSunV = suns.length ? Math.min(...suns.map(c => c.v)) : Infinity;
+      const maxMoonV = moons.length ? Math.max(...moons.map(c => c.v)) : -Infinity;
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'close6') {
+          const d = Math.abs(sums[i] - 6);
+          const ok = segs.every((_, j) => j === i || Math.abs(sums[j] - 6) > d);
+          items.push({ label: `${i + 1}号位：总和最接近6（${sums[i]}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'minSun') {
+          const ok = segs[i].cards.some(c => c.color === 'sun' && c.v === minSunV);
+          items.push({ label: `${i + 1}号位：包含全场最小太阳牌（${isFinite(minSunV) ? minSunV : '无'}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'maxMoon') {
+          const ok = segs[i].cards.some(c => c.color === 'moon' && c.v === maxMoonV);
+          items.push({ label: `${i + 1}号位：包含全场最大月亮牌（${isFinite(maxMoonV) ? maxMoonV : '无'}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'exact2') {
+          const ok = segs[i].cards.length === 2;
+          items.push({ label: `${i + 1}号位：恰好放2张牌（${segs[i].cards.length}张）`, ok });
           if (!ok) { segBad[i] = true; condOK = false; }
         }
       });
@@ -452,8 +607,9 @@ function clearState() {
 function dealGame(names, challenge) {
   const n = names.length;
   const per = cardsPerPlayer(n);
-  const deck = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-    .map(v => ({ v, color: Math.random() < 0.5 ? 'sun' : 'moon' }));
+  // 牌组：1~12 每个数字各有太阳/月亮 1 张，共 24 张；每局只发 12 张（数字可能重复或缺号）
+  const deck = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    .flatMap(v => [{ v, color: 'sun' }, { v, color: 'moon' }]));
 
   const ch = challenge || {
     ...pendingChallenge,
