@@ -652,13 +652,17 @@ function restartChallenge() {
 function nextChallenge() {
   if (!isHost()) return;
   if (S.phase !== 'result' || !S.pass) return;
+  if (S.allDone) return; // 防重复触发
   const seat = mySeat();
   if (seat !== null) S.currentSeat = seat;
   if (!isActor()) return;
   const nextId = S.challenge.id + 1;
   const lib = CHALLENGE_LIB[nextId];
   if (!lib) {
-    if (typeof showAllDoneModal === 'function') showAllDoneModal();
+    S.currentSeat = seat;
+    S.allDone = true;
+    saveState();
+    showAllDoneModal();
     return;
   }
   const names = S.players.map(p => p.name);
@@ -692,11 +696,12 @@ function getOnlineState() {
 
 function chStep(kind, delta) {
   if (kind === 'chapter') {
-    if (delta > 0) { // 章节暂时只开放第 1 章
-      showToast('敬请期待');
-      return;
-    }
-    pendingChallenge.chapter = Math.max(1, pendingChallenge.chapter + delta);
+    const ids = Object.keys(CHALLENGE_LIB).filter(k => !isNaN(k)).map(Number);
+    const maxChapter = ids.length > 0 ? Math.ceil(Math.max(...ids) / CH_PER_CHAPTER) : 1;
+    const next = pendingChallenge.chapter + delta;
+    if (next > maxChapter) { showToast('敬请期待'); return; }
+    if (next < 1) { showToast('已是第一章'); return; }
+    pendingChallenge.chapter = next;
   } else {
     pendingChallenge.test = Math.min(CH_PER_CHAPTER, Math.max(1, pendingChallenge.test + delta));
   }

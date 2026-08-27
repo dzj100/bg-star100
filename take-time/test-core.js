@@ -164,7 +164,7 @@ assert(g.S.sums && g.S.sums.length === 6, 'sums 计算');
 assert(g.S.check.segOK.every(Boolean), '每区域≥1张检查');
 assert(g.S.check.ascOK === g.S.sums.every((s, i) => i === 0 || s >= g.S.sums[i - 1]), '递增检查与手算一致');
 const progFail = g.loadProgress()[1];
-assert(progFail && (progFail.passed === g.S.pass) && typeof progFail.bonus === 'number', '进度已写入');
+	assert(progFail && (progFail.passed === g.S.pass) && typeof progFail.bonus === 'number', '进度已写入');
 
 // 失败场景：清空区域3 → 破坏「每区域≥1张」，确定性失败
 const bonusBefore = g.S.eyeBonus;
@@ -173,10 +173,10 @@ g.S.segments[2].cards = [];
 g.settle();
 assert(g.S.pass === false, '构造失败场景 pass=false');
 assert(g.S.check.segOK[2] === false, '失败原因：区域3无牌');
-assert(g.S.eyeBonus === Math.min(bonusBefore + 1, 3) && g.S.eyeBonus >= 1, '失败后赠送1眼标记', { before: bonusBefore, after: g.S.eyeBonus });
-const progFail2 = g.loadProgress()[1];
-assert(progFail2.bonus >= 1 && progFail2.bonus <= 3, '失败后赠送眼标记上限3', progFail2.bonus);
-assert(progFail2.passed === false, '进度记录未通过');
+	assert(g.S.eyeBonus === Math.min(bonusBefore + 1, 3) && g.S.eyeBonus >= 1, '失败后赠送1眼标记', { before: bonusBefore, after: g.S.eyeBonus });
+	const progFail2 = g.loadProgress()[1];
+	assert(progFail2.bonus >= 1 && progFail2.bonus <= 3, '失败后赠送眼标记上限3', progFail2.bonus);
+	assert(progFail2.passed === false, '进度记录未通过');
 
 // ── 5. render 不崩溃（各阶段） ──
 console.log('\n[render]');
@@ -392,7 +392,7 @@ g.S.allPlaced = false;
 // ── 10. 退出房间重置本关进度 ──
 console.log('\n[退出重置进度]');
 g.updateLocalProgress(1, false, 999);
-assert((g.loadProgress()[1] || {}).bonus >= 1, '失败结算写入进度');
+	assert((g.loadProgress()[1] || {}).bonus >= 1, '失败结算写入进度');
 g.S.challenge = { id: 1 };
 g._olResetProgress();
 assert(!g.loadProgress()[1], '退出房间后本关进度（赠送标记）已清除');

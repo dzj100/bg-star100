@@ -419,7 +419,11 @@ function _handleRemoteState(row) {
 
   _isReceiving = true;
   _gameStarted = true;
-  _pendingPushSeat = row.state.currentPlayer;
+  // 只有当前不是"等待自己出牌"时才更新 pendingPushSeat，
+  // 防止 Supabase Realtime 乱序投递旧状态覆盖正确值导致 isOutgoingActor 判定失败
+  if (_pendingPushSeat !== _mySeatIndex) {
+    _pendingPushSeat = row.state.currentPlayer;
+  }
 
   // 从等候室切换到游戏界面
   if (document.getElementById('app').style.display === 'none') {

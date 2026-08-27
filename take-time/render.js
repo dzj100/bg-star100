@@ -96,7 +96,7 @@ function playersBarHTML() {
     return `<div class="${cls}" style="border-color:${PLAYER_COLORS[i]}">
       <span class="dot" style="background:${PLAYER_COLORS[i]}"></span>
       <span class="p-name">${esc(p.name)}${me === i ? '（我）' : ''}</span>
-      <span class="p-hand">${p.hand.length}张</span>
+      <span class="p-hand">${p.hand.filter(c => c.color === 'sun').length}☀、${p.hand.filter(c => c.color === 'moon').length}☾</span>
       ${tag ? `<span class="p-tag">${tag}</span>` : ''}
     </div>`;
   }).join('')}</div>`;
@@ -465,4 +465,7 @@ function render() {
   }
 
   if (typeof onlineAfterRender === 'function') onlineAfterRender();
+
+  // 成员侧接收房主推送的 allDone 状态后弹出「恭喜通关」
+  if (S.allDone && typeof showAllDoneModal === 'function') showAllDoneModal();
 }
