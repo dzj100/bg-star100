@@ -211,6 +211,55 @@ const CHALLENGE_LIB = {
       return { segOK, sumOK, ascOK, items, segBad, pass: segOK.every(Boolean) && sumOK.every(Boolean) && ascOK };
     },
   },
+  // ── 第3章 ──
+  /**
+   * 定首（第3章第1关）：6 个条件的顺序固定，但先手玩家要在开局
+   * 把其中一个条件指定到 1 号位，其余条件按原顺序顺延到 2~6 号位。
+   * rotate 标记：聚光灯确定先手后进入 cond 阶段，先手选完才进入 play。
+   */
+  9: {
+    name: '定首', chapter: 3, test: 1,
+    rotate: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'max', label: '含一张数字最大的牌', short: '含最大牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'close20', label: '总和最接近20', short: '最接近20' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为[无限制->无限制->无限制->含一张数字最大的牌->无限制->最接近20]；房主在看牌前，可随意将限制条件按顺序设置到对应区域',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'max') {
+          const maxV = Math.max(...segs.flatMap(s => s.cards.map(c => c.v)));
+          const ok = segs[i].cards.some(c => c.v === maxV);
+          items.push({ label: `${i + 1}号位：包含全场最大数字牌 （${maxV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'close20') {
+          const d = Math.abs(sums[i] - 20);
+          const ok = segs.every((_, j) => j === i || Math.abs(sums[j] - 20) > d);
+          items.push({ label: `${i + 1}号位：总和最接近20（${sums[i]}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
 };
 /** 通过 window 暴露（测试扩展用） */
 Object.defineProperty(window, 'CHALLENGE_LIB', { get: () => CHALLENGE_LIB });
@@ -450,6 +499,8 @@ function dealGame(names, challenge) {
   // 关卡覆盖：禁止使用眼标记
   const lib = CHALLENGE_LIB[ch.id];
   if (lib && lib.noEye) { S.eyeBase = 0; S.eyeBonus = 0; }
+  // 定首类关卡：先手选定前不分配区域条件（聚光灯停止后进入 cond 阶段）
+  if (lib && lib.rotate) S.segCond = null;
 
   const eyeTotal = S.eyeBase + S.eyeBonus;
   addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${eyeTotal}个眼标记`);
@@ -465,6 +516,12 @@ function dealGame(names, challenge) {
 function hostReveal() {
   if (!isHost() || !isActor()) return;
   if (S.phase !== 'discuss') return;
+  // 定首类关卡：看牌前必须先确定 1 号位条件（讨论才有方向）
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  if (lib && lib.rotate && !S.segCond) {
+    showToast('请先选择 1 号位条件');
+    return;
+  }
   S.phase = 'reveal';
   addLog('房主点击看牌，所有人可以查看自己的手牌');
   saveState();
@@ -515,6 +572,31 @@ function spinTick() {
   } else {
     render();
   }
+}
+
+// ========================================
+// 定首（第3章第1关）：房主在看牌前指定 1 号位条件
+// ========================================
+
+/** 选中原顺序下标 idx 的条件作为 1 号位，其余条件从选中项之后按循环顺序填到 2~6 号位（与滚轮视觉顺序一致） */
+function buildSegConds(idx) {
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  const conds = lib.conds.map(c => ({ ...c }));
+  const n = conds.length;
+  return Array.from({ length: n }, (_, i) => ({ ...conds[(idx + i) % n] }));
+}
+
+/** 房主在讨论阶段（看牌前）确定 1 号位条件，之后才可看牌 */
+function chooseFirstCond(idx) {
+  if (S.phase !== 'discuss') return;
+  if (!isHost() || !isActor()) return;
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  if (!lib || !lib.rotate || !lib.conds || !lib.conds[idx]) return;
+  if (S.segCond) return; // 已选定，不可更改
+  S.segCond = buildSegConds(idx);
+  addLog(`1号位条件已确定：${lib.conds[idx].label}（其余按下方顺序顺延）`);
+  saveState();
+  render();
 }
 
 // ========================================

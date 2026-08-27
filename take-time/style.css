@@ -86,9 +86,18 @@ input { font-family:inherit; }
   background:rgba(0,0,0,.35); border-radius:50%; width:16px; height:16px;
   display:flex; align-items:center; justify-content:center;
 }
-.seg-sum { font-size:1.25rem; font-weight:700; color:var(--gold); }
+.seg-sum { font-size:1.05rem; font-weight:700; color:var(--gold); }
 .seg-cards { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:center; gap:1px; width:100%; padding:0 2px; }
 .seg-vis { font-size:.72rem; color:#7ec8ff; }
+/* 区域条件标签（定首类关卡：先手选定后显示） */
+.seg-cond {
+  position:absolute; bottom:1px; left:2px; right:2px;
+  font-size:.52rem; line-height:1.3; color:var(--gold);
+  background:rgba(0,0,0,.4); border-radius:6px; padding:1px 2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  pointer-events:none;
+}
+.seg-cond.free { color:var(--text-dim); opacity:.8; }
 
 /* 桌面中央的牌：与手牌同款式，多张横置按比例缩放 */
 .mini-card {
@@ -323,6 +332,46 @@ input { font-family:inherit; }
 }
 .eye-opt .eye-box { font-size:1.05rem; }
 .eye-opt.off { color:var(--text-dim); }
+
+/* ── 1号位条件选择器（城市选择器风格滚轮） ── */
+.cond-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:150;
+  display:flex; align-items:flex-end; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .25s;
+}
+.cond-overlay.show { opacity:1; pointer-events:auto; }
+.cond-sheet {
+  background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-width:480px;
+  padding:18px 16px; padding-bottom:max(18px, env(safe-area-inset-bottom));
+  transform:translateY(100%); transition:transform .28s cubic-bezier(.2,.8,.3,1);
+}
+.cond-overlay.show .cond-sheet { transform:translateY(0); }
+.cond-sheet h3 { text-align:center; margin-bottom:4px; font-size:1rem; }
+.wheel-sub { text-align:center; color:var(--text-dim); font-size:.75rem; margin-bottom:10px; }
+.wheel-view {
+  position:relative; height:348px; overflow:hidden; margin-bottom:10px;
+  touch-action:none; user-select:none; -webkit-user-select:none;
+  border-radius:10px;
+}
+.wheel-list { will-change:transform; }
+.wheel-item {
+  height:58px; display:flex; align-items:center; justify-content:center;
+  font-size:.95rem; color:var(--text-dim); text-align:center; padding:0 26px;
+}
+.wheel-item.free { color:#5d6b88; }
+.wheel-item.active {
+  color:var(--gold); font-weight:700;
+  background:rgba(245,197,24,.14);
+}
+.wheel-line {
+  position:absolute; left:0; right:0; top:0;
+  height:58px; border-top:2px solid rgba(245,197,24,.7); border-bottom:1px solid rgba(245,197,24,.35);
+  pointer-events:none;
+}
+.wheel-current {
+  text-align:center; font-size:.85rem; color:var(--text); margin-bottom:12px; min-height:20px;
+}
+.wheel-current b { color:var(--gold); }
 
 /* ── 等候室（联机大厅，online.js 渲染） ── */
 .setup-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }

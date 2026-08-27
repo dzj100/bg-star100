@@ -50,6 +50,8 @@ global.prompt = () => '';
 global.requestAnimationFrame = (fn) => fn();
 global.setInterval = () => 0;
 global.clearInterval = () => {};
+global.setTimeout = () => 0;
+global.clearTimeout = () => {};
 global.Date = Date;
 
 const ctx = {
@@ -60,6 +62,8 @@ const ctx = {
   prompt: global.prompt,
   setInterval: global.setInterval,
   clearInterval: global.clearInterval,
+  setTimeout: global.setTimeout,
+  clearTimeout: global.clearTimeout,
   Date,
   Math,
   JSON,
@@ -335,6 +339,107 @@ g._pendingPlay = { cardIndex: 0, seg: 1, useEye: false }; // 第2张 → 2号位
 g.placeCard();
 assert(g.S.segments[2].cards[0].order === 1, '第1张牌 order=1');
 assert(g.S.segments[1].cards[0].order === 2, '第2张牌 order=2');
+
+// ── 8b. 第三章第一关「定首」：房主在看牌前指定 1 号位条件 ──
+console.log('\n[第三章·定首]');
+g._olSeatIndex = () => 0;
+g._olIsHost = () => true;
+g.dealGame(['A', 'B'], { chapter: 3, test: 1, id: 9 });
+assert(g.S.phase === 'discuss', '第9关初始 discuss');
+assert(g.S.segCond === null, '第9关 segCond 未定');
+
+// 未选条件时不能看牌
+g.hostReveal();
+assert(g.S.phase === 'discuss', '未选1号位条件时不能看牌');
+try { g.render(); assert(true, 'render discuss+未选条件 无异常'); }
+catch (e) { assert(false, `render 异常: ${e.message}`); }
+
+// 非房主不能选择
+g._olIsHost = () => false;
+g.chooseFirstCond(2);
+assert(g.S.segCond === null, '非房主不能选择');
+g._olIsHost = () => true;
+
+// 房主选择原第3个条件（这里需要有最大的一张数字牌）作为 1 号位
+g.chooseFirstCond(2);
+assert(g.S.phase === 'discuss', '选择后仍在 discuss 阶段');
+const conds9 = g.S.segCond;
+assert(conds9.length === 6, 'segCond 6项');
+assert(conds9[0].key === 'max', '选中条件到1号位', conds9[0]);
+assert(conds9[1].key === 'free' && conds9[2].key === 'close20' && conds9[3].key === 'free' && conds9[4].key === 'free' && conds9[5].key === 'free', '其余按下方（循环）顺序顺延', conds9.map(c => c.key));
+
+// 已选定后不可更改
+g.chooseFirstCond(0);
+assert(g.S.segCond[0].key === 'max', '已选择后不可更改');
+
+// 选定后：看牌 → 聚光灯 → 直接 play（无 cond 阶段）
+try { g.render(); assert(true, 'render discuss+已选条件 无异常'); }
+catch (e) { assert(false, `render 异常: ${e.message}`); }
+g.hostReveal();
+assert(g.S.phase === 'reveal', '已选条件后可看牌');
+g.hostStartSpin();
+g.hostStopSpin();
+assert(g.S.phase === 'play', '聚光灯停止 → 直接 play');
+
+// 结算判定（手动构造 segCond：1号位含最大牌+6号位最接近20）
+g.S.segCond = [
+  { key: 'max', label: '这里需要有最大的一张数字牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'close20', label: '总和最接近20', short: '最接近20' },
+];
+const c9Pass = g.challengeCheck({ id: 9 }, [12, 12, 12, 13, 14, 15], [
+  mkSeg([cd(12, 'sun')]), mkSeg([cd(5, 'sun'), cd(7, 'moon')]), mkSeg([cd(1, 'sun'), cd(11, 'moon')]),
+  mkSeg([cd(3, 'sun'), cd(10, 'moon')]), mkSeg([cd(6, 'sun'), cd(8, 'moon')]), mkSeg([cd(2, 'sun'), cd(4, 'moon'), cd(9, 'sun')]),
+]);
+assert(c9Pass.pass === true, '第9关：1号位含最大牌+6号位最接近20 → 通过', c9Pass);
+assert(c9Pass.items.some(it => it.label.includes('最大数字牌')), '结算项含最大牌条件');
+assert(c9Pass.items.some(it => it.label.includes('最接近20')), '结算项含最接近20条件');
+
+// close20 在 5 号位同样可达：先手选 conds[0]（无限制）放 1 号位 → max 到 3 号位、close20 到 5 号位
+g.S.segCond = [
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'max', label: '这里需要有最大的一张数字牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'close20', label: '总和最接近20', short: '最接近20' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c9Close5 = g.challengeCheck({ id: 9 }, [3, 8, 12, 14, 19, 22], [
+  mkSeg([cd(3, 'sun')]), mkSeg([cd(8, 'moon')]), mkSeg([cd(12, 'sun')]),
+  mkSeg([cd(10, 'moon'), cd(4, 'sun')]), mkSeg([cd(11, 'sun'), cd(6, 'moon'), cd(2, 'sun')]),
+  mkSeg([cd(9, 'moon'), cd(7, 'sun'), cd(5, 'moon'), cd(1, 'sun')]),
+]);
+assert(c9Close5.pass === true, '第9关：3号位含最大牌+5号位最接近20（19 vs 22） → 通过', c9Close5);
+g.S.segCond = [
+  { key: 'max', label: '这里需要有最大的一张数字牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'close20', label: '总和最接近20', short: '最接近20' },
+];
+
+
+const c9MaxFail = g.challengeCheck({ id: 9 }, [10, 12, 14, 18, 19, 22], [
+  mkSeg([cd(10, 'sun')]), mkSeg([cd(12, 'sun')]), mkSeg([cd(14, 'moon')]),
+  mkSeg([cd(18, 'moon')]), mkSeg([cd(19, 'sun')]), mkSeg([cd(22, 'moon')]),
+]);
+assert(c9MaxFail.pass === false && c9MaxFail.segBad[0] === true, '第9关：最大牌不在1号位失败');
+
+const c9TieFail = g.challengeCheck({ id: 9 }, [12, 14, 16, 18, 19, 19], [
+  mkSeg([cd(12, 'sun')]), mkSeg([cd(14, 'moon')]), mkSeg([cd(16, 'sun')]),
+  mkSeg([cd(18, 'moon')]), mkSeg([cd(19, 'sun')]), mkSeg([cd(19, 'moon')]),
+]);
+assert(c9TieFail.pass === false && c9TieFail.segBad[5] === true, '第9关：最接近20出现平局失败');
+
+const c9Over = g.challengeCheck({ id: 9 }, [12, 25, 16, 18, 19, 22], [
+  mkSeg([cd(12, 'sun')]), mkSeg([cd(12, 'moon'), cd(13, 'sun')]), mkSeg([cd(16, 'sun')]),
+  mkSeg([cd(18, 'moon')]), mkSeg([cd(19, 'sun')]), mkSeg([cd(22, 'moon')]),
+]);
+assert(c9Over.pass === false && c9Over.sumOK[1] === false, '第9关：硬规则≤24仍生效');
 
 // ── 9. 房主接管离席玩家（轮到离席玩家时房主代操作） ──
 console.log('\n[房主接管离席玩家]');

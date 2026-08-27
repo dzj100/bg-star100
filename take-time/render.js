@@ -40,6 +40,14 @@ function cardBackMiniHTML(c) {
   return `<span class="${cls}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span></span>`;
 }
 
+/** 区域条件标签（定首类关卡：先手选定后每个区域显示其条件） */
+function segCondHTML(i) {
+  if (!S.segCond || !S.segCond[i]) return '';
+  const cond = S.segCond[i];
+  const cls = cond.key === 'free' ? 'seg-cond free' : 'seg-cond';
+  return `<div class="${cls}">${esc(cond.short || cond.label)}</div>`;
+}
+
 function segHTML(i) {
   const seg = S.segments[i];
   const pos = segPos(i);
@@ -62,6 +70,7 @@ function segHTML(i) {
   return `<div class="seg${cls}" data-i="${i}" style="left:${pos.x}%;top:${pos.y}%">
     <div class="seg-idx">${i + 1}</div>
     ${body}
+    ${segCondHTML(i)}
   </div>`;
 }
 
@@ -189,11 +198,20 @@ function showAllDoneModal() {
 
 function actionHTML() {
   switch (S.phase) {
-    case 'discuss':
-      return isHost()
-        ? `<button class="btn-full btn-primary" onclick="hostReveal()">🔍 看牌（所有人可查看自己手牌）</button>
-           <div class="wait-text">💬 看牌前请先讨论策略</div>`
+    case 'discuss': {
+      // 定首类关卡：看牌前房主先选 1 号位条件
+      const needCond = (CHALLENGE_LIB[S.challenge.id] || {}).rotate && !S.segCond;
+      if (isHost()) {
+        return needCond
+          ? `<button class="btn-full btn-primary" onclick="openCondPicker()">🎯 选择 1 号位条件</button>
+             <div class="wait-text">先确定 1 号位条件，再点【看牌】讨论战术<br>💬 看牌前请先讨论策略</div>`
+          : `<button class="btn-full btn-primary" onclick="hostReveal()">🔍 看牌（所有人可查看自己手牌）</button>
+             <div class="wait-text">💬 看牌前请先讨论策略</div>`;
+      }
+      return needCond
+        ? `<div class="wait-text">房主正在选择 1 号位条件…<br>💬 确定后即可看牌讨论战术</div>`
         : `<div class="wait-text">等待房主操作…<br>💬 看牌前请先讨论策略</div>`;
+    }
     case 'reveal':
       return isHost()
         ? `<button class="btn-full btn-primary" onclick="hostStartSpin()">🎯 启动聚光灯选先手</button>
@@ -253,6 +271,7 @@ function showLogModal() {
   }
   document.getElementById('logModalList').innerHTML = [...S.log].reverse().map(l =>
     `<div class="log-item ${l.cls}">${esc(l.msg)}</div>`).join('');
+  void ov.offsetHeight; // 首次创建时强制初始帧，抽屉过渡才会触发
   ov.classList.add('show');
 }
 
@@ -377,6 +396,180 @@ function renderPlaySheet() {
     <button class="btn-full btn-primary" onclick="placeCard()" ${pendingPlay.seg === -1 ? 'disabled' : ''}>确认放置</button>
     <button class="btn-full btn-secondary" onclick="closePlaySheet()">取消</button>`;
   sheet.classList.add('show');
+}
+
+// ========================================
+// 1号位条件选择器（顶部选中滚轮：6 个条件全部可见，选中项固定第一行）
+// ========================================
+
+const COND_ITEM_H = 58;      // 单项高度（与 .wheel-item 一致）
+const COND_ROUNDS = 3;       // 渲染 3 轮实现循环滚动
+let _wheel = null;           // { index, topItem, offset, dragging, startY, baseOffset, velocity, lastY, lastT, list }
+
+function condItems() {
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  return lib && lib.conds ? lib.conds : [];
+}
+
+function condClamp(v, lo, hi) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+function openCondPicker() {
+  if (S.phase !== 'discuss' || !isHost()) return;
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  if (!lib || !lib.rotate || S.segCond) return;
+  let ov = document.getElementById('condOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'condOverlay';
+    ov.className = 'cond-overlay';
+    document.body.appendChild(ov);
+  }
+  const conds = condItems();
+  const items = Array.from({ length: COND_ROUNDS * conds.length }, (_, k) => {
+    const c = conds[k % conds.length];
+    return `<div class="wheel-item${c.key === 'free' ? ' free' : ''}">${esc(c.label)}</div>`;
+  }).join('');
+  ov.innerHTML = `
+    <div class="cond-sheet">
+      <h3>选择 1 号位的条件</h3>
+      <div class="wheel-sub">选中的条件放到 1 号位，其余按下方顺序顺延</div>
+      <div class="wheel-view" id="wheelView">
+        <div class="wheel-list" id="wheelList">${items}</div>
+        <div class="wheel-line"></div>
+      </div>
+      <div class="wheel-current" id="wheelCurrent"></div>
+      <button class="btn-full btn-primary" onclick="confirmCondPick()">确认</button>
+      <button class="btn-full btn-secondary" onclick="closeCondPicker()">取消</button>
+    </div>`;
+  _wheel = {
+    index: 0, topItem: conds.length, offset: -conds.length * COND_ITEM_H,
+    dragging: false, velocity: 0, list: document.getElementById('wheelList'),
+  };
+  _wheel.list.style.transform = `translateY(${_wheel.offset}px)`; // 初始定位：conds[0] 对准顶部选中线
+  void ov.offsetHeight; // 强制初始帧（sheet 处于 translateY(100%)），否则过渡不触发、抽屉变成直接出现
+  ov.classList.add('show');
+  bindWheelEvents();
+  updateWheelRender();
+}
+
+function closeCondPicker() {
+  const ov = document.getElementById('condOverlay');
+  if (ov) ov.classList.remove('show');
+  _wheel = null;
+}
+
+function confirmCondPick() {
+  if (!_wheel) return;
+  const idx = _wheel.index;
+  closeCondPicker();
+  chooseFirstCond(idx);
+}
+
+/** 循环归一到 [0, n) */
+function normIdx(v, n) {
+  return ((v % n) + n) % n;
+}
+
+/** 吸附：raw 为 18 项内的目标下标（无边界，可无限循环） */
+function snapWheel(raw) {
+  _wheel.index = normIdx(raw, condItems().length);
+  _wheel.topItem = raw;
+  _wheel.offset = -raw * COND_ITEM_H;
+  reflowList();
+}
+
+/**
+ * 无限循环：topItem 越过中间轮（[n, 2n)）时，把整轮 DOM 平移到另一端，
+ * 并同步 offset，视觉上无缝衔接，保证任意位置下 6 项都可见。
+ */
+function reflowList() {
+  const n = condItems().length;
+  const list = _wheel.list;
+  while (_wheel.topItem >= 2 * n) {
+    _wheel.topItem -= n;
+    _wheel.offset += n * COND_ITEM_H;
+    if (_wheel.dragging) _wheel.baseOffset += n * COND_ITEM_H;
+    for (let k = 0; k < n; k++) list.appendChild(list.children[0]);
+  }
+  while (_wheel.topItem < n) {
+    _wheel.topItem += n;
+    _wheel.offset -= n * COND_ITEM_H;
+    if (_wheel.dragging) _wheel.baseOffset -= n * COND_ITEM_H;
+    for (let k = 0; k < n; k++) list.prepend(list.children[list.children.length - 1]);
+  }
+  list.style.transform = `translateY(${_wheel.offset}px)`;
+}
+
+function bindWheelEvents() {
+  const view = document.getElementById('wheelView');
+  if (!view || !_wheel) return;
+  const list = _wheel.list;
+  const n = condItems().length;
+  const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  view.onpointerdown = (e) => {
+    if (!_wheel) return;
+    _wheel.dragging = true;
+    _wheel.startY = e.clientY;
+    _wheel.baseOffset = _wheel.offset;
+    _wheel.velocity = 0;
+    _wheel.lastY = e.clientY;
+    _wheel.lastT = now();
+    if (view.setPointerCapture) view.setPointerCapture(e.pointerId);
+    list.style.transition = 'none';
+  };
+  view.onpointermove = (e) => {
+    if (!_wheel || !_wheel.dragging) return;
+    const t = now();
+    const dt = t - _wheel.lastT;
+    const inst = dt > 0 ? (e.clientY - _wheel.lastY) / dt : 0;
+    _wheel.velocity = 0.75 * _wheel.velocity + 0.25 * inst;
+    _wheel.lastY = e.clientY;
+    _wheel.lastT = t;
+    _wheel.offset = _wheel.baseOffset + (e.clientY - _wheel.startY);
+    list.style.transform = `translateY(${_wheel.offset}px)`;
+    // 高亮顶部对准项（仅在变化时更新 DOM，避免拖动卡顿）
+    const t2 = Math.round(-_wheel.offset / COND_ITEM_H);
+    if (t2 !== _wheel.topItem) {
+      _wheel.topItem = t2;
+      _wheel.index = normIdx(t2, n);
+      reflowList();
+      updateWheelRender();
+    }
+  };
+  const endDrag = () => {
+    if (!_wheel || !_wheel.dragging) return;
+    _wheel.dragging = false;
+    const start = _wheel.offset;
+    const glide = condClamp(_wheel.velocity * 160, -2.2 * COND_ITEM_H, 2.2 * COND_ITEM_H);
+    const raw = Math.round(-(start + glide) / COND_ITEM_H);
+    // 先按吸附目标归位 DOM：transform 瞬时换算到新坐标系（视觉不变），
+    // 再启用过渡吸附，动画起点与目标同坐标系，内容不会往回倒（回弹）
+    _wheel.topItem = raw;
+    _wheel.offset = start;
+    reflowList();
+    void list.offsetHeight; // 强制提交瞬时位移，过渡从该位置开始
+    list.style.transition = 'transform .3s cubic-bezier(.18,.85,.3,1.05)';
+    snapWheel(raw);
+    updateWheelRender();
+  };
+  view.onpointerup = endDrag;
+  view.onpointercancel = endDrag;
+}
+
+/** 更新列表高亮与当前选中文案（仅顶部对准项变化时调用） */
+function updateWheelRender() {
+  const list = _wheel && _wheel.list;
+  const cur = document.getElementById('wheelCurrent');
+  if (!list || !_wheel) return;
+  const items = list.children;
+  // 拖动中隐藏高亮框：半透明金色背景随列表 transform 移动会产生残影重影，
+  // 顶部选中线 + 下方文案已实时指明对准项，松手吸附后再显示高亮
+  const show = !_wheel.dragging;
+  for (let i = 0; i < items.length; i++) items[i].classList.toggle('active', show && i === _wheel.topItem);
+  const c = condItems()[_wheel.index];
+  if (cur && c) cur.innerHTML = `1号位：<b>${esc(c.label)}</b>（其余按下方顺序顺延）`;
 }
 
 // ========================================
