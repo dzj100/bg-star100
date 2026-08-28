@@ -755,15 +755,20 @@ function buildSegConds(idx) {
   return Array.from({ length: n }, (_, i) => ({ ...conds[(idx + i) % n] }));
 }
 
-/** 房主在讨论阶段（看牌前）确定 1 号位条件，之后才可看牌 */
+/**
+ * 房主在讨论阶段（看牌前）预览 1 号位条件：可反复重新预览覆盖，
+ * 各区域条件实时渲染给所有玩家；一旦看牌（phase 离开 discuss）即锁定不可变更。
+ */
 function chooseFirstCond(idx) {
   if (S.phase !== 'discuss') return;
   if (!isHost() || !isActor()) return;
   const lib = CHALLENGE_LIB[S.challenge.id];
   if (!lib || !lib.rotate || !lib.conds || !lib.conds[idx]) return;
-  if (S.segCond) return; // 已选定，不可更改
+  const previewing = !!S.segCond;
   S.segCond = buildSegConds(idx);
-  addLog(`1号位条件已确定：${lib.conds[idx].label}（其余按下方顺序顺延）`);
+  addLog(previewing
+    ? `预览条件已更新：1号位 ${lib.conds[idx].label}（其余按下方顺序顺延）`
+    : `预览条件：1号位 ${lib.conds[idx].label}（其余按下方顺序顺延），所有玩家可见`);
   saveState();
   render();
 }

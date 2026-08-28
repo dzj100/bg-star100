@@ -371,15 +371,18 @@ assert(conds9.length === 6, 'segCond 6项');
 assert(conds9[0].key === 'max', '选中条件到1号位', conds9[0]);
 assert(conds9[1].key === 'free' && conds9[2].key === 'close20' && conds9[3].key === 'free' && conds9[4].key === 'free' && conds9[5].key === 'free', '其余按下方（循环）顺序顺延', conds9.map(c => c.key));
 
-// 已选定后不可更改
+// 看牌前可重新预览覆盖：选 idx=0（无限制）→ 1号位变为 free
 g.chooseFirstCond(0);
-assert(g.S.segCond[0].key === 'max', '已选择后不可更改');
+assert(g.S.segCond[0].key === 'free' && g.S.segCond[2].key === 'max' && g.S.segCond[4].key === 'close20', '看牌前可重新预览覆盖', g.S.segCond.map(c => c.key));
 
 // 选定后：看牌 → 聚光灯 → 直接 play（无 cond 阶段）
 try { g.render(); assert(true, 'render discuss+已选条件 无异常'); }
 catch (e) { assert(false, `render 异常: ${e.message}`); }
 g.hostReveal();
 assert(g.S.phase === 'reveal', '已选条件后可看牌');
+// 看牌后条件锁定，不可再变更
+g.chooseFirstCond(1);
+assert(g.S.segCond[0].key === 'free' && g.S.segCond[2].key === 'max', '看牌后条件锁定，不可再变更', g.S.segCond.map(c => c.key));
 g.hostStartSpin();
 g.hostStopSpin();
 assert(g.S.phase === 'play', '聚光灯停止 → 直接 play');

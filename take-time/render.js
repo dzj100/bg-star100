@@ -199,18 +199,27 @@ function showAllDoneModal() {
 function actionHTML() {
   switch (S.phase) {
     case 'discuss': {
-      // 定首类关卡：看牌前房主先选 1 号位条件
-      const needCond = (CHALLENGE_LIB[S.challenge.id] || {}).rotate && !S.segCond;
+      const lib = CHALLENGE_LIB[S.challenge.id] || {};
+      const isRotate = !!lib.rotate;
+      const previewed = !!S.segCond;
       if (isHost()) {
-        return needCond
-          ? `<button class="btn-full btn-primary" onclick="openCondPicker()">🎯 选择 1 号位条件</button>
-             <div class="wait-text">先确定 1 号位条件，再点【看牌】讨论战术<br>💬 看牌前请先讨论策略</div>`
-          : `<button class="btn-full btn-primary" onclick="hostReveal()">🔍 看牌（所有人可查看自己手牌）</button>
-             <div class="wait-text">💬 看牌前请先讨论策略</div>`;
+        if (isRotate) {
+          return `
+            <button class="btn-full btn-primary" onclick="openCondPicker()">🎯 ${previewed ? '调整' : '选择'} 1 号位条件</button>
+            <button class="btn-full btn-primary" onclick="hostReveal()">🔍 看牌（所有人可查看自己手牌）</button>
+            <div class="wait-text">${previewed
+              ? '条件已预览，所有玩家可见区域规则；看牌后将锁定'
+              : '先预览 1 号位条件，所有玩家可见后再看牌'}</div>`;
+        }
+        return `<button class="btn-full btn-primary" onclick="hostReveal()">🔍 看牌（所有人可查看自己手牌）</button>
+           <div class="wait-text">💬 看牌前请先讨论策略</div>`;
       }
-      return needCond
-        ? `<div class="wait-text">房主正在选择 1 号位条件…<br>💬 确定后即可看牌讨论战术</div>`
-        : `<div class="wait-text">等待房主操作…<br>💬 看牌前请先讨论策略</div>`;
+      if (isRotate) {
+        return previewed
+          ? `<div class="wait-text">区域条件已由房主预览<br>📜 上方各区已标注规则，等待房主看牌…</div>`
+          : `<div class="wait-text">房主正在预览 1 号位条件…<br>📜 预览后区域规则立即可见</div>`;
+      }
+      return `<div class="wait-text">等待房主操作…<br>💬 看牌前请先讨论策略</div>`;
     }
     case 'reveal':
       return isHost()
@@ -418,7 +427,7 @@ function condClamp(v, lo, hi) {
 function openCondPicker() {
   if (S.phase !== 'discuss' || !isHost()) return;
   const lib = CHALLENGE_LIB[S.challenge.id];
-  if (!lib || !lib.rotate || S.segCond) return;
+  if (!lib || !lib.rotate) return;
   let ov = document.getElementById('condOverlay');
   if (!ov) {
     ov = document.createElement('div');
@@ -431,16 +440,18 @@ function openCondPicker() {
     const c = conds[k % conds.length];
     return `<div class="wheel-item${c.key === 'free' ? ' free' : ''}">${esc(c.label)}</div>`;
   }).join('');
+  const previewing = !!S.segCond;
   ov.innerHTML = `
     <div class="cond-sheet">
-      <h3>选择 1 号位的条件</h3>
+      <h3>${previewing ? '调整' : '选择'} 1 号位的条件</h3>
       <div class="wheel-sub">选中的条件放到 1 号位，其余按下方顺序顺延</div>
       <div class="wheel-view" id="wheelView">
         <div class="wheel-list" id="wheelList">${items}</div>
         <div class="wheel-line"></div>
       </div>
       <div class="wheel-current" id="wheelCurrent"></div>
-      <button class="btn-full btn-primary" onclick="confirmCondPick()">确认</button>
+      <div class="wheel-tip">${previewing ? '当前为预览：可反复调整，看牌后锁定' : '预览后所有玩家可见区域规则，看牌前可反复调整'}</div>
+      <button class="btn-full btn-primary" onclick="confirmCondPick()">预览</button>
       <button class="btn-full btn-secondary" onclick="closeCondPicker()">取消</button>
     </div>`;
   _wheel = {

@@ -241,7 +241,10 @@ input { font-family:inherit; }
 .result-panel.pass { border-color:var(--safe); animation:panel-in .38s cubic-bezier(.2,1.25,.4,1), glow-pass 1.6s ease-in-out .3s infinite; }
 .result-panel.fail { border-color:var(--danger); animation:panel-in .38s cubic-bezier(.2,1.25,.4,1), shake-x .5s ease-in-out .25s; }
 .result-panel h3 { text-align:center; margin-bottom:8px; font-size:1.05rem; }
-.sum-row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:8px; }
+.sum-row { 
+  display:none;
+  /* display:flex;  */
+  flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:8px; }
 .sum-chip { padding:4px 10px; border-radius:8px; font-size:.85rem; font-weight:700; background:var(--card-bg); }
 .sum-chip.ok { color:var(--safe); }
 .sum-chip.bad { color:var(--danger); }
@@ -372,6 +375,7 @@ input { font-family:inherit; }
   text-align:center; font-size:.85rem; color:var(--text); margin-bottom:12px; min-height:20px;
 }
 .wheel-current b { color:var(--gold); }
+.wheel-tip { text-align:center; color:var(--text-dim); font-size:.72rem; margin-bottom:10px; }
 
 /* ── 等候室（联机大厅，online.js 渲染） ── */
 .setup-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
