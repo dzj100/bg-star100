@@ -147,7 +147,7 @@
     var tier = cardIconTier(card);
     el.innerHTML =
       '<div class="corner"><span class="crank">' + rankTxt + '</span><span class="csuit">' + suitTxt + '</span></div>' +
-      '<div class="cface"><img class="fsuit fsuit-t' + (tier + 1) + '" src="' + cardIcon[card.suit][tier] + '" alt="' + typeTxt + '"><span class="frank">' + rankTxt + '</span></div>' +
+      '<div class="cface"><img class="fsuit fsuit-t' + (tier + 1) + '" src="' + cardIcon[card.suit][tier] + '" alt="' + typeTxt + '"><span class="frank">' + card.rank + '</span></div>' +
       '<div class="ctype">' + typeTxt + '</div>';
     var w = state.weapon;
     if (card.suit !== 'H' && card.suit !== 'D' && w && w.enabled && w.lastFight !== null && card.rank >= w.lastFight) {
