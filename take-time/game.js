@@ -213,9 +213,9 @@ const CHALLENGE_LIB = {
   },
   // ── 第3章 ──
   /**
-   * 定首（第3章第1关）：6 个条件的顺序固定，但先手玩家要在开局
+   * 定首（第3章第1关）：6 个条件的顺序固定，但房主要在看牌前
    * 把其中一个条件指定到 1 号位，其余条件按原顺序顺延到 2~6 号位。
-   * rotate 标记：聚光灯确定先手后进入 cond 阶段，先手选完才进入 play。
+   * rotate 标记：discuss 阶段由房主选定 1 号位条件后才能看牌。
    */
   9: {
     name: '定首', chapter: 3, test: 1,
@@ -228,7 +228,7 @@ const CHALLENGE_LIB = {
       { key: 'close20', label: '总和最接近20', short: '最接近20' },
       { key: 'free', label: '无限制', short: '无限制' },
     ],
-    desc: '区域规则为“无限制->无限制->无限制->含1张数字最大的牌->无限制->总和最接近20”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    desc: '区域规则为“无限制->无限制->含1张数字最大的牌->无限制->总和最接近20->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
     check(sums, segs) {
       const segOK = segs.map(seg => seg.cards.length >= 1);
       const sumOK = sums.map(s => s <= 24);
@@ -261,21 +261,22 @@ const CHALLENGE_LIB = {
     },
   },
   /**
-   * 双锚（第3章第2关）：含最小牌 + 最后一张牌两个锚点条件，与定首一样
+   * 双锚（第3章第2关）：两个锚点区域须分别放置全场数字最小的两张牌
+   * （最小/次小，顺序不限）+ 最后一张牌条件，与定首一样
    * 由房主在看牌前指定 1 号位条件，其余循环顺延。
    */
   10: {
     name: '双锚', chapter: 3, test: 2,
     rotate: true,
     conds: [
-      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'min', label: '含1张数字最小/次小的牌', short: '含最小牌' },
       { key: 'last', label: '最后1张牌放这里', short: '最后1张牌' },
       { key: 'free', label: '无限制', short: '无限制' },
-      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'min', label: '含1张数字最小/次小的牌', short: '含最小牌' },
       { key: 'free', label: '无限制', short: '无限制' },
       { key: 'free', label: '无限制', short: '无限制' },
     ],
-    desc: '区域规则为“含1张数字最小的牌->最后1张牌放这里->无限制->含1张数字最小的牌->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    desc: '区域规则为“含1张数字最小/次小的牌->最后1张牌放这里->无限制->含1张数字最小/次小的牌->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
     check(sums, segs) {
       const segOK = segs.map(seg => seg.cards.length >= 1);
       const sumOK = sums.map(s => s <= 24);
@@ -287,12 +288,24 @@ const CHALLENGE_LIB = {
       ];
       const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
       const conds = S.segCond || [];
-      let condOK = true;
+      // 候选 = 全场数字最小的两张牌（按数字排序取前2张，阈值=第2张的数字）：
+      // 所有 ≤ 阈值的牌都算候选。例：最小数字1有两张时，次小的2不在候选内；
+      // 最小数字只有1张时，次小数字的牌补入候选（共2~3张）。
+      const allCards = segs.flatMap(s => s.cards);
+      const sortedV = allCards.map(c => c.v).sort((a, b) => a - b);
+      const minV = sortedV[0];
+      const candMax = sortedV.length >= 2 ? sortedV[1] : sortedV[0];
+      const isCandidate = c => c.v <= candMax;
+      const isAnchor = c => c.key === 'min';
+      const anchorIdx = conds.map((c, i) => isAnchor(c) ? i : -1).filter(i => i >= 0);
+      const anchorCards = anchorIdx.flatMap(i => segs[i].cards);
+      let condOK = anchorIdx.every(i => segs[i].cards.some(isCandidate)) // 每个锚点区域至少1张候选
+        && anchorCards.filter(isCandidate).length >= 2                    // 合计至少2张候选
+        && anchorCards.some(c => c.v === minV);                           // 必须含最小数字牌
       conds.forEach((cond, i) => {
-        if (cond.key === 'min') {
-          const minV = Math.min(...segs.flatMap(s => s.cards.map(c => c.v)));
-          const ok = segs[i].cards.some(c => c.v === minV);
-          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+        if (isAnchor(cond)) {
+          const ok = segs[i].cards.some(isCandidate);
+          items.push({ label: `${i + 1}号位：包含全场最小或次小的牌（${minV}${candMax !== minV ? '/' + candMax : ''}）`, ok });
           if (!ok) { segBad[i] = true; condOK = false; }
         } else if (cond.key === 'last') {
           const lastOrder = Math.max(...segs.flatMap(s => s.cards.map(c => c.order || 0)));

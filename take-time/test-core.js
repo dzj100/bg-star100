@@ -454,14 +454,14 @@ assert(g.S.segCond === null, '第10关 segCond 未定');
 g.chooseFirstCond(2);
 const conds10 = g.S.segCond;
 assert(conds10.length === 6, '第10关 segCond 6项');
-assert(conds10[0].key === 'free' && conds10[1].key === 'min' && conds10[2].key === 'free' && conds10[3].key === 'free' && conds10[4].key === 'min' && conds10[5].key === 'last', '第10关循环顺延含 min/last', conds10.map(c => c.key));
+assert(conds10[0].key === 'free' && conds10[1].key === 'min' && conds10[2].key === 'free' && conds10[3].key === 'free' && conds10[4].key === 'min' && conds10[5].key === 'last', '第10关循环顺延含双 min/last', conds10.map(c => c.key));
 
 // 结算判定：选 idx=0 → [min, last, free, min, free, free]
 g.S.segCond = [
-  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'min', label: '含1张数字最小/次小的牌', short: '含最小牌' },
   { key: 'last', label: '最后一张牌放这里', short: '最后一张牌' },
   { key: 'free', label: '无限制', short: '无限制' },
-  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'min', label: '含1张数字最小/次小的牌', short: '含最小牌' },
   { key: 'free', label: '无限制', short: '无限制' },
   { key: 'free', label: '无限制', short: '无限制' },
 ];
@@ -473,21 +473,67 @@ const c10 = g.challengeCheck({ id: 10 }, [8, 10, 12, 14, 16, 18], [
   mkSeg([cd(9, 'sun', 7), cd(5, 'moon', 8), cd(2, 'sun', 9)]),// 16
   mkSeg([cd(8, 'moon', 10), cd(10, 'sun', 11)]),              // 18
 ]);
-assert(c10.items[3].label.includes('最小数字牌') && c10.items[3].ok === true, '第10关：1号位含最小牌通过');
+assert(c10.items[3].label.includes('最小') && c10.items[3].ok === true, '第10关：1号位含最小牌通过');
 assert(c10.items[4].label.includes('最后一张牌') && c10.items[4].ok === true, '第10关：2号位最后一张牌通过');
-assert(c10.items[5].label.includes('最小数字牌') && c10.items[5].ok === false, '第10关：4号位无最小牌失败（双min严格判定）');
-assert(c10.pass === false, '第10关：双min严格判定下无解（用户确认保留）');
+assert(c10.items[5].label.includes('次小') && c10.items[5].ok === false, '第10关：4号位未含最小/次小牌失败');
+assert(c10.pass === false, '第10关：4号位缺最小/次小牌 → 失败');
 
-// 有解：牌组24张（1~12×太阳/月亮），两张1各放一个min区域 → 通关
-const c10Solve = g.challengeCheck({ id: 10 }, [8, 9, 10, 12, 13, 15], [
-  mkSeg([cd(1, 'sun', 1), cd(7, 'moon', 2)]),                 // 8，含1 → min@1 ✓
-  mkSeg([cd(4, 'sun', 12), cd(5, 'moon', 3)]),                // 9，order=12 → last@2 ✓
-  mkSeg([cd(10, 'sun', 4)]),                                  // 10
-  mkSeg([cd(1, 'moon', 5), cd(11, 'sun', 6)]),                // 12，含另一张1 → min@4 ✓
-  mkSeg([cd(3, 'sun', 7), cd(2, 'moon', 8), cd(8, 'sun', 9)]),// 13
-  mkSeg([cd(9, 'moon', 10), cd(6, 'sun', 11)]),               // 15
+// 有解：最小牌（1）放1号位、次小牌（2）放4号位，顺序不限 → 通关
+const c10Solve = g.challengeCheck({ id: 10 }, [1, 4, 5, 13, 15, 18], [
+  mkSeg([cd(1, 'sun', 1)]),                                    // 1，含1 → 锚点@1 ✓
+  mkSeg([cd(4, 'sun', 12)]),                                   // 4，order=12 → last@2 ✓
+  mkSeg([cd(5, 'moon', 2)]),                                   // 5
+  mkSeg([cd(2, 'moon', 3), cd(11, 'sun', 4)]),                 // 13，含2 → 锚点@4 ✓
+  mkSeg([cd(7, 'moon', 5), cd(8, 'sun', 6)]),                  // 15
+  mkSeg([cd(3, 'sun', 7), cd(6, 'moon', 8), cd(9, 'sun', 9)]), // 18
 ]);
-assert(c10Solve.pass === true, '第10关：两张最小牌（太阳/月亮）各占一个min区域 → 通过', c10Solve);
+assert(c10Solve.pass === true, '第10关：最小+次小牌各占一个锚点区域 → 通过', c10Solve);
+
+// 例1：最小数字1有两张（月亮1+太阳1），"最小的两张牌"=两张1，次小的2不是候选
+// 通过：两张1分别位于两个锚点区域
+const c10Ex1Pass = g.challengeCheck({ id: 10 }, [1, 6, 9, 9, 21, 21], [
+  mkSeg([cd(1, 'sun', 1)]),                                    // 1，含太阳1 → 锚点@1 ✓
+  mkSeg([cd(2, 'sun', 12), cd(4, 'sun', 2)]),                  // 6，order=12 → last@2 ✓
+  mkSeg([cd(6, 'sun', 3), cd(3, 'moon', 4)]),                  // 9
+  mkSeg([cd(1, 'moon', 5), cd(8, 'sun', 6)]),                  // 9，含月亮1 → 锚点@4 ✓
+  mkSeg([cd(9, 'moon', 7), cd(5, 'moon', 8), cd(7, 'moon', 9)]), // 21
+  mkSeg([cd(10, 'sun', 10), cd(11, 'moon', 11)]),              // 21
+]);
+assert(c10Ex1Pass.pass === true, '第10关：最小数字两张1各占一个锚点区（太阳2非候选）→ 通过', c10Ex1Pass);
+
+// 例1失败：锚点区4 放 5+10（无候选），另一张1在非锚点区 → 失败
+const c10Ex1Fail = g.challengeCheck({ id: 10 }, [1, 6, 9, 15, 17, 19], [
+  mkSeg([cd(1, 'sun', 1)]),                                    // 1，锚点@1 有候选
+  mkSeg([cd(2, 'sun', 12), cd(4, 'sun', 2)]),                  // 6，order=12 → last@2 ✓
+  mkSeg([cd(6, 'sun', 3), cd(3, 'moon', 4)]),                  // 9
+  mkSeg([cd(5, 'moon', 5), cd(10, 'sun', 6)]),                 // 15，无候选 → 锚点@4 ✗
+  mkSeg([cd(8, 'sun', 7), cd(9, 'moon', 8)]),                  // 17
+  mkSeg([cd(7, 'moon', 9), cd(11, 'moon', 10), cd(1, 'moon', 11)]), // 19，另一张1在非锚点区
+]);
+assert(c10Ex1Fail.pass === false, '第10关：次小牌太阳2不能顶替候选（最小数字有两张时）→ 失败', c10Ex1Fail);
+
+// 例2：最小数字1只有1张（月亮1），次小2有两张（太阳2+月亮2）→ 候选3张，任取2张但须含最小
+// 通过：月亮1 + 太阳2 分别位于两个锚点区域
+const c10Ex2Pass = g.challengeCheck({ id: 10 }, [1, 7, 11, 11, 15, 23], [
+  mkSeg([cd(1, 'moon', 1)]),                                   // 1，含月亮1 → 锚点@1 ✓
+  mkSeg([cd(4, 'sun', 12), cd(3, 'moon', 2)]),                 // 7，order=12 → last@2 ✓
+  mkSeg([cd(5, 'moon', 3), cd(6, 'sun', 4)]),                  // 11
+  mkSeg([cd(2, 'sun', 5), cd(9, 'moon', 6)]),                  // 11，含太阳2 → 锚点@4 ✓
+  mkSeg([cd(7, 'moon', 7), cd(8, 'sun', 8)]),                  // 15
+  mkSeg([cd(10, 'sun', 9), cd(11, 'moon', 10), cd(2, 'moon', 11)]), // 23，月亮2在非锚点区也可
+]);
+assert(c10Ex2Pass.pass === true, '第10关：最小1张+次小2张，月亮1+太阳2分放锚点区 → 通过', c10Ex2Pass);
+
+// 例2失败：两个锚点区只放了两张2（缺最小牌月亮1）→ 失败
+const c10Ex2Fail = g.challengeCheck({ id: 10 }, [2, 7, 11, 11, 15, 22], [
+  mkSeg([cd(2, 'sun', 1)]),                                    // 2，锚点@1 有候选但非最小
+  mkSeg([cd(4, 'sun', 12), cd(3, 'moon', 2)]),                 // 7，order=12 → last@2 ✓
+  mkSeg([cd(5, 'moon', 3), cd(6, 'sun', 4)]),                  // 11
+  mkSeg([cd(2, 'moon', 5), cd(9, 'moon', 6)]),                 // 11，锚点@4 有候选但非最小
+  mkSeg([cd(7, 'moon', 7), cd(8, 'sun', 8)]),                  // 15
+  mkSeg([cd(10, 'sun', 9), cd(11, 'moon', 10), cd(1, 'moon', 11)]), // 22，月亮1在非锚点区
+]);
+assert(c10Ex2Fail.pass === false, '第10关：锚点区缺最小牌（两张2不能算最小的两张牌）→ 失败', c10Ex2Fail);
 
 // last 失败：最后一张牌（order=12）不在条件区域
 const c10LastFail = g.challengeCheck({ id: 10 }, [8, 10, 12, 14, 16, 18], [
