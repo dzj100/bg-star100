@@ -684,6 +684,264 @@ const c12Exact2Fail = g.challengeCheck({ id: 12 }, [6, 8, 9, 12, 18, 24], [
 ]);
 assert(c12Exact2Fail.items[6].ok === false && c12Exact2Fail.pass === false, '第12关：6号位3张牌不满足恰好2张失败');
 
+// ── 8f. 第四章第一关「序位」：exact1 + firstCard + 从大到小出牌 ──
+console.log('\n[第四章·序位]');
+g._olSeatIndex = () => 0;
+g._olIsHost = () => true;
+g.dealGame(['A', 'B'], { chapter: 4, test: 1, id: 13 });
+assert(g.S.phase === 'discuss', '第13关初始 discuss');
+assert(g.S.segCond === null, '第13关 segCond 未定');
+
+// 选 idx=2（exact1）→ [exact1, free, free, firstCard, free, free]
+g.chooseFirstCond(2);
+const conds13 = g.S.segCond;
+assert(conds13.length === 6, '第13关 segCond 6项');
+assert(conds13[0].key === 'exact1' && conds13[1].key === 'free' && conds13[2].key === 'free' && conds13[3].key === 'firstCard' && conds13[4].key === 'free' && conds13[5].key === 'free', '第13关循环顺延含 exact1/firstCard', conds13.map(c => c.key));
+
+// 看牌→聚光灯→play，验证 chapterLockedIndexes desc
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+assert(g.S.phase === 'play', '第13关 play 阶段');
+g._olSeatIndex = () => 0;
+g.S.currentSeat = 0;
+// mock 手牌 [12, 12, 8, 5, 3, 1]
+g.S.players[0].hand = [
+  { v: 12, color: 'sun' }, { v: 12, color: 'moon' },
+  { v: 8, color: 'sun' }, { v: 5, color: 'moon' },
+  { v: 3, color: 'sun' }, { v: 1, color: 'moon' },
+];
+const ch13Locked = g.chapterLockedIndexes();
+assert(ch13Locked.has(0) === false && ch13Locked.has(1) === false, '从大到小：两张12都可选');
+assert(ch13Locked.has(2) === true && ch13Locked.has(3) === true, '从大到小：8和5不可选');
+// 打出一张12后，另一张12仍可选
+g.S.players[0].hand.splice(1, 1); // 移除一张12
+const ch13Locked2 = g.chapterLockedIndexes();
+assert(ch13Locked2.has(2) === true && ch13Locked2.has(3) === true, '打出一张12后，8和5仍不可选');
+assert(ch13Locked2.has(0) === false, '另一张12仍可选');
+
+// exact1 通过：1号位恰好1张
+g.S.segCond = [
+  { key: 'exact1', label: '仅1张牌', short: '仅1张牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'firstCard', label: '第1张牌放这里', short: '第1张牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c13Pass = g.challengeCheck({ id: 13 }, [5, 8, 11, 13, 18, 20], [
+  mkSeg([cd(5, 'sun', 5)]),                                                   // exact1 ✓ 恰好1张5
+  mkSeg([cd(8, 'moon', 6)]),
+  mkSeg([cd(3, 'sun', 7), cd(8, 'sun', 8)]),
+  mkSeg([cd(1, 'sun', 1), cd(12, 'moon', 9)]),                               // firstCard ✓ order=1
+  mkSeg([cd(10, 'sun', 10), cd(8, 'moon', 11)]),
+  mkSeg([cd(7, 'sun', 12), cd(6, 'moon', 13), cd(7, 'moon', 14)]),
+]);
+assert(c13Pass.pass === true, '第13关：exact1+firstCard → 通过', c13Pass);
+
+// exact1 失败：1号位放了2张牌
+const c13Exact1Fail = g.challengeCheck({ id: 13 }, [10, 8, 12, 6, 18, 20], [
+  mkSeg([cd(5, 'sun', 5), cd(5, 'moon', 6)]),                                // exact1 ✗ 2张
+  mkSeg([cd(8, 'moon', 7)]),
+  mkSeg([cd(3, 'sun', 8), cd(9, 'moon', 9)]),
+  mkSeg([cd(1, 'sun', 1), cd(5, 'moon', 10)]),
+  mkSeg([cd(10, 'sun', 11), cd(8, 'moon', 12)]),
+  mkSeg([cd(7, 'sun', 13), cd(6, 'moon', 14), cd(7, 'moon', 15)]),
+]);
+assert(c13Exact1Fail.pass === false, '第13关：exact1 1号位2张牌失败');
+
+// firstCard 失败：第1张牌不在4号位
+const c13FirstFail = g.challengeCheck({ id: 13 }, [5, 8, 12, 6, 18, 20], [
+  mkSeg([cd(5, 'sun', 5)]),
+  mkSeg([cd(8, 'moon', 6)]),
+  mkSeg([cd(3, 'sun', 7), cd(9, 'moon', 8)]),
+  mkSeg([cd(5, 'moon', 9)]),                                                  // firstCard ✗ 无order=1
+  mkSeg([cd(10, 'sun', 10), cd(8, 'moon', 11)]),
+  mkSeg([cd(1, 'sun', 1), cd(7, 'sun', 12), cd(6, 'moon', 13)]),             // order=1 在6号位
+]);
+assert(c13FirstFail.pass === false, '第13关：firstCard 第1张牌不在4号位失败');
+
+// ── 8g. 第四章第二关「极序」：firstCard + max + 从小到大出牌 ──
+console.log('\n[第四章·极序]');
+g.dealGame(['A', 'B'], { chapter: 4, test: 2, id: 14 });
+assert(g.S.phase === 'discuss', '第14关初始 discuss');
+assert(g.S.segCond === null, '第14关 segCond 未定');
+
+// 选 idx=1（firstCard）→ [firstCard, max, free, free, free, free]
+g.chooseFirstCond(1);
+const conds14 = g.S.segCond;
+assert(conds14.length === 6, '第14关 segCond 6项');
+assert(conds14[0].key === 'firstCard' && conds14[1].key === 'max' && conds14[2].key === 'free' && conds14[3].key === 'free' && conds14[4].key === 'free' && conds14[5].key === 'free', '第14关循环顺延含 firstCard/max', conds14.map(c => c.key));
+
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.currentSeat = 0;
+g.S.players[0].hand = [
+  { v: 1, color: 'sun' }, { v: 3, color: 'moon' },
+  { v: 5, color: 'sun' }, { v: 5, color: 'moon' },
+  { v: 9, color: 'sun' }, { v: 12, color: 'moon' },
+];
+const ch14Locked = g.chapterLockedIndexes();
+assert(ch14Locked.has(0) === false, '从小到大：1可选');
+assert(ch14Locked.has(1) === true && ch14Locked.has(4) === true, '从小到大：3和9不可选（当前最小=1）');
+assert(ch14Locked.has(5) === true, '从小到大：12不可选（当前最小=1）');
+// 打出1后，只剩 [3, 5, 5, 9, 12]，当前最小=3
+g.S.players[0].hand.splice(0, 1);
+const ch14Locked2 = g.chapterLockedIndexes();
+assert(ch14Locked2.has(0) === false, '打出1后：3可选（index=0）');
+assert(ch14Locked2.has(1) === true && ch14Locked2.has(2) === true, '打出1后：5不可选（当前最小=3）');
+
+// 结算：firstCard + max 通过
+g.S.segCond = [
+  { key: 'firstCard', label: '第1张牌放这里', short: '第1张牌' },
+  { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c14Pass = g.challengeCheck({ id: 14 }, [6, 12, 14, 16, 18, 20], [
+  mkSeg([cd(1, 'sun', 1), cd(5, 'moon', 7)]),                                // firstCard ✓
+  mkSeg([cd(12, 'moon', 8)]),                                                 // max ✓
+  mkSeg([cd(4, 'sun', 9), cd(10, 'moon', 10)]),
+  mkSeg([cd(7, 'sun', 11), cd(9, 'moon', 12)]),
+  mkSeg([cd(8, 'sun', 13), cd(10, 'moon', 14)]),
+  mkSeg([cd(9, 'sun', 15), cd(11, 'moon', 16)]),
+]);
+assert(c14Pass.pass === true, '第14关：firstCard+max → 通过', c14Pass);
+
+// max 失败：最大牌12不在2号位
+const c14MaxFail = g.challengeCheck({ id: 14 }, [6, 8, 12, 14, 16, 18], [
+  mkSeg([cd(1, 'sun', 1), cd(5, 'moon', 7)]),
+  mkSeg([cd(8, 'moon', 8)]),                                                  // max ✗ 无12
+  mkSeg([cd(12, 'sun', 9), cd(4, 'moon', 10)]),                              // 12在3号位
+  mkSeg([cd(7, 'sun', 11), cd(7, 'moon', 12)]),
+  mkSeg([cd(8, 'sun', 13), cd(8, 'moon', 14)]),
+  mkSeg([cd(9, 'sun', 15), cd(9, 'moon', 16)]),
+]);
+assert(c14MaxFail.pass === false, '第14关：最大牌不在2号位失败');
+
+// ── 8h. 第四章第三关「禁数」：no123 + 按顺序出牌 ──
+console.log('\n[第四章·禁数]');
+g.dealGame(['A', 'B'], { chapter: 4, test: 3, id: 15 });
+assert(g.S.phase === 'discuss', '第15关初始 discuss');
+
+// 选 idx=1（no123）→ [no123, free, no123, free, no123, free]
+g.chooseFirstCond(1);
+const conds15 = g.S.segCond;
+assert(conds15.length === 6, '第15关 segCond 6项');
+assert(conds15[0].key === 'no123' && conds15[1].key === 'free' && conds15[2].key === 'no123' && conds15[3].key === 'free' && conds15[4].key === 'no123' && conds15[5].key === 'free', '第15关循环顺延含 no123', conds15.map(c => c.key));
+
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.currentSeat = 0;
+g.S.players[0].hand = [
+  { v: 5, color: 'sun' }, { v: 8, color: 'moon' },
+  { v: 3, color: 'sun' }, { v: 12, color: 'moon' },
+];
+const ch15Locked = g.chapterLockedIndexes();
+assert(ch15Locked.has(0) === false, 'playLock：index=0可选');
+assert(ch15Locked.has(1) === true && ch15Locked.has(2) === true && ch15Locked.has(3) === true, 'playLock：index>0不可选');
+
+// no123 通过
+g.S.segCond = [
+  { key: 'no123', label: '不含1、2、3数字牌', short: '不含1-3' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'no123', label: '不含1、2、3数字牌', short: '不含1-3' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'no123', label: '不含1、2、3数字牌', short: '不含1-3' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c15Pass = g.challengeCheck({ id: 15 }, [8, 10, 12, 14, 16, 18], [
+  mkSeg([cd(8, 'sun', 1)]),                                                   // no123 ✓
+  mkSeg([cd(10, 'moon', 2)]),
+  mkSeg([cd(4, 'sun', 3), cd(8, 'moon', 4)]),                                // no123 ✓
+  mkSeg([cd(14, 'sun', 5)]),
+  mkSeg([cd(6, 'moon', 6), cd(10, 'sun', 7)]),                               // no123 ✓
+  mkSeg([cd(9, 'moon', 8), cd(9, 'sun', 9)]),
+]);
+assert(c15Pass.pass === true, '第15关：no123 全满足 → 通过', c15Pass);
+
+// no123 失败：某区域含1、2、3数字牌
+const c15No123Fail = g.challengeCheck({ id: 15 }, [8, 5, 13, 8, 12, 9], [
+  mkSeg([cd(8, 'sun', 1)]),                                                   // no123 ✓
+  mkSeg([cd(5, 'moon', 2)]),
+  mkSeg([cd(4, 'sun', 3), cd(3, 'moon', 4)]),                                // no123 ✗ 含3
+  mkSeg([cd(8, 'moon', 5)]),
+  mkSeg([cd(12, 'sun', 6)]),                                                  // no123 ✓
+  mkSeg([cd(9, 'moon', 7)]),
+]);
+assert(c15No123Fail.pass === false, '第15关：含3数字牌在no123区域失败');
+
+// ── 8i. 第四章第四关「均衡」：close12 + min + max + 按顺序出牌 ──
+console.log('\n[第四章·均衡]');
+g.dealGame(['A', 'B'], { chapter: 4, test: 4, id: 16 });
+assert(g.S.phase === 'discuss', '第16关初始 discuss');
+
+// 选 idx=3（close12）→ [close12, min, max, free, free, free]
+g.chooseFirstCond(3);
+const conds16 = g.S.segCond;
+assert(conds16.length === 6, '第16关 segCond 6项');
+assert(conds16[0].key === 'close12' && conds16[1].key === 'min' && conds16[2].key === 'max' && conds16[3].key === 'free' && conds16[4].key === 'free' && conds16[5].key === 'free', '第16关循环顺延含 close12/min/max', conds16.map(c => c.key));
+
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.currentSeat = 0;
+g.S.players[0].hand = [
+  { v: 5, color: 'sun' }, { v: 8, color: 'moon' },
+  { v: 3, color: 'sun' }, { v: 12, color: 'moon' },
+];
+const ch16Locked = g.chapterLockedIndexes();
+assert(ch16Locked.has(0) === false, 'playLock：index=0可选');
+assert(ch16Locked.has(1) === true && ch16Locked.has(3) === true, 'playLock：index>0不可选');
+
+// close12 + min + max 通过
+g.S.segCond = [
+  { key: 'close12', label: '总和最接近12', short: '最接近12' },
+  { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+  { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+  { key: 'free', label: '无限制', short: '无限制' },
+];
+const c16Pass = g.challengeCheck({ id: 16 }, [12, 13, 21, 21, 22, 24], [
+  mkSeg([cd(5, 'sun', 1), cd(7, 'moon', 2)]),                                 // 12 最接近12（距离0）✓
+  mkSeg([cd(1, 'moon', 3), cd(2, 'sun', 4), cd(10, 'moon', 5)]),              // 13，min ✓ 含最小1
+  mkSeg([cd(12, 'sun', 6), cd(9, 'moon', 7)]),                                // 21，max ✓ 含最大12
+  mkSeg([cd(10, 'sun', 8), cd(11, 'moon', 9)]),
+  mkSeg([cd(11, 'sun', 10), cd(11, 'moon', 11)]),
+  mkSeg([cd(12, 'moon', 12), cd(12, 'sun', 13)]),
+]);
+assert(c16Pass.pass === true, '第16关：close12+min+max → 通过', c16Pass);
+
+// close12 失败：4号位更接近12
+const c16CloseFail = g.challengeCheck({ id: 16 }, [18, 8, 12, 11, 15, 20], [
+  mkSeg([cd(9, 'sun', 1), cd(9, 'moon', 2)]),                                 // 18 距离6
+  mkSeg([cd(1, 'moon', 3), cd(7, 'sun', 4)]),                                 // min ✓
+  mkSeg([cd(12, 'sun', 5)]),                                                   // max ✓
+  mkSeg([cd(6, 'moon', 6), cd(5, 'sun', 7)]),                                 // 11 距离1 → 更接近12
+  mkSeg([cd(7, 'sun', 8), cd(8, 'moon', 9)]),
+  mkSeg([cd(9, 'moon', 10), cd(11, 'sun', 11)]),
+]);
+assert(c16CloseFail.pass === false, '第16关：close12 1号位非最接近12失败');
+
+// min 失败：最小牌1不在2号位
+const c16MinFail = g.challengeCheck({ id: 16 }, [12, 10, 12, 10, 15, 18], [
+  mkSeg([cd(5, 'sun', 1), cd(7, 'moon', 2)]),
+  mkSeg([cd(7, 'sun', 4)]),                                                    // min ✗ 无1
+  mkSeg([cd(12, 'sun', 5), cd(1, 'moon', 3)]),                                // 最小1在3号位
+  mkSeg([cd(10, 'sun', 6)]),
+  mkSeg([cd(7, 'sun', 7), cd(8, 'moon', 8)]),
+  mkSeg([cd(9, 'moon', 9), cd(9, 'sun', 10)]),
+]);
+assert(c16MinFail.pass === false, '第16关：最小牌不在2号位失败');
+
+// max 失败：最大牌12不在3号位
+const c16MaxFail = g.challengeCheck({ id: 16 }, [12, 8, 10, 12, 15, 18], [
+  mkSeg([cd(5, 'sun', 1), cd(7, 'moon', 2)]),
+  mkSeg([cd(1, 'moon', 3), cd(7, 'sun', 4)]),
+  mkSeg([cd(10, 'sun', 5)]),                                                   // max ✗ 无12
+  mkSeg([cd(12, 'moon', 6)]),                                                  // 最大12在4号位
+  mkSeg([cd(7, 'sun', 7), cd(8, 'moon', 8)]),
+  mkSeg([cd(9, 'moon', 9), cd(9, 'sun', 10)]),
+]);
+assert(c16MaxFail.pass === false, '第16关：最大牌不在3号位失败');
+
 // ── 9. 房主接管离席玩家（轮到离席玩家时房主代操作） ──
 console.log('\n[房主接管离席玩家]');
 g._olSeatIndex = () => 0;
@@ -747,9 +1005,11 @@ assert(!g.loadProgress()[1], '退出房间后本关进度（赠送标记）已�
 g.updateLocalProgress(1, true, 1000);
 assert(g.loadProgress()[1].passed === true, '通关进度写入');
 g._olResetProgress();
-assert(!g.loadProgress()[1], '退出房间后通关进度也已清除');
+assert(g.loadProgress()[1].passed === true, '通关记录在退出房间后保留（长期进度）');
 g.updateLocalProgress(1, false, 1001);
+assert((g.loadProgress()[1] || {}).bonus >= 1, '失败结算写入进度（覆盖记录）');
 g._olResetProgress();
+assert(!g.loadProgress()[1], '退出房间后未通关进度（赠送标记）已清除');
 g.dealGame(['A', 'B'], { chapter: 1, test: 1, id: 1 });
 assert(g.S.eyeBonus === 0, '重置后重建房间重开同关 eyeBonus=0');
 

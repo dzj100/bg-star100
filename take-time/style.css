@@ -192,6 +192,7 @@ input { font-family:inherit; }
 .card.back .c-icon { font-size:1.45rem; opacity:.85; }
 .card.sel { transform:translateY(-6px) scale(1.08); box-shadow:0 0 12px rgba(245,197,24,.7); border-color:#fff; }
 .card.dragging { opacity:.3; transform:scale(.85); box-shadow:none; }
+.card.dimmed { opacity:.4; filter:grayscale(.6); pointer-events:none; }
 .card .c-icon { font-size:.8rem; }
 .card .c-num { font-size:1.3rem; font-weight:700; }
 

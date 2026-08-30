@@ -428,7 +428,180 @@ const CHALLENGE_LIB = {
       };
     },
   },
+  // ── 第4章 ──
+  13: {
+    name: '序位', chapter: 4, test: 1,
+    rotate: true, playOrder: 'desc',
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'exact1', label: '仅1张牌', short: '仅1张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'firstCard', label: '第1张牌放这里', short: '第1张牌' },
+    ],
+    desc: '区域规则为“无限制->无限制->仅1张牌->无限制->无限制->第1张牌放这里”；看牌前，房主可自行将限制条件按顺序设置到对应区域；玩家必须从大到小出牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'exact1') {
+          const ok = segs[i].cards.length === 1;
+          items.push({ label: `${i + 1}号位：恰好放1张牌（${segs[i].cards.length}张）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'firstCard') {
+          const ok = segs[i].cards.some(c => c.order === 1);
+          items.push({ label: `${i + 1}号位：第1张牌放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  14: {
+    name: '极序', chapter: 4, test: 2,
+    rotate: true, playOrder: 'asc',
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'firstCard', label: '第1张牌放这里', short: '第1张牌' },
+      { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“无限制->第1张牌放这里->含1张数字最大牌->无限制->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域；玩家必须从小到大出牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      const allCards = segs.flatMap(s => s.cards);
+      const maxV = allCards.length ? Math.max(...allCards.map(c => c.v)) : 0;
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'firstCard') {
+          const ok = segs[i].cards.some(c => c.order === 1);
+          items.push({ label: `${i + 1}号位：第1张牌放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'max') {
+          const ok = segs[i].cards.some(c => c.v === maxV);
+          items.push({ label: `${i + 1}号位：包含全场最大数字牌（${maxV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  15: {
+    name: '禁数', chapter: 4, test: 3,
+    rotate: true, playLock: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'no123', label: '不含1、2、3数字牌', short: '不含1、2、3' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'no123', label: '不含1、2、3数字牌', short: '不含1、2、3' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'no123', label: '不含1、2、3数字牌', short: '不含1、2、3' },
+    ],
+    desc: '区域规则为“无限制->不含1、2、3数字牌->无限制->不含1、2、3数字牌->无限制->不含1、2、3数字牌”；看牌前，房主可自行将限制条件按顺序设置到对应区域；玩家不能改变手牌顺序，必须从左到右打出',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'no123') {
+          const ok = segs[i].cards.every(c => c.v > 3);
+          const banned = segs[i].cards.filter(c => c.v <= 3).map(c => c.v);
+          items.push({ label: `${i + 1}号位：不含1、2、3数字牌${banned.length ? '（含' + banned.join('、') + '）' : ''}`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  16: {
+    name: '均衡', chapter: 4, test: 4,
+    rotate: true, playLock: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'close12', label: '总和最接近12', short: '最接近12' },
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+    ],
+    desc: '区域规则“无限制->无限制->无限制->总和最接近12->含1张数字最小的牌->含1张数字最大的”；看牌前，房主可自行将限制条件按顺序设置到对应区域；玩家不能改变手牌顺序，必须从左到右打出',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length >= 1);
+      const sumOK = sums.map(s => s <= 24);
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每区域至少1张', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+      const conds = S.segCond || [];
+      const allCards = segs.flatMap(s => s.cards);
+      const minV = allCards.length ? Math.min(...allCards.map(c => c.v)) : 0;
+      const maxV = allCards.length ? Math.max(...allCards.map(c => c.v)) : 0;
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'close12') {
+          const d = Math.abs(sums[i] - 12);
+          const ok = segs.every((_, j) => j === i || Math.abs(sums[j] - 12) > d);
+          items.push({ label: `${i + 1}号位：总和最接近12（${sums[i]}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'min') {
+          const ok = segs[i].cards.some(c => c.v === minV);
+          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'max') {
+          const ok = segs[i].cards.some(c => c.v === maxV);
+          items.push({ label: `${i + 1}号位：包含全场最大数字牌（${maxV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
 };
+
 /** 通过 window 暴露（测试扩展用） */
 Object.defineProperty(window, 'CHALLENGE_LIB', { get: () => CHALLENGE_LIB });
 
@@ -580,9 +753,12 @@ function resetChallengeProgress(id) {
   console.log('[taketime] progress reset:', id);
 }
 
-/** 联机层退出房间前调用：重置本关（当前 S.challenge）的进度与赠送标记 */
+/** 联机层退出房间前调用：重置本关（当前 S.challenge）的进度与赠送标记。
+ *  已通过的关卡保留通关记录（长期进度），仅清除未通过的（防刷眼标记）。 */
 window._olResetProgress = function() {
   if (S && S.challenge && typeof S.challenge.id === 'number') {
+    const cur = loadProgress()[S.challenge.id] || {};
+    if (cur.passed) return;
     resetChallengeProgress(S.challenge.id);
   }
 };
@@ -786,11 +962,44 @@ function isMyTurn() {
   return isHost() && (S.departedPlayers || []).includes(S.currentSeat);
 }
 
+/**
+ * 第4章：出牌顺序/手牌顺序限制
+ * 返回指定手牌索引是否被 chapter 规则禁用（不可选）。
+ */
+function chapterLockedIndexes() {
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  if (!lib) return new Set();
+  const seat = actionSeat();
+  if (seat === null) return new Set();
+  const hand = S.players[seat].hand;
+  const locked = handLockedIndexes();
+  const disabled = new Set();
+
+  if (lib.playOrder === 'desc') {
+    // 只能出当前最大值的牌
+    const visible = hand.filter((_, i) => !locked.has(i));
+    if (visible.length === 0) return disabled;
+    const maxV = Math.max(...visible.map(c => c.v));
+    hand.forEach((_, i) => { if (!locked.has(i) && hand[i].v !== maxV) disabled.add(i); });
+  } else if (lib.playOrder === 'asc') {
+    // 只能出当前最小值的牌
+    const visible = hand.filter((_, i) => !locked.has(i));
+    if (visible.length === 0) return disabled;
+    const minV = Math.min(...visible.map(c => c.v));
+    hand.forEach((_, i) => { if (!locked.has(i) && hand[i].v !== minV) disabled.add(i); });
+  } else if (lib.playLock) {
+    // 只能出最左边的牌
+    hand.forEach((_, i) => { if (i > 0 && !locked.has(i)) disabled.add(i); });
+  }
+  return disabled;
+}
+
 function selectCard(i) {
   if (!isMyTurn() || !isActor()) return;
   const seat = actionSeat();
   if (seat === null || !S.players[seat].hand[i]) return;
   if (handLockedIndexes().has(i)) return; // 2人局后2张未解锁，不可选择
+  if (chapterLockedIndexes().has(i)) return; // 第4章出牌限制
   pendingPlay = { cardIndex: i, seg: -1, useEye: false };
   render();
 }

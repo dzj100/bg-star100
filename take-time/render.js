@@ -77,8 +77,9 @@ function segHTML(i) {
 function clockHTML() {
   const ch = S.challenge;
   const ruleText = ch.desc || challengeDesc(ch);
+  const ruleDisplay = esc(ruleText).replace(/\n/g, '<br>');
   return `
-  <div class="clock-rule">📜 ${esc(ruleText)}</div>
+  <div class="clock-rule">📜 ${ruleDisplay}</div>
   <div class="clock-wrap">
     <div class="clock-ring"></div>
     ${S.segments.map((_, i) => segHTML(i)).join('')}
@@ -123,17 +124,25 @@ function handHTML() {
   const canSee = S.phase === 'reveal' || S.phase === 'spin' || S.phase === 'play' || S.phase === 'result';
   const myTurn = isMyTurn();
   const locked = handLockedIndexes();
+  const chLocked = chapterLockedIndexes();
   const taking = me !== mySeat();
+  const lib = CHALLENGE_LIB[S.challenge.id];
   let title = taking ? `⚑ 接管 ${esc(p.name)} 的手牌` : '我的手牌';
   if (S.phase === 'discuss') title = '我的手牌（未看牌，牌面向下）';
   else if (locked.size > 0) title = '我的手牌（后2张暂锁定：双方各出2张后解锁）';
+  else if (S.phase === 'play' && lib) {
+    if (lib.playOrder === 'desc') title = '我的手牌（从大到小）';
+    else if (lib.playOrder === 'asc') title = '我的手牌（从小到大）';
+    else if (lib.playLock) title = '我的手牌（按顺序从左到右）';
+  }
 
   const cards = p.hand.map((c, i) => {
     // 牌背：按日/月显示 ☀/☾ 与对应底色（隐藏数字）
     if (!canSee || locked.has(i)) return `<div class="card back ${c.color}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span></div>`;
     const sel = pendingPlay && pendingPlay.cardIndex === i ? ' sel' : '';
-    const draggable = myTurn ? `onpointerdown="cardDragStart(event, ${i})"` : '';
-    return `<div class="card ${c.color}${sel}" ${draggable}>
+    const dim = chLocked.has(i) ? ' dimmed' : '';
+    const draggable = myTurn && !chLocked.has(i) ? `onpointerdown="cardDragStart(event, ${i})"` : '';
+    return `<div class="card ${c.color}${sel}${dim}" ${draggable}>
       <span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span>
       <span class="c-num">${c.v}</span>
     </div>`;
@@ -309,6 +318,7 @@ function cardDragStart(e, i) {
   const seat = actionSeat();
   if (seat === null || !S.players[seat].hand[i]) return;
   if (handLockedIndexes().has(i)) return;
+  if (chapterLockedIndexes().has(i)) return;
   e.preventDefault();
   // 缓存 6 个区域圆（屏内固定），拖拽中用纯几何命中检测，避免每帧 DOM 查询
   const segs = document.querySelectorAll('.seg');
