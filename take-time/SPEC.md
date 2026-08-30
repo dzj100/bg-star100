@@ -57,6 +57,7 @@ S = {
   allPlaced: false, settled: false, pass: null,
   sums: [n×6] | null, check: { segOK[], sumOK[], ascOK } | null,
   settleStamp: number,                  // 进度防重
+  startAt: number,                      // 本关挑战开始时间戳（发牌时记录，结算时计算用时）
   log: [], gameOver: false,
 }
 ```

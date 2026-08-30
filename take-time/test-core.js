@@ -1013,5 +1013,22 @@ assert(!g.loadProgress()[1], '退出房间后未通关进度（赠送标记）�
 g.dealGame(['A', 'B'], { chapter: 1, test: 1, id: 1 });
 assert(g.S.eyeBonus === 0, '重置后重建房间重开同关 eyeBonus=0');
 
+// ── 11. 结算日志展示挑战用时（从发牌起算） ──
+console.log('\n[挑战计时]');
+g.dealGame(['A', 'B'], { chapter: 1, test: 1, id: 1 });
+assert(typeof g.S.startAt === 'number', '发牌时记录 startAt');
+g.S.startAt = Date.now() - 125000; // 模拟已进行 2 分 5 秒
+g.S.allPlaced = true;
+g.S.settled = false;
+g.settle();
+let lastMsg = g.S.log[g.S.log.length - 1].msg;
+assert(/挑战用时 2分5秒/.test(lastMsg), '结算日志展示 2分5秒（实测: ' + lastMsg + '）');
+g.S.startAt = Date.now() - 45000; // 不足 1 分钟
+g.S.allPlaced = true;
+g.S.settled = false;
+g.settle();
+lastMsg = g.S.log[g.S.log.length - 1].msg;
+assert(/挑战用时 45秒/.test(lastMsg), '不足 1 分钟显示秒数（实测: ' + lastMsg + '）');
+
 console.log(`\n结果: ${passCount} 通过 / ${failCount} 失败`);
 process.exit(failCount ? 1 : 0);

@@ -836,6 +836,7 @@ function dealGame(names, challenge) {
     sums: null,
     check: null,
     settleStamp: 0,
+    startAt: Date.now(),
     log: [],
     gameOver: false,
   };
@@ -1090,6 +1091,10 @@ function settle() {
     S.eyeBonus = Math.min(S.eyeBonus + 1, MAX_EYE_BONUS);
     addLog('❌ 未通关，获赠 1 个眼标记（下次挑战本关可用）');
   }
+  // 挑战用时（从发牌起算；老存档无 startAt 时按 0 秒兜底）
+  const durSec = Math.max(0, Math.floor((Date.now() - (S.startAt || Date.now())) / 1000));
+  const durText = durSec < 60 ? `${durSec}秒` : `${Math.floor(durSec / 60)}分${durSec % 60}秒`;
+  addLog(`⏱ 本关挑战用时 ${durText}`);
   updateLocalProgress(S.challenge.id, S.pass, S.settleStamp);
   console.log('[taketime] settle:', S.sums, 'pass=', S.pass);
   saveState();
