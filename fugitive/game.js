@@ -438,6 +438,13 @@ function pickCovers(hand, main, need){
 function planFugMove(){
   const last = lastRouteNum();
   const hand = state.fug.hand;
+  // 直接胜利：42 在手且能一步打出（裸打或凑掩护），优先于一切推进
+  if(hand.includes(42) && 42 - last >= 1){
+    const need = 42 - last - 3;
+    if(need <= 0) return { main:42, cover:[] };
+    const cover = pickCovers(hand, 42, need);
+    if(cover) return { main:42, cover };
+  }
   // 普通移动：差 1~3
   const moves = hand.filter(v => v-last>=1 && v-last<=3);
   if(moves.length){
