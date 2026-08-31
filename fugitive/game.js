@@ -709,11 +709,12 @@ function renderGame(){
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
         '</div>' +
       '</div>' +
-      '<div class="tb-row">' +
-        '<div class="tb-left">' + roleTag('fugitive') + roleTag('marshal') + '</div>' +
-        '<div class="tb-right">' +
+      '<div class="tb-row tb-tri">' +
+        '<div class="tb-left">' + roleTag(state.humanRole==='fugitive'?'marshal':'fugitive') + '</div>' +
+        '<div class="tb-center">' +
           '<div class="pile-box">' + PILES.map(p => '<span class="pile">' + p.key + ' <b>' + state.piles[p.key].length + '</b></span>').join('') + '</div>' +
         '</div>' +
+        '<div class="tb-right">' + roleTag(state.humanRole) + '</div>' +
       '</div>' +
     '</div>' +
     logLineHTML() +
@@ -911,11 +912,12 @@ function renderManhunt(){
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
         '</div>' +
       '</div>' +
-      '<div class="tb-row">' +
-        '<div class="tb-left">' + roleTag('fugitive') + roleTag('marshal') + '</div>' +
-        '<div class="tb-right">' +
+      '<div class="tb-row tb-tri">' +
+        '<div class="tb-left">' + roleTag(state.humanRole==='fugitive'?'marshal':'fugitive') + '</div>' +
+        '<div class="tb-center">' +
           '<div class="pile-box">' + PILES.map(p => '<span class="pile">' + p.key + ' <b>' + state.piles[p.key].length + '</b></span>').join('') + '</div>' +
         '</div>' +
+        '<div class="tb-right">' + roleTag(state.humanRole) + '</div>' +
       '</div>' +
     '</div>' +
     logLineHTML() +
@@ -942,11 +944,12 @@ function renderOver(){
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
         '</div>' +
       '</div>' +
-      '<div class="tb-row">' +
-        '<div class="tb-left">' + roleTag('fugitive') + roleTag('marshal') + '</div>' +
-        '<div class="tb-right">' +
+      '<div class="tb-row tb-tri">' +
+        '<div class="tb-left">' + roleTag(state.humanRole==='fugitive'?'marshal':'fugitive') + '</div>' +
+        '<div class="tb-center">' +
           '<div class="pile-box">' + PILES.map(p => '<span class="pile">' + p.key + ' <b>' + state.piles[p.key].length + '</b></span>').join('') + '</div>' +
         '</div>' +
+        '<div class="tb-right">' + roleTag(state.humanRole) + '</div>' +
       '</div>' +
     '</div>' +
     logLineHTML() +
@@ -1039,10 +1042,11 @@ function modalHTML(){
     '<h3>规则说明</h3>' +
     '<ul>' +
       '<li><b>目标</b>：<u>大盗</u>暗放地点牌（必须递增，且 ≤ 上一张 +3），率先打出 42 则逃脱；<u>警探</u>抽牌并猜测数字，猜对则翻开地点牌，全部地点牌翻出则获胜。</li>' +
-      '<li><b>掩护</b>：每张 1~41 牌自带掩护标记（奇数 1 个、偶数 2 个；0/42 不能作掩护）。打出地点牌时可追加任意数量掩护牌（面朝下），每 1 个标记可放宽上限 +1。</li>' +
-      '<li><b>第一回合</b>：大盗放 1~2 张；警探抽 2 张并必须猜测。</li>' +
-      '<li><b>后续回合</b>：大盗抽 1 张后，可放 1 张或跳过；警探抽 1 张后必须猜测。</li>' +
-      '<li><b>猜测</b>：可猜任意 1~41 数字（不消耗手牌）。单猜命中即翻开（掩护牌一并翻开）；多猜须全部命中才翻。已公开 / 手牌数字不可再猜，猜过未中的数字可再猜。</li>' +
+      '<li><b>牌堆</b>：<table class="pile-table"><tr><th>牌堆</th><th>范围</th><th>张数</th></tr><tr><td>A</td><td>4 ~ 14</td><td>11</td></tr><tr><td>B</td><td>15 ~ 28</td><td>14</td></tr><tr><td>C</td><td>29 ~ 41</td><td>13</td></tr></table>剩牌数在顶栏中部显示。</li>' +
+      '<li><b>初始手牌</b>：大盗起始 9 张——固定 <b>1、2、3、42</b> + A 堆抽 3 张 + B 堆抽 2 张。警探起始空手。</li>' +
+      '<li><b>掩护</b>：每张 1~41 牌自带掩护标记（奇数 1 个、偶数 2 个；42 不能作掩护）。打出地点牌时可追加任意数量掩护牌（正面朝下），每 1 个标记可放宽上限 +1。</li>' +
+      '<li><b>回合流程</b>：<table class="pile-table"><tr><th></th><th>大盗</th><th>警探</th></tr><tr><td>第一回合</td><td>放 1~2 张地点牌</td><td>抽 2 张后必须猜测</td></tr><tr><td>后续回合</td><td>抽 1 张，可放 1 张或跳过</td><td>抽 1 张后必须猜测</td></tr></table></li>' +
+      '<li><b>猜测</b>：可猜任意 1~41 数字。单猜命中即翻开（掩护牌一并翻开）；多猜须全部命中才翻。</li>' +
       '<li><b>搜捕</b>：大盗打出 42 时若已翻开地点牌均不大于 30 ，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜，全对则警探获胜。</li>' +
     '</ul>' +
     '<button class="btn btn-primary" onclick="closeModal(\'rules\')">知道了</button>' +
