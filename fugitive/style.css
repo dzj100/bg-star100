@@ -134,7 +134,7 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .sheet-foot { font-size:11px; color:var(--text-dim); text-align:center; margin:10px 0; }
 
 /* ===== 气泡对话 ===== */
-#bubble-layer { position:fixed; left:0; right:0; top:84px; z-index:90; display:flex; flex-direction:column; gap:8px; padding:0 16px; pointer-events:none; }
+#bubble-layer { position:fixed; left:50%; transform:translateX(-50%); width:min(100%,520px); top:170px; z-index:90; display:flex; flex-direction:column; gap:8px; padding:0 16px; pointer-events:none; }
 .bubble { max-width:78%; padding:10px 14px; border-radius:16px; font-size:15px; font-weight:600; line-height:1.4; box-shadow:0 4px 16px rgba(0,0,0,.5); animation:popIn .22s ease; }
 .bubble-mar { background:linear-gradient(180deg, #245a80, #1d4a6b); color:#cfe6f5; border:1px solid #2f6f9e; }
 .bubble-fug { background:linear-gradient(180deg, #8a5c1e, #6e4715); color:#ffe6b8; border:1px solid #a5762c; }
