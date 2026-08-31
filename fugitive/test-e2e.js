@@ -507,7 +507,7 @@ async function setup(page, patch){
     await page.click('#log');
     await waitFor(page, () => document.getElementById('sheet').classList.contains('show'), 5000, '日志抽屉弹出');
     const drawerTitle = await page.evaluate(() => document.getElementById('sheet-title').textContent);
-    assert(drawerTitle.includes('操作日志') && drawerTitle.includes('倒序'), '抽屉标题含倒序');
+    assert(drawerTitle.includes('操作日志'), '抽屉标题含操作日志');
     const firstItem = await page.evaluate(() => document.querySelector('#sheet-body .ld-item').textContent);
     assert(firstItem.includes(lastMsg), '抽屉首条为最新日志');
     const drawerCount = await page.evaluate(() => document.querySelectorAll('#sheet-body .ld-item').length);

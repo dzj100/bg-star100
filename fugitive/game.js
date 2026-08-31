@@ -643,8 +643,8 @@ function logLineHTML(){
 }
 function openLogDrawer(){
   const items = state.log.slice().reverse().map(l =>
-    '<div class="ld-item"><span class="' + (l.cls||'') + '">' + fmtTime(l.t) + '</span> ' + l.msg + '</div>').join('');
-  openSheet('操作日志（时间倒序）', items + '<div class="sheet-foot">共 ' + state.log.length + ' 条</div>');
+    '<div class="ld-item"><span class="ld-time">' + fmtTime(l.t) + '</span><span class="' + (l.cls||'') + '">' + l.msg + '</span></div>').join('');
+  openSheet('📅 操作日志', items + '<div class="sheet-foot">共 ' + state.log.length + ' 条</div>');
 }
 function fmtTime(t){
   if(!t) return '';
@@ -934,12 +934,27 @@ function renderOver(){
   const revealCount = state.fug.route.filter(r=>!r.hidden).length;
   const fugCards = state.fug.route.filter(r=>r.num!==42).length;
   return '' +
+    '<div id="topbar">' +
+      '<div class="tb-row">' +
+        '<h2 class="tb-title">🕵️ 神探缉凶</h2>' +
+        '<div class="tb-btns">' +
+          '<button class="icon-btn" onclick="quitGame()">🚪 退出</button>' +
+          '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tb-row">' +
+        '<div class="tb-left">' + roleTag('fugitive') + roleTag('marshal') + '</div>' +
+        '<div class="tb-right">' +
+          '<div class="pile-box">' + PILES.map(p => '<span class="pile">' + p.key + ' <b>' + state.piles[p.key].length + '</b></span>').join('') + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
     logLineHTML() +
     '<div class="win-banner win-' + (state.winner==='fugitive'?'fug':'mar') + '">' +
-      '<div class="big">' + (humanWin ? '你赢了！' : '你输了…') + '</div>' +
-      '<div class="sub">' + (state.winner==='fugitive' ? '大盗成功逃脱！' : '警探成功抓捕！') +
-        ' · 你扮演 ' + (state.humanRole==='fugitive'?'大盗':'警探') +
-        ' · 共 ' + state.turns + ' 回合 · 翻开 ' + revealCount + ' 张地点牌</div>' +
+      '<div class="big">' + (humanWin ? '😎你赢了' : '😭你输了…') + '</div>' +
+      '<div class="sub">' + (state.winner==='fugitive' ? '大盗成功逃脱！' : '警探成功抓捕大盗！') +
+        // ' · 你扮演 ' + (state.humanRole==='fugitive'?'大盗':'警探') +
+        // ' · 共 ' + state.turns + ' 回合 · 翻开 ' + revealCount + ' 张地点牌</div>' +
     '</div>' +
     '<div id="final-track">' +
       '<div class="t-card t-start"><b>0</b><div class="idx">起点</div></div>' +
@@ -999,9 +1014,9 @@ function showLanding(){
       '<h1>神探缉凶</h1>' +
       '<div class="sub">Fugitive · 人机对战</div>' +
       '<div class="badge">🏙️ 大盗藏匿 警探追捕</div>' +
-      '<button class="btn btn-primary role-btn" onclick="newGame(\'fugitive\')"><span class="em">🕶️</span><span class="rt"><b>扮演 大盗</b><span class="de">暗放地点牌，冲刺到 42 逃脱</span></span></button>' +
-      '<button class="btn role-btn" onclick="newGame(\'marshal\')"><span class="em">🕵️</span><span class="rt"><b>扮演 警探</b><span class="de">猜数字，翻开全部藏身处</span></span></button>' +
-      '<button class="btn btn-gold role-btn" id="btn-random"><span class="em">🎲</span><span class="rt"><b>随机身份</b><span class="de">系统替你决定</span></span></button>' +
+      '<button class="btn btn-fug role-btn" onclick="newGame(\'fugitive\')"><span class="em">🕶️</span><span class="rt"><b>扮演 大盗</b><span class="de">暗放地点牌，冲刺到 42 逃脱</span></span></button>' +
+      '<button class="btn btn-mar role-btn" onclick="newGame(\'marshal\')"><span class="em">🕵️</span><span class="rt"><b>扮演 警探</b><span class="de">猜数字，翻开全部藏身处</span></span></button>' +
+      '<button class="btn btn-random role-btn" id="btn-random"><span class="em">🎲</span><span class="rt"><b>随机身份</b><span class="de">系统替你决定</span></span></button>' +
       '<div class="credit">@imStar100</div>' +
     '</div>';
   document.getElementById('btn-random').onclick = function(){
@@ -1028,7 +1043,7 @@ function modalHTML(){
       '<li><b>第一回合</b>：大盗放 1~2 张；警探抽 2 张并必须猜测。</li>' +
       '<li><b>后续回合</b>：大盗抽 1 张后，可放 1 张或跳过；警探抽 1 张后必须猜测。</li>' +
       '<li><b>猜测</b>：可猜任意 1~41 数字（不消耗手牌）。单猜命中即翻开（掩护牌一并翻开）；多猜须全部命中才翻。已公开 / 手牌数字不可再猜，猜过未中的数字可再猜。</li>' +
-      '<li><b>搜捕</b>：打出 42 时若已翻开地点牌无大于 30 的数字，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜。</li>' +
+      '<li><b>搜捕</b>：大盗打出 42 时若已翻开地点牌均不大于 30 ，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜，全对则警探获胜。</li>' +
     '</ul>' +
     '<button class="btn btn-primary" onclick="closeModal(\'rules\')">知道了</button>' +
   '</div></div>' +
