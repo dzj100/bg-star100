@@ -308,6 +308,8 @@ async function manhuntGuess(n, gen){
   const smallestHidden = Math.min(...hidden.map(r=>r.num));
   // 搜捕必须从小到大依次猜；猜测数字不等于当前最小暗牌 → 跳过/猜错即败
   if(n !== smallestHidden){
+    await guessBubbles([n], false, gen); // 搜捕失败同样先气泡对话
+    if(stale(gen)) return;
     log('搜捕：须按顺序猜最小暗牌 <b>' + smallestHidden + '</b>（你猜了 ' + n + '），大盗逃脱！', 'lg-fug');
     console.log('[manhunt] guess', n, '→ ORDER FAIL (smallest hidden is', smallestHidden + ')');
     ui.lock = false; ui.aiBusy = false;
@@ -507,9 +509,11 @@ function marshalInference(){
   const known = aiKnownNums();
   const cands = [];
   let prevSet = new Set([0]); // 起点 0
+  let lastPublic = 0;
   for(let i=0;i<route.length;i++){
     if(!route[i].hidden){
       prevSet = new Set([route[i].num]);
+      lastPublic = route[i].num;
       cands.push(null);
       continue;
     }
@@ -521,9 +525,9 @@ function marshalInference(){
       }
     }
     if(cur.size === 0){
-      // 兜底：约束推导断链时，候选 = 全部未排除数字
+      // 兜底：约束推导断链时，候选 = 最后公开牌之后的未排除数字（路线严格递增，暗牌必 > 最后公开牌）
       cur = new Set();
-      for(let n=1;n<=41;n++){ if(!known.has(n)) cur.add(n); }
+      for(let n=lastPublic+1;n<=41;n++){ if(!known.has(n)) cur.add(n); }
     }
     cands.push(cur);
     prevSet = cur;
@@ -562,10 +566,15 @@ function aiMarChooseGuess(){
 }
 async function aiManhunt(gen){
   if(state.phase!=='manhunt'){ ui.aiBusy=false; render(); return; }
-  const hidden = state.fug.route.filter(r=>r.hidden);
-  // 搜捕必须从小到大依次猜
-  const guess = Math.min(...hidden.map(r=>r.num));
-  console.log('[manhunt-ai] guess =', guess, '(smallest hidden)');
+  // 搜捕必须从小到大依次猜：用推断推导第一个暗置位置（= 当前最小暗牌）的候选，猜最可能值
+  const cands = marshalInference();
+  let guess = 1;
+  for(const c of cands){
+    if(!c) continue; // 已翻开的（cands 为 null）
+    guess = [...c][0]; // Set 升序 → 最小候选；唯一候选即准确推断
+    break;
+  }
+  console.log('[manhunt-ai] guess =', guess, '(inferred smallest hidden)');
   await manhuntGuess(guess, gen);
 }
 
@@ -630,7 +639,7 @@ function logLineHTML(){
   const last = state.log[state.log.length-1];
   return '<div id="log" onclick="openLogDrawer()"><span class="ld-msg">' +
     (last ? '<span class="' + (last.cls||'') + '">' + last.msg + '</span>' : '暂无操作') +
-    '</span><span class="log-more">全部日志 ›</span></div>';
+    '</span><span class="log-more">日志 ›</span></div>';
 }
 function openLogDrawer(){
   const items = state.log.slice().reverse().map(l =>
@@ -684,6 +693,13 @@ function renderGame(){
     handArea = renderMarArea();
     actions = '';
   }
+  let body;
+  if(humanIsFug && state.needDraw){
+    // 摸牌阶段：抽牌 UI 在整个手牌区上方，状态行在最后
+    body = actions + handArea + renderFugStatus();
+  } else {
+    body = handArea + (humanIsFug ? renderFugStatus() + actions : '');
+  }
   return '' +
     '<div id="topbar">' +
       '<div class="tb-row">' +
@@ -703,11 +719,11 @@ function renderGame(){
     logLineHTML() +
     '<div class="hint">' + turnLabel() + '</div>' +
     '<div id="track">' + trackHTML(humanIsFug) + '</div>' +
-    handArea + actions;
+    body;
 }
 
 /* ===== 大盗视角 ===== */
-function renderFugHand(){
+function renderFugStatus(){
   const last = lastRouteNum();
   const m = ui.selMain;
   const covers = ui.selCover;
@@ -719,6 +735,9 @@ function renderFugHand(){
   else if(diff < 1){ status = '主牌 ' + m + '：必须比 ' + last + ' 更大'; }
   else if(diff <= 3){ status = '主牌 ' + m + '：差 ' + diff + '，无需掩护'; }
   else { status = '主牌 ' + m + '：差 ' + diff + '，掩护标记 ' + marksTotal + ' → 上限 ' + maxAllowed + (diff<=maxAllowed?' ✓':'（不够！）'); }
+  return '<div class="hint">' + status + '</div>';
+}
+function renderFugHand(){
   const cards = state.fug.hand.map(n => {
     const selMain = ui.selMain===n ? ' sel-main' : '';
     const selCover = ui.selCover.includes(n) ? ' sel-cover' : '';
@@ -727,8 +746,7 @@ function renderFugHand(){
   }).join('');
   return '' +
     '<div class="section-title">你的手牌 <span style="font-size:11px">掩护标记：奇 ● / 偶 ●●</span></div>' +
-    '<div id="hand">' + cards + '</div>' +
-    '<div class="hint">' + status + '</div>';
+    '<div id="hand">' + cards + '</div>';
 }
 function renderFugActions(){
   if(state.turn !== 'fugitive' || ui.lock) return '';
@@ -752,7 +770,11 @@ function renderFugActions(){
   return html;
 }
 function toggleFugCard(n){
-  if(ui.lock || state.turn!=='fugitive' || state.phase!=='playing' || state.needDraw) return;
+  if(ui.lock || state.turn!=='fugitive' || state.phase!=='playing') return;
+  if(state.needDraw){
+    if(anyPileLeft()){ toast('先进行摸牌'); return; }
+    state.needDraw = false; save(); render(); // 牌库全空 → 自愈清除，直接可选牌
+  }
   if(ui.selMain === null){
     ui.selMain = n;
   } else if(ui.selMain === n){
@@ -924,9 +946,11 @@ function renderOver(){
       (state.fug.route.length ? '<span class="t-arrow">›</span>' : '') +
       state.fug.route.map((r,i)=>{
       const cls = r.hidden ? 't-hidden' : 't-open';
-      const body = r.hidden ? '<span class="q">?</span>' : ('<b>' + r.num + '</b>' + (r.cover.length?'<span class="cov">掩 ' + r.cover.join(',') + '</span>':''));
-      const chk = !r.hidden && r.cover.length ? ' chk' : '';
-      // 结算页：未猜到的暗牌可点击复盘（？→弹窗显示确切数字）
+      const body = r.hidden
+        ? ('<span class="q">?</span>' + (r.cover.length ? '<span class="cov">掩护×' + r.cover.length + '</span>' : ''))
+        : ('<b>' + r.num + '</b>' + (r.cover.length?'<span class="cov">掩 ' + r.cover.join(',') + '</span>':''));
+      const chk = r.cover.length ? ' chk' : '';
+      // 结算页：未猜到的暗牌可点击复盘（？→弹窗显示确切数字与掩护牌）
       const clickable = chk || r.hidden;
       return '<div class="t-card ' + cls + chk + '"' + (clickable ? ' onclick="viewRouteCard(' + i + ')"' : '') + '><div class="idx">第' + (i+1) + '张</div>' + body + '</div>';
     }).join('<span class="t-arrow">›</span>') + '</div>' +
