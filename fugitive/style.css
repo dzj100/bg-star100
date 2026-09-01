@@ -67,7 +67,8 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .tb-row.tb-tri .tb-right { justify-self:end; }
 .tb-title { font-size:16px; margin:0; color:var(--gold); letter-spacing:2px; display:flex; align-items:center; gap:6px; }
 .tb-btns { display:flex; gap:6px; }
-.role-tag { padding:6px 14px; border-radius:999px; font-size:14px; font-weight:700; }
+.role-tag { padding:6px 14px; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; }
+.role-tag:active { filter:brightness(1.15); }
 .role-fug { background:var(--fug); color:#ffe6b0; border:1px solid #dda34d; }
 .role-mar { background:var(--mar); color:#eaf6fc; border:1px solid #5db8dd; }
 .tb-left { display:flex; align-items:center; gap:6px; }
@@ -132,6 +133,9 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .ld-item .lg-mar { color:#7cc0e8; }
 .ld-item:last-child { border-bottom:none; }
 .sheet-foot { font-size:11px; color:var(--text-dim); text-align:center; margin:10px 0; }
+.rh-card { display:inline-flex; align-items:center; justify-content:center; width:42px; height:56px; margin:4px; border-radius:8px; background:linear-gradient(180deg, #f2ead4, var(--paper)); border:2px solid #b8a986; color:var(--ink); font-size:18px; font-weight:800; box-shadow:0 2px 4px rgba(0,0,0,.4); }
+.rh-card.rh-hide { background:#0f2233; border:2px dashed #33506e; color:#6c8aa6; }
+.rh-empty { text-align:center; color:var(--text-dim); font-size:13px; padding:14px 0; }
 
 /* ===== 气泡对话 ===== */
 #bubble-layer { position:fixed; left:50%; transform:translateX(-50%); width:min(100%,520px); top:170px; z-index:90; display:flex; flex-direction:column; gap:8px; padding:0 16px; pointer-events:none; }

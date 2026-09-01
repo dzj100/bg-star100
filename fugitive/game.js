@@ -609,8 +609,19 @@ function render(){
 }
 
 function roleTag(role){
-  if(role==='fugitive') return '<span class="role-tag role-fug">大盗' + (state.humanRole==='fugitive'?' (你)':' (AI)') + '</span>';
-  return '<span class="role-tag role-mar">警探' + (state.humanRole==='marshal'?' (你)':' (AI)') + '</span>';
+  if(role==='fugitive') return '<span class="role-tag role-fug" onclick="showRoleHand(\'fugitive\')">大盗' + (state.humanRole==='fugitive'?' (你)':' (AI)') + '</span>';
+  return '<span class="role-tag role-mar" onclick="showRoleHand(\'marshal\')">警探' + (state.humanRole==='marshal'?' (你)':' (AI)') + '</span>';
+}
+function showRoleHand(role){
+  const isHuman = state.humanRole === role;
+  const name = role==='fugitive' ? '大盗' : '警探';
+  const hand = (role==='fugitive' ? state.fug.hand : state.mar.hand) || [];
+  // 自己的角色可见数字；对方手牌一律保密，仅显示张数与牌背
+  const chips = hand.slice().sort((a,b)=>a-b).map(n =>
+    '<span class="rh-card' + (isHuman?'':' rh-hide') + '">' + (isHuman?n:'?') + '</span>').join('');
+  openSheet(name + ' 手牌（' + hand.length + ' 张）',
+    (chips || '<div class="rh-empty">空手</div>') +
+    '<div class="sheet-foot">' + (isHuman ? '牌面数字' : '对方手牌保密，仅显示张数') + '</div>');
 }
 function turnLabel(){
   if(ui.lock) return '第 ' + state.turns + ' 回合 · 结算中…';
