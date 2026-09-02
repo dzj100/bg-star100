@@ -85,7 +85,7 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .t-card { position:relative; width:calc((100% - 40px)/6); height:76px; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:800; font-size:20px; flex-shrink:0; text-align:center; }
 .t-card .idx { position:absolute; top:-14px; left:0; right:0; text-align:center; font-size:10px; color:var(--text-dim); text-shadow:0 1px 3px rgba(0,0,0,.6); }
 .t-card .sprint { font-size:9px; color:var(--text-dim); font-weight:400; margin-top:2px; }
-.t-card .cov { font-size:9px; color:var(--ink-dim); font-weight:400; margin-top:2px; }
+.t-card .cov { display:block; max-width:100%; overflow:hidden; font-size:9px; color:var(--ink-dim); font-weight:400; margin-top:2px; text-overflow:ellipsis;}
 .t-open { background:linear-gradient(180deg, #f2ead4, var(--paper)); border:2px solid #4a9fce; color:var(--ink); box-shadow:0 0 10px rgba(74,159,206,.4); }
 .t-hidden { background:#0f2233; border:2px dashed #33506e; color:#9fb8cc; }
 .t-hidden .q { color:#6c8aa6; font-size:26px; }
@@ -194,7 +194,6 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 #final-track { display:flex; flex-wrap:wrap; gap:20px 8px; padding:24px 12px 12px; background:linear-gradient(180deg, var(--surface), var(--surface-2)); border:1px solid var(--line); border-radius:var(--radius); margin:14px 0; align-items:center; }
 #final-track .t-arrow { display:none; }
 #final-track .t-card.chk { cursor:pointer; }
-#final-track .t-card.chk .cov { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #stats { display:flex; gap:10px; margin-bottom:14px; }
 #stats .s { flex:1; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:10px; text-align:center; }
 #stats .s b { display:block; font-size:20px; color:var(--gold); }
@@ -207,3 +206,58 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .pop { animation:popIn .3s ease; }
 @keyframes flash { 0%,100%{ box-shadow:0 0 0 rgba(76,175,80,0);} 50%{ box-shadow:0 0 18px rgba(76,175,80,.9);} }
 .flash-hit { animation:flash .6s ease; }
+
+/* ===== 搜捕开场「缉凶时刻」戏剧提示（打出 42 → 进入搜捕；全屏自动展示后自动移除） ===== */
+#manhunt-drama { position:fixed; inset:0; z-index:140; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .26s ease; background:radial-gradient(92% 72% at 50% 38%, rgba(38,73,110,.38) 0%, rgba(5,10,18,.92) 80%); }
+#manhunt-drama.on { opacity:1; pointer-events:auto; }
+#manhunt-drama .d-flash { position:absolute; inset:0; opacity:0; pointer-events:none; background:radial-gradient(62% 48% at 50% 44%, rgba(255,243,210,.95) 0%, rgba(226,85,90,.4) 55%, rgba(226,85,90,0) 100%); }
+#manhunt-drama.on .d-f1 { animation:strikeFlash .34s ease-out .05s both; }
+#manhunt-drama.on .d-f2 { animation:strikeFlash .3s ease-out .56s both; }
+@keyframes strikeFlash { 0%{opacity:0} 25%{opacity:.9} 100%{opacity:0} }
+#manhunt-drama .d-heart { position:absolute; inset:0; opacity:0; pointer-events:none; background:radial-gradient(120% 90% at 50% 50%, rgba(226,85,90,0) 55%, rgba(226,85,90,.42) 100%); }
+#manhunt-drama.on .d-heart { animation:heartBeat 1.5s ease-in-out .35s infinite; }
+@keyframes heartBeat { 0%,100%{opacity:.18} 28%{opacity:.9} 46%{opacity:.25} 66%{opacity:.55} }
+#manhunt-drama .d-shake { display:flex; align-items:center; justify-content:center; width:100%; }
+#manhunt-drama.on .d-shake { animation:dramaShake .5s ease-out .58s both; }
+@keyframes dramaShake { 0%{transform:translate(0,0) rotate(0)} 14%{transform:translate(-8px,3px) rotate(-.8deg)} 30%{transform:translate(7px,-4px) rotate(.6deg)} 46%{transform:translate(-5px,2px) rotate(-.4deg)} 64%{transform:translate(3px,-1px) rotate(.2deg)} 82%{transform:translate(-1px,.5px) rotate(0)} 100%{transform:translate(0,0) rotate(0)} }
+#manhunt-drama .d-pop { width:100%; }
+#manhunt-drama.on .d-pop { animation:stagePop .42s cubic-bezier(.18,1.35,.38,1) .05s both; }
+@keyframes stagePop { 0%{ transform:scale(.84) translateY(18px); opacity:0; } 100%{ transform:scale(1) translateY(0); opacity:1; } }
+#manhunt-drama .d-inner { display:flex; flex-direction:column; align-items:center; padding:0 16px; text-align:center; }
+#manhunt-drama .d-kicker { display:inline-block; font-size:12px; font-weight:800; letter-spacing:5px; padding:7px 16px 7px 21px; border-radius:999px; color:#ff9d94; background:rgba(226,85,90,.15); border:1px solid rgba(255,93,96,.55); opacity:0; }
+#manhunt-drama.on .d-kicker { animation:fadeUp .34s ease-out .08s both; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+#manhunt-drama .d-42wrap { position:relative; display:inline-block; margin:22px 14px 8px; opacity:0; filter:drop-shadow(0 16px 24px rgba(0,0,0,.55)); }
+#manhunt-drama.on .d-42wrap { animation:cardSlam .82s .12s both; }
+@keyframes cardSlam { 0%{ opacity:0; transform:translateY(-56vh) rotate(4deg) scale(.92); } 12%{ opacity:1; } 55%{ transform:translateY(0) rotate(-5deg) scale(1.18,.8); } 72%{ transform:translateY(-4vh) rotate(-5deg) scale(.97,1.06); } 86%{ transform:translateY(0) rotate(-5deg) scale(1.08,.92); } 100%{ opacity:1; transform:translateY(0) rotate(-5deg) scale(1); } }
+#manhunt-drama .d-42 { position:relative; display:flex; align-items:center; justify-content:center; width:120px; height:150px; border-radius:16px; background:linear-gradient(165deg,#f8f0da 0%, #e6d9b4 70%, #d8c79c 100%); border:3px solid #c98f2f; color:#2b241c; font-size:76px; font-weight:900; line-height:1; box-shadow:inset 0 0 0 3px rgba(201,143,47,.22), 0 6px 18px rgba(0,0,0,.4); }
+#manhunt-drama .d-42::after { content:''; position:absolute; inset:8px; border:1.5px dashed rgba(201,143,47,.4); border-radius:10px; pointer-events:none; }
+#manhunt-drama .d-stamp { position:absolute; right:-10px; bottom:-14px; padding:7px 13px 7px 17px; border-radius:8px; background:rgba(58,12,16,.88); border:3px solid #ff5d60; color:#ffd9d4; font-size:17px; font-weight:800; letter-spacing:4px; line-height:1; box-shadow:0 5px 14px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,93,96,.3); opacity:0; }
+#manhunt-drama.on .d-stamp { animation:stampIn .34s cubic-bezier(.25,1.7,.35,1) .9s both; }
+@keyframes stampIn { 0%{ opacity:0; transform:rotate(10deg) scale(2); } 100%{ opacity:1; transform:rotate(10deg) scale(1); } }
+#manhunt-drama .d-sub { margin-top:34px; font-size:14.5px; font-weight:600; color:#f6c876; letter-spacing:1px; line-height:1.5; opacity:0; }
+#manhunt-drama.on .d-sub { animation:fadeUp .32s ease-out 1.18s both; }
+#manhunt-drama .d-chips { display:flex; gap:20px; justify-content:center; margin-top:16px; }
+#manhunt-drama .d-chip { display:inline-flex; align-items:center; gap:6px; padding:0; border:none; background:none; border-radius:0; font-size:13px; font-weight:600; letter-spacing:.5px; line-height:1; opacity:0; }
+#manhunt-drama .d-chip::before { content:''; width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+#manhunt-drama.on .d-chip-fail { animation:fadeUp .3s ease-out 1.4s both; }
+#manhunt-drama.on .d-chip-win { animation:fadeUp .3s ease-out 1.54s both; }
+.d-chip-fail { color:#ff9894; }
+.d-chip-fail::before { background:#e2555a; box-shadow:0 0 6px rgba(226,85,90,.9); }
+.d-chip-win { color:#8fd8b4; }
+.d-chip-win::before { background:#4daa7d; box-shadow:0 0 6px rgba(77,170,125,.8); }
+/* 弱动效偏好：静态展示内容，仅整体淡入淡出 */
+#manhunt-drama.calm .d-flash, #manhunt-drama.calm .d-heart { display:none; }
+#manhunt-drama.calm .d-shake, #manhunt-drama.calm .d-pop, #manhunt-drama.calm .d-kicker, #manhunt-drama.calm .d-42wrap, #manhunt-drama.calm .d-stamp, #manhunt-drama.calm .d-sub, #manhunt-drama.calm .d-chip { animation:none !important; opacity:1 !important; transform:none !important; }
+
+/* ===== 警探摸牌展示：在所点牌堆按钮下方弹出摸到的牌（数字可见，驻留 0.5s + 0.2s 淡出移除，不拦截点击） ===== */
+#draw-pop { position:fixed; inset:0; z-index:130; opacity:0; pointer-events:none; transition:opacity .18s ease; }
+#draw-pop.on { opacity:1; }
+#draw-pop .dp-anchor { position:absolute; transform:translateX(-50%); }
+#draw-pop .dp-inner { display:flex; flex-direction:column; align-items:center; gap:6px; }
+#draw-pop.on .dp-inner { animation:dpIn .38s cubic-bezier(.18,1.35,.38,1) both; }
+#draw-pop .dp-tag { font-size:12px; font-weight:800; line-height:1; letter-spacing:4px; padding-left:4px; color:var(--gold); text-shadow:0 2px 8px rgba(0,0,0,.65); }
+#draw-pop .dp-card { display:flex; align-items:center; justify-content:center; width:64px; height:90px; border-radius:10px; background:linear-gradient(180deg,#f2ead4,var(--paper)); border:2.5px solid #2f9cc8; color:var(--ink); font-size:34px; font-weight:800; box-shadow:0 0 14px rgba(47,156,200,.5), 0 10px 20px rgba(0,0,0,.4); }
+#draw-pop.on .dp-card { animation:dpGlow .5s ease-out; }
+@keyframes dpIn { 0%{ transform:translateY(30px) scale(.45) rotate(-5deg); opacity:0; } 62%{ opacity:1; transform:translateY(-4px) scale(1.1) rotate(2deg); } 100%{ transform:translateY(0) scale(1) rotate(0); opacity:1; } }
+@keyframes dpGlow { 0%{ box-shadow:0 0 0 0 rgba(47,156,200,.55), 0 10px 20px rgba(0,0,0,.4); } 100%{ box-shadow:0 0 0 20px rgba(47,156,200,0), 0 10px 20px rgba(0,0,0,.4); } }

@@ -85,6 +85,64 @@ function toast(msg){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
+/* ===== 搜捕开场「缉凶时刻」戏剧提示：全屏展示约 2.6s 后淡出并自动移除 ===== */
+const MANHUNT_DRAMA_MS = 2600;
+function prefersReducedMotion(){
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch(e){ return false; }
+}
+async function showManhuntDrama(){
+  const calm = prefersReducedMotion();
+  const node = document.createElement('div');
+  node.id = 'manhunt-drama';
+  if(calm) node.classList.add('calm');
+  node.setAttribute('role', 'alert');
+  node.innerHTML =
+    '<div class="d-flash d-f1"></div><div class="d-flash d-f2"></div><div class="d-heart"></div>' +
+    '<div class="d-shake"><div class="d-pop"><div class="d-inner">' +
+      '<div class="d-kicker">缉凶时刻 MANHUNT</div>' +
+      '<div class="d-42wrap"><div class="d-42">42</div><div class="d-stamp">搜捕开始</div></div>' +
+      '<div class="d-sub">警探必须从小到大依次单猜所有暗牌</div>' +
+      '<div class="d-chips"><span class="d-chip d-chip-fail">猜错则大盗逃脱</span><span class="d-chip d-chip-win">全对则警探获胜</span></div>' +
+    '</div></div></div>';
+  document.body.appendChild(node);
+  node.getBoundingClientRect(); // 强制 reflow，随后入场动画才会播放
+  node.classList.add('on');
+  if(!calm && navigator.vibrate){ try { navigator.vibrate([60,40,90]); } catch(e){} }
+  await wait(calm ? 1700 : MANHUNT_DRAMA_MS);
+  node.classList.remove('on'); // 淡出；同时立刻放行点击（pointer-events 关闭）
+  await wait(320);
+  if(node.parentNode) node.remove();
+}
+/* ===== 警探摸牌展示：在所点牌堆按钮下方弹出摸到的牌（数字可见，驻留 0.5s 后淡出移除） ===== */
+function showDrawPop(card, rect){
+  if(prefersReducedMotion()) return; // 弱动效：网格标蓝即是反馈，跳过弹出
+  const old = document.getElementById('draw-pop');
+  if(old) old.remove(); // 连摸两牌时直接替换
+  const node = document.createElement('div');
+  node.id = 'draw-pop';
+  node.setAttribute('role', 'status');
+  node.innerHTML =
+    '<div class="dp-anchor"><div class="dp-inner">' +
+      // '<div class="dp-tag">摸 到</div>' +
+      '<div class="dp-card"><b></b></div>' +
+    '</div></div>';
+  node.querySelector('.dp-card b').textContent = card;
+  document.body.appendChild(node);
+  const anchor = node.querySelector('.dp-anchor');
+  const inner = node.querySelector('.dp-inner');
+  // 锚定到所点牌堆按钮：水平贴按钮中线，垂直落在按钮正下方（标签贴缝，卡片尽量上提）
+  const cx = rect ? rect.left + rect.width / 2 : innerWidth / 2;
+  const top = rect ? rect.bottom + 2 : (innerHeight - inner.offsetHeight) / 2;
+  anchor.style.left = cx + 'px';
+  anchor.style.top = top + 'px';
+  node.getBoundingClientRect(); // 强制 reflow，随后入场动画才会播放
+  node.classList.add('on');
+  setTimeout(() => {
+    node.classList.remove('on');
+    setTimeout(() => { if(node.parentNode) node.remove(); }, 200);
+  }, 500);
+}
 async function flipOut(target){
   target.classList.add('flip-out');
   await wait(300);
@@ -206,13 +264,16 @@ function openNums(){
   });
   return set;
 }
-function marDrawClick(pileKey){
+function marDrawClick(pileKey, btn){
   if(ui.lock || state.turn!=='marshal' || !state.needDraw || state.phase!=='playing') return;
-  if(!drawFrom(pileKey,'marshal')){
+  const rect = btn ? btn.getBoundingClientRect() : null; // 渲染重建前取锚点
+  const card = drawFrom(pileKey,'marshal');
+  if(!card){
     if(!anyPileLeft()){ state.needDraw = false; save(); render(); }
     return;
   }
   save(); render();
+  showDrawPop(card, rect); // 在所点牌堆下方弹出摸到的牌：短暂展示后自动消失
 }
 async function marGuess(nums, gen){
   if(state.phase!=='playing' || state.turn!=='marshal' || state.needDraw) return;
@@ -259,6 +320,7 @@ async function marGuess(nums, gen){
       if(state.humanRole === 'fugitive') aiMarMissed.push(nums[0]); // AI 内部排除，避免反复猜同一数字
       console.log('[mar] guess', nums[0], '→ MISS, missed stats:', state.marMissed.join(','));
     } else {
+      state.marMissed.push(0); // 多选整组未中：无法归因错误项，0 占位仅计入「猜错次数」
       console.log('[mar] guess', nums.join(','), '→ MISS (multi, unsure which)');
     }
     log('警探猜 <b>' + nums.join(', ') + '</b>：未命中', 'lg-miss');
@@ -287,7 +349,7 @@ function checkMarshalWin(){
 }
 
 /* ================= 逃脱与搜捕 ================= */
-function triggerEscape(){
+async function triggerEscape(){
   // 搜捕判定只看除 42 外已翻开的地点牌（42 刚打出，不能算作"已翻开 >30"）
   const maxOpen = Math.max(0, ...state.fug.route.filter(r=>!r.hidden && r.num!==42).map(r=>r.num));
   if(maxOpen >= 30){
@@ -300,7 +362,11 @@ function triggerEscape(){
   state.needDraw = false;
   log('搜捕开始！警探依次单猜所有暗置地点牌，猜错即失败', 'lg-mar');
   console.log('[escape] maxOpen =', maxOpen, '<30 → 搜捕');
-  save(); render(); scheduleAI();
+  save(); render();
+  const gen = aiGen;
+  await showManhuntDrama(); // 「缉凶时刻」戏剧提示：展示期间全屏锁定，结束自动移除
+  if(stale(gen) || state.phase !== 'manhunt') return; // 提示期间退出/重开 → 不再调度 AI
+  scheduleAI();
 }
 async function manhuntGuess(n, gen){
   if(state.phase!=='manhunt' || state.turn!=='marshal') return;
@@ -312,6 +378,7 @@ async function manhuntGuess(n, gen){
     if(stale(gen)) return;
     log('搜捕：须按顺序猜最小暗牌 <b>' + smallestHidden + '</b>（你猜了 ' + n + '），大盗逃脱！', 'lg-fug');
     console.log('[manhunt] guess', n, '→ ORDER FAIL (smallest hidden is', smallestHidden + ')');
+    state.marMissed.push(n); // 搜捕致命猜错同样计入「猜错次数」
     ui.lock = false; ui.aiBusy = false;
     resetUI();
     save(); render();
@@ -617,7 +684,8 @@ function showRoleHand(role){
   const name = role==='fugitive' ? '大盗' : '警探';
   const hand = (role==='fugitive' ? state.fug.hand : state.mar.hand) || [];
   // 自己的角色可见数字；对方手牌一律保密，仅显示张数与牌背
-  const chips = hand.slice().sort((a,b)=>a-b).map(n =>
+  // 警探自己的手牌按摸牌顺序展示（与摸牌日志对应）；大盗按数字升序便于规划出牌
+  const chips = (role==='marshal' && isHuman ? hand.slice() : hand.slice().sort((a,b)=>a-b)).map(n =>
     '<span class="rh-card' + (isHuman?'':' rh-hide') + '">' + (isHuman?n:'?') + '</span>').join('');
   openSheet(name + ' 手牌（' + hand.length + ' 张）',
     (chips || '<div class="rh-empty">空手</div>') +
@@ -695,7 +763,7 @@ function checkFugCard(i){
 function pilePickHTML(onclickFn, label){
   return (label ? '<div class="pick-label">' + label + '</div>' : '') +
     '<div class="pile-pick">' + PILES.map(p =>
-    '<button class="btn" onclick="' + onclickFn + '(\'' + p.key + '\')" ' + (state.piles[p.key].length?'':'disabled') + '>' +
+    '<button class="btn" onclick="' + onclickFn + '(\'' + p.key + '\', this)" ' + (state.piles[p.key].length?'':'disabled') + '>' +
     p.key + ' 堆 ' + p.lo + '-' + p.hi + '（剩 ' + state.piles[p.key].length + '）</button>'
   ).join('') + '</div>';
 }
@@ -828,7 +896,7 @@ function renderMarArea(){
   const myTurn = state.turn === 'marshal' && !ui.lock;
   let html = '';
   if(!myTurn){
-    html += '<div class="hint">' + (state.turn==='fugitive' ? '大盗行动中，网格仅供参考…' : '结算中…') + '</div>' + gridAreaHTML();
+    html += '<div class="hint">' + (state.turn==='fugitive' ? '大盗行动中…' : '结算中…') + '</div>' + gridAreaHTML();
   } else if(state.needDraw){
     const remain = state.mar.firstDraw ? Math.max(1, 2 - (state.mar.drawCount||0)) : 1;
     html += pilePickHTML('marDrawClick', '还可抽 ' + remain + ' 张') + gridAreaHTML();
@@ -1098,6 +1166,7 @@ function confirmQuit(){
   if(saved){
     state = saved;
     render();
+    scheduleAI(); // 刷新恢复：若轮到 AI 则续跑其回合（气泡/延时属瞬态不入档，AI 可能从存档点重演当前行动）
   } else {
     showLanding();
   }
