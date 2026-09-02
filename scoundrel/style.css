@@ -389,6 +389,44 @@ body {
 .over-stats { color: var(--text-dim); font-size: .85rem; line-height: 1.8; margin-bottom: 16px; }
 .over-stats b { color: var(--text); }
 
+/* 结算得分：计分卡区域（金色=通关 / 红色=失败） */
+.over-score {
+  position: relative;
+  margin: 4px auto 14px;
+  max-width: 260px;
+  padding: 18px 16px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 6px 18px rgba(0, 0, 0, .25);
+}
+.over-score::before {
+  content: '';
+  position: absolute; top: 0; left: 15%; right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .4), transparent);
+}
+.over-score.win {
+  border-color: rgba(255, 209, 102, .4);
+  background:
+    radial-gradient(130% 170% at 50% -20%, rgba(255, 209, 102, .16), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 6px 18px rgba(0, 0, 0, .25), 0 0 26px rgba(255, 209, 102, .14);
+}
+.over-score.lose {
+  border-color: rgba(255, 96, 96, .36);
+  background:
+    radial-gradient(130% 170% at 50% -20%, rgba(255, 90, 90, .14), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 6px 18px rgba(0, 0, 0, .25), 0 0 22px rgba(255, 90, 90, .1);
+}
+.over-score-num { font-size: 2.8rem; font-weight: 900; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.over-score.win .over-score-num { color: var(--gold); text-shadow: 0 0 20px rgba(255, 209, 102, .4); }
+.over-score.lose .over-score-num { color: var(--red); text-shadow: 0 0 18px rgba(255, 90, 90, .35); }
+.over-score-label { font-size: .78rem; color: var(--text-dim); letter-spacing: .35em; margin-top: 2px; }
+.over-score-formula { font-size: .8rem; color: var(--text-dim); opacity: .9; margin-top: 10px; padding-top: 9px; border-top: 1px dashed rgba(255, 255, 255, .12); }
+.over-score-formula b { color: var(--text); }
+
 /* ============================================================
    特效层
    ============================================================ */

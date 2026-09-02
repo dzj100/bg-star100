@@ -113,7 +113,14 @@
 
   function afterConsume(state) {
     if (state.room.length === 1) enterRoom(state);
-    if (state.deck.length === 0 && state.room.length === 0) state.phase = 'won';
+    if (state.deck.length === 0) {
+      if (state.room.length === 0) {
+        state.phase = 'won';
+      } else if (state.room.length === 1 && state.room[0].suit === 'H') {
+        // 牌堆清空且房间只剩最后 1 张红桃：保留不喝，直接通关结算（结算加分）
+        state.phase = 'won';
+      }
+    }
   }
 
   // 处理房间中的一张牌（index 为 room 下标）
@@ -184,6 +191,28 @@
   function rankLabel(r) { return r === 14 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r); }
   function cardLabel(c) { return suitLabel[c.suit] + rankLabel(c.rank); }
 
+  // 结算得分：失败 = 血量 −（剩余牌堆怪物点数之和 + 房间怪物点数之和）；通关 = 血量 + 最后 1 张未喝红桃点数
+  function computeScore(state) {
+    if (state.phase === 'won') {
+      var lastHeart = (state.room.length === 1 && state.room[0].suit === 'H') ? state.room[0].rank : 0;
+      return state.hp + lastHeart;
+    }
+    if (state.phase === 'lost') {
+      var danger = 0;
+      var i, c;
+      for (i = 0; i < state.deck.length; i++) {
+        c = state.deck[i];
+        if (c.suit === 'S' || c.suit === 'C') danger += c.rank;
+      }
+      for (i = 0; i < state.room.length; i++) {
+        c = state.room[i];
+        if (c.suit === 'S' || c.suit === 'C') danger += c.rank;
+      }
+      return state.hp - danger;
+    }
+    return null;
+  }
+
   return {
     MAX_HP: MAX_HP,
     buildDeck: buildDeck,
@@ -196,6 +225,7 @@
     act: act,
     serialize: serialize,
     deserialize: deserialize,
+    computeScore: computeScore,
     cardLabel: cardLabel,
     rankLabel: rankLabel,
     suitLabel: suitLabel,

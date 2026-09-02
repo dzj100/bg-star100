@@ -241,12 +241,43 @@ section('血瓶');
   eq(s.hp, 20, '上限20，回复不超');
   eq(r.hpGain, 1, '实际回复1');
 
-  // 房间更替重置血瓶计数
-  s = craft(1, { hp: 5, potionUsed: true, room: [C('H', 6), C('S', 2)], deck: [] });
-  G.act(s, 1); // 打掉怪物 → 房间剩1张 → 自动补牌（新房间，重置血瓶）
+  // 房间更替重置血瓶计数（牌堆需有牌才能真实补牌进新房间）
+  s = craft(1, { hp: 5, potionUsed: true, room: [C('H', 6), C('S', 2)], deck: [C('S', 5)] });
+  G.act(s, 1); // 打掉怪物 → 房间剩1张 → 补牌（新房间，重置血瓶）
   eq(s.potionUsed, false, '补牌进入新房间后血瓶计数重置');
   r = G.act(s, 0);
   eq(r.hpGain, 6, '新房间第一瓶生效');
+})();
+
+/* ---------- 结算得分 ---------- */
+section('结算得分');
+(function () {
+  // 通关无红桃加成：得分 = 血量
+  let s = craft(1, { hp: 12, phase: 'won', room: [], deck: [] });
+  eq(G.computeScore(s), 12, '通关无红桃得分=血量');
+
+  // 通关且房间剩最后1张未喝红桃：得分 = 血量 + 红桃点数
+  s = craft(1, { hp: 9, phase: 'won', room: [C('H', 13)], deck: [] });
+  eq(G.computeScore(s), 22, '通关剩♥K得分=9+13');
+
+  // 红桃已喝（房间空）不计入
+  s = craft(1, { hp: 9, phase: 'won', room: [], deck: [] });
+  eq(G.computeScore(s), 9, '红桃已喝不计分');
+
+  // 失败：血量 − 牌堆怪物总和 − 房间怪物总和（红方片不算怪物）
+  s = craft(1, { hp: 5, phase: 'lost', room: [C('H', 7), C('S', 3), C('D', 9)], deck: [C('C', 10), C('H', 4), C('S', 2)] });
+  eq(G.computeScore(s), -10, '失败得分=5-(3+10+2)=-10');
+
+  // 进行中：无得分
+  s = craft(1, { hp: 10, room: [C('S', 3)], deck: [] });
+  eq(G.computeScore(s), null, '进行中无得分');
+
+  // 牌堆清空后打掉最后怪物、房间剩最后1张红桃 → 自动通关且红桃保留计分
+  s = craft(1, { hp: 8, room: [C('H', 5), C('S', 4)], deck: [] });
+  G.act(s, 1); // 空手打 S4 扣4血
+  eq(s.phase, 'won', '剩最后1张红桃自动通关');
+  eq(s.hp, 4, '战斗扣血保留');
+  eq(G.computeScore(s), 9, '自动通关得分=4+5');
 })();
 
 /* ---------- 补牌与房间流程 ---------- */

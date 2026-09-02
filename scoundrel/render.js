@@ -558,10 +558,37 @@
       flash('red');
     }
     var m = $('overModal');
+    var score = G.computeScore(state);
+    var scoreHtml = '';
+    if (score !== null) {
+      var formula;
+      if (win) {
+        formula = '剩余血量 <b>' + state.hp + '</b>';
+        if (state.room.length === 1 && state.room[0].suit === 'H') {
+          formula += ' + 最后红桃 <b>' + G.cardLabel(state.room[0]) + '</b>';
+        }
+      } else {
+        var deckDanger = 0, roomDanger = 0, i;
+        for (i = 0; i < state.deck.length; i++) {
+          if (state.deck[i].suit === 'S' || state.deck[i].suit === 'C') deckDanger += state.deck[i].rank;
+        }
+        for (i = 0; i < state.room.length; i++) {
+          if (state.room[i].suit === 'S' || state.room[i].suit === 'C') roomDanger += state.room[i].rank;
+        }
+        formula = '血量 <b>' + state.hp + '</b> − 剩余怪物 <b>' + deckDanger + '</b> − 房间怪物 <b>' + roomDanger + '</b>';
+      }
+      scoreHtml =
+        '<div class="over-score ' + (win ? 'win' : 'lose') + '">' +
+          '<div class="over-score-num">' + score + '</div>' +
+          '<div class="over-score-label">本局得分</div>' +
+          '<div class="over-score-formula">' + formula + '</div>' +
+        '</div>';
+    }
     m.innerHTML =
       '<div class="over-icon">' + (win ? '🎉' : '💀') + '</div>' +
       '<div class="over-title ' + (win ? 'win' : 'lose') + '">' + (win ? randomPick(WIN_TITLES) : randomPick(LOSE_TITLES)) + '</div>' +
       '<div class="over-desc">' + (win ? randomPick(WIN_DESC) : randomPick(LOSE_DESC)) + '</div>' +
+      scoreHtml +
       '<div class="over-stats">' +
         (win ? '剩余血量 <b>' + state.hp + '</b><br>' : '') +
         '击杀怪物 <b>' + state.stats.kills + '</b><br>' +
