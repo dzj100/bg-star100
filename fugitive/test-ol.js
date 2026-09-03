@@ -133,8 +133,9 @@ async function pickSafeMiss(page){
     await host.goto(URL);
     await host.waitForSelector('#ol-enter-online', { timeout: 20000 });
     assert(await host.isVisible('.ol-landing-title'), '首页标题缺失');
-    const landingBtns = await host.$$eval('#online button', els => els.map(e => e.textContent.trim()));
-    assert(landingBtns.length === 1 && landingBtns[0].indexOf('联机模式') >= 0, '首页应只有 1 个【联机模式】按钮: ' + landingBtns);
+    const landingBtns = await host.$$eval('#online button', els => els.map(e => e.textContent.trim()).filter(t => t.indexOf('联机模式') >= 0));
+    assert(landingBtns.length === 1, '首页应只有 1 个【联机模式】按钮: ' + landingBtns);
+    assert(await host.isVisible('.ol-landing .rules-corner button'), '首页右上角规则按钮缺失');
     await shot(host, '1-landing');
     await host.click('#ol-enter-online');
     await host.waitForSelector('#ol-code', { timeout: 20000 });

@@ -138,6 +138,7 @@ function showOnlineLanding(){
 function renderOnlineLanding(){
   document.getElementById('online').innerHTML =
     '<div class="ol-landing">' +
+      '<div class="rules-corner"><button onclick="showModal(\'rules\')">📖 规则</button></div>' +
       '<div class="ol-landing-icon">🕵️</div>' +
       '<h1 class="ol-landing-title">神探缉凶</h1>' +
       '<div class="ol-landing-sub">大盗藏匿 · 警探追捕 · 1v1 实时对战</div>' +
