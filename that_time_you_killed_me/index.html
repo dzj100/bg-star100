@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4ecda">
+<title>煞有其时 · That Time You Killed Me</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 封面/菜单 -->
+  <div id="screen-menu">
+    <div class="deco r1"></div><div class="deco r2"></div><div class="deco r3"></div><div class="deco r4"></div>
+    <div class="menu-inner">
+      <div class="logo-block">
+        <div class="logo-zh">煞有其时</div>
+        <div class="logo-en">That Time You Killed Me</div>
+        <div class="logo-sub">双人 · 时空棋盘 · 推挤与悖论</div>
+        <div class="menu-trio"><i></i><i></i><i></i></div>
+      </div>
+      <button class="btn-main primary" id="btnAI">🧠 单人对 AI<span class="sub">你执黑先行 · 白方由程序执掌</span></button>
+      <button class="btn-main" id="btn2P">👥 双人同屏<span class="sub">轮流落子 · 一台设备传着玩</span></button>
+      <button class="btn-link" id="btnRules">规则速览</button>
+      <div class="credit">@imStar100</div>
+    </div>
+  </div>
+
+  <!-- 对局界面 -->
+  <div id="screen-game">
+    <div id="topbar">
+      <button class="tb-btn" id="btnMenu">‹ 菜单</button>
+      <div class="tb-title">煞有其时<small>THAT TIME YOU KILLED ME</small></div>
+      <button class="tb-btn" id="btnRestart">重开</button>
+      <button class="tb-btn" id="btnRulesGame">规则</button>
+    </div>
+    <div id="turnstrip"></div>
+    <div id="notebar" role="button"><span class="nb-t"></span><span class="nb-open">记录</span></div>
+    <div id="stagewrap"><div id="stage">
+      <div id="boards"></div>
+      <div id="fx"></div>
+    </div></div>
+    <div id="panel"></div>
+    <div id="overlay-win" class="hidden"></div>
+  </div>
+
+  <!-- 规则速览弹层 -->
+  <div class="sheet-mask hidden" id="rulesMask">
+    <div class="sheet" id="rulesSheet">
+      <h3>规则速览</h3>
+      <p>游戏改编自桌游《That Time You Killed Me》。三个时空棋盘：<b>过去 · 现在 · 未来</b>，各 4×4。黑方从 1 号格出发，白方从 16 号格出发；每方盘上 3 子 + 4 个备用分身。</p>
+      <p><b>每回合：</b></p>
+      <ol>
+        <li>在自己焦点时空选一枚己方棋子；</li>
+        <li>该子连续执行 <b>至多 2 次行动</b>：<b>移动</b>（上下左右一格）或<b>穿越</b>（到相邻时空同编号格）。若第 1 次行动后无路可走，可手动【结束行动】；</li>
+        <li>把焦点移到<b>另一个</b>时空，回合结束。</li>
+      </ol>
+      <p><b>推挤：</b>移动撞上对方棋子会把一整条链推开。链头<b>撞墙</b>即死；同色相邻两子被推挤会触发<b>悖论</b>双双出局（前方有空格也照样）。</p>
+      <p><b>穿越：</b>只能穿到相邻时空（过去↔现在↔未来），目标格有子则不能穿。<b>逆时穿越</b>（未来→现在→过去）会在原格留下一个<b>分身</b>（消耗备用，最多 4 个）。</p>
+      <p><b>胜负：</b>回合结束时，若一方在 <b>≥2 个时空</b>已没有任何己方棋子，即告失败。</p>
+      <p>焦点时空里无子时只能<b>空过</b>，直接进行移动焦点并结束。</p>
+      <button class="btn-main" id="btnCloseRules">知道了</button>
+    </div>
+  </div>
+
+  <!-- 对局记录弹层（倒序：最新在上） -->
+  <div class="sheet-mask hidden" id="logMask">
+    <div class="sheet" id="logSheet">
+      <h3>对局记录<small class="sheet-sub">最新在前 · 点击提示条可随时查看</small></h3>
+      <div id="logList"></div>
+      <button class="btn-main" id="btnCloseLog">关闭</button>
+    </div>
+  </div>
+</div>
+<script src="game.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
