@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>神探缉凶 · 联机对战</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* 联机页初始：先隐藏对局容器，由 online.js 决定展示大厅还是恢复对局 */
+  #app { display:none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="online" style="display:none"></div>
+
+<!-- 初始化加载遮罩 -->
+<div id="ol-init-loading" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(8,14,24,.9);">
+  <div style="text-align:center;color:var(--text);font-size:1rem;">
+    <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,.2);border-top-color:var(--gold);border-radius:50%;animation:olspin .7s linear infinite;margin:0 auto 14px;"></div>
+    载入中…
+  </div>
+  <style>@keyframes olspin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<script src="game.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="net.js"></script>
+<script src="online.js"></script>
+</body>
+</html>

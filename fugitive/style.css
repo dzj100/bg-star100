@@ -184,6 +184,7 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 .pile-table td { color:var(--text); }
 .modal ul { padding-left:18px; }
 .modal .btn { width:100%; }
+.modal .btn + .btn { margin-top:10px; }
 
 /* ===== 结算 ===== */
 .win-banner { text-align:center; padding:20px 0 8px; }
@@ -261,3 +262,78 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 #draw-pop.on .dp-card { animation:dpGlow .5s ease-out; }
 @keyframes dpIn { 0%{ transform:translateY(30px) scale(.45) rotate(-5deg); opacity:0; } 62%{ opacity:1; transform:translateY(-4px) scale(1.1) rotate(2deg); } 100%{ transform:translateY(0) scale(1) rotate(0); opacity:1; } }
 @keyframes dpGlow { 0%{ box-shadow:0 0 0 0 rgba(47,156,200,.55), 0 10px 20px rgba(0,0,0,.4); } 100%{ box-shadow:0 0 0 20px rgba(47,156,200,0), 0 10px 20px rgba(0,0,0,.4); } }
+
+/* ===== 联机（index_ol.html）：大厅 / 等候室 ===== */
+#online { width:100%; max-width:520px; margin:0 auto; }
+#online .ol-logo { font-size:48px; margin:4px 0 10px; filter:drop-shadow(0 0 18px rgba(224,163,62,.4)); }
+#online .ol-title { font-size:26px; letter-spacing:5px; color:var(--gold); text-align:center; text-shadow:0 2px 0 rgba(0,0,0,.5); margin-bottom:8px; }
+#online .ol-sub { color:var(--text-dim); font-size:13px; text-align:center; margin-bottom:20px; letter-spacing:1px; }
+.ol-card { width:min(400px,100%); background:linear-gradient(180deg, var(--surface), var(--surface-2)); border:1px solid var(--line); border-radius:16px; padding:18px 16px; margin-bottom:14px; }
+.ol-label { font-size:12px; color:var(--text-dim); font-weight:700; margin:2px 0 8px; }
+.ol-input { width:100%; padding:12px; border-radius:10px; border:1px solid #33506e; background:#0f2233; color:var(--text); font-size:16px; outline:none; margin-bottom:10px; }
+.ol-input:focus { border-color:var(--gold); }
+.ol-code-input { text-align:center; letter-spacing:.45em; font-weight:800; font-size:20px; }
+.ol-btn { width:100%; margin-top:4px; }
+.ol-btn + .ol-btn { margin-top:10px; }
+.ol-divider { display:flex; align-items:center; gap:10px; color:var(--text-dim); font-size:12px; margin:14px 0; text-align:center; }
+.ol-divider::before, .ol-divider::after { content:''; flex:1; height:1px; background:var(--line); }
+.ol-link { display:block; text-align:center; color:var(--text-dim); font-size:13px; text-decoration:none; padding:8px 0 4px; }
+.ol-link:active { color:var(--gold); }
+
+/* 连接大厅（紧凑页头 + 全宽表单 + 四周留白，参考时序谜局联机页） */
+.ol-lobby { width:100%; max-width:480px; margin:0 auto; padding:26px 24px 32px; }
+.ol-lobby .ol-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:18px; }
+.ol-lobby .ol-head-title { font-size:19px; font-weight:800; letter-spacing:2px; color:var(--text); margin:0; display:flex; align-items:center; gap:6px; }
+.ol-lobby .ol-label { margin:2px 0 8px; }
+.ol-lobby .ol-input { margin-bottom:14px; }
+.ol-lobby .ol-input::placeholder { color:var(--text-dim); opacity:1; }
+.ol-lobby .ol-divider { margin:22px 0 20px; font-size:12px; }
+.ol-join-btn { width:100%; height:var(--btn-h); border-radius:var(--radius); background:transparent; border:1.5px solid var(--gold); color:var(--gold); font-size:16px; font-weight:700; cursor:pointer; box-shadow:none; }
+.ol-join-btn:active { filter:brightness(1.35); background:rgba(224,163,62,.1); }
+#ol-modal-nick .ol-input { background:#0c1c2c; }
+
+/* 首页（联机入口：点击【联机模式】进入连接大厅） */
+.ol-landing { position:relative; width:100%; min-height:calc(100dvh - 30px); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 20px 42px; }
+.ol-landing-icon { font-size:64px; line-height:1; margin-bottom:14px; filter:drop-shadow(0 0 24px rgba(224,163,62,.45)); }
+.ol-landing-title { font-size:40px; letter-spacing:8px; margin-bottom:8px; background:linear-gradient(135deg, var(--gold), #ffe9b0); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:var(--gold); }
+.ol-landing-sub { color:var(--text-dim); font-size:14px; letter-spacing:2px; margin-bottom:42px; }
+.ol-landing-btn { width:min(320px,84vw); height:auto; padding:15px 0; font-size:18px; font-weight:800; letter-spacing:3px; }
+.ol-landing .ol-link { margin-top:18px; }
+.ol-credit { position:absolute; bottom:12px; left:0; right:0; color:var(--text-dim); font-size:12px; opacity:.7; }
+
+/* 等候室（房间页：同连接大厅的四周留白） */
+.ol-room { width:100%; max-width:480px; margin:0 auto; padding:26px 24px 32px; }
+.ol-room-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.ol-room-top .ol-title { margin:0; font-size:20px; letter-spacing:4px; }
+.ol-code { width:min(400px,100%); text-align:center; font-size:42px; font-weight:900; letter-spacing:14px; padding-left:14px; color:var(--gold); text-shadow:0 3px 0 rgba(0,0,0,.45); margin:6px 0 2px; }
+.ol-seat { display:flex; align-items:center; gap:10px; background:rgba(10,20,34,.45); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px; }
+.ol-seat.host .os-dot { background:var(--accent); box-shadow:0 0 8px rgba(224,163,62,.6); }
+.ol-seat:not(.host) .os-dot { background:var(--mar); box-shadow:0 0 8px rgba(47,156,200,.55); }
+.ol-seat.empty .os-dot { background:#41546b; box-shadow:none; }
+.ol-seat.me { border-color:var(--gold); background:rgba(224,163,62,.08); }
+.os-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.os-name { flex:1; font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.os-tag { flex-shrink:0; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--card-bg); color:var(--text-dim); }
+.ol-seat.host .os-tag { color:#ffe6b0; background:rgba(201,131,42,.22); border:1px solid rgba(224,163,62,.45); }
+
+/* 身份三选（房主） */
+.ol-assign { display:flex; align-items:center; gap:12px; width:100%; padding:12px; margin-bottom:8px; background:var(--surface-2); border:1.5px solid var(--line); border-radius:12px; color:var(--text); font-size:15px; text-align:left; cursor:pointer; }
+.ol-assign:active { filter:brightness(1.2); }
+.ol-assign.sel { border-color:var(--gold); background:rgba(224,163,62,.12); box-shadow:inset 0 0 0 1px rgba(224,163,62,.35); }
+.ol-assign-ro { cursor:default; }
+.ol-assign-ro:active { filter:none; }
+.oa-icon { font-size:24px; flex-shrink:0; }
+.oa-txt { display:flex; flex-direction:column; gap:2px; }
+.oa-txt b { font-size:15px; }
+.oa-txt i { font-style:normal; font-size:11px; color:var(--text-dim); }
+.ol-wait-note { text-align:center; color:var(--text-dim); font-size:13px; padding:10px 0 4px; }
+
+/* 忙碌遮罩 & 网络轻提示 */
+.ol-busy { position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; flex-direction:column; background:rgba(6,11,20,.72); }
+.ob-spin { width:36px; height:36px; border:3px solid rgba(255,255,255,.18); border-top-color:var(--gold); border-radius:50%; animation:olbusy-spin .7s linear infinite; }
+@keyframes olbusy-spin { to { transform:rotate(360deg); } }
+.ob-text { margin-top:14px; color:var(--text); font-size:14px; }
+.ol-net-toast { position:fixed; top:max(18px, env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-6px); z-index:310; background:rgba(10,22,36,.96); border:1px solid var(--gold); color:var(--text); font-size:13px; padding:9px 18px; border-radius:999px; opacity:0; pointer-events:none; animation:oltoast-in .25s ease-out forwards; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+.ol-net-toast.hide { animation:oltoast-out .3s ease-in forwards; }
+@keyframes oltoast-in { from { opacity:0; transform:translateX(-50%) translateY(-14px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+@keyframes oltoast-out { from { opacity:1; } to { opacity:0; } }

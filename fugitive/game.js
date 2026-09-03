@@ -10,12 +10,21 @@ function rangeArr(lo,hi){ const a=[]; for(let i=lo;i<=hi;i++) a.push(i); return 
 // 掩护标记：奇数牌 1 个，偶数牌 2 个；0 与 42 无标记且不可作掩护牌
 function marks(n){ if(n===0 || n===42) return 0; return n%2===1 ? 1 : 2; }
 function coverMarks(covers){ return (covers||[]).reduce((s,c)=>s+marks(c),0); }
+// HTML 转义：昵称等用户输入进入内联 HTML 前必须转义
+function esc(s){ const d = document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML; }
 
 let state = null;
 let ui = { selMain:null, selCover:[], gridSel:[], aiBusy:false, lock:false, deal:null };
 let gridMode = 'guess'; // 'guess' | 'mark'
 let aiGen = 0; // 每次新游戏/重新调度递增，令旧的 AI 定时器作废
 let aiMarMissed = []; // AI 警探猜过未中的数字（内部记忆，避免反复猜同一数字；对玩家 UI 不置灰）
+let revealBusy = false;   // 联机翻牌补播动画进行中：到达的快照延后重绘，防打断动画
+let revealQueued = false; // 动画期间到达过快照：动画结束后补一次最新渲染
+
+/* ================= 联机模式（index_ol.html）================= */
+// ONLINE_MODE 页 = 联机对战页（online.js 全权接管流程）；OL 记录本座位信息，由 online.js 维护、game.js 读取
+const ONLINE_MODE = typeof location !== 'undefined' && /index_ol\.html/.test(location.pathname || '');
+const OL = { active:false, isHost:false, mySeat:-1, myRole:null, oppName:'', oppSeat:-1, seats:[] };
 
 /* ================= 新游戏 ================= */
 function newGame(humanRole){
@@ -40,7 +49,7 @@ function newGame(humanRole){
     log:[], turns:1,
     winner:null,
   };
-  log('游戏开始：你扮演' + (humanRole==='fugitive'?'大盗':'警探'));
+  log(ONLINE_MODE ? '对局开始' : '游戏开始：你扮演' + (humanRole==='fugitive'?'大盗':'警探'));
   log('大盗暗置起点 0，藏匿于城中');
   console.log('[setup] fug.hand =', finalHand.join(','), '| piles:', state.piles.A.length+'/'+state.piles.B.length+'/'+state.piles.C.length);
   save();
@@ -167,6 +176,50 @@ async function guessBubbles(nums, allHit, gen){
   if(stale(gen)) return;
   await hideBubbles();
 }
+// 联机：大盗端收到警探猜测宣言后，本地同步重放气泡（纯展示，不改状态、不推送）
+async function replayGuessFx(fx){
+  // 猜测必然发生在警探回合；若结算已先到（turn 已离开 marshal），气泡节拍已过，跳过
+  if(!state || state.turn !== 'marshal' ||
+     (state.phase !== 'playing' && state.phase !== 'manhunt')) return;
+  ui.lock = true;
+  ui.aiBusy = true;
+  render();
+  addBubble('mar', '我猜地点有 ' + (fx.nums || []).join('、'));
+  await wait(600);
+  addBubble('fug', fx.allHit ? '你猜对了！' : '你猜错了');
+  await wait(1400);
+  await hideBubbles();
+  // 命中：同一节拍补播「翻开地点牌」动画，与警探端本地编排保持一致
+  if(fx.allHit) await replayRevealFx(fx.nums || []);
+  // 不主动解锁：随后到达的结算推送会 resetUI；若对方迟迟未推（异常），轮到自己回合时仍能操作
+}
+
+// 联机翻牌补播：把仍为暗置的命中牌先 flipOut（背面转出），再翻明渲染 + flipIn。
+// 编排期间到达的结算/移交快照被 revealBusy 门控延后重绘，避免渲染重建打断动画；
+// 快照本身照常更新 state，故动画结束时统一渲染即为最新状态。
+async function replayRevealFx(nums){
+  const targets = [];
+  for(const n of nums){
+    const idx = state.fug.route.findIndex(r => r.num === n && r.hidden);
+    if(idx < 0) return; // 结算已先行翻明（极端时序）：无需补播
+    const el = document.querySelector('#track .t-card[data-i="' + idx + '"]');
+    if(el) targets.push({ idx, el });
+  }
+  if(!targets.length) return;
+  revealBusy = true;
+  try {
+    await Promise.all(targets.map(t => flipOut(t.el)));
+    targets.forEach(t => { const r = state.fug.route[t.idx]; if(r) r.hidden = false; });
+    render();
+    const fresh = targets
+      .map(t => document.querySelector('#track .t-card[data-i="' + t.idx + '"]'))
+      .filter(Boolean);
+    if(fresh.length) await Promise.all(fresh.map(el => flipIn(el)));
+  } finally {
+    revealBusy = false;
+    if(revealQueued){ revealQueued = false; render(); }
+  }
+}
 
 /* ================= 抽牌 ================= */
 function drawFrom(pileKey, who){
@@ -288,6 +341,8 @@ async function marGuess(nums, gen){
   const hidden = state.fug.route.filter(r=>r.hidden);
   const hiddenNums = hidden.map(r=>r.num);
   const allHit = nums.every(n => hiddenNums.includes(n));
+  // 联机：猜测宣言即上报（带瞬态标记），对方端同步播放气泡，不等本端气泡结束
+  if(ONLINE_MODE && typeof onlinePushGuessFx === 'function') onlinePushGuessFx(nums, allHit, false);
   await guessBubbles(nums, allHit, gen);
   if(stale(gen)) return;
   if(allHit){
@@ -374,6 +429,7 @@ async function manhuntGuess(n, gen){
   const smallestHidden = Math.min(...hidden.map(r=>r.num));
   // 搜捕必须从小到大依次猜；猜测数字不等于当前最小暗牌 → 跳过/猜错即败
   if(n !== smallestHidden){
+    if(ONLINE_MODE && typeof onlinePushGuessFx === 'function') onlinePushGuessFx([n], false, true);
     await guessBubbles([n], false, gen); // 搜捕失败同样先气泡对话
     if(stale(gen)) return;
     log('搜捕：须按顺序猜最小暗牌 <b>' + smallestHidden + '</b>（你猜了 ' + n + '），大盗逃脱！', 'lg-fug');
@@ -387,6 +443,7 @@ async function manhuntGuess(n, gen){
   }
   // 走到这里必然命中（guaranteed hit）
   const hit = hidden.find(r=>r.num===n);
+  if(ONLINE_MODE && typeof onlinePushGuessFx === 'function') onlinePushGuessFx([n], true, true);
   await guessBubbles([n], true, gen);
   if(stale(gen)) return;
   const idx = state.fug.route.findIndex(r=>r.num===n && r.hidden);
@@ -417,6 +474,7 @@ function endGame(winner){
 
 /* ================= AI 调度 ================= */
 function scheduleAI(){
+  if(ONLINE_MODE) return; // 联机：无 AI，双方玩家手动行动
   if(state.phase==='over') return;
   const aiRole = state.humanRole==='fugitive' ? 'marshal' : 'fugitive';
   const current = state.turn === 'fugitive' ? 'fugitive' : 'marshal';
@@ -653,7 +711,14 @@ async function aiManhunt(gen){
 }
 
 /* ================= 存储 ================= */
-function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function save(){
+  if(ONLINE_MODE){
+    // 联机：状态实时推送房间，不写单机存档（避免污染人机版进度）
+    if(typeof onlinePushState === 'function') onlinePushState();
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 function load(){
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -666,6 +731,42 @@ function load(){
 }
 
 /* ================= 渲染 ================= */
+// 联机：应用房主广播的房间状态（online.js 收到实时推送时调用）。
+// 关键点：每个座位只渲染自己的身份视角 → 覆盖 state.humanRole 为本座位角色。
+function applyOnlineState(s){
+  if(!s) return;
+  const prevPhase = state ? state.phase : null;
+  const fx = s._guessFx || null; // 瞬态猜测宣言：本端消费一次即从状态摘除，防再次推送重放
+  if(fx) delete s._guessFx;
+  state = s;
+  if(OL.active && Array.isArray(state.seats)){
+    OL.seats = state.seats;
+    const me = state.seats.find(x => x.seatIndex === OL.mySeat);
+    if(me) OL.myRole = me.role;
+    const opp = state.seats.find(x => x.seatIndex !== OL.mySeat);
+    OL.oppSeat = opp ? opp.seatIndex : -1;
+    OL.oppName = opp ? opp.name : '';
+    if(OL.myRole) state.humanRole = OL.myRole; // 对方发来的 humanRole（发送者视角）覆盖为本座位角色
+  }
+  resetUI();
+  aiGen++;
+  closeSheet();
+  if(revealBusy){
+    revealQueued = true; // 翻牌补播动画进行中：快照照常更新 state，重绘延后到动画结束，防打断翻面
+  } else {
+    render();
+  }
+  // 对方端补播猜测气泡：警探宣言（猜测事件）→ 大盗侧同步播放
+  if(fx && OL.active && OL.myRole === 'fugitive' &&
+     (state.phase === 'playing' || state.phase === 'manhunt')){
+    replayGuessFx(fx);
+  }
+  // 对方端补播「缉凶时刻」开场：打出 42 的客户端已本地播放，此处仅在远程进入搜捕时补一次
+  if(s.phase === 'manhunt' && prevPhase !== 'manhunt' &&
+     OL.active && OL.myRole === 'marshal' && typeof showManhuntDrama === 'function'){
+    showManhuntDrama();
+  }
+}
 function render(){
   if(!state){ return; }
   const app = document.getElementById('app');
@@ -675,19 +776,26 @@ function render(){
   bindGame();
 }
 
+function roleWho(role){
+  const me = state.humanRole === role;
+  if(!OL.active) return me ? ' (你)' : ' (AI)';
+  if(me) return ' (你)';
+  return OL.oppName ? ' (' + esc(OL.oppName) + ')' : '';
+}
 function roleTag(role){
-  if(role==='fugitive') return '<span class="role-tag role-fug" onclick="showRoleHand(\'fugitive\')">大盗' + (state.humanRole==='fugitive'?' (你)':' (AI)') + '</span>';
-  return '<span class="role-tag role-mar" onclick="showRoleHand(\'marshal\')">警探' + (state.humanRole==='marshal'?' (你)':' (AI)') + '</span>';
+  if(role==='fugitive') return '<span class="role-tag role-fug" onclick="showRoleHand(\'fugitive\')">大盗' + roleWho('fugitive') + '</span>';
+  return '<span class="role-tag role-mar" onclick="showRoleHand(\'marshal\')">警探' + roleWho('marshal') + '</span>';
 }
 function showRoleHand(role){
   const isHuman = state.humanRole === role;
   const name = role==='fugitive' ? '大盗' : '警探';
+  const who = OL.active ? (isHuman ? '你' : (OL.oppName || '对方')) : (isHuman ? '你' : 'AI');
   const hand = (role==='fugitive' ? state.fug.hand : state.mar.hand) || [];
   // 自己的角色可见数字；对方手牌一律保密，仅显示张数与牌背
   // 警探自己的手牌按摸牌顺序展示（与摸牌日志对应）；大盗按数字升序便于规划出牌
   const chips = (role==='marshal' && isHuman ? hand.slice() : hand.slice().sort((a,b)=>a-b)).map(n =>
     '<span class="rh-card' + (isHuman?'':' rh-hide') + '">' + (isHuman?n:'?') + '</span>').join('');
-  openSheet(name + ' 手牌（' + hand.length + ' 张）',
+  openSheet(name + '（' + who + '）手牌（' + hand.length + ' 张）',
     (chips || '<div class="rh-empty">空手</div>') +
     '<div class="sheet-foot">' + (isHuman ? '牌面数字' : '对方手牌保密，仅显示张数') + '</div>');
 }
@@ -695,6 +803,9 @@ function turnLabel(){
   if(ui.lock) return '第 ' + state.turns + ' 回合 · 结算中…';
   const cur = state.turn==='fugitive' ? '大盗' : '警探';
   const isHuman = state.humanRole === state.turn;
+  if(OL.active){
+    return '第 ' + state.turns + ' 回合 · ' + cur + (isHuman ? '（你的回合）' : '（等待 ' + (OL.oppName || '对方') + '…）');
+  }
   const busy = ui.aiBusy && !isHuman;
   return '第 ' + state.turns + ' 回合 ' + cur + (busy ? '（AI 思考中…）' : (isHuman ? '（你的回合）' : ''));
 }
@@ -1016,6 +1127,19 @@ function doManhuntGuess(){
   manhuntGuess(ui.gridSel[0]);
 }
 
+function overActionsHTML(){
+  if(!OL.active){
+    return '<button class="btn btn-primary" onclick="playAgain()">再来一局</button>' +
+      '<button class="btn btn-ghost" onclick="backToLanding()">重选身份</button>';
+  }
+  if(OL.isHost){
+    return '<button class="btn btn-primary" onclick="olRematch()">再来一局</button>' +
+      '<button class="btn btn-ghost" onclick="olBackToRoom()">重选身份</button>';
+  }
+  // 成员侧：没有再来一局权限，仅提示等待房主；顶部 🚪 退出 按钮已覆盖退出入口，底部不再重复
+  return '<div class="hint" style="width:100%;text-align:center">对局结束，等待房主发起下一局…</div>';
+}
+
 /* ===== 结算视图 ===== */
 function renderOver(){
   const humanWin = state.humanRole === state.winner;
@@ -1040,7 +1164,7 @@ function renderOver(){
     '</div>' +
     logLineHTML() +
     '<div class="win-banner win-' + (state.winner==='fugitive'?'fug':'mar') + '">' +
-      '<div class="big">' + (humanWin ? '😎你赢了' : '😭你输了…') + '</div>' +
+      '<div class="big">' + (humanWin ? '😎你赢了' : '😵你输了…') + '</div>' +
       '<div class="sub">' + (state.winner==='fugitive' ? '大盗成功逃脱！' : '警探成功抓捕大盗！') +
         // ' · 你扮演 ' + (state.humanRole==='fugitive'?'大盗':'警探') +
         // ' · 共 ' + state.turns + ' 回合 · 翻开 ' + revealCount + ' 张地点牌</div>' +
@@ -1064,10 +1188,7 @@ function renderOver(){
       '<div class="s"><b>' + revealCount + '</b><span>被翻开</span></div>' +
       '<div class="s"><b>' + state.marMissed.length + '</b><span>猜错次数</span></div>' +
     '</div>' +
-    '<div id="actions">' +
-      '<button class="btn btn-primary" onclick="playAgain()">再来一局</button>' +
-      '<button class="btn btn-ghost" onclick="backToLanding()">重选身份</button>' +
-    '</div>';
+    '<div id="actions">' + overActionsHTML() + '</div>';
 }
 function bindOver(){}
 function viewRouteCard(i){
@@ -1140,11 +1261,12 @@ function modalHTML(){
   '<div class="modal-overlay" id="modal-quit" onclick="if(event.target===this)closeModal(\'quit\')"><div class="modal">' +
     '<h3>退出本局？</h3>' +
     '<p>当前进度会清除，重新选择身份。</p>' +
-    '<button class="btn btn-primary" style="margin-bottom:8px" onclick="confirmQuit()">确认退出</button>' +
+    '<button class="btn btn-primary" onclick="confirmQuit()">确认退出</button>' +
     '<button class="btn btn-ghost" onclick="closeModal(\'quit\')">继续游戏</button>' +
   '</div></div>';
 }
 function quitGame(){
+  if(ONLINE_MODE && typeof olConfirmQuit === 'function'){ olConfirmQuit(); return; }
   const ov = document.getElementById('modal-quit');
   if(ov) ov.classList.add('show');
 }
@@ -1162,6 +1284,7 @@ function confirmQuit(){
       '<h3 id="sheet-title"></h3>' +
       '<div id="sheet-body"></div>' +
     '</div></div>');
+  if(ONLINE_MODE) return; // 联机页：由 online.js 全权接管（不读单机存档、不显示人机登录页）
   const saved = load();
   if(saved){
     state = saved;
