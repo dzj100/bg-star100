@@ -17,6 +17,8 @@
   let S = null, mode = 'menu', live = false, busy = false, aiStop = false, aiRunning = false;
   let pend = null, pendKey = '';                     // 输入缓冲：busy 期间收下的一次点击（收尾重放）
   let winFired = null;                               // 结算演出只对同一终局触发一次
+  let aiSide = 1;                                    // AI 执子（0=黑/1=白）：开局随机，旧存档缺省按白方
+  const isAiTurn = () => mode === 'ai' && S.turn === aiSide;
   const timers = [];
   const sleep = ms => new Promise(r => timers.push(setTimeout(r, ms)));
   function clearTimers() { while (timers.length) clearTimeout(timers.pop()); }
@@ -298,7 +300,7 @@
     if (stripKey === k) return;                       // 无真实回合变化：跳过重写与弹动
     stripKey = k;
     const strip = $('#turnstrip');
-    const who = PLAY[S.turn] + (mode === 'ai' && S.turn === 1 ? '（AI）' : '');
+    const who = PLAY[S.turn] + (mode === 'ai' ? (isAiTurn() ? '（AI）' : '（你）') : '');
     strip.innerHTML =
       '<div class="who c' + S.turn + '"><span class="dot"></span>' + who + '</div>' +
       '<div class="meta"><b>回合 ' + S.turnNo + '</b>焦点 · ' + ERA_NAMES[S.focus[S.turn]] +
@@ -405,9 +407,9 @@
   function renderPanel() {
     const pan = $('#panel');
     let html = '';
-    const aiTurn = mode === 'ai' && S.turn === 1;
+    const aiTurn = isAiTurn();
     if (S.stage === 'select') {
-      html += '<div class="phint">' + (aiTurn ? '白方（AI）思考中…' : '轮到' + PLAY[S.turn] + '，在焦点时空（' + ERA_NAMES[S.focus[S.turn]] + '）选一枚可行动的棋子') + '</div>';
+      html += '<div class="phint">' + (aiTurn ? PLAY[S.turn] + '（AI）思考中…' : '轮到' + PLAY[S.turn] + '，在焦点时空（' + ERA_NAMES[S.focus[S.turn]] + '）选一枚可行动的棋子') + '</div>';
     } else if (S.stage === 'act') {
       const left = 2 - S.acted;
       if (G.canEnd(S)) {
@@ -419,8 +421,7 @@
       }
     } else if (S.stage === 'focus') {
       const cur = S.focus[S.turn];
-      const aiTurn = mode === 'ai' && S.turn === 1;
-      html += '<div class="phint">' + (aiTurn ? '白方（AI）选择下一时空…' : '把焦点移到：') +
+      html += '<div class="phint">' + (isAiTurn() ? PLAY[S.turn] + '（AI）选择下一时空…' : '把焦点移到：') +
           // '<small>移动后换对方回合并在回合末判定胜负</small>'+
         '</div>';
       html += '<div class="focus-row">';
@@ -498,14 +499,13 @@
     }
     winFired = null;
     if (S.stage === 'select') {
-      const aiTurn = mode === 'ai' && S.turn === 1;
       if (G.needPass(S)) {
-        if (aiTurn) return;                                  // AI 由 aiRun 处理
+        if (isAiTurn()) return;                                  // AI 由 aiRun 处理
         sleep(650).then(() => { if (live && !busy && S.stage === 'select' && G.needPass(S)) doOp({ op: 'pass' }); });
         return;
       }
-      if (aiTurn) aiRun();
-    } else if (S.stage === 'focus' && mode === 'ai' && S.turn === 1) {
+      if (isAiTurn()) aiRun();
+    } else if (S.stage === 'focus' && isAiTurn()) {
       aiRun();                                               // 换手后 AI 需空过移焦点
     }
   }
@@ -544,7 +544,7 @@
   function bindBoards() {
     $('#boards').addEventListener('click', e => {
       if (!S || S.over) return;
-      if (mode === 'ai' && S.turn === 1) return;            // AI 回合：人类点击一律忽略
+      if (isAiTurn()) return;                                  // AI 回合：人类点击一律忽略
       const cell = e.target.closest('.cell');
       if (!cell) return;
       if (busy) { pend = { cell: { e: +cell.dataset.e, i: +cell.dataset.i } }; pendKey = turnKey(); return; }
@@ -552,7 +552,7 @@
     });
     $('#panel').addEventListener('click', e => {
       if (!S || S.over) return;
-      if (mode === 'ai' && S.turn === 1) return;
+      if (isAiTurn()) return;
       const end = e.target.closest('#btnEnd');
       if (end) { if (busy) { pend = { op: { op: 'end' } }; pendKey = turnKey(); } else doOp({ op: 'end' }); return; }
       const fb = e.target.closest('.fbtn');
@@ -590,13 +590,13 @@
   }
 
   /* ---------------- 断点续玩（localStorage 自动存档） ----------------
-     key 沿用仓库惯例 <项目名>-state；存 {v, mode, S}，S 即引擎局面（含对局记录）。
+     key 沿用仓库惯例 <项目名>-state；存 {v, mode, aiSide, S}，S 即引擎局面（含对局记录）。
      每次引擎变更后立即落盘：演出较长的操作先存后演，中途关页也不丢步。 */
   const SAVE_KEY = 'that_time_you_killed_me-state';
   const SAVE_V = 1;
   const saveGame = () => {
     if (!S || mode === 'menu') return;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, mode, S })); }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, mode, aiSide, S })); }
     catch (e) { /* 隐私模式/配额：存档失败不打断对局 */ }
   };
   function clearSave() {
@@ -622,12 +622,14 @@
     if (st.stage === 'over' && !(st.over && (st.over.winner === 0 || st.over.winner === 1 || st.over.draw === true))) return bad();
     if (!Array.isArray(st.log)) st.log = [];
     st.mode = d.mode;
-    return { mode: d.mode, S: st };
+    const aiS = (d.aiSide === 0 || d.aiSide === 1) ? d.aiSide : 1;  // 旧档无 aiSide：按 1（AI 白方）兼容
+    return { mode: d.mode, aiSide: aiS, S: st };
   }
   function tryRestore() {
     const d = readSave();
     if (!d) return;
     mode = d.mode;
+    aiSide = d.aiSide;
     live = false; clearTimers(); aiStop = true; aiRunning = false; busy = false;
     pend = null; pendKey = ''; stripKey = null; fitLast = null;
     S = d.S;
@@ -637,8 +639,7 @@
     renderAll();
     if (S.over) return;                                   // 终局：停在结算画面即可
     live = true;
-    const aiTurn = mode === 'ai' && S.turn === 1;
-    if (aiTurn && (S.stage === 'act' || (S.stage === 'select' && G.needPass(S)))) aiRun();
+    if (isAiTurn() && (S.stage === 'act' || (S.stage === 'select' && G.needPass(S)))) aiRun();
     else afterChange();                                   // select/focus：空过与选子由 afterChange 触发
   }
 
@@ -647,7 +648,9 @@
     mode = m;
     clearTimers(); aiStop = true; aiRunning = false; busy = false; live = true;
     pend = null; pendKey = ''; stripKey = null; fitLast = null;
-    S = G.newGame(mode, mode === 'ai' ? () => 0 : Math.random);
+    if (mode === 'ai') aiSide = Math.random() < 0.5 ? 1 : 0;  // 随机分色；先后手由 newGame 随机
+    else aiSide = 1;
+    S = G.newGame(mode, Math.random);
     $('#screen-menu').classList.add('hidden');
     $('#screen-game').classList.add('on');
     renderAll();

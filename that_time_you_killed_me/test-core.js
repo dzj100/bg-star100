@@ -41,20 +41,26 @@ function hasMove(acts, d, to) { return acts.some(a => a.t === 'move' && a.d === 
 function hasTravel(acts, e2) { return acts.some(a => a.t === 'travel' && a.e2 === e2); }
 
 console.log('— 开局 —');
-test('开局布子与焦点', () => {
+test('开局布子与焦点（白1号格/黑16号格，黑焦点未来）', () => {
   const S = G.newGame('local2p', () => 0);
   assert.strictEqual(S.turn, 0);
   for (let e = 0; e < 3; e++) {
-    assert.strictEqual(color(S, e, 0), 0);
-    assert.strictEqual(color(S, e, 15), 1);
+    assert.strictEqual(color(S, e, 0), 1);   // 白子 1 号格
+    assert.strictEqual(color(S, e, 15), 0);  // 黑子 16 号格
   }
   assert.deepStrictEqual(S.spares, [4, 4]);
-  assert.deepStrictEqual(S.focus, [0, 2]);
-  assert.strictEqual(G.stage, undefined); // 命名探针
+  assert.deepStrictEqual(S.focus, [2, 0]);   // [黑焦点=未来, 白焦点=过去]
   assert.ok(G.selectablePieces(S).length >= 1);
-  const acts = G.legalActions(S, 0, 0); // 黑子1号格
-  assert.ok(hasMove(acts, 'right', 1) && hasMove(acts, 'down', 4));
-  assert.ok(!hasTravel(acts, 1)); // 现在1号格被自己的黑子占据
+  // 黑方焦点在未来：16 号格黑子仅可上/左（下/右是墙）
+  const actsB = G.legalActions(S, 2, 15);
+  assert.ok(hasMove(actsB, 'up', 11) && hasMove(actsB, 'left', 14));
+  assert.ok(!hasTravel(actsB, 1));          // 现在 16 号格被自己的黑子占据
+  // 白方焦点在过去：轮到白方时 1 号格白子可右/下
+  S.turn = 1;
+  const actsW = G.legalActions(S, 0, 0);
+  assert.ok(hasMove(actsW, 'right', 1) && hasMove(actsW, 'down', 4));
+  assert.ok(!hasTravel(actsW, 1));          // 现在 1 号格被自己的白子占据
+  S.turn = 0;
   assert.strictEqual(S.log.length, 1);            // 开局默认插入一条 log
   assert.deepStrictEqual(S.log[0], { no: 1, p: 0, text: '对局开始，黑方先手' });
   inv(S);
@@ -297,7 +303,7 @@ console.log('— 空过 —');
 test('焦点时空无己子 → 空过仅移焦点，回合继续', () => {
   const S = fresh(); S.focus[0] = 0;
   put(S, 1, 3, 0); put(S, 2, 0, 0);
-  put(S, 1, 0, 1); put(S, 2, 15, 1);
+  put(S, 0, 0, 1); put(S, 2, 15, 1);   // 白在「过去」（焦点）与「未来」各有子 → 白下回合可行动
   assert.strictEqual(G.selectablePieces(S).length, 0);
   assert.ok(G.needPass(S));
   assert.ok(G.doPass(S));
@@ -306,7 +312,7 @@ test('焦点时空无己子 → 空过仅移焦点，回合继续', () => {
   const mf = G.moveFocus(S, 1);
   assert.ok(mf.ok && !mf.over);
   assert.strictEqual(S.turn, 1);
-  assert.strictEqual(S.stage, 'select'); // 白方焦点未来有子可行动
+  assert.strictEqual(S.stage, 'select'); // 白方焦点在过去有子可行动
   inv(S);
 });
 

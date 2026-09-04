@@ -51,11 +51,13 @@ async function main() {
   console.log('■ 1 菜单（封面风）');
   await shot('m1-menu.png');
 
-  console.log('■ 2 开局选子（AI 模式）');
+  console.log('■ 2 开局选子（AI 模式，随机分色）');
+  await page.evaluate(() => { Math.random = () => 0.1; });  // aiSide=1（AI 白方）且 first=0（玩家执黑先手）→ 确定性
   await page.click('#btnAI');
   await page.waitForTimeout(600);
   await shot('m2-open.png');
   expect('开局 select', (await st()).stage === 'select');
+  expect('玩家执黑（turn=0）', (await st()).turn === 0);
   {
     const spare = await page.evaluate(() => {
       const fl = document.getElementById('spareFloat');
@@ -76,14 +78,14 @@ async function main() {
   }
 
   console.log('■ 3 选子后行动提示');
-  await clickCell(0, 0);
+  await clickCell(2, 15);                                 // 黑方焦点在未来：选 16 号格黑子
   await page.waitForTimeout(160);
   await shot('m3-select.png');
   let s = await st();
   expect('act 阶段 & 尚未行动', s.stage === 'act' && s.acted === 0);
 
   console.log('■ 4 推挤撞墙演出（中途帧）');
-  // 场景测试改在双人模式跑：AI 模式会在白方(1号)行动后自动接管回合
+  // 场景测试改在双人模式跑：AI 模式在玩家回合结束后会自动接管（分色已随机）
   await page.evaluate(() => window.TTYKM_UI.goMenu());
   await page.click('#btn2P');
   await page.waitForTimeout(400);
@@ -235,17 +237,17 @@ async function main() {
   await page.evaluate(() => { Math.random = () => 0.1; });  // 锁定黑方先手
   await page.click('#btn2P');
   await page.waitForTimeout(400);
-  await clickCell(0, 0);
+  await clickCell(2, 15);                              // 黑方家：未来 16 号格
   await page.waitForTimeout(150);
-  await clickCell(0, 1);
+  await clickCell(2, 11);                              // 上移 → 12 号格
   await page.waitForTimeout(1000);
   s = await st();
   expect('第1次行动后 acted=1', s.acted === 1 && s.stage === 'act');
-  await clickCell(0, 2);
+  await clickCell(2, 7);                               // 再上移 → 8 号格
   await page.waitForTimeout(1000);
   s = await st();
   expect('两次行动进入 focus', s.stage === 'focus');
-  await page.click('.fbtn[data-e="2"]');
+  await page.click('.fbtn[data-e="1"]');               // 焦点移到「现在」（黑当前在「未来」）
   await page.waitForTimeout(500);
   s = await st();
   expect('换白方回合 select', s.turn === 1 && s.stage === 'select');
@@ -255,14 +257,14 @@ async function main() {
   await page.evaluate(() => window.TTYKM_UI.goMenu());
   await page.click('#btnAI');
   await page.waitForTimeout(400);
-  await clickCell(0, 0);
+  await clickCell(2, 15);
   await page.waitForTimeout(150);
-  await clickCell(0, 1);
+  await clickCell(2, 11);
   await page.waitForTimeout(1000);
-  await clickCell(0, 2);
+  await clickCell(2, 7);
   await page.waitForTimeout(1000);
   s = await st();
-  if (s.stage === 'focus') { await page.click('.fbtn[data-e="2"]'); await page.waitForTimeout(600); }
+  if (s.stage === 'focus') { await page.click('.fbtn[data-e="1"]'); await page.waitForTimeout(600); }
   await page.waitForFunction(() => {
     const S = window.TTYKM_UI.state();
     return S.over || (S.turn === 0 && S.stage === 'select');
@@ -276,12 +278,12 @@ async function main() {
     await page.evaluate(() => window.TTYKM_UI.goMenu());   // 清掉可能残留的结算遮罩
     const S = scene({ stage: 'select' });
     S.turn = 0; S.focus = [0, 2];
-    put(S, 0, 0, 0); put(S, 1, 0, 0); put(S, 2, 0, 0);
-    put(S, 0, 15, 1); put(S, 1, 15, 1); put(S, 2, 15, 1);
+    put(S, 0, 15, 0); put(S, 1, 15, 0); put(S, 2, 15, 0);  // 黑 16 号格
+    put(S, 0, 0, 1); put(S, 1, 0, 1); put(S, 2, 0, 1);     // 白 1 号格
     S.log.push(
-      { no: 1, p: 0, text: '黑子3→2，黑1 撞墙出局' },
-      { no: 1, p: 0, text: '黑子2→1，白1 撞墙出局' },
-      { no: 1, p: 1, text: '白子15→14，白子穿越→未来14格（分身留现在）' },
+      { no: 1, p: 0, text: '黑子16→12，白16 撞墙出局' },
+      { no: 1, p: 0, text: '黑子12→11，白1 悖论出局' },
+      { no: 1, p: 1, text: '白子1→2，白子穿越→现在2格（分身留过去）' },
       { no: 2, p: 1, text: '白方焦点时空无子可行动，本回合空过' },
     );
     await setState(S);
@@ -305,9 +307,10 @@ async function main() {
     dpage.on('pageerror', e => errors.push('DPAGE: ' + e.message));
     await dpage.goto(URL);
     await dpage.waitForTimeout(400);
+    await dpage.evaluate(() => { Math.random = () => 0.1; });  // 玩家执黑先手，确定性
     await dpage.click('#btnAI');
     await dpage.waitForTimeout(500);
-    await dpage.click('.era[data-e="0"] .cell[data-i="0"]');
+    await dpage.click('.era[data-e="2"] .cell[data-i="15"]');
     await dpage.waitForTimeout(180);
     await dpage.screenshot({ path: path.join(SHOTS, 'd1-landscape.png') });
     console.log('  shot: d1-landscape.png');
@@ -335,14 +338,14 @@ async function main() {
     await page.evaluate(() => { Math.random = () => 0.1; });
     await page.click('#btn2P');
     await page.waitForTimeout(350);
-    await clickCell(0, 0); await page.waitForTimeout(180);     // 黑1→2 行动1
-    await clickCell(0, 1); await page.waitForTimeout(1100);
-    await clickCell(0, 2); await page.waitForTimeout(1100);    // 行动2 → focus
+    await clickCell(2, 15); await page.waitForTimeout(180);    // 黑 16→12 行动1
+    await clickCell(2, 11); await page.waitForTimeout(1100);
+    await clickCell(2, 7); await page.waitForTimeout(1100);    // 行动2 → focus
     s = await stFull();
     expect('行动后自动写入存档', s.stage === 'focus' && await page.evaluate(() => !!localStorage.getItem(window.TTYKM_UI.saveKey)));
     const saved1 = await page.evaluate(() => JSON.parse(localStorage.getItem(window.TTYKM_UI.saveKey)));
     expect('存档含模式+引擎局面', saved1.mode === 'local2p' && saved1.S.turn === 0 && saved1.S.stage === 'focus' && saved1.S.turnNo === 1);
-    await page.click('.fbtn[data-e="2"]');
+    await page.click('.fbtn[data-e="1"]');
     await page.waitForTimeout(700);
     s = await stFull();
     expect('移焦点换手后存档', s.turn === 1 && s.stage === 'select' && s.turnNo === 2);
@@ -352,12 +355,12 @@ async function main() {
       document.getElementById('screen-menu').classList.contains('hidden') &&
       document.getElementById('screen-game').classList.contains('on')));
     s = await stFull();
-    expect('局面完整恢复（白方第2回合 select，黑子已到3号格）', s.turn === 1 && s.stage === 'select' && s.turnNo === 2 &&
-      await page.evaluate(() => { const c = window.TTYKM_UI.state().boards[0].cell; return c[2] && c[2].c === 0 && !c[1]; }));
-    await clickCell(2, 15);                                     // 恢复后可继续下
+    expect('局面完整恢复（白方第2回合 select，黑子已到8号格）', s.turn === 1 && s.stage === 'select' && s.turnNo === 2 &&
+      await page.evaluate(() => { const c = window.TTYKM_UI.state().boards[2].cell; return c[7] && c[7].c === 0 && !c[11]; }));
+    await clickCell(0, 0);                                      // 恢复后白方 1 号格可下
     await page.waitForTimeout(250);
     s = await stFull();
-    expect('恢复后交互可用（选中白子进 act）', s.stage === 'act' && s.sel && s.sel.era === 2);
+    expect('恢复后交互可用（选中白子进 act）', s.stage === 'act' && s.sel && s.sel.era === 0);
     await shot('m12-resume.png');
 
     // 12b 返回菜单 = 清档 → 下次进封面

@@ -33,13 +33,13 @@ const G = (() => {
     const first = rnd() < 0.5 ? 0 : 1;
     const S = {
       mode, first, turn: first, turnNo: 1,
-      focus: [0, 2],                       // [黑焦点时空, 白焦点时空]
+      focus: [2, 0],                       // [黑焦点时空=未来, 白焦点时空=过去]
       boards: [newBoard(), newBoard(), newBoard()],
       spares: [4, 4], dead: [0, 0],        // 备用分身 / 阵亡（盘上+备用+阵亡=7）
       stage: 'select', sel: null, acted: 0,
       over: null, log: [],                       // 事件日志 {no:回合,p:玩家,text}，UI 展示最新一条/抽屉
     };
-    for (let e = 0; e < 3; e++) { S.boards[e].cell[0] = { c: 0 }; S.boards[e].cell[15] = { c: 1 }; }
+    for (let e = 0; e < 3; e++) { S.boards[e].cell[0] = { c: 1 }; S.boards[e].cell[15] = { c: 0 }; } // 白1号格/黑16号格
     logPush(S, '对局开始，' + NAMES[first] + '先手');
     return S;
   }

@@ -396,3 +396,34 @@ button { font-family: inherit; touch-action: manipulation; }
   .btn-end { min-height: 50px; font-size: 15px; border-width: 2.5px; }
   #panel .hint-inline { font-size: 12px; }
 }
+
+/* ============================================================
+   棋盘做旧（仅 现在/未来 两盘；过去及全站其余区域保持原样）
+   配方：黄褐渍迹(径向渐变) + 纸纹(内联 SVG feTurbulence，零外部资源)
+   现在=做旧 1 倍；未来=2 倍 —— 两盘渍形同位置同形状，
+   仅浓度不同：渍迹 alpha×2、颗粒 feColorMatrix 系数 0.045→0.09。
+   强弱调节：渍迹看各 radial-gradient 的 alpha，颗粒看 --grain* 的 0.0xx 系数。
+   ============================================================ */
+:root {
+  --grain:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.045 0.045 0.045 0 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain2x:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.09 0.09 0.09 0 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* 两盘底色沿用 --paper，做旧差异只来自叠加层浓度 → 未来正好 = 现在 ×2 */
+/* 现在 · 做旧 1 倍 */
+/* .era[data-e="1"] .board {
+  background-image:
+    radial-gradient(130px 100px at 84% 14%, rgba(150, 112, 58, .09), rgba(150, 112, 58, 0) 70%),
+    radial-gradient(150px 120px at 14% 86%, rgba(122, 90, 44, .07), rgba(122, 90, 44, 0) 70%),
+    var(--grain);
+  background-size: auto, auto, 180px 180px;
+} */
+/* 未来 · 做旧 2 倍 */
+/* .era[data-e="2"] .board {
+  background-image:
+    radial-gradient(130px 100px at 84% 14%, rgba(150, 112, 58, .18), rgba(150, 112, 58, 0) 70%),
+    radial-gradient(150px 120px at 14% 86%, rgba(122, 90, 44, .14), rgba(122, 90, 44, 0) 70%),
+    var(--grain2x);
+  background-size: auto, auto, 180px 180px;
+} */
