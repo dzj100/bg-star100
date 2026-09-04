@@ -406,7 +406,7 @@ function checkMarshalWin(){
 
 /* ================= 逃脱与搜捕 ================= */
 async function triggerEscape(){
-  // 搜捕判定只看除 42 外已翻开的地点牌（42 刚打出，不能算作"已翻开 >30"）
+  // 搜捕判定只看除 42 外已翻开的地点牌（42 刚打出，不能算作"已翻开 ≥30"）
   const maxOpen = Math.max(0, ...state.fug.route.filter(r=>!r.hidden && r.num!==42).map(r=>r.num));
   if(maxOpen >= 30){
     console.log('[escape] maxOpen =', maxOpen, '≥30 → 直接逃脱');
@@ -781,7 +781,7 @@ function roleWho(role){
   const me = state.humanRole === role;
   if(!OL.active) return me ? ' (你)' : ' (AI)';
   if(me) return ' (你)';
-  return OL.oppName ? ' (' + esc(OL.oppName) + ')' : '';
+  return OL.oppName ? ' ' + esc(OL.oppName) : '';
 }
 function roleTag(role){
   if(role==='fugitive') return '<span class="role-tag role-fug" onclick="showRoleHand(\'fugitive\')">大盗' + roleWho('fugitive') + '</span>';
@@ -796,7 +796,7 @@ function showRoleHand(role){
   // 警探自己的手牌按摸牌顺序展示（与摸牌日志对应）；大盗按数字升序便于规划出牌
   const chips = (role==='marshal' && isHuman ? hand.slice() : hand.slice().sort((a,b)=>a-b)).map(n =>
     '<span class="rh-card' + (isHuman?'':' rh-hide') + '">' + (isHuman?n:'?') + '</span>').join('');
-  openSheet(name + '（' + who + '）手牌（' + hand.length + ' 张）',
+  openSheet(name + '（' + who + '）手牌 ' + hand.length + ' 张',
     (chips || '<div class="rh-empty">空手</div>') +
     '<div class="sheet-foot">' + (isHuman ? '牌面数字' : '对方手牌保密，仅显示张数') + '</div>');
 }
@@ -1255,7 +1255,7 @@ function modalHTML(){
       '<li><b>掩护</b>：每张 1~41 牌自带掩护标记（奇数 1 个、偶数 2 个；42 不能作掩护）。打出地点牌时可追加任意数量掩护牌（正面朝下），每 1 个标记可放宽上限 +1。</li>' +
       '<li><b>回合流程</b>：<table class="pile-table"><tr><th></th><th>大盗</th><th>警探</th></tr><tr><td>第一回合</td><td>放 1~2 张地点牌</td><td>抽 2 张后必须猜测</td></tr><tr><td>后续回合</td><td>抽 1 张，可放 1 张或跳过</td><td>抽 1 张后必须猜测</td></tr></table></li>' +
       '<li><b>猜测</b>：可猜任意 1~41 数字。单猜命中即翻开（掩护牌一并翻开）；多猜须全部命中才翻。</li>' +
-      '<li><b>搜捕</b>：大盗打出 42 时若已翻开地点牌均不大于 30 ，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜，全对则警探获胜。</li>' +
+      '<li><b>搜捕</b>：大盗打出 42 时，若已翻开地点牌均不大于 29，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜，全对则警探反败为胜。</li>' +
     '</ul>' +
     '<button class="btn btn-primary" onclick="closeModal(\'rules\')">知道了</button>' +
   '</div></div>' +

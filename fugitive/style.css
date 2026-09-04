@@ -65,12 +65,12 @@ body { font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-
 #topbar { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
 .tb-row { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 .tb-row.tb-tri { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; flex-wrap:nowrap; }
-.tb-row.tb-tri .tb-left { justify-self:start; }
+.tb-row.tb-tri .tb-left { justify-self:start; max-width:100%; min-width:0; }
 .tb-row.tb-tri .tb-center { justify-self:center; }
-.tb-row.tb-tri .tb-right { justify-self:end; }
+.tb-row.tb-tri .tb-right { justify-self:end; max-width:100%; min-width:0; }
 .tb-title { font-size:16px; margin:0; color:var(--gold); letter-spacing:2px; display:flex; align-items:center; gap:6px; }
 .tb-btns { display:flex; gap:6px; }
-.role-tag { padding:6px 14px; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; }
+.role-tag { padding:6px 14px; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:100%; }
 .role-tag:active { filter:brightness(1.15); }
 .role-fug { background:var(--fug); color:#ffe6b0; border:1px solid #dda34d; }
 .role-mar { background:var(--mar); color:#eaf6fc; border:1px solid #5db8dd; }

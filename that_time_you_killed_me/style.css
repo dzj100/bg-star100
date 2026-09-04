@@ -383,7 +383,10 @@ button { font-family: inherit; touch-action: manipulation; }
   .cell.pick .piece::after { inset: -5px; border-width: 2px; }
   .cell.sel .piece::after { inset: -4px; border-width: 2px; }
   .arrow { font-size: clamp(14px, 4.6vw, 20px); }
-  .cell.hint-trv::before { font-size: 7px; bottom: 0; padding: 1px 3px; }
+  .cell.hint-trv::before {
+    font-size: 7px; bottom: 0; padding: 1px 3px;
+    min-width: 18px; text-align: center;
+  }
   #panel { padding: 7px 10px calc(7px + env(safe-area-inset-bottom)); min-height: calc(92px + env(safe-area-inset-bottom)); }
   #panel .phint { font-size: 12.5px; margin: 0 1px 6px; }
   #panel .phint small { font-size: 10.5px; }
