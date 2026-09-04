@@ -9,7 +9,7 @@
      - 执行1次后无合法行动 → 可结束行动(canEnd/endActions)
      - 移动撞对方子触发推链：撞墙前端死、同色相邻段悖论死；己子可被推死
      - 穿越仅相邻时空同编号格，目标有子不可穿；逆时穿越(未来→现在→过去)留分身耗备用
-     - 移焦点到另一时空后回合末判定：一方在≥2时空无子判负
+     - 行动结束(两次行动/提前结束/空过)与移焦点后即判：一方在≥2时空无子判负，双方同时满足判平局
    ============================================================ */
 'use strict';
 const G = (() => {
@@ -86,6 +86,30 @@ const G = (() => {
   const needPass = S => S.stage === 'select' && selectablePieces(S).length === 0;
   const canEnd = S => S.stage === 'act' && S.sel && S.acted >= 1 && S.acted < 2
     && legalActions(S, S.sel.era, S.sel.i).length === 0;
+
+  /* 胜负判定：行动结束(两次行动/提前结束/空过)与移焦点后立即结算。
+     双方同时 ≥2 时空无子 → 平局；否则行动方(当前回合方)在后者判负。终局返回 true */
+  function judgeEnd(S) {
+    if (S.over) return true;
+    const cur = S.turn, opp = 1 - cur;
+    const curGone = colorEmptyEras(S, cur) >= 2, oppGone = colorEmptyEras(S, opp) >= 2;
+    if (oppGone && curGone) {
+      S.over = { draw: true }; S.stage = 'over';
+      logPush(S, '平局｜黑白双方在 ≥2 个时空都已没有棋子');
+      return true;
+    }
+    if (oppGone) {
+      S.over = { winner: cur }; S.stage = 'over';
+      logPush(S, NAMES[cur] + '获胜｜' + NAMES[opp] + '在 ≥2 个时空已无棋子');
+      return true;
+    }
+    if (curGone) {
+      S.over = { winner: opp }; S.stage = 'over';
+      logPush(S, NAMES[opp] + '获胜｜' + NAMES[cur] + '在 ≥2 个时空已无棋子');
+      return true;
+    }
+    return false;
+  }
   const focusTargets = S => [0, 1, 2].filter(e => e !== S.focus[S.turn]); // 合法焦点：除当前外另两时空（UI 仅在 focus 阶段展示）
 
   function selectPiece(S, era, i) {
@@ -162,7 +186,8 @@ const G = (() => {
     S.acted++;
     logPush(S, summarize(S, evs));
     if (S.acted >= 2) {
-      S.sel = null; S.stage = 'focus';
+      S.sel = null;
+      if (!judgeEnd(S)) S.stage = 'focus';   // 两次行动结束即判，未终局才进入移焦点
     } else {
       S.sel = { era: nera, i: ni };   // 无后续行动时由 UI 提供【结束行动】（canEnd）
     }
@@ -190,34 +215,26 @@ const G = (() => {
 
   function endActions(S) {
     if (!canEnd(S)) return false;
-    S.sel = null; S.stage = 'focus';
+    S.sel = null;
     logPush(S, NAMES[S.turn] + '提前结束行动');
+    if (!judgeEnd(S)) S.stage = 'focus';
     return true;
   }
 
   function doPass(S) {
     if (!needPass(S)) return false;
-    S.stage = 'focus';
     logPush(S, NAMES[S.turn] + '焦点时空无子可行动，本回合空过');
+    if (!judgeEnd(S)) S.stage = 'focus';
     return true;
   }
 
-  /* 移焦点 → 回合末胜负判定（先判对手负=当前方胜，再判己方负）→ 换手 */
+  /* 移焦点 → 换手；终点结算交由 judgeEnd（行动结束处已判，此处兜底旧存档） */
   function moveFocus(S, e) {
     if (S.stage !== 'focus') return { ok: false, over: false };
     if (e !== 0 && e !== 1 && e !== 2 || e === S.focus[S.turn]) return { ok: false, over: false };
     const cur = S.turn, opp = 1 - cur;
     S.focus[cur] = e;
-    if (colorEmptyEras(S, opp) >= 2) {
-      S.over = { winner: cur }; S.stage = 'over';
-      logPush(S, NAMES[cur] + '获胜｜' + NAMES[opp] + '在 ≥2 个时空已无棋子');
-      return { ok: true, over: true };
-    }
-    if (colorEmptyEras(S, cur) >= 2) {
-      S.over = { winner: opp }; S.stage = 'over';
-      logPush(S, NAMES[opp] + '获胜｜' + NAMES[cur] + '在 ≥2 个时空已无棋子');
-      return { ok: true, over: true };
-    }
+    if (judgeEnd(S)) return { ok: true, over: true };
     S.turn = opp; S.turnNo++; S.sel = null; S.acted = 0;
     if (selectablePieces(S).length) {
       S.stage = 'select';
@@ -232,6 +249,7 @@ const G = (() => {
   function evalState(S, me, rnd) {
     const opp = 1 - me;
     const oe = colorEmptyEras(S, opp), meE = colorEmptyEras(S, me);
+    if (oe >= 2 && meE >= 2) return -1e6;   // 平局：比任何活局差，但优于判负（-1e7）
     if (oe >= 2) return 1e7;
     if (meE >= 2) return -1e7;
     let v = 0;

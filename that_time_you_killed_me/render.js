@@ -16,6 +16,7 @@
 
   let S = null, mode = 'menu', live = false, busy = false, aiStop = false, aiRunning = false;
   let pend = null, pendKey = '';                     // 输入缓冲：busy 期间收下的一次点击（收尾重放）
+  let winFired = null;                               // 结算演出只对同一终局触发一次
   const timers = [];
   const sleep = ms => new Promise(r => timers.push(setTimeout(r, ms)));
   function clearTimers() { while (timers.length) clearTimeout(timers.pop()); }
@@ -438,10 +439,18 @@
     const ov = $('#overlay-win');
     if (!S.over) { ov.classList.add('hidden'); ov.innerHTML = ''; return; }
     ov.classList.remove('hidden');
-    const win = S.over.winner;
+    let title, sub;
+    if (S.over.draw) {
+      title = '平局！';
+      sub = '黑白双方在 ≥2 个时空都已没有棋子<br>——两条时间线，同归于尽。';
+    } else {
+      const win = S.over.winner;
+      title = PLAY[win] + ' 获胜！';
+      sub = PLAY[1 - win] + ' 在 ≥2 个时空已没有棋子<br>——现在的你，杀死了过去的我。';
+    }
     ov.innerHTML =
-      '<div class="win-card"><div class="w-title">' + PLAY[win] + ' 获胜！</div>' +
-      '<div class="w-sub">' + PLAY[1 - win] + ' 在 ≥2 个时空已没有棋子<br>——现在的你，杀死了过去的我。</div>' +
+      '<div class="win-card"><div class="w-title">' + title + '</div>' +
+      '<div class="w-sub">' + sub + '</div>' +
       '<button class="btn-main primary" id="btnAgain">再来一局</button>' +
       '<button class="btn-main" id="btnHome">返回菜单</button></div>';
   }
@@ -465,11 +474,10 @@
       } else if (op.op === 'pass') {
         G.doPass(S); saveGame(); renderAll(); await sleep(150);
       } else if (op.op === 'focus') {
-        const r = G.moveFocus(S, op.e);
+        G.moveFocus(S, op.e);
         saveGame();                              // 换手/终局节点落盘
         await sleep(120);
         renderAll();
-        if (r.over) playWin();
       }
     } catch (e) { console.error(e); }
     busy = false;
@@ -483,7 +491,12 @@
     if (card) { card.classList.remove('winPop'); void card.offsetWidth; card.classList.add('winPop'); }
   }
   function afterChange() {
-    if (!live || S.over) return;
+    if (!live) return;
+    if (S.over) {                                // 行动结束/移焦点均可当场终局 → 结算演出统一在此收口
+      if (winFired !== S.over) { winFired = S.over; playWin(); }
+      return;
+    }
+    winFired = null;
     if (S.stage === 'select') {
       const aiTurn = mode === 'ai' && S.turn === 1;
       if (G.needPass(S)) {
@@ -606,7 +619,7 @@
         !Array.isArray(st.focus) || st.focus.length !== 2 ||
         !Array.isArray(st.spares) || st.spares.length !== 2 ||
         !Array.isArray(st.dead) || st.dead.length !== 2) return bad();
-    if (st.stage === 'over' && !(st.over && (st.over.winner === 0 || st.over.winner === 1))) return bad();
+    if (st.stage === 'over' && !(st.over && (st.over.winner === 0 || st.over.winner === 1 || st.over.draw === true))) return bad();
     if (!Array.isArray(st.log)) st.log = [];
     st.mode = d.mode;
     return { mode: d.mode, S: st };

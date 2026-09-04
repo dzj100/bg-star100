@@ -22,8 +22,8 @@
       <button class="btn-main primary" id="btnAI">🧠 单人对 AI<span class="sub">你执黑先行 · 白方由程序执掌</span></button>
       <button class="btn-main" id="btn2P">👥 双人同屏<span class="sub">轮流落子 · 一台设备传着玩</span></button>
       <button class="btn-link" id="btnRules">规则速览</button>
-      <div class="credit">@imStar100</div>
     </div>
+    <div class="credit">@imStar100</div>
   </div>
 
   <!-- 对局界面 -->
@@ -57,7 +57,7 @@
       </ol>
       <p><b>推挤：</b>移动撞上对方棋子会把一整条链推开。链头<b>撞墙</b>即死；同色相邻两子被推挤会触发<b>悖论</b>双双出局（前方有空格也照样）。</p>
       <p><b>穿越：</b>只能穿到相邻时空（过去↔现在↔未来），目标格有子则不能穿。<b>逆时穿越</b>（未来→现在→过去）会在原格留下一个<b>分身</b>（消耗备用，最多 4 个）。</p>
-      <p><b>胜负：</b>回合结束时，若一方在 <b>≥2 个时空</b>已没有任何己方棋子，即告失败。</p>
+      <p><b>胜负：</b>两次行动结束（或提前结束/空过）时立即判定：一方在 <b>≥2 个时空</b>已没有任何己方棋子即告失败；若<b>双方同时</b>满足，则判为<b>平局</b>。</p>
       <p>焦点时空里无子时只能<b>空过</b>，直接进行移动焦点并结束。</p>
       <button class="btn-main" id="btnCloseRules">知道了</button>
     </div>

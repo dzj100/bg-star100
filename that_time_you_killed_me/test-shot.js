@@ -90,6 +90,7 @@ async function main() {
   {
     const S = scene({});
     put(S, 0, 0, 0); put(S, 0, 1, 1); put(S, 0, 2, 0);   // 黑1白2黑3 → 3推入
+    put(S, 1, 10, 0); put(S, 1, 5, 1);                   // 双方另有时空 → 不触发终局
     await setState(S);
     await clickCell(0, 2);
     await page.waitForTimeout(120);
@@ -111,6 +112,7 @@ async function main() {
   {
     const S = scene({ turn: 1, focus: [0, 2] });
     put(S, 2, 5, 1);                                       // 白方未来6号
+    put(S, 0, 10, 0); put(S, 1, 10, 0);                    // 黑两时空有子 → 不触发终局
     await setState(S);
     await clickCell(2, 5);
     await page.waitForTimeout(120);
@@ -140,6 +142,7 @@ async function main() {
     S.turn = 0; S.focus[0] = 1;
     put(S, 1, 0, 0); put(S, 1, 1, 0); put(S, 1, 4, 0);     // 角落黑子：右/下己方
     put(S, 0, 0, 1); put(S, 2, 0, 1);                      // 穿越目标被敌占
+    put(S, 0, 5, 0); put(S, 2, 5, 0);                      // 黑仍占其它时空
     await setState(S);
     const hasEnd = await page.evaluate(() => !!document.getElementById('btnEnd'));
     expect('canEnd 局面显示结束按钮', hasEnd);
@@ -175,6 +178,7 @@ async function main() {
   {
     const S = scene({});
     put(S, 0, 0, 0); put(S, 0, 1, 1); put(S, 0, 2, 0);   // 黑3推左：白2→0 幸存、黑1撞墙出局
+    put(S, 1, 10, 0); put(S, 1, 5, 1); put(S, 2, 5, 1);  // 双方另有时空 → 不触发终局
     await setState(S);
     await clickCell(0, 2);
     await page.waitForTimeout(120);

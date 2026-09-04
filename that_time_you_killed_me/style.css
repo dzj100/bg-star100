@@ -70,7 +70,11 @@ button { font-family: inherit; touch-action: manipulation; }
   margin-top: 18px; background: none; border: none; font-size: 14px; color: var(--ink);
   text-decoration: underline; text-underline-offset: 4px; letter-spacing: 1px; padding: 10px 14px;
 }
-.credit { margin-top: 22px; font-size: 12px; opacity: .55; letter-spacing: 1px; }
+.credit {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  font-size: 12px; opacity: .55; letter-spacing: 1px; text-align: center;
+}
 /* 规则底部弹层 */
 .sheet-mask {
   position: fixed; inset: 0; background: rgba(35, 32, 24, .45); z-index: 40;

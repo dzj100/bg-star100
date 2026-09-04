@@ -2,7 +2,7 @@
    煞有其时 · 规则引擎单测（node test-core.js）
    覆盖：开局 / 推挤撞墙(例1) / 悖论(例2) / 双穿越分身(例3) /
         穿越占用 / 分身备用耗尽 / 己子目标禁止 / 结束行动 /
-        强制2次行动 / 回合末胜负 / 双负顺序 / 空过 / 随机与AI对局不变量
+        强制2次行动 / 行动结束即判胜负与平局 / 空过 / 随机与AI对局不变量
    ============================================================ */
 'use strict';
 const G = require('./game.js');
@@ -71,6 +71,7 @@ console.log('— 示例1：推挤撞墙（己子可误杀）—');
 test('黑3→2 推白2与己黑1，己黑撞墙死；再推白出局', () => {
   const S = fresh(); S.focus[0] = 0;
   put(S, 0, 0, 0); put(S, 0, 1, 1); put(S, 0, 2, 0);
+  put(S, 1, 10, 0); put(S, 1, 5, 1); put(S, 2, 5, 1); // 双方在别处仍有子 → 不触发终局
   assert.ok(G.selectPiece(S, 0, 2));
   const r = G.applyAction(S, { t: 'move', d: 'left', to: 1 });
   assert.ok(r.ok);
@@ -98,6 +99,7 @@ console.log('— 示例2：悖论 —');
 test('下推 [5白,9白]：同色相邻段全死，即使9后有空格', () => {
   const S = fresh(); S.focus[0] = 0;
   put(S, 0, 0, 0); put(S, 0, 4, 1); put(S, 0, 8, 1);
+  put(S, 1, 10, 0); put(S, 1, 5, 1); put(S, 2, 5, 1); // 双方在别处仍有子 → 不触发终局
   assert.ok(G.selectPiece(S, 0, 0));
   const r = G.applyAction(S, { t: 'move', d: 'down', to: 4 });
   assert.ok(r.ok);
@@ -130,6 +132,7 @@ console.log('— 示例3：穿越与分身 —');
 test('未来→现在→过去 双穿越双分身', () => {
   const S = fresh(); S.turn = 1; S.focus[1] = 2;
   put(S, 2, 5, 1);
+  put(S, 1, 12, 0); put(S, 2, 12, 0);               // 黑在别处仍有子 → 不触发终局
   assert.ok(G.selectPiece(S, 2, 5));
   const acts = G.legalActions(S, 2, 5);
   assert.ok(hasTravel(acts, 1));
@@ -201,7 +204,7 @@ test('仅有1次行动的棋子可选；执行后无合法行动可结束行动'
   const S = fresh(); S.turn = 1; S.focus[1] = 2;
   put(S, 2, 10, 1);
   put(S, 2, 6, 1); put(S, 2, 9, 1); put(S, 2, 11, 1); put(S, 2, 14, 1); // 四邻皆己方
-  put(S, 0, 10, 0);                                     // 过去10号被敌占（挡前穿）
+  put(S, 0, 10, 0); put(S, 1, 5, 0); put(S, 2, 5, 0); // 黑三时空各有子 → 不触发终局
   assert.strictEqual(G.legalActions(S, 2, 10).length, 1); // 仅逆时穿越到现在
   assert.ok(G.selectPiece(S, 2, 10));
   const r = G.applyAction(S, { t: 'travel', e2: 1 });
@@ -218,6 +221,7 @@ test('仅有1次行动的棋子可选；执行后无合法行动可结束行动'
 test('仍有第2次合法行动时不可提前结束，且必须执行满2次', () => {
   const S = fresh(); S.focus[0] = 0;
   put(S, 0, 0, 0);
+  put(S, 1, 10, 0); put(S, 1, 5, 1); put(S, 2, 5, 1); // 双方在别处仍有子 → 不触发终局
   assert.ok(G.selectPiece(S, 0, 0));
   const r1 = G.applyAction(S, { t: 'move', d: 'right', to: 1 });
   assert.ok(r1.ok);
@@ -229,33 +233,64 @@ test('仍有第2次合法行动时不可提前结束，且必须执行满2次', 
   assert.strictEqual(S.stage, 'focus');
 });
 
-console.log('— 胜负（回合末判定）—');
-test('行动中杀光对方不判胜，移焦点后才判', () => {
+console.log('— 胜负（行动结束即判）—');
+test('第2次行动杀死对方唯一子 → 当场终局，无需再移焦点', () => {
   const S = fresh(); S.focus[0] = 0;
-  put(S, 0, 0, 1);  // 白只有这一子（1号格）
-  put(S, 0, 1, 0);  // 黑在2号格
+  put(S, 0, 0, 1);  // 白唯一子
+  put(S, 0, 1, 0);  // 黑推子
+  put(S, 1, 10, 0); // 黑在现在还有子 → 只有白满足负条件
   assert.ok(G.selectPiece(S, 0, 1));
   const r1 = G.applyAction(S, { t: 'move', d: 'left', to: 0 }); // 白撞墙死
   assert.ok(r1.ok);
   assert.strictEqual(G.colorEmptyEras(S, 1), 3);
-  assert.strictEqual(S.over, null);         // 未判
-  const r2 = G.applyAction(S, { t: 'move', d: 'right', to: 1 });
+  assert.strictEqual(S.over, null);         // 第1次行动后不判
+  assert.strictEqual(S.stage, 'act');
+  const r2 = G.applyAction(S, { t: 'move', d: 'right', to: 1 }); // 第2次行动结束即判
   assert.ok(r2.ok);
-  assert.strictEqual(S.stage, 'focus');
-  assert.strictEqual(S.over, null);
-  const mf = G.moveFocus(S, 1);
-  assert.ok(mf.ok && mf.over);
+  assert.strictEqual(S.stage, 'over');
   assert.strictEqual(S.over.winner, 0);
+  assert.ok(!G.moveFocus(S, 1).ok);         // 终局后移焦点被拒
   inv(S);
 });
-test('回合末双方同时满足负条件 → 行动方优先判胜', () => {
+test('己方悖论自毁 → 第2次行动结束当场判负', () => {
+  const S = fresh(); S.focus[0] = 0;
+  put(S, 0, 0, 0); put(S, 0, 1, 1); put(S, 0, 2, 0); put(S, 0, 3, 0);
+  put(S, 1, 5, 1);                          // 白仍占现在 → 不满足负条件
+  assert.ok(G.selectPiece(S, 0, 0));
+  const r1 = G.applyAction(S, { t: 'move', d: 'right', to: 1 }); // 推链[白,己黑2,己黑3]悖论双死
+  assert.ok(r1.ok);
+  assert.strictEqual(S.dead[0], 2);
+  assert.strictEqual(S.over, null);
+  const r2 = G.applyAction(S, { t: 'move', d: 'right', to: 2 });
+  assert.ok(r2.ok);
+  assert.strictEqual(S.stage, 'over');
+  assert.strictEqual(S.over.winner, 1);     // 黑只剩过去一子
+  inv(S);
+});
+test('双方同时 ≥2 时空无子 → 平局（不分胜负）', () => {
   const S = fresh(); S.turn = 0;
   S.focus[0] = 1;
-  S.stage = 'focus'; // moveFocus 仅接受回合末的 focus 阶段
+  S.stage = 'focus'; // 直接构造已停手局面，移焦点兜底判定
   put(S, 0, 0, 0); put(S, 0, 5, 1); // 双方都只存在于过去
   const mf = G.moveFocus(S, 2);
   assert.ok(mf.ok && mf.over);
-  assert.strictEqual(S.over.winner, 0);
+  assert.strictEqual(S.over.winner, undefined);
+  assert.strictEqual(S.over.draw, true);
+});
+test('第2次行动结束双方同时仅存1时空 → 当场平局', () => {
+  const S = fresh(); S.focus[0] = 0;
+  put(S, 0, 0, 0); put(S, 0, 1, 1); put(S, 0, 2, 0); put(S, 0, 3, 0);
+  assert.ok(G.selectPiece(S, 0, 0));
+  const r1 = G.applyAction(S, { t: 'move', d: 'right', to: 1 }); // 己黑2、3悖论双死
+  assert.ok(r1.ok);
+  assert.strictEqual(S.dead[0], 2);
+  assert.strictEqual(S.over, null);
+  const r2 = G.applyAction(S, { t: 'move', d: 'right', to: 2 }); // 双方都只剩过去一子
+  assert.ok(r2.ok);
+  assert.strictEqual(S.stage, 'over');
+  assert.strictEqual(S.over.draw, true);
+  assert.strictEqual(S.over.winner, undefined);
+  inv(S);
 });
 
 console.log('— 空过 —');
