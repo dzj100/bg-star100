@@ -26,6 +26,16 @@
     <div class="credit">@imStar100</div>
   </div>
 
+  <!-- 模组选择弹窗（开局前，可多选；不勾选 = 经典规则） -->
+  <div class="sheet-mask hidden" id="modMask">
+    <div class="sheet" id="modSheet">
+      <h3>选择模组<small class="sheet-sub">可选玩法扩展 · 保持空白即为经典规则</small></h3>
+      <div id="modList"></div>
+      <button class="btn-main primary" id="btnModStart">开始游戏</button>
+      <button class="btn-main" id="btnModCancel">取消</button>
+    </div>
+  </div>
+
   <!-- 对局界面 -->
   <div id="screen-game">
     <div id="topbar">
@@ -60,6 +70,12 @@
       <p><b>穿越：</b>只能穿到相邻时空（过去↔现在↔未来），目标格有子则不能穿。<b>逆时穿越</b>（未来→现在→过去）会在原格留下一个<b>分身</b>（消耗备用，最多 4 个）。</p>
       <p><b>胜负：</b>两次行动结束（或提前结束/空过）时立即判定：一方在 <b>≥2 个时空</b>已没有任何己方棋子即告失败；若<b>双方同时</b>满足，则判为<b>平局</b>。</p>
       <p>焦点时空里无子时只能<b>空过</b>，直接进行移动焦点并结束。</p>
+      <div id="rulesMod" class="mod-rules hidden">
+        <h4>模组 · 生长<small class="sheet-sub">开局勾选「生长」后生效</small></h4>
+        <p>公共 <b>5 粒种子</b>（无归属）。新行动 <b>播种</b>：在己子所在格或上/下/左/右格播 1 粒种子（对方子/种子/植物格不可播）。种子朝<b>未来</b>生长：过去播种 → 现在长出<b>灌木</b>，灌木之上再下一时空长出<b>大树</b>；现在播种只长未来灌木；未来播种不生长。</p>
+        <p>新行动 <b>拨除</b>：范围同播种，可回收任意一方的种子，并让未来同号格的灌木/树随之消逝。种子透明：棋子可走过、推链穿过、穿越落于其上。</p>
+        <p><b>地形：</b>灌木与<b>倒下的树</b>是墙，不可进入、不可穿越、推链撞上即死；<b>站立的大树</b>可被移动或推挤推倒（多米诺）。树倒压到棋子 = <b>压垮出局</b>；树被墙/灌木挡住倒不下时，接触的棋子被<b>挤死出局</b>。悖论死亡的棋子不会压到树。</p>
+      </div>
       <button class="btn-main" id="btnCloseRules">知道了</button>
     </div>
   </div>
@@ -74,6 +90,7 @@
   </div>
 </div>
 <script src="game.js"></script>
+<script src="mods/growth.js"></script>
 <script src="render.js"></script>
 </body>
 </html>

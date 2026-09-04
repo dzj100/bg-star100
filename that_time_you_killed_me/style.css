@@ -388,7 +388,7 @@ button { font-family: inherit; touch-action: manipulation; }
     min-width: 18px; text-align: center;
   }
   #panel { padding: 7px 10px calc(7px + env(safe-area-inset-bottom)); min-height: calc(92px + env(safe-area-inset-bottom)); }
-  #panel .phint { font-size: 12.5px; margin: 0 1px 6px; }
+  #panel .phint { font-size: 12.5px; margin: 0 1px 0px; }
   #panel .phint small { font-size: 10.5px; }
   .focus-row { gap: 8px; }
   .focus-row .fbtn { min-height: 50px; font-size: 15px; border-width: 2.5px; border-radius: 10px; }
@@ -427,3 +427,96 @@ button { font-family: inherit; touch-action: manipulation; }
     var(--grain2x);
   background-size: auto, auto, 180px 180px;
 } */
+
+/* ============================================================
+   生长模组：种子/植物 静态渲染 + 新行动提示 + 演出幽灵
+   植物形状一律以"整格盒"为坐标系的百分比伪元素 → 静态格与
+   #fx 幽灵（整格尺寸包装）共用同一套形状定义
+   ============================================================ */
+.pl { position: absolute; inset: 0; pointer-events: none; }
+.pl.k-seed { inset: auto; right: 7%; bottom: 6%; width: 25%; height: 25%; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #e0bd66, #b98a2e 72%);
+  border: 2px solid var(--ink); box-shadow: 0 2px 0 rgba(35,32,24,.18); }
+.pl.k-bush::before { content: ''; position: absolute; left: 16%; bottom: 8%; width: 68%; height: 53%;
+  background: radial-gradient(circle at 34% 26%, #6cb85e, #3b8742 76%);
+  border: 2.5px solid var(--ink); border-radius: 46% 54% 52% 48% / 62% 58% 42% 38%;
+  box-shadow: 0 3px 0 rgba(35,32,24,.14); }
+.pl.k-bush::after { content: ''; position: absolute; left: 34%; top: 40%; width: 30%; height: 26%;
+  background: #85cd72; border-radius: 50%; opacity: .85; }
+.pl.k-tree::after { content: ''; position: absolute; left: 39%; top: 46%; width: 22%; height: 54%;
+  background: linear-gradient(90deg, #77491f, #9a6a33 55%, #77491f);
+  border: 2.5px solid var(--ink); border-radius: 4px; box-shadow: 0 3px 0 rgba(35,32,24,.12); }
+.pl.k-tree::before { content: ''; position: absolute; left: 11%; top: -1%; width: 78%; height: 57%;
+  background: radial-gradient(circle at 34% 26%, #7cbf66, #2e7a38 78%);
+  border: 2.5px solid var(--ink); border-radius: 46% 54% 54% 46% / 58% 62% 38% 42%;
+  z-index: 1; box-shadow: 0 3px 0 rgba(35,32,24,.10); }
+/* 倒树：卧倒原木（方向中立），与灌木同属墙体 */
+.pl.k-tree.down::after { left: -1%; top: 43%; width: 56%; height: 21%; /*border-radius: 6px;*/}
+.pl.k-tree.down::before { 
+  /* left: 44%; top: 25%; width: 52%; height: 47%; border-radius: 50% 46% 44% 52% / 55% 52% 48% 45%; */
+    left: 44%;
+    top: 15%;
+    width: 52%;
+    height: 57%;
+ }
+/* 行动模式提示标签（与 hint-trv 同款下缘小签，配色区分） */
+.cell.hint-sow { background: rgba(63, 143, 70, .11); }
+.cell.hint-sow::before { content: "播种"; position: absolute; left: 50%; transform: translateX(-50%); bottom: 1px;
+  font-size: 8.5px; font-weight: 900; background: #2f7d38; color: #fff; border-radius: 4px;
+  padding: 1px 4px; letter-spacing: 1px; animation: hop2 .9s ease-in-out infinite; }
+.cell.hint-pluck { background: rgba(138, 90, 43, .10); }
+.cell.hint-pluck::before { content: "拨除"; position: absolute; left: 50%; transform: translateX(-50%); bottom: 1px;
+  font-size: 8.5px; font-weight: 900; background: #7a4f1d; color: #fff; border-radius: 4px;
+  padding: 1px 4px; letter-spacing: 1px; animation: hop2 .9s ease-in-out infinite; }
+/* #fx 幽灵包装（整格尺寸，内嵌 .pl 复用静态形状） */
+.fxpl { position: absolute; pointer-events: none; will-change: transform; }
+.fxpl .pl.growIn { animation: growIn .32s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes growIn { from { transform: scale(.08); opacity: 0; } 60% { opacity: 1; } }
+.fxpl .pl.poofOut { animation: poofOut .4s ease-in forwards; }
+@keyframes poofOut { 20% { opacity: 1; } to { opacity: 0; transform: scale(.5) translateY(8px); } }
+.fxpl .pl.landpop { animation: landSquash .2s ease-out; }
+@keyframes landSquash { 0% { transform: scale(1.1, .82); opacity: .9; } 60% { transform: scale(.96, 1.06); } }
+/* 死亡标签色：压垮(褐=树) / 挤死(橙) */
+.fxlabel.crush .tag { background: #6b4a24; color: var(--cream); }
+.fxlabel.squash .tag { background: var(--org); color: var(--cream); }
+/* 行动模式切换行 */
+.actmode-row { display: flex; gap: 8px; margin: 0 0 8px; }
+.am-btn { flex: 1; min-height: 44px; border: 2.5px solid var(--ink); border-radius: 10px;
+  background: var(--paper); box-shadow: var(--shadow); font-size: 14.5px; font-weight: 800;
+  color: var(--ink); letter-spacing: 1px; }
+.am-btn:active { transform: translateY(1.5px); box-shadow: none; }
+.am-btn.on { background: var(--ink); color: var(--cream); box-shadow: none; }
+.am-btn.dis { opacity: .4; box-shadow: none; }
+/* 种子池托盘（顶栏角标 / 窄屏悬浮行，同分身式样） */
+.seed-cnt { position: absolute; right: 238px; top: 50%; transform: translateY(-50%);
+  display: flex; gap: 5px; align-items: center; }
+.seed-cnt .lab { font-size: 9.5px; font-weight: 800; letter-spacing: 1px; opacity: .5; }
+.seed-cnt i { width: 11px; height: 11px; border-radius: 50%; border: 1.7px solid var(--ink); display: inline-block; }
+.seed-cnt i.on { background: #b98a2e; }
+.seed-cnt.seedpop { animation: seedPop .3s ease; }
+@keyframes seedPop { 40% { transform: translateY(-50%) scale(1.35); } }
+.spare-float .fl-seed { margin-top: 3px; padding-top: 3px; border-top: 1.5px dashed rgba(35,32,24,.28); }
+.spare-float .fl-seed .st { display: block; font-size: 8.5px; font-weight: 800; letter-spacing: 2px;
+  opacity: .55; line-height: 1.2; margin-bottom: 2px; }
+.spare-float .fl-seed .dots { display: flex; gap: 3px; justify-content: center; }
+.spare-float .fl-seed i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink); }
+.spare-float .fl-seed i.on { background: #b98a2e; }
+/* 模组弹窗 */
+#modList { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; }
+.mod-item { display: flex; gap: 10px; align-items: flex-start; background: var(--paper);
+  border: 2px solid var(--ink); border-radius: 12px; padding: 10px 12px; cursor: pointer;
+  box-shadow: var(--shadow); }
+.mod-item input { width: 18px; height: 18px; margin-top: 2px; accent-color: #3b8742; flex: none; }
+.mod-item .mod-name { font-weight: 900; font-size: 14.5px; letter-spacing: 1px; line-height: 1.3; }
+.mod-item .mod-name .sprout { display: inline-block; width: 12px; height: 12px; border-radius: 4px;
+  background: #3b8742; border: 1.5px solid var(--ink); margin-right: 6px; vertical-align: -1px; }
+.mod-item .mod-desc { font-size: 12px; line-height: 1.55; opacity: .72; margin-top: 3px; }
+.sheet h4 { margin: 14px 0 8px; font-size: 15px; }
+.mod-rules { border: 2px dashed rgba(35,32,24,.35); border-radius: 12px;
+  padding: 2px 12px 6px; margin: 10px 0 4px; background: rgba(35,32,24,.03); }
+@media (max-width: 560px) {
+  .seed-cnt { display: none; }
+  .am-btn { min-height: 38px; font-size: 12.5px; gap: 0; }
+  .actmode-row { gap: 6px; margin-bottom: 6px; }
+  .cell.hint-sow::before, .cell.hint-pluck::before { font-size: 7px; bottom: 0; padding: 1px 3px; }
+}

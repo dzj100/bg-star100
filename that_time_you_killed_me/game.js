@@ -21,7 +21,8 @@ const G = (() => {
   const col = i => i & 3;
   const ok = (i, d) => d === 'up' ? row(i) > 0 : d === 'down' ? row(i) < 3
     : d === 'left' ? col(i) > 0 : col(i) < 3;
-  const newBoard = () => ({ cell: Array(16).fill(null) });
+  const newBoard = () => ({ cell: Array(16).fill(null), pl: Array(16).fill(null), sd: Array(16).fill(0) });
+  // pl = 植物层（模组用，如 {k:'bush'}/{k:'tree',down:0|1}），sd = 种子层（模组用，0/1）
   const cloneState = S => structuredClone(S);
   const LOGMAX = 60;
   function logPush(S, text) {                       // 事件日志（纯叙事，无引导语）
@@ -29,10 +30,27 @@ const G = (() => {
     if (S.log.length > LOGMAX) S.log.splice(0, S.log.length - LOGMAX);
   }
 
-  function newGame(mode = 'local2p', rnd = Math.random) {
+  /* ---- 模组注册表：一个模组一个文件，regMod 注入钩子（见 mods/*.js）。
+     基础玩法不启用任何模组时，全部委托点直接落到本文件的基础实现，行为逐字节不变。
+     模组钩子（均可选）：legalActions / applyAction / evalState / sameLayout / hydrate
+     hydrate(S)：newGame 与存档恢复后补齐模组数据层（pl/sd/种子池等） ---- */
+  const MODULES = [];
+  const MOD_MAP = {};
+  function regMod(m) { if (!MOD_MAP[m.id]) { MOD_MAP[m.id] = m; MODULES.push(m); } }
+  const hookOf = (S, name) => {
+    for (const id of S.mods || []) { const m = MOD_MAP[id]; if (m && m[name]) return m; }
+    return null;
+  };
+  function hydrateMods(S) {
+    if (!S.mods) S.mods = [];
+    for (const id of S.mods) { const m = MOD_MAP[id]; if (m && m.hydrate) m.hydrate(S); }
+  }
+
+  function newGame(mode = 'local2p', rnd = Math.random, mods) {
     const first = rnd() < 0.5 ? 0 : 1;
     const S = {
       mode, first, turn: first, turnNo: 1,
+      mods: mods ? mods.slice() : [],
       focus: [2, 0],                       // [黑焦点时空=未来, 白焦点时空=过去]
       boards: [newBoard(), newBoard(), newBoard()],
       spares: [4, 4], dead: [0, 0],        // 备用分身 / 阵亡（盘上+备用+阵亡=7）
@@ -40,6 +58,7 @@ const G = (() => {
       over: null, log: [],                       // 事件日志 {no:回合,p:玩家,text}，UI 展示最新一条/抽屉
     };
     for (let e = 0; e < 3; e++) { S.boards[e].cell[0] = { c: 1 }; S.boards[e].cell[15] = { c: 0 }; } // 白1号格/黑16号格
+    hydrateMods(S);
     logPush(S, '对局开始，' + NAMES[first] + '先手');
     return S;
   }
@@ -56,8 +75,12 @@ const G = (() => {
     return n;
   }
 
-  /* 某格的合法行动（须是当前行动方的子） */
+  /* 某格的合法行动（须是当前行动方的子）。模组委托：启用模组时由模组全量计算 */
   function legalActions(S, era, i) {
+    const m = hookOf(S, 'legalActions');
+    return m ? m.legalActions(S, era, i) : baseLegalActions(S, era, i);
+  }
+  function baseLegalActions(S, era, i) {
     const me = S.turn, p = pc(S, era, i);
     if (!p || p.c !== me) return [];
     const b = S.boards[era], out = [];
@@ -121,8 +144,8 @@ const G = (() => {
     return true;
   }
 
-  /* ---- 移动 + 推挤结算（返回事件流供演出） ---- */
-  function doMove(S, era, from, d) {
+  /* ---- 移动 + 推挤结算（基础版，返回事件流供演出；模组内部经 plan 裁决后调用） ---- */
+  function baseDoMove(S, era, from, d) {
     const me = S.turn, b = S.boards[era], to = from + DI[d];
     const evs = [];
     const mover = b.cell[from];
@@ -159,7 +182,7 @@ const G = (() => {
     return evs;
   }
 
-  function doTravel(S, era, i, e2) {
+  function baseDoTravel(S, era, i, e2) {
     const me = S.turn, evs = [];
     const mover = S.boards[era].cell[i];
     S.boards[era].cell[i] = null;
@@ -175,16 +198,21 @@ const G = (() => {
 
   const actEq = (a, b) => a.t === b.t && (a.t === 'move' ? a.d === b.d && a.to === b.to : a.e2 === b.e2);
 
+  /* 模组委托：启用模组时由模组全量执行（含播种/拨除等新行动） */
   function applyAction(S, act) {
+    const m = hookOf(S, 'applyAction');
+    return m ? m.applyAction(S, act) : baseApplyAction(S, act);
+  }
+  function baseApplyAction(S, act) {
     if (S.stage !== 'act' || !S.sel) return { ok: false, evs: [] };
     const { era, i } = S.sel;
     const legal = legalActions(S, era, i);
     if (!legal.some(a => actEq(a, act))) return { ok: false, evs: [] };
-    const evs = act.t === 'move' ? doMove(S, era, i, act.d) : doTravel(S, era, i, act.e2);
+    const evs = act.t === 'move' ? baseDoMove(S, era, i, act.d) : baseDoTravel(S, era, i, act.e2);
     const nera = act.t === 'move' ? era : act.e2;
     const ni = act.t === 'move' ? act.to : i;
     S.acted++;
-    logPush(S, summarize(S, evs));
+    logPush(S, baseSummarize(S, evs));
     if (S.acted >= 2) {
       S.sel = null;
       if (!judgeEnd(S)) S.stage = 'focus';   // 两次行动结束即判，未终局才进入移焦点
@@ -194,7 +222,7 @@ const G = (() => {
     return { ok: true, evs };
   }
 
-  function summarize(S, evs) {
+  function baseSummarize(S, evs) {
     const cname = c => CN[c];
     const move = evs.find(e => e.k === 'move');
     const parts = [];
@@ -246,7 +274,12 @@ const G = (() => {
   }
 
   /* ============ 人机（轻启发）：返回操作序列，UI 负责分步执行 ============ */
+  /* 模组委托：启用的模组可在基础估值上叠加自己的权重 */
   function evalState(S, me, rnd) {
+    const m = hookOf(S, 'evalState');
+    return m ? m.evalState(S, me, rnd) : baseEvalState(S, me, rnd);
+  }
+  function baseEvalState(S, me, rnd) {
     const opp = 1 - me;
     const oe = colorEmptyEras(S, opp), meE = colorEmptyEras(S, me);
     if (oe >= 2 && meE >= 2) return -1e6;   // 平局：比任何活局差，但优于判负（-1e7）
@@ -277,8 +310,13 @@ const G = (() => {
     return best;
   }
 
-  /* 三盘面布子是否逐格完全相同（识别"折返一趟 = 净零"的行动对） */
+  /* 三盘面布子是否逐格完全相同（识别"折返一趟 = 净零"的行动对）。
+     模组委托：启用的模组追加比较自己的数据层 */
   function sameLayout(A, B) {
+    const m = hookOf(A, 'sameLayout');
+    return m ? m.sameLayout(A, B) : baseSameLayout(A, B);
+  }
+  function baseSameLayout(A, B) {
     for (let e = 0; e < 3; e++) {
       const ca = A.boards[e].cell, cb = B.boards[e].cell;
       for (let i = 0; i < 16; i++) {
@@ -383,9 +421,13 @@ const G = (() => {
   }
 
   return {
-    ERAS, CN, NAMES, DI, newGame, pc, countOn, colorEmptyEras, legalActions,
+    ERAS, CN, NAMES, DI, ok, newGame, pc, countOn, colorEmptyEras, legalActions,
     selectablePieces, needPass, canEnd, focusTargets, selectPiece, applyAction,
     endActions, doPass, moveFocus, aiPlan, randomPlan, execOps, cloneState,
+    judgeEnd, logPush, hydrateMods,
+    /* 模组注册与基础实现（供 mods/*.js 调用与委托） */
+    regMod, MODULES, baseLegalActions, baseDoMove, baseDoTravel, baseSummarize,
+    baseEvalState, baseSameLayout,
   };
 })();
 
