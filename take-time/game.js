@@ -600,6 +600,179 @@ const CHALLENGE_LIB = {
       };
     },
   },
+  // ── 第5章（每关每个区域恰好2张牌） ──
+  /**
+   * 平分（第5章第1关）：6 个区域都必须恰好放 2 张牌（12 张牌正好填满），
+   * 其余按基础规则：区域1→6总和递增（恰好2张时总和≤24自动满足）。
+   */
+  17: {
+    name: '平分', chapter: 5, test: 1,
+    segCap: 2,
+    desc: '本关必须所有区域都放置2张牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length === 2);
+      const sumOK = sums.map(() => true); // 恰好2张（最大 12+11=23）自动满足 ≤24
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每个区域恰好放2张牌', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24（恰好2张自动满足）', ok: true },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => segs[i].cards.length !== 2);
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 衡中（第5章第2关）：区域条件“含1张数字最小的牌->…->总和最接近15”，
+   * 每区域恰好2张；与定首类关卡相同：看牌前房主先选 1 号位条件（其余顺延）。
+   */
+  18: {
+    name: '衡中', chapter: 5, test: 2,
+    rotate: true,
+    segCap: 2,
+    conds: [
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'close15', label: '总和最接近15', short: '最接近15' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“含1张数字最小的牌->无限制->无限制->无限制->总和最接近15->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域；本关必须所有区域都放置2张牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length === 2);
+      const sumOK = sums.map(() => true); // 恰好2张自动满足 ≤24
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每个区域恰好放2张牌', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24（恰好2张自动满足）', ok: true },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => segs[i].cards.length !== 2);
+      const conds = S.segCond || [];
+      const allCards = segs.flatMap(s => s.cards);
+      const minV = allCards.length ? Math.min(...allCards.map(c => c.v)) : 0;
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'min') {
+          const ok = segs[i].cards.some(c => c.v === minV);
+          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'close15') {
+          const d = Math.abs(sums[i] - 15);
+          const ok = segs.every((_, j) => j === i || Math.abs(sums[j] - 15) > d);
+          items.push({ label: `${i + 1}号位：总和最接近15（${sums[i]}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 极对（第5章第3关）：区域条件“…->含1张数字最小的牌->含1张数字最大的牌->…”，
+   * 每区域恰好2张；与定首类关卡相同：看牌前房主先选 1 号位条件（其余顺延）。
+   */
+  19: {
+    name: '极对', chapter: 5, test: 3,
+    rotate: true,
+    segCap: 2,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'min', label: '含1张数字最小的牌', short: '含最小牌' },
+      { key: 'max', label: '含1张数字最大的牌', short: '含最大牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“无限制->无限制->含1张数字最小的牌->含1张数字最大的牌->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域；本关必须所有区域都放置2张牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length === 2);
+      const sumOK = sums.map(() => true); // 恰好2张自动满足 ≤24
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每个区域恰好放2张牌', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24（恰好2张自动满足）', ok: true },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => segs[i].cards.length !== 2);
+      const conds = S.segCond || [];
+      const allCards = segs.flatMap(s => s.cards);
+      const minV = allCards.length ? Math.min(...allCards.map(c => c.v)) : 0;
+      const maxV = allCards.length ? Math.max(...allCards.map(c => c.v)) : 0;
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'min') {
+          const ok = segs[i].cards.some(c => c.v === minV);
+          items.push({ label: `${i + 1}号位：包含全场最小数字牌（${minV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'max') {
+          const ok = segs[i].cards.some(c => c.v === maxV);
+          items.push({ label: `${i + 1}号位：包含全场最大数字牌（${maxV}）`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
+  /**
+   * 双色（第5章第4关）：区域条件“第2张牌放这里->…->第3张牌放这里->太阳月亮各1张->太阳月亮各1张”，
+   * 每区域恰好2张；与定首类关卡相同：看牌前房主先选 1 号位条件（其余顺延）。
+   */
+  20: {
+    name: '双色', chapter: 5, test: 4,
+    rotate: true,
+    segCap: 2,
+    conds: [
+      { key: 'order2', label: '第2张牌放这里', short: '第2张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'order3', label: '第3张牌放这里', short: '第3张牌' },
+      { key: 'both', label: '太阳月亮各1张', short: '1太阳+1月亮' },
+      { key: 'both', label: '太阳月亮各1张', short: '1太阳+1月亮' },
+    ],
+    desc: '区域规则为“第2张牌放这里->无限制->无限制->第3张牌放这里->太阳月亮各1张->太阳月亮各1张”；看牌前，房主可自行将限制条件按顺序设置到对应区域；本关必须所有区域都放置2张牌',
+    check(sums, segs) {
+      const segOK = segs.map(seg => seg.cards.length === 2);
+      const sumOK = sums.map(() => true); // 恰好2张自动满足 ≤24
+      const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+      const items = [
+        { label: '每个区域恰好放2张牌', ok: segOK.every(Boolean) },
+        { label: '每区域总和≤24（恰好2张自动满足）', ok: true },
+        { label: '区域1→6总和递增', ok: ascOK },
+      ];
+      const segBad = segs.map((_, i) => segs[i].cards.length !== 2);
+      const conds = S.segCond || [];
+      let condOK = true;
+      conds.forEach((cond, i) => {
+        if (cond.key === 'order2') {
+          const ok = segs[i].cards.some(c => c.order === 2);
+          items.push({ label: `${i + 1}号位：第2张牌放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'order3') {
+          const ok = segs[i].cards.some(c => c.order === 3);
+          items.push({ label: `${i + 1}号位：第3张牌放这里`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        } else if (cond.key === 'both') {
+          const ok = segs[i].cards.some(c => c.color === 'sun') && segs[i].cards.some(c => c.color === 'moon');
+          items.push({ label: `${i + 1}号位：太阳月亮各1张`, ok });
+          if (!ok) { segBad[i] = true; condOK = false; }
+        }
+      });
+      return {
+        segOK, sumOK, ascOK, items, segBad,
+        pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+      };
+    },
+  },
 };
 
 /** 通过 window 暴露（测试扩展用） */
@@ -713,6 +886,18 @@ function handLockedIndexes() {
   const me = actionSeat();
   if (me === null) return new Set();
   return new Set(S.players[me].hand.map((c, i) => c.lock ? i : -1).filter(i => i >= 0));
+}
+
+/** 当前关卡每区域可放置的卡牌上限（第5章=2；无上限返回 null） */
+function segCapLimit() {
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  return lib && typeof lib.segCap === 'number' ? lib.segCap : null;
+}
+
+/** 区域是否已放满（达到关卡上限）——第5章满2张后实时封区，拖放/选择均不可再入 */
+function segFull(i) {
+  const cap = segCapLimit();
+  return cap !== null && !!S.segments[i] && S.segments[i].cards.length >= cap;
 }
 
 // ========================================
@@ -1029,6 +1214,8 @@ function placeCard() {
   if (!isMyTurn() || !isActor()) return;
   if (!pendingPlay || pendingPlay.seg === -1) return;
   if (pendingPlay.useEye && eyeLeft() <= 0) return;
+  // 第5章封区兜底：满 2 张的区域不可放置（正常路径在 UI 已拦截）
+  if (segFull(pendingPlay.seg)) { showToast('该区域已满 2 张，不能再放置'); return; }
 
   const me = actionSeat();
   if (me === null) return;

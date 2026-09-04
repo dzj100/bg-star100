@@ -351,12 +351,12 @@ function cardDragMove(e) {
   }
   // transform 定位（像素偏移，不用百分比）：合成层移动，不触发布局
   _drag.ghost.style.transform = `translate(${e.clientX - GHOST_W / 2}px, ${e.clientY - GHOST_H / 2}px) rotate(-4deg)`;
-  // 几何命中：指针在哪个区域圆内
+  // 几何命中：指针在哪个区域圆内（第5章已放满的区域不可作为落点）
   let segIdx = -1;
   for (let k = _drag.circles.length - 1; k >= 0; k--) {
     const c = _drag.circles[k];
     const d = Math.hypot(e.clientX - c.cx, e.clientY - c.cy);
-    if (d <= c.r * 1.1) { segIdx = k; break; }
+    if (d <= c.r * 1.1 && !segFull(k)) { segIdx = k; break; }
   }
   if (segIdx !== _drag.seg) {
     const segs = document.querySelectorAll('.seg');
@@ -396,8 +396,9 @@ function renderPlaySheet() {
   const segGrid = pendingPlay.seg >= 0 ? '' : `<div class="seg-grid">${S.segments.map((seg, i) => {
     const visibleSum = seg.cards.filter(c => c.revealed).reduce((a, c) => a + c.v, 0);
     const sel = pendingPlay.seg === i ? ' sel' : '';
-    return `<button class="seg-btn${sel}" onclick="pickSeg(${i})">
-      区域${i + 1}<span class="sg-sub">${seg.cards.length}张${visibleSum ? '·' + visibleSum : ''}</span>
+    const full = segFull(i);
+    return `<button class="seg-btn${sel}" onclick="pickSeg(${i})" ${full ? 'disabled' : ''}>
+      区域${i + 1}<span class="sg-sub">${seg.cards.length}张${full ? '·已满' : ''}${!full && visibleSum ? '·' + visibleSum : ''}</span>
     </button>`;
   }).join('')}</div>`;
   const title = pendingPlay.seg >= 0
