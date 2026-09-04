@@ -913,22 +913,36 @@ test('仅有播种可用的棋子仍可选（选子标准=含播种在内的合�
   assert.deepStrictEqual(sel, [1, 4, 5, 6, 9], '四周己子也各只有播种可选 → 全可选');
   assert.ok(G.selectPiece(S, 0, 5));
   const acts = G.legalActions(S, 0, 5);
-  assert.ok(acts.length >= 5 && acts.every(a => a.t === 'sow'));
+  assert.ok(acts.length === 1 && acts[0].t === 'sow' && acts[0].to === 5, '四邻己子皆不可播 → 仅脚下可播');
+  invG(S);
+});
+test('播种规则：脚下格必可播；四邻站任意棋子/种子/植物皆拒播', () => {
+  const S = freshG(); S.turn = 0; S.focus[0] = 0;
+  put(S, 0, 5, 0);
+  put(S, 0, 1, 0);                        // 己方棋子邻格 → 拒
+  putSd(S, 0, 4);                          // 种子邻格 → 拒
+  putPl(S, 0, 6, 'bush');                 // 植物邻格 → 拒
+  put(S, 0, 9, 1);                         // 对手棋子邻格 → 拒
+  assert.ok(G.selectPiece(S, 0, 5));
+  const acts = G.legalActions(S, 0, 5);
+  assert.ok(hasSow(acts, 5), '脚下格必可播');
+  assert.ok(!hasSow(acts, 1) && !hasSow(acts, 4) && !hasSow(acts, 6) && !hasSow(acts, 9), '四邻有任何东西皆拒播');
+  assert.ok(hasPluck(acts, 4), '邻格种子仍可拨');
   invG(S);
 });
 test('播种1次后仍可播种时不可结束行动；拨除/播种凑满2次入移焦点', () => {
   const S = freshG(); S.turn = 0; S.focus[0] = 0;
   put(S, 0, 5, 0); put(S, 2, 10, 0);       // 黑两时空
   put(S, 1, 10, 1); put(S, 2, 12, 1);      // 白两时空
-  put(S, 0, 1, 0); put(S, 0, 4, 0); put(S, 0, 6, 0); put(S, 0, 9, 0); // 5号四周己方
-  put(S, 1, 5, 0);                         // 穿越占位 → 唯一出路是播种/拨除
+  put(S, 0, 1, 0); put(S, 0, 4, 0); put(S, 0, 9, 0);  // 5号三面己方；6号留空（四邻空格，供第二次播种）
+  put(S, 1, 5, 0);                         // 穿越目标被己子占 → 不可穿越
   assert.ok(G.selectPiece(S, 0, 5));
   assert.ok(G.applyAction(S, { t: 'sow', to: 5 }).ok);
   assert.strictEqual(S.acted, 1);
   assert.strictEqual(G.canEnd(S), false, '仍可播种 → 不可提前结束');
   assert.strictEqual(G.endActions(S), false);
   assert.strictEqual(S.seeds, 4);
-  assert.ok(G.applyAction(S, { t: 'sow', to: 1 }).ok);
+  assert.ok(G.applyAction(S, { t: 'sow', to: 6 }).ok);
   assert.strictEqual(S.acted, 2);
   assert.strictEqual(S.stage, 'focus');
   assert.ok(!S.over);

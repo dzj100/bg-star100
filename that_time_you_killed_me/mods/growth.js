@@ -5,8 +5,9 @@
 
    模组规则：
    - 公共 5 粒种子（S.seeds 池 + 各板 sd 层 0/1，盘上种子 + 池 ≡ 5）
-   - 新行动「播种」：在己子所在格或上/下/左/右格播 1 粒种子
-     （目标须无对手子/种子/植物，可站己子格）；若下一时空同号格全空
+   - 新行动「播种」：在己子脚下格播 1 粒种子（脚下必然可播），或播在
+     完全空置的上/下/左/右邻格（邻格站任何棋子/种子/植物都不可播）；
+     若下一时空同号格全空
      立即长出灌木丛，灌木丛长出后再下一时空同号格全空则立即长出大树
    - 新行动「拨除」：在己子所在格或上/下/左/右格回收 1 粒种子
      （可拨任意玩家播的种子）；只消**本种子长出**的植物——(E+1,i) 灌木、
@@ -241,10 +242,12 @@
     }
     if (S.seeds > 0) {
       for (const to of around(S, era, i)) {
-        if (plantOf(S, era, to) || sdOf(S, era, to)) continue;                 // 无种子/植物（种子+植物都占位）
-        const tp = b.cell[to];
-        if (tp && tp.c !== me) continue;                                       // 对手子占位不可播；己子可
-        out.push({ t: 'sow', to });
+        if (to === i) {                                      // 脚下格必然可播（己子站在其上不阻挡）
+          if (plantOf(S, era, to) || sdOf(S, era, to)) continue;   // 但脚下已有种子/植物时不可再播
+          out.push({ t: 'sow', to });
+        } else if (cellEmptyG(S, era, to)) {                 // 四邻仅完全空置可播（任何棋子/种子/植物皆不可）
+          out.push({ t: 'sow', to });
+        }
       }
     }
     for (const to of around(S, era, i)) {
@@ -351,7 +354,7 @@
   const mod = {
     id: 'growth',
     name: '生长',
-    desc: '新增公共 5 粒种子：可在己子所在格或相邻格播种，种子在下一时空长出灌木丛、再下一时空长出大树；树木可被推倒、灌木丛与倒树如墙壁。',
+    desc: '新增公共 5 粒种子：可在己子脚下格或完全空置的相邻格播种，种子在下一时空长出灌木丛、再下一时空长出大树；树木可被推倒、灌木丛与倒树如墙壁。',
     hydrate, legalActions, applyAction, evalState, sameLayout,
   };
   G.regMod(mod);
