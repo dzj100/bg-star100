@@ -22,8 +22,9 @@ let revealBusy = false;   // 联机翻牌补播动画进行中：到达的快照
 let revealQueued = false; // 动画期间到达过快照：动画结束后补一次最新渲染
 
 /* ================= 联机模式（index_ol.html）================= */
-// ONLINE_MODE 页 = 联机对战页（online.js 全权接管流程）；OL 记录本座位信息，由 online.js 维护、game.js 读取
-const ONLINE_MODE = typeof location !== 'undefined' && /index_ol\.html/.test(location.pathname || '');
+// ONLINE_MODE 页 = 联机对战页（online.js 全权接管流程）；OL 记录本座位信息，由 online.js 维护、game.js 读取。
+// 用页面标记而非 URL 判断：Cloudflare Pages 会把 index_ol.html 301 到无后缀 index_ol，路径检测会失效。
+const ONLINE_MODE = typeof window !== 'undefined' && !!window.__FUGITIVE_OL__;
 const OL = { active:false, isHost:false, mySeat:-1, myRole:null, oppName:'', oppSeat:-1, seats:[] };
 
 /* ================= 新游戏 ================= */

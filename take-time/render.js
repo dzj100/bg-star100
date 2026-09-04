@@ -629,7 +629,7 @@ function renderLandingHTML() {
   return `
   <div class="landing">
     <div class="rules-corner"><button class="icon-btn" onclick="showRulesModal()">📖 规则</button></div>
-    <div class="landing-icon">⏳</div>
+    <div class="landing-icon">🕰️</div>
     <h1>时序谜局</h1>
     <p class="subtitle">Take Time · 2~4人合作默契配合</p>
     <!--ONLINE_BTN-->
@@ -655,7 +655,7 @@ function render() {
   const ch = S.challenge;
   app.innerHTML = `
   <div class="game-header">
-    <div class="header-title">⏳ 时序谜局 <span class="ch-tag">第${ch.chapter}章·第${ch.test}关</span></div>
+    <div class="header-title">🕰️ 时序谜局 <span class="ch-tag">第${ch.chapter}章·第${ch.test}关</span></div>
     <div class="header-btns"><button class="icon-btn" onclick="showRulesModal()">📖 规则</button></div>
   </div>
   ${logHTML()}

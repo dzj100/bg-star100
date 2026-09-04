@@ -2013,7 +2013,8 @@ if (typeof window !== 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
   // 联机页由 online.js 负责初始化流程，这里不要读取单机存档，
   // 否则单机的 'regicide-state' 会让联机页直接跳进游戏界面、缺"退出"入口
-  const isOnlinePage = /index_ol\.html($|\?|#)/.test(location.pathname + location.search);
+  // 部分部署平台会把 index_ol.html 重写为无扩展名的 index_ol（或带尾斜杠）地址，需兼容
+  const isOnlinePage = /index_ol(?:\.html)?(?:\/)?($|\?|#)/.test(location.pathname + location.search);
   if (isOnlinePage) {
     const saved = loadState();
     if (saved) clearState();
