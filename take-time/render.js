@@ -25,6 +25,16 @@ function segPos(i) {
   return { x: 50 + 30 * Math.cos(ang) - 15, y: 50 + 30 * Math.sin(ang) - 15 };
 }
 
+/** 结算时区域展示值：第6章区域取值为两牌之差，其余章节为总和 */
+function segShowVal(i) {
+  const seg = S.segments[i];
+  const lib = CHALLENGE_LIB[S.challenge.id];
+  if (lib && lib.chapter === 6 && seg.cards.length === 2) {
+    return Math.abs(seg.cards[0].v - seg.cards[1].v);
+  }
+  return S.sums ? S.sums[i] : 0;
+}
+
 function cardMiniHTML(c) {
   const cls = `mini-card ${c.color}${c.revealed ? ' lit' : ''}${c.fresh ? ' anim' : ''}`;
   return `<span class="${cls}"><span class="c-icon">${c.color === 'sun' ? '☀' : '☾'}</span><span class="c-num">${c.v}</span></span>`;
@@ -54,7 +64,7 @@ function segHTML(i) {
   const visibleSum = seg.cards.filter(c => c.revealed).reduce((a, c) => a + c.v, 0);
   let body = '';
   if (S.settled) {
-    body = `<div class="seg-sum">${S.sums[i]}</div>
+    body = `<div class="seg-sum">${segShowVal(i)}</div>
       <div class="seg-cards">${seg.cards.map(cardMiniHTML).join('')}</div>`;
   } else {
     if (seg.cards.length) {
@@ -161,8 +171,8 @@ function handHTML() {
 function resultHTML() {
   const chk = S.check;
   const pass = S.pass;
-  const sumChips = S.sums.map((s, i) =>
-    `<span class="sum-chip ${chk.segOK[i] && chk.sumOK[i] ? 'ok' : 'bad'}">${i + 1}:${s}</span>`).join('');
+  const sumChips = S.sums.map((_, i) =>
+    `<span class="sum-chip ${chk.segOK[i] && chk.sumOK[i] ? 'ok' : 'bad'}">${i + 1}:${segShowVal(i)}</span>`).join('');
   // 自定义关卡展示 check.items，否则展示默认三项
   const checks = (chk.items && chk.items.length)
     ? chk.items
