@@ -923,6 +923,7 @@
     $('#overlay-win').addEventListener('click', e => {
       if (e.target.closest('#btnAgain')) start(mode);
       else if (e.target.closest('#btnHome')) goMenu();
+      else if (!e.target.closest('.win-card')) $('#overlay-win').classList.add('hidden');
     });
     bindBoards();
   }
