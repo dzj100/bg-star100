@@ -62,6 +62,7 @@ function _recordSeenPush(st){
 }
 let _busy          = false;   // 网络动作互斥
 let _assign        = 'random'; // 房主身份分配选择：host-mar | host-fug | random（默认「随机分配」，建房间即落库）
+let _mode          = 'normal'; // 房主对局模式选择：normal 普通 | phantom 怪盗（默认「普通」，随身份配置一并落库）
 let _waitTimer     = null;    // 等候室对账轮询（兜住订阅窗口内错过的 UPDATE 事件）
 
 /* ============================================================
@@ -199,11 +200,11 @@ async function _createRoom(name){
     _knownSeatList = [{ name, joinedAt: '', seatIndex: 0 }];
     _saveSession();
     _subscribe(code);
-    // 身份配置（默认「随机分配」）随建房间落库：不等房主显式点选，
-    // 否则成员首屏看不到任何分配（与房主 UI 已高亮的默认态不一致）
+    // 身份配置 + 对局模式（默认「随机分配 / 普通」）随建房间落库：不等房主显式点选，
+    // 否则成员首屏看不到任何配置（与房主 UI 已高亮的默认态不一致）
     _assignQ = _assignQ
-      .then(() => _pushAssignOnce(_assign))
-      .catch(e => console.warn('[online] assign init push:', e && e.message));
+      .then(() => _pushRoomConfigOnce())
+      .catch(e => console.warn('[online] config init push:', e && e.message));
     _lastRow = { status: 'waiting', seats: _knownSeatList };
     renderWaitingRoom(_lastRow);
     _startWaitReconcile();
@@ -304,7 +305,13 @@ const ASSIGN_OPTIONS = [
   { v: 'random',   icon: '🎲', label: '随机分配', sub: '开局时决定' },
 ];
 
-/* 等候室身份选择 → 写入房间行 state.assign，成员侧实时可见；
+/* 对局模式二选（与身份分配同级）：怪盗模式 = 本局大盗初始手牌 12 张（普通 9 张 + A/B/C 各多摸 1 张），其余规则不变 */
+const MODE_OPTIONS = [
+  { v: 'normal',  icon: '📜', label: '普通对战', sub: '标准规则 · 大盗 9 张开局' },
+  { v: 'phantom', icon: '🎩', label: '怪盗对战', sub: '大盗 12 张开局 · A/B/C 各多摸 1 张' },
+];
+
+/* 等候室配置（身份分配 + 对局模式）选择 → 原子写入房间行 state{assign,mode}，成员侧实时可见；
    串行队列防连点/与开始对战推送竞态（先排空再推 playing）。 */
 let _assignQ = Promise.resolve();
 function olPickAssign(v){
@@ -312,19 +319,29 @@ function olPickAssign(v){
   _assign = v;
   if(_lastRow) renderWaitingRoom(_lastRow);
   if(_roomId && !_started){
-    const assign = _assign;
     _assignQ = _assignQ
-      .then(() => _pushAssignOnce(assign))
-      .catch(e => console.warn('[online] assign push:', e && e.message));
+      .then(() => _pushRoomConfigOnce())
+      .catch(e => console.warn('[online] config push:', e && e.message));
   }
 }
-async function _pushAssignOnce(assign){
+function olPickMode(v){
+  if(!_isHost) return;
+  _mode = v === MODE_PHANTOM ? MODE_PHANTOM : MODE_NORMAL;
+  if(_lastRow) renderWaitingRoom(_lastRow);
+  if(_roomId && !_started){
+    _assignQ = _assignQ
+      .then(() => _pushRoomConfigOnce())
+      .catch(e => console.warn('[online] config push:', e && e.message));
+  }
+}
+// 身份 + 模式同份推送：分开推送会互相覆盖（state 列为整行替换），成员端可能读到缺一半的配置
+async function _pushRoomConfigOnce(){
   for(let attempt = 0; attempt < 2; attempt++){
-    try { if(await netUpdateGameState(_roomId, { assign }, 'waiting')) return; }
+    try { if(await netUpdateGameState(_roomId, { assign: _assign, mode: _mode }, 'waiting')) return; }
     catch(e){}
     if(attempt === 0) await _sleep(400);
   }
-  console.warn('[online] assign push failed:', assign);
+  console.warn('[online] room config push failed:', _assign, _mode);
 }
 async function _flushAssignPush(){
   try { await _assignQ; } catch(e){}
@@ -332,6 +349,10 @@ async function _flushAssignPush(){
 
 function _assignOf(row){
   return (row && row.state && row.state.assign) || null;
+}
+function _modeOf(row){
+  const m = row && row.state && row.state.mode;
+  return m === MODE_PHANTOM ? MODE_PHANTOM : MODE_NORMAL;
 }
 
 function renderWaitingRoom(row){
@@ -365,13 +386,23 @@ function renderWaitingRoom(row){
             '<span class="oa-icon">' + o.icon + '</span>' +
             '<span class="oa-txt"><b>' + o.label + '</b><i>' + o.sub + '</i></span>' +
           '</button>').join('') +
-        '<button id="ol-start" class="btn btn-primary ol-btn' + (hasMember ? '' : ' dis') + '" ' +
-          (hasMember ? '' : 'disabled') + ' onclick="olStartGame()">' +
-          '⚔️ 开始对战' + (hasMember ? '' : '（等待成员加入）') + '</button>' +
-      '</div>';
+      '</div>' +
+      '<div class="ol-card">' +
+        '<div class="ol-label">对局模式（房主选择）</div>' +
+        MODE_OPTIONS.map(o =>
+          '<button class="ol-assign' + (_mode === o.v ? ' sel' : '') + '" onclick="olPickMode(\'' + o.v + '\')">' +
+            '<span class="oa-icon">' + o.icon + '</span>' +
+            '<span class="oa-txt"><b>' + o.label + '</b><i>' + o.sub + '</i></span>' +
+          '</button>').join('') +
+        '<div class="ol-mode-note">作用于本局的大盗方（无论房主还是成员扮演），其余规则不变</div>' +
+      '</div>' +
+      '<button id="ol-start" class="btn btn-primary ol-btn' + (hasMember ? '' : ' dis') + '" ' +
+        (hasMember ? '' : 'disabled') + ' onclick="olStartGame()">' +
+        '⚔️ 开始对战' + (hasMember ? '' : '（等待成员加入）') + '</button>';
   } else {
     const picked = _assignOf(row);
     const opt = picked ? ASSIGN_OPTIONS.find(o => o.v === picked) : null;
+    const modeOpt = MODE_OPTIONS.find(o => o.v === _modeOf(row)) || MODE_OPTIONS[0];
     hostPanel =
       '<div class="ol-card">' +
         (opt
@@ -379,6 +410,11 @@ function renderWaitingRoom(row){
             '<div class="ol-assign sel ol-assign-ro">' +
               '<span class="oa-icon">' + opt.icon + '</span>' +
               '<span class="oa-txt"><b>' + opt.label + '</b><i>' + opt.sub + '</i></span>' +
+            '</div>' +
+            '<div class="ol-label ol-label-gap">对局模式（房主选择）</div>' +
+            '<div class="ol-assign sel ol-assign-ro">' +
+              '<span class="oa-icon">' + modeOpt.icon + '</span>' +
+              '<span class="oa-txt"><b>' + modeOpt.label + '</b><i>' + modeOpt.sub + '</i></span>' +
             '</div>' +
             '<div class="ol-wait-note">⏳ 等待房主开始对战…</div>'
           : '<div class="ol-wait-note">⏳ 等待房主选择身份并开始对战…</div>') +
@@ -485,17 +521,16 @@ async function _reconcileRoom(){
     return;
   }
   // 房主自愈：本地配置与库中不一致（初始落库失败/推送被迟到写入覆盖）→ 补推，
-  // 保证「成员任何时候进入房间」都能立即读到 state.assign
-  if(_isHost && _assignOf(room) !== _assign){
-    const assign = _assign;
+  // 保证「成员任何时候进入房间」都能立即读到 state.assign 与 state.mode
+  if(_isHost && (_assignOf(room) !== _assign || _modeOf(room) !== _mode)){
     _assignQ = _assignQ
-      .then(() => _pushAssignOnce(assign))
-      .catch(e => console.warn('[online] assign repush:', e && e.message));
+      .then(() => _pushRoomConfigOnce())
+      .catch(e => console.warn('[online] config repush:', e && e.message));
   }
   const same = seats.length === _knownSeats &&
     JSON.stringify(seats.map(s => [s.seatIndex, s.name])) ===
     JSON.stringify(_knownSeatList.map(s => [s.seatIndex, s.name]));
-  const assignChanged = _assignOf(room) !== _assignOf(_lastRow);
+  const assignChanged = _assignOf(room) !== _assignOf(_lastRow) || _modeOf(room) !== _modeOf(_lastRow);
   _syncSeats(room);
   if(room.status === 'waiting' && (!same || assignChanged)) renderWaitingRoom(room);
 }
@@ -529,7 +564,7 @@ async function olStartGame(){
     _startReconcile();
     _showGameUI();
 
-    newGame(roles[0]); // 本地建局（联机分支不调度 AI、不写单机存档）
+    newGame(roles[0], _mode); // 本地建局（联机分支不调度 AI、不写单机存档）；模式 = 等候室所选
     state.seats = OL.seats.map(s => ({ ...s }));
     const r0 = roles[0] === 'fugitive' ? '大盗' : '警探';
     const r1 = roles[1] === 'fugitive' ? '大盗' : '警探';
@@ -550,7 +585,7 @@ function _pickRoles(){
   return Math.random() < 0.5 ? ['fugitive', 'marshal'] : ['marshal', 'fugitive'];
 }
 
-/** 再来一局：保持原身份（房主专用，结算页按钮调用） */
+/** 再来一局：保持原身份与对局模式（房主专用，结算页按钮调用） */
 function olRematch(){
   if(!_isHost || !_started) return;
   if(!OL.seats || OL.seats.length < 2){ alert('需要成员在场才能再来一局'); return; }
@@ -558,7 +593,7 @@ function olRematch(){
   _showGameUI();
   _startReconcile();
   const roles = [OL.seats[0].role, OL.seats[1].role];
-  newGame(roles[0]);
+  newGame(roles[0], _mode);
   state.seats = OL.seats.map(s => ({ ...s }));
   const r0 = roles[0] === 'fugitive' ? '大盗' : '警探';
   const r1 = roles[1] === 'fugitive' ? '大盗' : '警探';
@@ -569,8 +604,8 @@ function olRematch(){
   _markPush(state, 'playing');
 }
 
-/** 对局/结算 → 等候室（房主「重选身份」推送后本地复位，或收到 waiting 行时随行复位）：
-   清掉对局快照与推送世代，回到未开赛的匹配页；座位保留，房主可重选身份再次开局。 */
+/** 对局/结算 → 等候室（房主「重选身份/模式」推送后本地复位，或收到 waiting 行时随行复位）：
+   清掉对局快照与推送世代，回到未开赛的匹配页；座位保留，房主可重选配置再次开局。 */
 function _resetToWaitingRoom(row){
   _stopReconcile();
   _started = false;
@@ -588,20 +623,19 @@ function _resetToWaitingRoom(row){
   _startWaitReconcile();
 }
 
-/** 结算页「重选身份」（房主专用，底部按钮）：房间行退回 waiting（保留当前身份选择），
-   成员实时收到后同样回到等候室；房主在等候室可切换房主大盗/警探/随机并再次开局。 */
+/** 结算页「重选身份」（房主专用，底部按钮）：房间行退回 waiting（保留当前身份与模式选择），
+   成员实时收到后同样回到等候室；房主在等候室可切换身份分配/对局模式并再次开局。 */
 async function olBackToRoom(){
   if(!_isHost || !_roomId || _busy) return;
   _busy = true; _setLoading(true);
   try {
-    const assign = _assign;
     try { await _assignQ; } catch(e){}
-    _assignQ = _pushAssignOnce(assign).catch(e => console.warn('[online] back-to-room push:', e && e.message));
+    _assignQ = _pushRoomConfigOnce().catch(e => console.warn('[online] back-to-room push:', e && e.message));
     await _assignQ;
-    let row = { status: 'waiting', seats: _knownSeatList.slice(), state: { assign } };
+    let row = { status: 'waiting', seats: _knownSeatList.slice(), state: { assign: _assign, mode: _mode } };
     try { const r = await netGetRoom(_roomId); if(r) row = r; } catch(e){}
     _resetToWaitingRoom(row);
-    _toastNet('已回到等候室，可重新分配身份');
+    _toastNet('已回到等候室，可重新分配身份 / 模式');
   } finally { _busy = false; _setLoading(false); }
 }
 
@@ -932,6 +966,7 @@ async function _tryReconnect(){
     } else if(room.status === 'waiting'){
       if(_isHost && room.state && room.state.assign){
         _assign = room.state.assign; // 房主刷新：恢复库中的身份配置，与成员侧所见一致
+        _mode = _modeOf(room);       // 对局模式同样恢复
       }
       _lastRow = { status: 'waiting', seats: room.seats || [], state: room.state || null };
       _showLobbyUI();

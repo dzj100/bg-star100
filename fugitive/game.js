@@ -4,6 +4,9 @@ const A = { key:'A', lo:4, hi:14 };   // 低堆
 const B = { key:'B', lo:15, hi:28 };  // 中堆
 const C = { key:'C', lo:29, hi:41 };  // 高堆
 const PILES = [A,B,C];
+// 对局模式：normal 普通（标准 9 张）/ phantom 怪盗（大盗初始手牌 +3：A、B、C 各多摸 1 张 → 12 张）
+const MODE_NORMAL = 'normal';
+const MODE_PHANTOM = 'phantom';
 function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function rng(n){ return Math.floor(Math.random()*n); }
 function rangeArr(lo,hi){ const a=[]; for(let i=lo;i<=hi;i++) a.push(i); return a; }
@@ -18,6 +21,7 @@ let ui = { selMain:null, selCover:[], gridSel:[], aiBusy:false, lock:false, deal
 let gridMode = 'guess'; // 'guess' | 'mark'
 let aiGen = 0; // 每次新游戏/重新调度递增，令旧的 AI 定时器作废
 let aiMarMissed = []; // AI 警探猜过未中的数字（内部记忆，避免反复猜同一数字；对玩家 UI 不置灰）
+let curMode = MODE_NORMAL; // 登录页所选模式；新一局/再来一局沿用（联机页不经登录页，模式由房主选择传入）
 let revealBusy = false;   // 联机翻牌补播动画进行中：到达的快照延后重绘，防打断动画
 let revealQueued = false; // 动画期间到达过快照：动画结束后补一次最新渲染
 
@@ -28,19 +32,24 @@ const ONLINE_MODE = typeof window !== 'undefined' && !!window.__FUGITIVE_OL__;
 const OL = { active:false, isHost:false, mySeat:-1, myRole:null, oppName:'', oppSeat:-1, seats:[] };
 
 /* ================= 新游戏 ================= */
-function newGame(humanRole){
+// mode：'normal' 普通 / 'phantom' 怪盗（大盗初始手牌 +3：A、B、C 各摸 1 张）；谁当大盗（人/AI）都按此开局
+function newGame(humanRole, mode){
   aiGen++;
   aiMarMissed = [];
+  mode = mode === MODE_PHANTOM ? MODE_PHANTOM : MODE_NORMAL;
+  curMode = mode;
   const pileA = shuffle(rangeArr(A.lo,A.hi));
   const pileB = shuffle(rangeArr(B.lo,B.hi));
   const pileC = shuffle(rangeArr(C.lo,C.hi));
   const a3 = [pileA.pop(), pileA.pop(), pileA.pop()];
   const b2 = [pileB.pop(), pileB.pop()];
+  const extra = mode === MODE_PHANTOM ? [pileA.pop(), pileB.pop(), pileC.pop()] : []; // 怪盗：A/B/C 各多摸 1
   resetUI();
   // const finalHand = shuffle([1,2,3,42, ...a3, ...b2]);
-  const finalHand = [1,2,3,42, ...a3, ...b2];
+  const finalHand = [1,2,3,42, ...a3, ...b2, ...extra];
   state = {
     v:2,
+    mode,
     phase:'playing', humanRole,
     piles:{ A:pileA, B:pileB, C:pileC },
     fug:{ hand:finalHand, route:[] },
@@ -52,7 +61,8 @@ function newGame(humanRole){
   };
   log(ONLINE_MODE ? '对局开始' : '游戏开始：你扮演' + (humanRole==='fugitive'?'大盗':'警探'));
   log('大盗暗置起点 0，藏匿于城中');
-  console.log('[setup] fug.hand =', finalHand.join(','), '| piles:', state.piles.A.length+'/'+state.piles.B.length+'/'+state.piles.C.length);
+  if(mode === MODE_PHANTOM) log('怪盗模式：大盗初始手牌 +3（A/B/C 各 1 张），共 12 张', 'lg-fug');
+  console.log('[setup] mode =', mode, '| fug.hand =', finalHand.join(','), '| piles:', state.piles.A.length+'/'+state.piles.B.length+'/'+state.piles.C.length);
   save();
   render();
   scheduleAI();
@@ -725,6 +735,7 @@ function load(){
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if(s && s.v===2 && s.phase && s.fug && s.mar){
       if(!s.mar.marks) s.mar.marks = {}; // 旧存档迁移：警探标记网格
+      if(!s.mode) s.mode = MODE_NORMAL;  // 旧存档迁移：无对局模式字段 → 普通模式
       return s;
     }
   } catch(e){}
@@ -782,6 +793,12 @@ function roleWho(role){
   if(!OL.active) return me ? ' (你)' : ' (AI)';
   if(me) return ' (你)';
   return OL.oppName ? ' ' + esc(OL.oppName) : '';
+}
+// 局内顶栏徽标：怪盗模式局双方可见（模式是公开信息，无信息泄露）
+function modeChipHTML(){
+  return state && state.mode === MODE_PHANTOM
+    ? '<span class="mode-chip" title="怪盗模式：大盗初始手牌 12 张（A/B/C 各多摸 1 张）">🎩 怪盗</span>'
+    : '';
 }
 function roleTag(role){
   if(role==='fugitive') return '<span class="role-tag role-fug" onclick="showRoleHand(\'fugitive\')">大盗' + roleWho('fugitive') + '</span>';
@@ -901,7 +918,7 @@ function renderGame(){
   return '' +
     '<div id="topbar">' +
       '<div class="tb-row">' +
-        '<h2 class="tb-title">🕵️ 神探缉凶</h2>' +
+        '<h2 class="tb-title">🕵️ 神探缉凶' + modeChipHTML() + '</h2>' +
         '<div class="tb-btns">' +
           '<button class="icon-btn" onclick="quitGame()">🚪 退出</button>' +
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
@@ -1011,7 +1028,9 @@ function renderMarArea(){
     html += '<div class="hint">' + (state.turn==='fugitive' ? '大盗行动中…' : '结算中…') + '</div>' + gridAreaHTML();
   } else if(state.needDraw){
     const remain = state.mar.firstDraw ? Math.max(1, 2 - (state.mar.drawCount||0)) : 1;
-    html += pilePickHTML('marDrawClick', '还可抽 ' + remain + ' 张') + gridAreaHTML();
+    html += (gridMode==='mark'
+      ? '<div class="hint">标记模式：摸牌前也可先点格标「怀疑」；猜测仍需先摸牌</div>'
+      : '') + pilePickHTML('marDrawClick', '还可抽 ' + remain + ' 张') + gridAreaHTML();
   } else {
     html += '<div class="hint">手牌已自动标蓝于网格（其数字不可能在暗牌中）。猜测模式：点选数字（可多选）→ 猜；单猜命中即翻开，多猜须全部命中才翻开。标记模式：点击单元格标记「怀疑」。</div>' +
       gridAreaHTML() +
@@ -1076,11 +1095,11 @@ function cycleMark(n){
 function toggleGrid(n){
   if(ui.lock) return;
   if(state.turn!=='marshal' || (state.phase!=='playing' && state.phase!=='manhunt')) return;
+  if(gridMode==='mark'){ cycleMark(n); return; } // 怀疑标记=私人笔记：摸牌前也可标；猜测才须先摸牌
   if(state.needDraw){
     if(anyPileLeft()){ toast('先进行摸牌'); return; }
     state.needDraw = false; save(); render(); // 牌库全空 → 自愈清除，直接可猜
   }
-  if(gridMode==='mark'){ cycleMark(n); return; }
   if(ui.gridSel.includes(n)) ui.gridSel = ui.gridSel.filter(x=>x!==n);
   else ui.gridSel.push(n);
   render();
@@ -1104,7 +1123,7 @@ function renderManhunt(){
   return '' +
     '<div id="topbar">' +
       '<div class="tb-row">' +
-        '<h2 class="tb-title">🕵️ 神探缉凶</h2>' +
+        '<h2 class="tb-title">🕵️ 神探缉凶' + modeChipHTML() + '</h2>' +
         '<div class="tb-btns">' +
           '<button class="icon-btn" onclick="quitGame()">🚪 退出</button>' +
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
@@ -1149,7 +1168,7 @@ function renderOver(){
   return '' +
     '<div id="topbar">' +
       '<div class="tb-row">' +
-        '<h2 class="tb-title">🕵️ 神探缉凶</h2>' +
+        '<h2 class="tb-title">🕵️ 神探缉凶' + modeChipHTML() + '</h2>' +
         '<div class="tb-btns">' +
           '<button class="icon-btn" onclick="quitGame()">🚪 退出</button>' +
           '<button class="icon-btn" onclick="showModal(\'rules\')">📖 规则</button>' +
@@ -1209,7 +1228,7 @@ function viewRouteCard(i){
 function bindManhunt(){}
 function bindGame(){}
 
-function playAgain(){ newGame(state.humanRole); }
+function playAgain(){ newGame(state.humanRole, state.mode); } // 再来一局：保持本局模式
 function backToLanding(){
   localStorage.removeItem(STORAGE_KEY);
   state = null;
@@ -1217,6 +1236,11 @@ function backToLanding(){
 }
 
 /* ================= 登录页 ================= */
+function startGame(role){ newGame(role, curMode); } // 登录页入口：携带当前所选对局模式
+function pickMode(m){
+  curMode = m === MODE_PHANTOM ? MODE_PHANTOM : MODE_NORMAL;
+  showLanding();
+}
 function showLanding(){
   document.getElementById('app').innerHTML =
     '<div id="landing">' +
@@ -1225,13 +1249,19 @@ function showLanding(){
       '<h1>神探缉凶</h1>' +
       '<div class="sub">Fugitive · 人机对战</div>' +
       '<div class="badge">🏙️ 大盗藏匿 警探追捕</div>' +
-      '<button class="btn btn-fug role-btn" onclick="newGame(\'fugitive\')"><span class="em">🕶️</span><span class="rt"><b>扮演 大盗</b><span class="de">暗放地点牌，冲刺到 42 逃脱</span></span></button>' +
-      '<button class="btn btn-mar role-btn" onclick="newGame(\'marshal\')"><span class="em">🕵️</span><span class="rt"><b>扮演 警探</b><span class="de">猜数字，翻开全部藏身处</span></span></button>' +
+      '<div class="mode-pick" role="group" aria-label="对局模式">' +
+        '<div class="mp-opts">' +
+          '<button class="mp-opt' + (curMode===MODE_NORMAL?' sel':'') + '" onclick="pickMode(\'normal\')">普通 · 9 张</button>' +
+          '<button class="mp-opt' + (curMode===MODE_PHANTOM?' sel':'') + '" onclick="pickMode(\'phantom\')">🎩 怪盗 · 12 张</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-fug role-btn" onclick="startGame(\'fugitive\')"><span class="em">🕶️</span><span class="rt"><b>扮演 大盗</b><span class="de">暗放地点牌，冲刺到 42 逃脱</span></span></button>' +
+      '<button class="btn btn-mar role-btn" onclick="startGame(\'marshal\')"><span class="em">🕵️</span><span class="rt"><b>扮演 警探</b><span class="de">猜数字，翻开全部藏身处</span></span></button>' +
       '<button class="btn btn-random role-btn" id="btn-random"><span class="em">🎲</span><span class="rt"><b>随机身份</b><span class="de">系统替你决定</span></span></button>' +
       '<div class="credit">@imStar100</div>' +
     '</div>';
   document.getElementById('btn-random').onclick = function(){
-    newGame(Math.random()<0.5 ? 'fugitive' : 'marshal');
+    startGame(Math.random()<0.5 ? 'fugitive' : 'marshal');
   };
 }
 
@@ -1252,9 +1282,11 @@ function modalHTML(){
       '<li><b>目标</b>：<u>大盗</u>暗放地点牌（必须递增，且 ≤ 上一张 +3），率先打出 42 则逃脱；<u>警探</u>抽牌并猜测数字，猜对则翻开地点牌，全部地点牌翻出则获胜。</li>' +
       '<li><b>牌堆</b>：<table class="pile-table"><tr><th>牌堆</th><th>范围</th><th>张数</th></tr><tr><td>A</td><td>4 ~ 14</td><td>11</td></tr><tr><td>B</td><td>15 ~ 28</td><td>14</td></tr><tr><td>C</td><td>29 ~ 41</td><td>13</td></tr></table>剩牌数在顶栏中部显示。</li>' +
       '<li><b>初始手牌</b>：大盗起始 9 张——固定 <b>1、2、3、42</b> + A 堆抽 3 张 + B 堆抽 2 张。警探起始空手。</li>' +
+      '<li><b>对局模式（普通 / 🎩 怪盗）</b>：游戏前可选，怪盗模式下大盗初始手牌 <b>12 张</b>——在普通 9 张基础上，A、B、C 各多摸 1 张。</li>' +
       '<li><b>掩护</b>：每张 1~41 牌自带掩护标记（奇数 1 个、偶数 2 个；42 不能作掩护）。打出地点牌时可追加任意数量掩护牌（正面朝下），每 1 个标记可放宽上限 +1。</li>' +
       '<li><b>回合流程</b>：<table class="pile-table"><tr><th></th><th>大盗</th><th>警探</th></tr><tr><td>第一回合</td><td>放 1~2 张地点牌</td><td>抽 2 张后必须猜测</td></tr><tr><td>后续回合</td><td>抽 1 张，可放 1 张或跳过</td><td>抽 1 张后必须猜测</td></tr></table></li>' +
       '<li><b>猜测</b>：可猜任意 1~41 数字。单猜命中即翻开（掩护牌一并翻开）；多猜须全部命中才翻。</li>' +
+      '<li><b>标记</b>：网格可切「标记模式」点格标「怀疑」（黄色），是警探的私人笔记——回合开始没摸牌也能先标记；猜测（选中蓝色）仍须先摸完牌。</li>' +
       '<li><b>搜捕</b>：大盗打出 42 时，若已翻开地点牌均不大于 29，警探进入搜捕：依次单猜全部暗牌，猜错即大盗胜，全对则警探反败为胜。</li>' +
     '</ul>' +
     '<button class="btn btn-primary" onclick="closeModal(\'rules\')">知道了</button>' +
@@ -1289,6 +1321,7 @@ function confirmQuit(){
   const saved = load();
   if(saved){
     state = saved;
+    curMode = saved.mode || MODE_NORMAL; // 恢复存档后退出到登录页时，模式选择与本局一致
     render();
     scheduleAI(); // 刷新恢复：若轮到 AI 则续跑其回合（气泡/延时属瞬态不入档，AI 可能从存档点重演当前行动）
   } else {

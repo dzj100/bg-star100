@@ -53,6 +53,13 @@ async function freshGame(page, role){
   await page.evaluate((r) => newGame(r), role);
   await page.waitForTimeout(120);
 }
+async function freshGameMode(page, role, mode){
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.evaluate((a) => newGame(a.role, a.mode), { role, mode });
+  await page.waitForTimeout(120);
+}
 async function setup(page, patch){
   await page.evaluate((p) => {
     if(p.route !== undefined) state.fug.route = p.route;
@@ -239,6 +246,19 @@ async function setup(page, patch){
     });
     assert(toastTxt.includes('先进行摸牌') && toastTxt.includes('show'), '摸牌阶段点击网格显示吐司（' + toastTxt + '）');
     await page.waitForTimeout(1900); // 等吐司消失
+    // 标记模式是私人笔记：摸牌前也可先标「怀疑」（猜测仍须先摸牌，H 上方已验）
+    await page.evaluate(() => document.querySelector('.grid-mode-btn').click()); // 猜测 → 标记
+    await page.click('.g-cell[data-n="30"]');
+    st = await stateOf(page);
+    assert(st.mar.marks && st.mar.marks[30] === 1, '标记模式：摸牌前可先标怀疑');
+    assert(st.needDraw === true && st.mar.hand.length === 0, '标记不改变摸牌阶段状态');
+    const markToast = await page.evaluate(() => {
+      const t = document.getElementById('toast');
+      return t ? t.textContent + '|' + t.className : 'NO TOAST';
+    });
+    assert(!markToast.includes('show'), '摸牌前标记不弹吐司（' + markToast + '）');
+    await shot(page, '8b-mark-predraw');
+    await page.evaluate(() => document.querySelector('.grid-mode-btn').click()); // 标记 → 猜测，继续后续摸牌流程
     await page.evaluate(() => marDrawClick('A'));
     await page.evaluate(() => marDrawClick('B'));
     st = await stateOf(page);
@@ -515,6 +535,90 @@ async function setup(page, patch){
     assert(drawerCount === curLog.log.length, '抽屉条数 = 日志条数');
     await page.waitForTimeout(400); // 等抽屉滑入动画完成
     await shot(page, '18-log-drawer');
+
+    /* ============ Q. 怪盗模式：登录页开关 + 开局 12 张 + 再来一局保持 ============ */
+    console.log('Q. 怪盗模式 · 登录页与开局');
+    await page.goto(URL);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(URL);
+    await waitFor(page, () => !!document.querySelector('#landing'), 5000, '登录页');
+    const defNormal = await page.evaluate(() => {
+      const sels = document.querySelectorAll('.mp-opt.sel');
+      return sels.length === 1 && sels[0].textContent.includes('普通');
+    });
+    assert(defNormal, '登录页默认选中普通模式');
+    await shot(page, 'q1-landing-mode');
+    await page.click('.mp-opt >> nth=1'); // 切到怪盗
+    const pickedPhantom = await page.evaluate(() => {
+      const sels = document.querySelectorAll('.mp-opt.sel');
+      return sels.length === 1 && sels[0].textContent.includes('怪盗');
+    });
+    assert(pickedPhantom, '选中怪盗模式');
+    await shot(page, 'q1b-landing-mode-phantom');
+    await page.click('#landing .role-btn >> nth=0'); // 扮演大盗
+    await page.waitForTimeout(150);
+    let ph = await stateOf(page);
+    assert(ph.mode === 'phantom', 'state.mode = phantom');
+    assert(ph.fug.hand.length === 12, '怪盗开局大盗 12 张（实际 ' + ph.fug.hand.length + '）');
+    for(const fixed of [1,2,3,42]) assert(ph.fug.hand.includes(fixed), '手牌含固定牌 ' + fixed);
+    assert(ph.piles.A.length === 7 && ph.piles.B.length === 11 && ph.piles.C.length === 12,
+      '三堆余量 A7/B11/C12（实际 ' + ph.piles.A.length + '/' + ph.piles.B.length + '/' + ph.piles.C.length + '）');
+    const aCnt = ph.fug.hand.filter(n=>n>=4&&n<=14).length;  // A 范围（4~14）抽 4
+    const bCnt = ph.fug.hand.filter(n=>n>=15&&n<=28).length; // B 范围（15~28）抽 3
+    const cCnt = ph.fug.hand.filter(n=>n>=29&&n<=41).length; // C 范围（29~41）抽 1
+    assert(aCnt === 4 && bCnt === 3 && cCnt === 1, '抽取分布 A4/B3/C1（实际 ' + aCnt + '/' + bCnt + '/' + cCnt + '）');
+    assert(new Set(ph.fug.hand).size === 12, '手牌无重复');
+    const chipQ = await page.evaluate(() => { const el = document.querySelector('.mode-chip'); return el ? el.textContent.trim() : null; });
+    assert(chipQ && chipQ.includes('怪盗'), '顶栏显示怪盗徽标');
+    const handShownQ = await page.evaluate(() => document.querySelectorAll('#hand .h-card:not(.ph)').length);
+    assert(handShownQ === 12, '手牌区展示 12 张');
+    await shot(page, 'q2-phantom-fug-hand');
+    // 再来一局保持怪盗（补到结算页点按钮触发）
+    await page.evaluate(() => { state.phase='over'; state.winner='fugitive'; save(); render(); });
+    await page.click('#actions >> text=再来一局');
+    await page.waitForTimeout(150);
+    ph = await stateOf(page);
+    assert(ph.phase === 'playing' && ph.mode === 'phantom' && ph.fug.hand.length === 12, '再来一局保持怪盗 12 张');
+
+    /* ============ R. 怪盗模式：人类警探 vs AI 大盗（AI 12 张正常行动） ============ */
+    console.log('R. 怪盗模式 · 人类警探 vs AI 大盗');
+    await freshGameMode(page, 'marshal', 'phantom');
+    let sr = await stateOf(page);
+    assert(sr.mode === 'phantom' && sr.turn === 'fugitive' && sr.firstTurn, '开局 AI 大盗回合 · 怪盗');
+    assert(sr.fug.hand.length === 12 && sr.piles.A.length === 7, 'AI 大盗 12 张开局');
+    await waitFor(page, () => state.turn === 'marshal', 20000, 'AI 大盗完成首回合');
+    sr = await stateOf(page);
+    assert(sr.fug.route.length >= 1 && sr.fug.route.length <= 2, 'AI 大盗首回合放置 1~2 张');
+    assert(sr.fug.route[0].num >= 1 && sr.fug.route[0].num <= 3, '首张暗牌在 1~3');
+    const spent = sr.fug.route.reduce((s, r) => s + 1 + (r.cover || []).length, 0); // 主牌 + 掩护都离开手牌
+    assert(sr.fug.hand.length === 12 - spent, 'AI 手牌随放置相应减少（剩 ' + sr.fug.hand.length + '，共打出 ' + spent + '）');
+    const chipR = await page.evaluate(() => { const el = document.querySelector('.mode-chip'); return el ? el.textContent.trim() : null; });
+    assert(chipR && chipR.includes('怪盗'), '警探视角顶栏同样显示怪盗徽标');
+    await shot(page, 'q3-phantom-mar-vs-ai');
+
+    /* ============ S. 怪盗模式：存档恢复 + 旧档迁移 ============ */
+    console.log('S. 怪盗模式 · 存档与迁移');
+    await freshGameMode(page, 'fugitive', 'phantom');
+    await page.evaluate(() => { state.turn = 'fugitive'; state.firstTurn = false; state.needDraw = false; save(); }); // 刷新后轮到人类大盗，避免调度 AI
+    await page.goto(URL);
+    await page.waitForTimeout(150);
+    let ss = await stateOf(page);
+    assert(ss.mode === 'phantom' && ss.fug.hand.length === 12, '刷新恢复怪盗存档（12 张）');
+    const chipS = await page.evaluate(() => { const el = document.querySelector('.mode-chip'); return el ? el.textContent.trim() : null; });
+    assert(chipS && chipS.includes('怪盗'), '恢复后顶栏徽标仍在');
+    await shot(page, 'q4-phantom-reload');
+    // 旧 v2 存档（无 mode 字段）→ 迁移为普通模式
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('fugitive-state'));
+      delete s.mode;
+      localStorage.setItem('fugitive-state', JSON.stringify(s));
+    });
+    await page.goto(URL);
+    await page.waitForTimeout(150);
+    const sm = await stateOf(page);
+    assert(sm.mode === 'normal', '旧存档缺 mode → 迁移普通模式');
+    const noChipS = await page.evaluate(() => !document.querySelector('.mode-chip'));
+    assert(noChipS, '普通模式不显示怪盗徽标');
 
     console.log('✅ ALL TESTS PASSED in ' + ((Date.now()-t0)/1000).toFixed(1) + 's');
   } catch(e) {
