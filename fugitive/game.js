@@ -583,15 +583,40 @@ function jitterCovers(){
   if(dead.length >= 4 && Math.random() < 0.5) need = 2;
   return pickCovers(dead, null, need); // 死牌凑不够 → 放弃虚张
 }
+// 搜捕虚张：42 冲刺将触发搜捕（翻开地点牌 ≤29，冲 42 ≠ 稳赢）时，在必需掩护外再押死牌。
+// 警探搜捕依赖「AI 不浪费 ⇒ 42 掩护标记 T 精确反推 last=39-T」；虚张 1~2 张（1~4 标记）
+// 让反推值系统性偏低，对最后暗牌的猜测落空。死牌 ≤last 本不在警探候选内，翻开排除价值≈0。
+function manhuntBluff(hand, cover){
+  const maxOpen = Math.max(0, ...state.fug.route.filter(r=>!r.hidden && r.num!==42).map(r=>r.num));
+  if(maxOpen >= 30) return null; // 42 一出即胜，无需干扰
+  const last = lastRouteNum();
+  const used = new Set(cover);
+  const dead = hand.filter(c => c<=last && c!==42 && !used.has(c)).sort((a,b)=>a-b);
+  const add = [];
+  if(dead.length >= 2 && Math.random() < 0.5) add.push(dead[0]);
+  if(add.length && dead.length >= 3 && Math.random() < 0.5) add.push(dead[1]);
+  return add.length ? add : null;
+}
 function planFugMove(){
   const last = lastRouteNum();
   const hand = state.fug.hand;
-  // 直接胜利：42 在手且能一步打出（裸打或凑掩护），优先于一切推进
+  // 直接胜利候选：42 在手且能一步打出。
+  // 公开地点牌 >29 → 打出即直接获胜，任何掩护代价都值得，无条件冲；
+  // 将触发搜捕（公开 ≤29）→ 冲 42 ≠ 稳赢：掩护近乎整手梭哈（打后剩 ≤1）时先不冲，
+  //   落入常规小步/小跳/pass，每回合重新评估（42 是固定手牌不会丢，last 单调增使 need 单调减，
+  //   延迟只会让冲刺更便宜，不会卡死）；掩护代价可接受则冲，并押剩余死牌虚张干扰警探反推 last
   if(hand.includes(42) && 42 - last >= 1){
     const need = 42 - last - 3;
     if(need <= 0) return { main:42, cover:[] };
     const cover = pickCovers(hand, 42, need);
-    if(cover) return { main:42, cover };
+    if(cover){
+      const maxOpen = Math.max(0, ...state.fug.route.filter(r=>!r.hidden && r.num!==42).map(r=>r.num));
+      const manhuntAhead = maxOpen < 30;
+      if(!manhuntAhead || cover.length <= hand.length - 3){
+        const bluff = manhuntAhead ? manhuntBluff(hand, cover) : null;
+        return bluff ? { main:42, cover:cover.concat(bluff) } : { main:42, cover };
+      }
+    }
   }
   // 普通移动：差 1~3
   const moves = hand.filter(v => v-last>=1 && v-last<=3);
@@ -600,11 +625,13 @@ function planFugMove(){
     const mid = Math.floor(moves.length/2);
     const pool = moves.length>=3 ? moves.slice(Math.max(0,mid-1), mid+2) : moves;
     const pick = pool[rng(pool.length)];
-    const cover = jitterCovers();
+    // 42 在手 = 冲刺计划中（受阻/延迟）：死牌是 42 的掩护储备，不虚张浪费
+    const cover = hand.includes(42) ? null : jitterCovers();
     return cover ? { main:pick, cover } : { main:pick, cover:[] };
   }
-  // 跳跃：最小可行主牌 + 最小掩护组合
-  const candidates = hand.filter(v => v-last>3);
+  // 跳跃：最小可行主牌 + 最小掩护组合（排除 42——延迟冲刺期间不把 42 当普通跳跃打掉，
+  // 它留在手里等待代价可接受时再冲刺；cover 凑不齐时 42 本也选不上，排除无副作用）
+  const candidates = hand.filter(v => v-last>3 && v!==42);
   candidates.sort((a,b)=>a-b);
   for(const v of candidates){
     const need = v - last - 3;

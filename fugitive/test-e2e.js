@@ -651,6 +651,59 @@ async function setup(page, patch){
     st = await stateOf(page);
     assert(st.fug.route[1].cover.length === 0, '死牌 <2 不虚张');
 
+    /* ============ U. AI 大盗 42 冲刺：梭哈延迟 + 搜捕虚张 ============ */
+    console.log('U. AI 大盗 42 冲刺策略');
+    await freshGameMode(page, 'marshal', 'normal');
+    await waitFor(page, () => state.turn === 'marshal', 20000, 'AI 大盗首回合结束');
+    // U1 将触发搜捕（无公开牌）且掩护需整手梭哈 → 延迟：pass 不冲 42，手牌原样
+    await setup(page, {
+      route: [{ num:20, hidden:true, cover:[] }],
+      hand: [1,2,4,6,8,10,12,14,16,18,42], // need=19：整手 19 标记恰够 = 梭哈
+      turn:'fugitive', firstTurn:false, needDraw:false, phase:'playing',
+    });
+    await page.evaluate(() => scheduleAI());
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 1 && state.fug.hand.includes(42), 10000, '梭哈延迟：pass 不冲');
+    st = await stateOf(page);
+    assert(st.fug.hand.length === 11, '延迟回合 pass 后手牌原样（剩 ' + st.fug.hand.length + '）');
+    // U2 延迟后下回合：掩护代价可接受 → 恢复冲 42 进搜捕
+    await setup(page, {
+      route: [{ num:20, hidden:true, cover:[] }],
+      hand: [2,4,6,8,10,12,14,16,18,20,22,24,26,42], // cover 10 张偶 = 20 标记 ≥19，打后剩 3 → 不梭哈
+      turn:'fugitive', firstTurn:false, needDraw:false, phase:'playing',
+    });
+    await page.evaluate(() => scheduleAI());
+    await waitFor(page, () => state.fug.route.length === 2 && state.phase === 'manhunt', 10000, '恢复冲 42');
+    st = await stateOf(page);
+    assert(st.fug.route[1].num === 42 && st.fug.route[1].cover.length === 10, '恢复冲刺：42 + 10 张必需掩护（实际 ' + st.fug.route[1].cover.length + '）');
+    // U3 将搜捕 + 不梭哈 + 剩余死牌富余（stub roll 全中）→ 冲 42 且额外押 2 张虚张
+    await setup(page, {
+      route: [
+        { num:25, hidden:false, cover:[] },
+        { num:26, hidden:true, cover:[] },
+      ],
+      hand: [2,4,6,8,10,12,14,16,18,20,22,24,28,30,42], // need=13：cover=[2..14] 7 张，剩余死牌 16~24
+      turn:'fugitive', firstTurn:false, needDraw:false, phase:'playing',
+    });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.fug.route.length === 3 && state.phase === 'manhunt', 10000, '加戏冲 42');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const rU = st.fug.route[2];
+    assert(rU.num === 42 && rU.cover.length === 9, '42 掩护 = 必需 7 + 虚张 2（实际 ' + rU.cover.length + '）');
+    assert(rU.cover[7] === 16 && rU.cover[8] === 18, '虚张为剩余最小死牌 16,18');
+    await page.waitForTimeout(2800); // 等缉凶时刻横幅淡出再截图
+    await shot(page, '9c-42-manhunt-bluff');
+    // U4 公开 >29：无条件冲（即使近乎整手梭哈）且不加戏
+    await setup(page, {
+      route: [{ num:38, hidden:false, cover:[] }],
+      hand: [3,42], // need=1：唯一掩护牌 3 → 打后剩 0；公开 38>29 仍直接冲
+      turn:'fugitive', firstTurn:false, needDraw:false, phase:'playing',
+    });
+    await page.evaluate(() => scheduleAI());
+    await waitFor(page, () => state.fug.route.length === 2 && state.phase === 'over', 10000, '公开>29 直接冲');
+    st = await stateOf(page);
+    assert(st.fug.route[1].num === 42 && st.fug.route[1].cover.length === 1 && st.winner === 'fugitive', '直接胜利：42 + 1 掩护');
+
     console.log('✅ ALL TESTS PASSED in ' + ((Date.now()-t0)/1000).toFixed(1) + 's');
   } catch(e) {
     failures++;
