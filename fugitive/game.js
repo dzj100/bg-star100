@@ -21,6 +21,7 @@ let ui = { selMain:null, selCover:[], gridSel:[], aiBusy:false, lock:false, deal
 let gridMode = 'guess'; // 'guess' | 'mark'
 let aiGen = 0; // 每次新游戏/重新调度递增，令旧的 AI 定时器作废
 let aiMarMissed = []; // AI 警探猜过未中的数字（内部记忆，避免反复猜同一数字；对玩家 UI 不置灰）
+let aiMarMissLen = []; // 与 aiMarMissed 平行：各次猜错时的路线长度——排除只对「当时已放置」的槽成立，新槽仍可补打该数
 let curMode = MODE_NORMAL; // 登录页所选模式；新一局/再来一局沿用（联机页不经登录页，模式由房主选择传入）
 let revealBusy = false;   // 联机翻牌补播动画进行中：到达的快照延后重绘，防打断动画
 let revealQueued = false; // 动画期间到达过快照：动画结束后补一次最新渲染
@@ -36,6 +37,7 @@ const OL = { active:false, isHost:false, mySeat:-1, myRole:null, oppName:'', opp
 function newGame(humanRole, mode){
   aiGen++;
   aiMarMissed = [];
+  aiMarMissLen = [];
   mode = mode === MODE_PHANTOM ? MODE_PHANTOM : MODE_NORMAL;
   curMode = mode;
   const pileA = shuffle(rangeArr(A.lo,A.hi));
@@ -383,7 +385,7 @@ async function marGuess(nums, gen){
   } else {
     if(nums.length === 1){
       state.marMissed.push(nums[0]); // 仅统计猜错次数；不影响后续可猜性
-      if(state.humanRole === 'fugitive') aiMarMissed.push(nums[0]); // AI 内部排除，避免反复猜同一数字
+      if(state.humanRole === 'fugitive'){ aiMarMissed.push(nums[0]); aiMarMissLen.push(state.fug.route.length); } // AI 内部排除，避免反复猜同一数字
       console.log('[mar] guess', nums[0], '→ MISS, missed stats:', state.marMissed.join(','));
     } else {
       state.marMissed.push(0); // 多选整组未中：无法归因错误项，0 占位仅计入「猜错次数」
@@ -597,6 +599,36 @@ function manhuntBluff(hand, cover){
   if(add.length && dead.length >= 3 && Math.random() < 0.5) add.push(dead[1]);
   return add.length ? add : null;
 }
+// 效率跳跃垫牌：≤2 张凑满 need 标记的最小代价组合。区别于 pickCovers 的最小张贪心
+// （need=3 时贪心给 1+21+22 三张 4 标记，人类会找 21+22 两张恰好 3 标记）。
+// 代价排序：活牌数（>main、打完仍是主牌候选，优先不用）→ 张数 → 浪费标记 → 牌面小者
+function coverFit2(hand, main, need){
+  const pads = hand.filter(c => c!==main && c!==42).sort((a,b)=>a-b);
+  const fits = [];
+  for(let i=0;i<pads.length;i++){
+    if(marks(pads[i]) >= need) fits.push([pads[i]]);
+    for(let j=i+1;j<pads.length;j++){
+      if(marks(pads[i]) + marks(pads[j]) >= need) fits.push([pads[i], pads[j]]);
+    }
+  }
+  if(!fits.length) return null;
+  const live = s => s.filter(c=>c>main).length;
+  const waste = s => s.reduce((x,c)=>x+marks(c),0) - need;
+  const sum = s => s[0] + (s[1] || 0);
+  fits.sort((a,b) => live(a)-live(b) || a.length-b.length || waste(a)-waste(b) || sum(a)-sum(b));
+  return fits[0];
+}
+// 效率跳跃：小步尚存时的提前跳（人类常见打法——速度是与警探赛跑的资本）。
+// 只评估距 last+5~+7 的目标（need 2~4 标记、≤2 张可凑满），从大到小跳最大可行者；42 除外（冲刺弹药）
+function efficientJump(last, hand){
+  const targets = hand.filter(v => v!==42 && v-last>=5 && v-last<=7).sort((a,b)=>a-b);
+  for(let i=targets.length-1;i>=0;i--){
+    const v = targets[i];
+    const fit = coverFit2(hand, v, v-last-3);
+    if(fit) return { main:v, cover:fit };
+  }
+  return null;
+}
 function planFugMove(){
   const last = lastRouteNum();
   const hand = state.fug.hand;
@@ -605,6 +637,7 @@ function planFugMove(){
   // 将触发搜捕（公开 ≤29）→ 冲 42 ≠ 稳赢：掩护近乎整手梭哈（打后剩 ≤1）时先不冲，
   //   落入常规小步/小跳/pass，每回合重新评估（42 是固定手牌不会丢，last 单调增使 need 单调减，
   //   延迟只会让冲刺更便宜，不会卡死）；掩护代价可接受则冲，并押剩余死牌虚张干扰警探反推 last
+  let sprintHold = false; // 42 可冲但被梭哈规则按住：每一标记都是下回合冲刺弹药，小步阶段禁一切垫/跳加戏
   if(hand.includes(42) && 42 - last >= 1){
     const need = 42 - last - 3;
     if(need <= 0) return { main:42, cover:[] };
@@ -616,17 +649,37 @@ function planFugMove(){
         const bluff = manhuntAhead ? manhuntBluff(hand, cover) : null;
         return bluff ? { main:42, cover:cover.concat(bluff) } : { main:42, cover };
       }
+      sprintHold = true;
     }
   }
   // 普通移动：差 1~3
   const moves = hand.filter(v => v-last>=1 && v-last<=3);
   if(moves.length){
     moves.sort((a,b)=>a-b);
+    if(!sprintHold){
+      // 效率跳跃（50%）：先于小步评估提前跳；凑不齐 → 落回小步。
+      // 开局首张除外（route 为空）：警探推理以起点 0 起步只认 1~3，首张跳 5~7 会永久甩开其
+      // 锚点、破坏对局张力（旧 AI 在小步尚存时也不跳开局），第二张起才允许提前跳
+      if(rng(100) < 50 && state.fug.route.length >= 1){
+        const jump = efficientJump(last, hand);
+        if(jump) return jump;
+      }
+      // 顶格小步 + 顺手垫（60%）：打范围最大张，垫「被跳过」的牌——打完即成死牌，零活牌浪费；
+      // 补上老死牌虚张的盲区：首手（last=0 无死牌）也能制造「掩护=跳远」假象
+      if(moves.length >= 2 && rng(100) < 60){
+        const pick = moves[moves.length-1];
+        const skipped = moves.slice(0, -1);
+        const pads = [];
+        if(rng(100) < 60) pads.push(skipped[0]); // 60% 垫 1 张最小被跳过牌
+        if(pads.length && skipped.length >= 2 && rng(100) < 40) pads.push(skipped[1]); // 跳过 ≥2：再 40% 垫第 2 张
+        return { main: pick, cover: pads };
+      }
+    }
+    // 兜底：中位池随机选（防模式化）；老死牌虚张只在非延迟冲刺时允许
     const mid = Math.floor(moves.length/2);
     const pool = moves.length>=3 ? moves.slice(Math.max(0,mid-1), mid+2) : moves;
     const pick = pool[rng(pool.length)];
-    // 42 在手 = 冲刺计划中（受阻/延迟）：死牌是 42 的掩护储备，不虚张浪费
-    const cover = hand.includes(42) ? null : jitterCovers();
+    const cover = sprintHold ? null : jitterCovers();
     return cover ? { main:pick, cover } : { main:pick, cover:[] };
   }
   // 跳跃：最小可行主牌 + 最小掩护组合（排除 42——延迟冲刺期间不把 42 当普通跳跃打掉，
@@ -653,8 +706,9 @@ async function aiMarshalTurn(gen){
     return;
   }
   const guess = aiMarChooseGuess();
-  console.log('[mar-ai] choose guess =', guess);
-  await marGuess([guess], gen);
+  const batch = Array.isArray(guess) ? guess : [guess];
+  console.log('[mar-ai] choose guess =', batch.join(','));
+  await marGuess(batch, gen);
 }
 function aiMarPickPile(){
   // 威胁优先：摸走「大盗推断候选集」最密集的堆（摸走 = 大盗打不出，压缩路线）；平局按 C→B→A
@@ -686,13 +740,21 @@ function aiKnownNums(){
   aiMarMissed.forEach(n=>set.add(n));
   return set;
 }
-// 对每个暗置位置枚举候选（严格 +1~+3，忽略掩护放宽——AI 天然弱点）
+// 对每个暗置位置枚举候选（掩护感知：桌面可见掩护张数 N，值不可见 → 每张按最大 2 标记放宽，
+// 窗口上限 = prev+3+2N，绝不漏真值；无掩护保持严格 +3 精确性）
 function marshalInference(){
   const route = state.fug.route;
-  const known = aiKnownNums();
+  const base = knownNums(); // 公开 ∪ 手牌：对任意槽都成立的排除集
   const cands = [];
   let prevSet = new Set([0]); // 起点 0
   let lastPublic = 0;
+  // 暗格必小于其后任一公开锚点 → 窗口上限取更小值，避免浪费探测锚点之后的数字
+  const cap = [];
+  let nextPub = 41;
+  for(let i=route.length-1;i>=0;i--){
+    cap[i] = nextPub;
+    if(!route[i].hidden) nextPub = route[i].num - 1;
+  }
   for(let i=0;i<route.length;i++){
     if(!route[i].hidden){
       prevSet = new Set([route[i].num]);
@@ -700,17 +762,21 @@ function marshalInference(){
       cands.push(null);
       continue;
     }
+    // 猜错排除按槽龄过滤：该格在猜错时已放置（missLen > i）才排除，新槽仍可补打该数
+    const known = new Set(base);
+    for(let mi=0;mi<aiMarMissed.length;mi++){ if(aiMarMissLen[mi] > i) known.add(aiMarMissed[mi]); }
+    const relax = 2 * (route[i].cover || []).length; // 该格可见掩护牌数 ×2（标记奇 1 偶 2，取最大值）
     let cur = new Set();
     for(const p of prevSet){
-      for(let d=1;d<=3;d++){
+      for(let d=1;d<=3+relax;d++){
         const x = p+d;
-        if(x>=1 && x<=41 && !known.has(x)) cur.add(x);
+        if(x>=1 && x<=41 && x<=cap[i] && !known.has(x)) cur.add(x);
       }
     }
     if(cur.size === 0){
       // 兜底：约束推导断链时，候选 = 最后公开牌之后的未排除数字（路线严格递增，暗牌必 > 最后公开牌）
       cur = new Set();
-      for(let n=lastPublic+1;n<=41;n++){ if(!known.has(n)) cur.add(n); }
+      for(let n=lastPublic+1;n<=cap[i];n++){ if(!known.has(n)) cur.add(n); }
     }
     cands.push(cur);
     prevSet = cur;
@@ -724,18 +790,21 @@ function aiMarChooseGuess(){
     if(c && c.size===1){ uniques.push([...c][0]); }
   }
   if(uniques.length){
+    if(uniques.length >= 2) return uniques; // 批量：多个唯一窗口一次全猜（必中，单回合多翻牌提速「翻全」竞赛）
     const pick = rng(100)<15 ? uniques[rng(uniques.length)] : uniques[0];
     return pick;
   }
+  // 命中概率加权：候选跨槽按 1/窗口大小 求和——窗小者单槽命中率更高，槽数同频不代表同概率
   const freq = new Map();
   for(const c of cands){
-    if(!c) continue;
-    for(const n of c){ freq.set(n, (freq.get(n)||0)+1); }
+    if(!c || !c.size) continue;
+    const q = 1 / c.size;
+    for(const n of c){ freq.set(n, (freq.get(n)||0) + q); }
   }
-  let best=[], bestF=0;
+  let best=[], bestW=0;
   for(const [n,f] of freq){
-    if(f>bestF){ bestF=f; best=[n]; }
-    else if(f===bestF){ best.push(n); }
+    if(f>bestW){ bestW=f; best=[n]; }
+    else if(f===bestW){ best.push(n); }
   }
   if(best.length){
     const pick = rng(100)<15 ? best[rng(best.length)] : best[0];

@@ -620,14 +620,14 @@ async function setup(page, patch){
     const noChipS = await page.evaluate(() => !document.querySelector('.mode-chip'));
     assert(noChipS, '普通模式不显示怪盗徽标');
 
-    /* ============ T. AI 大盗虚张掩护：小步也偶尔挂掩护（stub Math.random 确定性） ============ */
+    /* ============ T. AI 大盗虚张掩护：老死牌小步虚张（stub Math.random 确定性） ============ */
     console.log('T. AI 大盗虚张掩护');
     await freshGameMode(page, 'marshal', 'normal');
     await waitFor(page, () => state.turn === 'marshal', 20000, 'AI 大盗首回合结束');
     const baseRouteT = [{ num:10, hidden:true, cover:[] }];
-    const deadHandT = [6,7,8,11,12,13]; // last=10：死牌 6/7/8 ≥2
-    // (a) roll 命中（0.01）：最小可走牌 11（差 1）却挂 1 张掩护 → 虚张
-    await setup(page, { route: baseRouteT, hand: deadHandT, turn:'fugitive', firstTurn:false, needDraw:false });
+    // 场景均为「唯一小步」：顶格垫(≥2 小步)/效率跳跃(距 last+5~7 目标)分支不触发，纯测老死牌虚张
+    // (a) roll 命中（0.01）：死牌 6/7/8 ≥2 → 唯一可走 11（差 1）也挂 1 张掩护（死牌 6）
+    await setup(page, { route: baseRouteT, hand: [6,7,8,11,20,21], turn:'fugitive', firstTurn:false, needDraw:false });
     await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
     await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(a)');
     await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
@@ -637,19 +637,26 @@ async function setup(page, patch){
     assert(rA.cover.length === 1 && rA.cover[0] === 6, '命中 roll：小步也挂掩护（掩护 ' + JSON.stringify(rA.cover) + '）');
     await shot(page, '9b-ai-bluff');
     // (b) roll 未命中（0.9）：裸打最大可走牌 13
-    await setup(page, { route: baseRouteT, hand: deadHandT, turn:'fugitive', firstTurn:false, needDraw:false });
+    await setup(page, { route: baseRouteT, hand: [6,7,8,11,12,13], turn:'fugitive', firstTurn:false, needDraw:false });
     await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.9; scheduleAI(); });
     await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(b)');
     await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
     st = await stateOf(page);
     assert(st.fug.route[1].num === 13 && st.fug.route[1].cover.length === 0, '未命中：裸打 13 无掩护');
     // (c) 死牌 <2（即使 roll 命中）→ 永不虚张
-    await setup(page, { route: baseRouteT, hand: [11,12,13,14,15], turn:'fugitive', firstTurn:false, needDraw:false });
+    await setup(page, { route: baseRouteT, hand: [11,20,21,22], turn:'fugitive', firstTurn:false, needDraw:false });
     await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
     await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(c)');
     await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
     st = await stateOf(page);
-    assert(st.fug.route[1].cover.length === 0, '死牌 <2 不虚张');
+    assert(st.fug.route[1].num === 11 && st.fug.route[1].cover.length === 0, '死牌 <2 不虚张');
+    // (d) 死牌 ≥4 + roll 全中：升级垫 2 张（5+6 = 3 标记）
+    await setup(page, { route: baseRouteT, hand: [5,6,7,8,11,19], turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(d)');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    assert(st.fug.route[1].num === 11 && st.fug.route[1].cover.length === 2 && st.fug.route[1].cover[0] === 5 && st.fug.route[1].cover[1] === 6, '死牌 ≥4：升级 2 张掩护（' + JSON.stringify(st.fug.route[1].cover) + '）');
 
     /* ============ U. AI 大盗 42 冲刺：梭哈延迟 + 搜捕虚张 ============ */
     console.log('U. AI 大盗 42 冲刺策略');
@@ -703,6 +710,119 @@ async function setup(page, patch){
     await waitFor(page, () => state.fug.route.length === 2 && state.phase === 'over', 10000, '公开>29 直接冲');
     st = await stateOf(page);
     assert(st.fug.route[1].num === 42 && st.fug.route[1].cover.length === 1 && st.winner === 'fugitive', '直接胜利：42 + 1 掩护');
+
+    /* ============ V. AI 大盗拟人加戏：顶格垫 + 效率跳跃（stub 0.01 = roll 全中） ============ */
+    console.log('V. AI 大盗拟人加戏（顶格垫/效率跳跃）');
+    await freshGameMode(page, 'marshal', 'normal');
+    await waitFor(page, () => state.turn === 'marshal', 20000, 'AI 大盗首回合结束');
+    // V1 顶格小步 + 顺手垫：last=10，小步 11/12/13 尚存（无 5~7 距目标）→ 打顶格 13，垫被跳过的 11+12
+    await setup(page, { route: [{ num:10, hidden:true, cover:[] }], hand: [6,7,8,11,12,13], turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 顶格垫');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const v1 = st.fug.route[1];
+    assert(v1.num === 13 && v1.cover.length === 2 && v1.cover[0] === 11 && v1.cover[1] === 12, '顶格垫：打 13 垫 11,12（实际 ' + JSON.stringify({num:v1.num, cover:v1.cover}) + '）');
+    await shot(page, '9d-top-pad');
+    // V2 效率跳跃：last=20，小步 21/22/23 尚存 → 跳 26，垫 1+22 恰好 3 标记（非贪心 1+21+22 三张）
+    await setup(page, { route: [{ num:20, hidden:true, cover:[] }], hand: [1,21,22,23,26,29,30,39], turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 效率跳跃');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const v2 = st.fug.route[1];
+    assert(v2.num === 26 && v2.cover.length === 2 && v2.cover[0] === 1 && v2.cover[1] === 22, '效率跳跃：小步尚存跳 26，垫恰好 3 标记（' + JSON.stringify(v2.cover) + '）');
+    await shot(page, '9e-eff-jump');
+    // V3 42 在手但冲刺不可行（need 19 > 手牌 7 标记）→ 收窄规则允许加戏：跳 26，42 保留（旧「42 在手一律禁」已废弃）
+    await setup(page, { route: [{ num:20, hidden:true, cover:[] }], hand: [1,21,22,23,26,42], turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, '42 不可冲仍加戏');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const v3 = st.fug.route[1];
+    assert(v3.num === 26 && v3.cover.length === 2 && st.fug.hand.includes(42), '42 不可冲 → 允许跳 26（42 保留手牌）');
+    // V4 延迟冲刺（42 可冲但梭哈被按 + 将触发搜捕）→ 禁一切加戏：裸打唯一小步 28
+    await setup(page, {
+      route: [
+        { num:25, hidden:false, cover:[] },
+        { num:26, hidden:true, cover:[] },
+      ],
+      hand: [1,21,22,23,24,28,30,32,34,42], // need=13：贪心 8 张恰够（打后剩 1）→ 梭哈延迟
+      turn:'fugitive', firstTurn:false, needDraw:false, phase:'playing',
+    });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 3, 10000, '延迟状态裸小步');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const v4 = st.fug.route[2];
+    assert(v4.num === 28 && v4.cover.length === 0 && st.fug.hand.includes(42), '延迟冲刺：裸打 28 不加戏（32 距 6 可跳也不跳），42 仍在手');
+
+    /* ============ W. AI 警探掩护感知：跳张命中重锚 ============ */
+    console.log('W. AI 警探掩护感知（跳张命中重锚）');
+    // 大盗从 20 跳 26 垫 1+22（3 标记）→ 警探只见「掩护×2」→ 窗口放宽到 20+3+2×2=27
+    // stub 0.9（15% 随机不触发）→ 从窗口最低位 21 逐发探测，第 6 发命中 26 → 全翻 → 警探胜
+    await freshGameMode(page, 'fugitive', 'normal');
+    await setup(page, {
+      route: [
+        { num:20, hidden:false, cover:[] },
+        { num:26, hidden:true, cover:[1,22] },
+      ],
+      hand: [], marHand: [], piles: { A:[], B:[], C:[] },
+      turn:'marshal', needDraw:false, firstTurn:false,
+    });
+    await page.evaluate(() => {
+      window.__origRand = Math.random; Math.random = () => 0.9;
+      window.__wPass = setInterval(() => {
+        if(state.phase==='playing' && state.turn==='fugitive' && !ui.lock) fugPass();
+      }, 80);
+      save(); scheduleAI();
+    });
+    await waitFor(page, () => state.phase==='over' && state.winner==='marshal', 45000, 'AI 警探宽窗口命中跳张 26');
+    await page.evaluate(() => {
+      clearInterval(window.__wPass); delete window.__wPass;
+      Math.random = window.__origRand; delete window.__origRand;
+    });
+    st = await stateOf(page);
+    assert(st.fug.route[1].hidden === false, '跳张 26 被 AI 猜中翻开重锚');
+    const lgW = await logs(page);
+    assert(lgW.some(l => l.includes('猜中') && l.includes('26')), '日志含「猜中 26」');
+    await shot(page, 'w1-catch-jump');
+
+    /* ============ X. AI 警探批量猜：双唯一窗口一次全猜 ============ */
+    console.log('X. AI 警探批量猜（双唯一窗口一次全猜）');
+    // 两个无掩护暗格各自夹在相邻公开锚点之间（20..22 → 21、24..26 → 25）：窗口封顶使两窗均为唯一
+    // stub 0.9（15% 随机不触发）→ AI 同回合批量猜 21 与 25 → 全翻 → 整条路线翻开 → 警探胜、零猜错
+    await freshGameMode(page, 'fugitive', 'normal');
+    await setup(page, {
+      route: [
+        { num:20, hidden:false, cover:[] },
+        { num:21, hidden:true,  cover:[] },
+        { num:22, hidden:false, cover:[] },
+        { num:24, hidden:false, cover:[] },
+        { num:25, hidden:true,  cover:[] },
+        { num:26, hidden:false, cover:[] },
+      ],
+      hand: [], marHand: [], piles: { A:[], B:[], C:[] },
+      turn:'marshal', needDraw:false, firstTurn:false,
+    });
+    await page.evaluate(() => {
+      window.__origRand = Math.random; Math.random = () => 0.9;
+      window.__xPass = setInterval(() => {
+        if(state.phase==='playing' && state.turn==='fugitive' && !ui.lock) fugPass();
+      }, 80);
+      save(); scheduleAI();
+    });
+    await waitFor(page, () => state.phase==='over' && state.winner==='marshal', 45000, 'AI 警探批量猜双唯一窗口后翻全胜');
+    await page.evaluate(() => {
+      clearInterval(window.__xPass); delete window.__xPass;
+      Math.random = window.__origRand; delete window.__origRand;
+    });
+    st = await stateOf(page);
+    assert(st.fug.route.every(r => !r.hidden), '批量猜后整条路线翻开');
+    assert(!st.marMissed.length, '批量必中：零猜错');
+    const lgX = await logs(page);
+    assert(lgX.some(l => l.includes('猜中') && l.includes('21, 25')), '日志含同一条「猜中 21, 25」（单回合批量）');
+    await shot(page, 'x1-batch-guess');
 
     console.log('✅ ALL TESTS PASSED in ' + ((Date.now()-t0)/1000).toFixed(1) + 's');
   } catch(e) {
