@@ -620,6 +620,37 @@ async function setup(page, patch){
     const noChipS = await page.evaluate(() => !document.querySelector('.mode-chip'));
     assert(noChipS, '普通模式不显示怪盗徽标');
 
+    /* ============ T. AI 大盗虚张掩护：小步也偶尔挂掩护（stub Math.random 确定性） ============ */
+    console.log('T. AI 大盗虚张掩护');
+    await freshGameMode(page, 'marshal', 'normal');
+    await waitFor(page, () => state.turn === 'marshal', 20000, 'AI 大盗首回合结束');
+    const baseRouteT = [{ num:10, hidden:true, cover:[] }];
+    const deadHandT = [6,7,8,11,12,13]; // last=10：死牌 6/7/8 ≥2
+    // (a) roll 命中（0.01）：最小可走牌 11（差 1）却挂 1 张掩护 → 虚张
+    await setup(page, { route: baseRouteT, hand: deadHandT, turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(a)');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    const rA = st.fug.route[1];
+    assert(rA.num - st.fug.route[0].num >= 1 && rA.num - st.fug.route[0].num <= 3, '虚张主牌仍是小步（差 ' + (rA.num - st.fug.route[0].num) + '）');
+    assert(rA.cover.length === 1 && rA.cover[0] === 6, '命中 roll：小步也挂掩护（掩护 ' + JSON.stringify(rA.cover) + '）');
+    await shot(page, '9b-ai-bluff');
+    // (b) roll 未命中（0.9）：裸打最大可走牌 13
+    await setup(page, { route: baseRouteT, hand: deadHandT, turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.9; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(b)');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    assert(st.fug.route[1].num === 13 && st.fug.route[1].cover.length === 0, '未命中：裸打 13 无掩护');
+    // (c) 死牌 <2（即使 roll 命中）→ 永不虚张
+    await setup(page, { route: baseRouteT, hand: [11,12,13,14,15], turn:'fugitive', firstTurn:false, needDraw:false });
+    await page.evaluate(() => { window.__origRand = Math.random; Math.random = () => 0.01; scheduleAI(); });
+    await waitFor(page, () => state.turn === 'marshal' && state.fug.route.length === 2, 10000, 'AI 行动(c)');
+    await page.evaluate(() => { Math.random = window.__origRand; delete window.__origRand; });
+    st = await stateOf(page);
+    assert(st.fug.route[1].cover.length === 0, '死牌 <2 不虚张');
+
     console.log('✅ ALL TESTS PASSED in ' + ((Date.now()-t0)/1000).toFixed(1) + 's');
   } catch(e) {
     failures++;

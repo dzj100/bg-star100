@@ -571,6 +571,18 @@ function pickCovers(hand, main, need){
   if(sum >= need) return chosen;
   return null;
 }
+// 虚张掩护：小步（差 1~3）移动也偶尔挂掩护，让警探「有掩护=跳远」的推断失效。
+// 只允许消耗「死牌」（≤last，永不能再当主牌）并留 ≥1 张兜底——真实跳跃的垫子优先级更高；
+// 首回合第 1 张时 last=0 手牌无死牌，结构上自动不触发。
+function jitterCovers(){
+  const last = lastRouteNum();
+  const dead = state.fug.hand.filter(c => c<=last && c!==42);
+  if(dead.length < 2) return null;
+  if(Math.random() >= 0.35) return null;
+  let need = 1;
+  if(dead.length >= 4 && Math.random() < 0.5) need = 2;
+  return pickCovers(dead, null, need); // 死牌凑不够 → 放弃虚张
+}
 function planFugMove(){
   const last = lastRouteNum();
   const hand = state.fug.hand;
@@ -588,7 +600,8 @@ function planFugMove(){
     const mid = Math.floor(moves.length/2);
     const pool = moves.length>=3 ? moves.slice(Math.max(0,mid-1), mid+2) : moves;
     const pick = pool[rng(pool.length)];
-    return { main:pick, cover:[] };
+    const cover = jitterCovers();
+    return cover ? { main:pick, cover } : { main:pick, cover:[] };
   }
   // 跳跃：最小可行主牌 + 最小掩护组合
   const candidates = hand.filter(v => v-last>3);
