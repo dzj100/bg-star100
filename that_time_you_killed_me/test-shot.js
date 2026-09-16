@@ -733,6 +733,74 @@ async function main() {
     await dpage.close();
   }
 
+  console.log('■ 19 空过提示：跳过行动卡片 + 面板引导 + 提示条高亮');
+  {
+    await page.evaluate(() => window.TTYKM_UI.startGame('local2p', []));   // 固定双人模式（不引入 AI 回合）
+    // 人类空过：黑方焦点=过去，但过去没有黑子（黑子在现在/未来）→ 跳过行动
+    const S1 = scene({ turn: 0, stage: 'focus', skip: true });
+    put(S1, 1, 5, 0); put(S1, 2, 10, 0);
+    put(S1, 0, 1, 1); put(S1, 1, 3, 1); put(S1, 2, 15, 1);
+    S1.log.push({ no: 1, p: 0, text: '黑方新回合焦点时空无子，将自动空过' });
+    await setState(S1);
+    await page.waitForTimeout(420);                 // 截在卡片停留帧
+    const coach = await page.evaluate(() => {
+      const el = document.querySelector('#coach .skipcard');
+      return el ? { txt: el.textContent, left: el.style.left, top: el.style.top } : null;
+    });
+    expect('空过卡片出现（人类）', !!coach);
+    expect('卡片文案含「跳过行动」+ 成因', !!coach && coach.txt.includes('跳过行动') && coach.txt.includes('没有可行动的棋子'));
+    expect('卡片已按空焦点时空定位', !!coach && !!coach.left && !!coach.top);
+    expect('提示条 skip 高亮', await page.evaluate(() => document.querySelector('#notebar').classList.contains('skip')));
+    const pTxt = await page.evaluate(() => document.querySelector('#panel').textContent);
+    expect('面板为跳过文案 + 引导', pTxt.includes('跳过行动') && pTxt.includes('把焦点移到另一个时空'));
+    await shot('p1-skip-human.png');
+    await page.waitForTimeout(2500);                // 动画结束自动移除
+    expect('卡片淡出后自动清理', await page.evaluate(() => !document.querySelector('#coach .skipcard')));
+    // 成因二：焦点时空有己子但全无路可走（黑 0 号被自子 1/4 + 白子挡穿越围死）
+    const S1b = scene({ turn: 0, stage: 'focus', skip: true });
+    put(S1b, 0, 0, 0); put(S1b, 0, 1, 0); put(S1b, 0, 4, 0); put(S1b, 1, 0, 1);
+    put(S1b, 1, 10, 0); put(S1b, 2, 10, 0); put(S1b, 0, 5, 1); put(S1b, 2, 11, 1);
+    await setState(S1b);
+    await page.waitForTimeout(260);
+    expect('成因文案：有子却无路可走', await page.evaluate(() => {
+      const el = document.querySelector('#coach .skipcard');
+      return !!el && el.textContent.includes('有子却无路可走');
+    }));
+    await page.click('.focus-row .fbtn[data-e="1"]');   // 选定新焦点 → 空过回合结束，提示撤除
+    await page.waitForTimeout(400);
+    expect('选定新焦点后卡片与高亮撤除', await page.evaluate(() =>
+      !document.querySelector('#coach .skipcard') && !document.querySelector('#notebar').classList.contains('skip')));
+  }
+
+  console.log('■ 19b 空过提示（AI 回合）：点名「（AI）」');
+  {
+    const apage = await browser.newPage({ viewport: DESK });
+    apage.on('pageerror', e => errors.push('APAGE: ' + e.message));
+    await apage.goto(URL);
+    await apage.waitForTimeout(400);
+    await apage.evaluate(() => { Math.random = () => 0.9; });      // 固定：AI 执黑（0.9 ≥ 0.5 → aiSide 0）
+    await apage.click('#btnAI');
+    await apage.waitForTimeout(250);
+    await modConfirm(apage, 400);
+    const aiS = await apage.evaluate(() => window.TTYKM_UI.aiSide());
+    const who = aiS === 0 ? '黑方' : '白方';
+    const S2 = scene({ turn: aiS, stage: 'focus', skip: true });
+    put(S2, 1 - aiS === 0 ? 1 : 1, 0, 1 - aiS);                     // 对方一子（保证局面成立）
+    put(S2, 1, 5, aiS); put(S2, 2, 10, aiS);
+    S2.log.push({ no: 1, p: aiS, text: who + '新回合焦点时空无子，将自动空过' });
+    await apage.evaluate(x => window.TTYKM_UI.setState(x), S2);
+    await apage.waitForTimeout(420);
+    const acoach = await apage.evaluate(() => {
+      const el = document.querySelector('#coach .skipcard');
+      return el ? el.textContent : '';
+    });
+    expect('AI 空过卡片点名（AI）', acoach.includes('跳过行动') && acoach.includes(who + '（AI）'));
+    expect('AI 面板文案点名胜者', (await apage.evaluate(() => document.querySelector('#panel').textContent)).includes(who + '（AI）'));
+    await apage.screenshot({ path: path.join(SHOTS, 'p2-skip-ai.png') });
+    console.log('  shot: p2-skip-ai.png');
+    await apage.close();
+  }
+
   console.log('\n断言: ' + ok + '/' + total);
   await browser.close();
   if (errors.length) { console.log('\n页面错误:\n' + errors.join('\n')); process.exit(1); }

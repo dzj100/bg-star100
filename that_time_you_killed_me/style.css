@@ -323,6 +323,44 @@ button { font-family: inherit; touch-action: manipulation; }
 #stagewrap { position: relative; }
 #notebar.warn { border-left-color: var(--red); animation: warnShake .3s ease-in-out; }
 @keyframes warnShake { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-5px); } 60% { transform: translateX(4px); } }
+
+/* ---------- 空过提示：跳过行动卡片 + 提示条高亮 ----------
+   卡片挂 #coach 层（#stage 内，pointer-events:none，在 #fx 之下）；
+   入场弹出 → 停留 → 上浮淡出，纯 CSS 动画，animationend 由 JS 清理 */
+#coach { position: absolute; inset: 0; pointer-events: none; z-index: 25; }
+.skipcard { position: absolute; transform: translateX(-50%); }
+.sk-card {
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 12px;
+  padding: 9px 14px 10px; text-align: center; min-width: 172px;
+  box-shadow: 5px 5px 0 rgba(35, 32, 24, .2);
+  animation: skCoach 2.4s cubic-bezier(.2, 1.45, .4, 1) .12s both;
+}
+@keyframes skCoach {
+  0%   { opacity: 0; transform: scale(.55) translateY(9px); }
+  11%  { opacity: 1; transform: scale(1.04) translateY(0); }
+  17%  { transform: scale(1); }
+  74%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.98) translateY(-14px); }
+}
+.sk-pill {
+  display: inline-block; background: var(--ink); color: var(--cream);
+  font-size: 13px; font-weight: 900; letter-spacing: 2px;
+  border-radius: 20px; padding: 3px 12px 4px;
+}
+.sk-reason { margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.45; }
+.sk-tip { margin-top: 2px; font-size: 11px; font-weight: 600; opacity: .6; line-height: 1.4; }
+#notebar.skip {
+  background: rgba(35, 32, 24, .11); border-left-width: 6px;
+  border-left-color: var(--ink); animation: nbSkip .45s ease-out;
+}
+@keyframes nbSkip { 40% { transform: scale(1.015); } }
+@media (max-width: 899px) {
+  .sk-card { padding: 7px 11px 8px; border-width: 2.5px; border-radius: 10px; box-shadow: 4px 4px 0 rgba(35,32,24,.18); min-width: 150px; }
+  .sk-pill { font-size: 11.5px; letter-spacing: 1.5px; padding: 2px 10px 3px; }
+  .sk-reason { font-size: 12px; margin-top: 5px; }
+  .sk-tip { font-size: 10px; }
+  #notebar.skip { border-left-width: 4px; }
+}
 #turnstrip.strippop { animation: stripIn .26s cubic-bezier(.2, 1.4, .4, 1); }
 @keyframes stripIn { from { transform: translateY(-6px) scale(.97); opacity: .3; } }
 .win-card.winPop { animation: winPop .42s cubic-bezier(.2, 1.7, .4, 1); }

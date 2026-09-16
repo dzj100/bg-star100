@@ -55,6 +55,7 @@ const G = (() => {
       boards: [newBoard(), newBoard(), newBoard()],
       spares: [4, 4], dead: [0, 0],        // 备用分身 / 阵亡（盘上+备用+阵亡=7）
       stage: 'select', sel: null, acted: 0,
+      skip: false,                         // 本回合空过（焦点时空无子可动）→ 移焦点阶段为 true，UI 据此提示
       over: null, log: [],                       // 事件日志 {no:回合,p:玩家,text}，UI 展示最新一条/抽屉
     };
     for (let e = 0; e < 3; e++) { S.boards[e].cell[0] = { c: 1 }; S.boards[e].cell[15] = { c: 0 }; } // 白1号格/黑16号格
@@ -251,6 +252,7 @@ const G = (() => {
 
   function doPass(S) {
     if (!needPass(S)) return false;
+    S.skip = true;
     logPush(S, NAMES[S.turn] + '焦点时空无子可行动，本回合空过');
     if (!judgeEnd(S)) S.stage = 'focus';
     return true;
@@ -264,7 +266,9 @@ const G = (() => {
     S.focus[cur] = e;
     if (judgeEnd(S)) return { ok: true, over: true };
     S.turn = opp; S.turnNo++; S.sel = null; S.acted = 0;
-    if (selectablePieces(S).length) {
+    const canAct = selectablePieces(S).length > 0;
+    S.skip = !canAct;                    // 新回合空过标记（仅供 UI 提示；仅 focus 阶段有意义）
+    if (canAct) {
       S.stage = 'select';
     } else {
       S.stage = 'focus'; // 新回合方也空过，交由其移动焦点（UI 自动 doPass）

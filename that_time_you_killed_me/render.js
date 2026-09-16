@@ -17,6 +17,7 @@
   let S = null, mode = 'menu', live = false, busy = false, aiStop = false, aiRunning = false;
   let pend = null, pendKey = '';                     // 输入缓冲：busy 期间收下的一次点击（收尾重放）
   let winFired = null;                               // 结算演出只对同一终局触发一次
+  let coachKey = null;                               // 空过提示卡去重键（turnNo:turn），换局/恢复时重置
   let aiSide = 1;                                    // AI 执子（0=黑/1=白）：开局随机，旧存档缺省按白方
   let activeMods = [];                               // 本局启用的模组（弹窗勾选；重开/再来一局沿用）
   let actMode = 'move';                              // 行动模式 UI 态：move(移动·穿越)/sow/pluck
@@ -389,6 +390,7 @@
     renderPanel();
     renderOverlay();
     scheduleFit();
+    showCoach();
   }
   function renderTurn() {
     const k = S.turnNo + ':' + S.turn + ':' + (S.over ? 1 : 0);
@@ -407,6 +409,51 @@
     const t = last ? last.text : '';
     const el = $('#notebar .nb-t');
     el.textContent = t.length > 60 ? t.slice(0, 60) + '…' : t;
+    $('#notebar').classList.toggle('skip', skipActive());   // 空过回合高亮提示条（引向日志原文）
+  }
+  /* ---- 空过提示（跳过行动）----
+     回合开始时焦点时空无己子/全无合法行动 → 引擎置 S.skip 并直接进入移焦点阶段。
+     三层提示：① 空焦点时空棋盘上缘弹出卡片（瞬时，纯 CSS 动画）
+               ② 底部面板转跳过文案引导选新焦点（常驻，见 renderPanel）
+               ③ 提示条 .skip 高亮（常驻同回合，见 renderNote） */
+  const skipActive = () => !!(S && S.skip && S.stage === 'focus' && !S.over);
+  function skipInfo() {                              // 点名/成因/下一步，卡片与面板共用
+    const me = S.turn, e = S.focus[me];
+    const has = S.boards[e].cell.some(p => p && p.c === me);
+    return {
+      who: isAiTurn() ? PLAY[me] + '（AI）' : (mode === 'ai' ? '你' : PLAY[me]),
+      cause: '焦点「' + ERA_NAMES[e] + '」' + (has ? '有子却无路可走' : '没有可行动的棋子'),
+      tip: isAiTurn() ? '正在选择新焦点…' : '把焦点移到另一个时空即可继续',
+    };
+  }
+  function showCoach() {
+    const box = $('#coach');
+    if (!box) return;
+    if (!skipActive()) { coachKey = null; box.textContent = ''; return; }
+    const key = S.turnNo + ':' + S.turn;
+    if (coachKey === key) return;                    // 同一回合多次 renderAll 不重放
+    coachKey = key;
+    const e = S.focus[S.turn];
+    const c = skipInfo();
+    box.innerHTML =
+      '<div class="skipcard"><div class="sk-card">' +
+      '<div class="sk-pill">跳过行动</div>' +
+      '<div class="sk-reason">' + c.who + '的' + c.cause + '</div>' +
+      '<div class="sk-tip">' + c.tip + '</div>' +
+      '</div></div>';
+    const card = box.firstElementChild;
+    requestAnimationFrame(() => {                    // 排在同帧 fitBoards 之后测量定位（锚定空焦点时空棋盘）
+      if (!card.isConnected) return;
+      const f = box.getBoundingClientRect();
+      const b = document.querySelector('.era[data-e="' + e + '"] .board');
+      const r = b ? b.getBoundingClientRect() : null;
+      const x = r && r.width ? r.left - f.left + r.width / 2 : f.width / 2;
+      const y = r && r.height ? r.top - f.top + Math.min(16, r.height * 0.12) : 8;
+      card.style.left = Math.round(x) + 'px';
+      card.style.top = Math.round(y) + 'px';
+    });
+    card.addEventListener('animationend', () => { if (card.parentNode === box) box.textContent = ''; });
+    sleep(2900).then(() => { if (card.parentNode === box) box.textContent = ''; });  // 动画兜底清理
   }
   function openLog() {
     const list = $('#logList');
@@ -554,7 +601,11 @@
     let html = '';
     const aiTurn = isAiTurn();
     if (S.stage === 'select') {
-      html += '<div class="phint">' + (aiTurn ? PLAY[S.turn] + '（AI）思考中…' : '轮到' + PLAY[S.turn] + '，在焦点时空（' + ERA_NAMES[S.focus[S.turn]] + '）选一枚可行动的棋子') + '</div>';
+      if (G.needPass(S)) {                         // 旧档恢复的自动空过窗口：先预告再跳转
+        html += '<div class="phint">焦点时空没有可行动的棋子<small>本回合将自动空过，只需选择新焦点</small></div>';
+      } else {
+        html += '<div class="phint">' + (aiTurn ? PLAY[S.turn] + '（AI）思考中…' : '轮到' + PLAY[S.turn] + '，在焦点时空（' + ERA_NAMES[S.focus[S.turn]] + '）选一枚可行动的棋子') + '</div>';
+      }
     } else if (S.stage === 'act') {
       const left = 2 - S.acted;
       if (G.canEnd(S)) {
@@ -590,9 +641,14 @@
       }
     } else if (S.stage === 'focus') {
       const cur = S.focus[S.turn];
-      html += '<div class="phint">' + (isAiTurn() ? PLAY[S.turn] + '（AI）选择下一时空…' : '把焦点移到：') +
-          // '<small>移动后换对方回合并在回合末判定胜负</small>'+
-        '</div>';
+      if (S.skip) {                                // 空过回合：说明原因 + 引导选新焦点
+        const c = skipInfo();
+        html += '<div class="phint">' + c.who + '本回合跳过行动<small>' + c.cause + ' —— ' + c.tip + '</small></div>';
+      } else {
+        html += '<div class="phint">' + (isAiTurn() ? PLAY[S.turn] + '（AI）选择下一时空…' : '把焦点移到：') +
+            // '<small>移动后换对方回合并在回合末判定胜负</small>'+
+          '</div>';
+      }
       html += '<div class="focus-row">';
       for (let e = 0; e < 3; e++) {
         html += e === cur
@@ -795,6 +851,7 @@
         !Array.isArray(st.dead) || st.dead.length !== 2) return bad();
     if (st.stage === 'over' && !(st.over && (st.over.winner === 0 || st.over.winner === 1 || st.over.draw === true))) return bad();
     if (!Array.isArray(st.log)) st.log = [];
+    if (typeof st.skip !== 'boolean') st.skip = false;   // 旧档无 skip 字段：按非空过处理
     const mods = Array.isArray(st.mods)
       ? st.mods.filter(id => typeof id === 'string' && G.MODULES.some(m => m.id === id))
       : [];                                         // v1 旧档无 mods → 迁移为经典规则
@@ -824,7 +881,7 @@
     activeMods = (d.S.mods || []).slice();
     actMode = 'move';
     live = false; clearTimers(); aiStop = true; aiRunning = false; busy = false;
-    pend = null; pendKey = ''; stripKey = null; fitLast = null;
+    pend = null; pendKey = ''; stripKey = null; fitLast = null; coachKey = null;
     S = d.S;
     resetFxDom();
     $('#screen-menu').classList.add('hidden');
@@ -870,7 +927,7 @@
     activeMods = mods ? mods.slice() : [];
     actMode = 'move';
     clearTimers(); aiStop = true; aiRunning = false; busy = false; live = true;
-    pend = null; pendKey = ''; stripKey = null; fitLast = null;
+    pend = null; pendKey = ''; stripKey = null; fitLast = null; coachKey = null;
     if (mode === 'ai') aiSide = Math.random() < 0.5 ? 1 : 0;  // 随机分色；先后手由 newGame 随机
     else aiSide = 1;
     S = G.newGame(mode, Math.random, activeMods);
@@ -885,7 +942,7 @@
   }
   function goMenu() {
     live = false; clearTimers(); aiStop = true; aiRunning = false; busy = false;
-    pend = null; pendKey = ''; stripKey = null; fitLast = null;
+    pend = null; pendKey = ''; stripKey = null; fitLast = null; coachKey = null;
     activeMods = []; actMode = 'move';
     S = null;
     $('#screen-game').classList.remove('on');
@@ -897,6 +954,7 @@
   }
   function resetFxDom() {
     fxEl().innerHTML = '';
+    const coach = $('#coach'); if (coach) coach.textContent = '';
     fxTweens.length = 0; fxClock = 0; fxHold = 0; fxRunning = false;
     trauma = 0; stageEl().style.transform = '';
   }
@@ -935,10 +993,11 @@
     mods: () => activeMods.slice(),
     state: () => S,
     mode: () => mode,
+    aiSide: () => aiSide,
     busy: () => busy,
     setState(obj, opts) {          // 注入局面（截图走查用）
       live = false; clearTimers(); aiStop = true; aiRunning = false; busy = false;
-      pend = null; pendKey = ''; stripKey = null; fitLast = null;
+      pend = null; pendKey = ''; stripKey = null; fitLast = null; coachKey = null;
       S = obj;
       resetFxDom();
       $('#screen-menu').classList.add('hidden');
