@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1219">
+<title>渗透因子 · Infiltraitors</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- ============ 封面 / 菜单 ============ -->
+  <div id="screen-menu">
+    <div class="cgrain"></div>
+    <div class="deco d1"></div><div class="deco d2"></div><div class="deco d3"></div>
+    <div class="menu-inner">
+      <div class="logo-block">
+        <div class="logo-kicker">机密档案 · 深夜行动</div>
+        <div class="logo-zh">渗透因子</div>
+        <div class="logo-en">Infiltraitors</div>
+        <div class="logo-sub">双人协作 · 推理缉凶 · 人机搭档</div>
+      </div>
+
+      <div class="cfg-panel" id="cfgPanel">
+        <div class="cfg-row" data-k="colors">
+          <span class="cfg-label">颜色数量</span>
+          <span class="seg" data-k="colors">
+            <button data-v="4">4 色<small>红黄绿蓝</small></button>
+            <button data-v="5">5 色<small>+黑</small></button>
+          </span>
+        </div>
+        <div class="cfg-row" data-k="one">
+          <span class="cfg-label">数字 1</span>
+          <span class="seg" data-k="one">
+            <button data-v="0">不含<small>数字 2~15</small></button>
+            <button data-v="1">含 1<small>更宽松 · 更难</small></button>
+          </span>
+        </div>
+        <div class="cfg-row" data-k="traitors">
+          <span class="cfg-label">叛徒数量</span>
+          <span class="seg num" data-k="traitors"></span>
+        </div>
+        <div class="cfg-row" data-k="extra">
+          <span class="cfg-label">额外子弹</span>
+          <span class="seg num" data-k="extra"></span>
+        </div>
+        <div class="cfg-read" id="cfgRead"></div>
+      </div>
+
+      <button class="btn-main primary" id="btnStart">开始任务<span class="sub">夜枭搭档 · 你负责推理与枪法</span></button>
+      <button class="btn-main hidden" id="btnResume">继续上次任务<span class="sub" id="resumeSub">上次对局未结束</span></button>
+      <button class="btn-link" id="btnRules">规则速览</button>
+    </div>
+    <div class="credit">@imStar100</div>
+  </div>
+
+  <!-- ============ 对局界面 ============ -->
+  <div id="screen-game">
+    <div id="topbar">
+      <button class="tb-btn" id="btnMenu">‹ 菜单</button>
+      <div class="tb-title">渗透因子<small>INFILTRAITORS</small></div>
+      <div id="gunbar" title="剩余子弹">
+        <span class="gun">🔫</span>
+        <span class="pips" id="pips"></span>
+        <b id="bcount">10</b>
+      </div>
+      <button class="tb-btn" id="btnBoard">推论</button>
+      <button class="tb-btn" id="btnRulesGame">规则</button>
+    </div>
+
+    <div id="alertbar" class="hidden"></div>
+
+    <div id="tablewrap">
+      <div id="turnsign" class="c0">你的回合</div>
+      <div id="table">
+        <button class="pile p-deck" id="pileDeck"><b id="dcount">39</b><span>牌库</span></button>
+        <button class="pile p-trait" id="pileTrait"><b id="tcount">6</b><span>叛徒</span></button>
+        <button class="pile p-down" id="pileDown"><b id="dncount">1</b><span>暗弃</span></button>
+        <button class="pile p-up" id="pileUp"><b id="upcount">0</b><span>明弃</span></button>
+      </div>
+    </div>
+
+    <div id="aiarea">
+      <div class="ai-head">
+        <span class="ai-name">夜枭</span>
+        <span class="ai-role">盯梢 · 情报</span>
+        <span class="ai-hand" id="aiHandChip" title="夜枭手牌张数（内容隐藏）"><i></i><b id="aiHandN">5</b></span>
+        <button class="watch" id="watchSlot" title="夜枭盯梢的叛徒（内容隐藏）">
+          <span class="watch-back">?</span>
+          <span class="watch-tag" id="watchTag">已布控</span>
+        </button>
+        <span class="ai-caught" id="caughtTag"></span>
+      </div>
+      <button class="intel-row" id="rowRel" data-zone="rel">
+        <span class="stamp rel">有关</span>
+        <span class="intel-cards" id="relCards"></span>
+        <span class="intel-n" id="relN">0</span>
+      </button>
+      <button class="intel-row" id="rowUnrel" data-zone="unrel">
+        <span class="stamp unrel">无关</span>
+        <span class="intel-cards" id="unrelCards"></span>
+        <span class="intel-n" id="unrelN">0</span>
+      </button>
+    </div>
+
+    <div id="handwrap">
+      <div id="hand"></div>
+      <div id="handtip" class="hidden">选中一张手牌 → 按【通讯】交给夜枭判定</div>
+    </div>
+
+    <div id="actbar">
+      <button class="act" id="btnProbe"><b>通讯</b><span>打出线索 · 摸 1 张</span></button>
+      <button class="act" id="btnLurk"><b>潜伏</b><span>摸 1~3 张 · 暗弃 1</span></button>
+      <button class="act elim" id="btnElim"><b>铲除</b><span>指认叛徒 · 耗 1 发</span></button>
+    </div>
+
+    <div id="notebar" role="button" tabindex="0">
+      <span class="nb-ico">▤</span>
+      <span class="nb-t" id="nbText">任务开始</span>
+      <span class="nb-open">日志</span>
+    </div>
+
+    <div id="fx"></div>
+  </div>
+
+  <!-- ============ 规则速览 ============ -->
+  <div class="sheet-mask hidden" id="rulesMask">
+    <div class="sheet">
+      <h3>规则速览<small class="sheet-sub">双人协作 · 叛徒全都藏在人群里</small></h3>
+      <p>你和搭档<b>夜枭</b>追查一群叛徒。叛徒区面朝下扣着 <b>N 名叛徒</b>，夜枭每次<b>盯梢</b>锁定 1 名目标，你和它轮流给出线索，由你推理出目标<b>确切的颜色和数字</b>，然后开枪<b>铲除</b>。</p>
+      <p><b>有关 / 无关（判定规则）：</b>线索牌与叛徒<b>同色</b>、<b>同数字</b>、数字互为<b>倍数或因数</b> → 有关；否则无关。判定永远真实。</p>
+      <p><b>你的行动（每次一选）：</b></p>
+      <ol>
+        <li><b>通讯</b>：打出手牌给夜枭判定（有关/无关）→ 情报区 +1 → 你从牌库摸 1 张；</li>
+        <li><b>潜伏</b>：摸 1~3 张（最多补到 7 张），然后牌库顶 1 张进暗弃堆；</li>
+        <li><b>铲除</b>：指认盯梢叛徒的颜色 + 数字，<b>无论成败都耗 1 发子弹</b>；命中则公示并洗回人群，你还能从弃牌堆拾 1 张；落空则什么都不变。</li>
+      </ol>
+      <p><b>夜枭的行动：</b>盯梢（锁定新目标，暗弃 1 张）· 情报（打出一张线索）· 潜伏补牌（牌库吃紧时改为按兵不动）。它名字旁的<b>牌背计数</b>就是它的手牌张数。</p>
+      <p><b>胜利：</b>铲除全部叛徒。<b>失败：</b>牌库被摸空，或未铲除的叛徒比剩余子弹还多（弹药告急）。</p>
+      <p><b>提示：</b>手牌、情报区、明弃堆里的牌都<b>不可能</b>是当前目标 —— 用「推论」面板自动圈定候选；线索牌选「切得最开」的那张，效率最高；剩下两三个候选时，直接赌一发可能比继续摸牌更划算。</p>
+      <button class="btn-main" id="btnCloseRules">知道了</button>
+    </div>
+  </div>
+
+  <!-- ============ 对局日志（倒序） ============ -->
+  <div class="sheet-mask hidden" id="logMask">
+    <div class="sheet">
+      <h3>行动日志<small class="sheet-sub">最新在前 · 点底部日志条随时查看</small></h3>
+      <div id="logList"></div>
+      <button class="btn-main" id="btnCloseLog">关闭</button>
+    </div>
+  </div>
+
+  <!-- ============ 推论板 ============ -->
+  <div class="sheet-mask hidden" id="boardMask">
+    <div class="sheet sheet-wide">
+      <h3>推论板<small class="sheet-sub">公开信息自动分析 · 圈定盯梢叛徒的可能身份</small></h3>
+      <div class="board-top">
+        <span class="cand-big"><b id="candN">0</b> 个候选</span>
+        <label class="switch"><input type="checkbox" id="autoChk" checked><span>自动分析</span></label>
+      </div>
+      <div id="boardGrid"></div>
+      <div class="board-legend">
+        <span class="lg"><i class="sw cand"></i>候选</span>
+        <span class="lg"><i class="sw hand"></i>你的手牌</span>
+        <span class="lg"><i class="sw intel"></i>情报区</span>
+        <span class="lg"><i class="sw disc"></i>明弃堆</span>
+        <span class="lg"><i class="sw judge"></i>与判定冲突</span>
+      </div>
+      <button class="btn-main" id="btnCloseBoard">关闭</button>
+    </div>
+  </div>
+
+  <!-- ============ 弃牌堆（明弃 / 暗弃） ============ -->
+  <div class="sheet-mask hidden" id="discMask">
+    <div class="sheet sheet-wide">
+      <h3>弃牌堆<small class="sheet-sub" id="discSub">明弃按颜色分组 · 数字升序</small></h3>
+      <div id="discUp"></div>
+      <div class="disc-down">
+        <b>暗弃堆</b><span id="discDownN">0 张</span>
+        <p>牌面朝下，只公开张数。拾牌阶段可从这里盲抽 1 张。</p>
+      </div>
+      <button class="btn-main" id="btnCloseDisc">关闭</button>
+    </div>
+  </div>
+
+  <!-- ============ 铲除（指认） ============ -->
+  <div class="sheet-mask hidden" id="elimMask">
+    <div class="sheet">
+      <h3>铲除 · 指认<small class="sheet-sub">颜色 + 数字都正确才算命中 · 开枪即耗 1 发</small></h3>
+      <div class="pick-block">
+        <div class="pick-title">颜色</div>
+        <div class="pick-colors" id="pickColors"></div>
+      </div>
+      <div class="pick-block">
+        <div class="pick-title">数字</div>
+        <div class="pick-nums" id="pickNums"></div>
+      </div>
+      <div class="pick-state" id="pickState">未选择</div>
+      <button class="btn-main primary" id="btnFire" disabled>确认开枪</button>
+      <button class="btn-main" id="btnCancelElim">再想想</button>
+    </div>
+  </div>
+
+  <!-- ============ 潜伏（摸牌数） ============ -->
+  <div class="sheet-mask hidden" id="lurkMask">
+    <div class="sheet">
+      <h3>潜伏 · 摸牌<small class="sheet-sub">摸得越多，牌库时钟走得越快；随后还要暗弃 1 张</small></h3>
+      <div class="lurk-opts" id="lurkOpts"></div>
+      <button class="btn-main" id="btnCancelLurk">取消</button>
+    </div>
+  </div>
+
+  <!-- ============ 情报区明细 ============ -->
+  <div class="sheet-mask hidden" id="intelMask">
+    <div class="sheet sheet-wide">
+      <h3>情报区明细<small class="sheet-sub" id="intelSub"></small></h3>
+      <div id="intelBody"></div>
+      <button class="btn-main" id="btnCloseIntel">关闭</button>
+    </div>
+  </div>
+
+  <!-- ============ 拾牌（铲除奖励） ============ -->
+  <div class="sheet-mask hidden" id="rewardMask">
+    <div class="sheet sheet-wide">
+      <h3>拾取战利品<small class="sheet-sub">从弃牌堆取 1 张进手牌（可选）</small></h3>
+      <div class="pick-title">明弃堆 · 点选一张</div>
+      <div id="rewardUp"></div>
+      <button class="btn-main" id="btnBlind">暗弃堆盲抽 1 张</button>
+      <button class="btn-main" id="btnSkipReward">跳过</button>
+    </div>
+  </div>
+
+  <!-- ============ 结算 ============ -->
+  <div id="overlay-win" class="hidden"></div>
+</div>
+<script src="game.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
