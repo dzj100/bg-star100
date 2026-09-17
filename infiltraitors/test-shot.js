@@ -178,14 +178,16 @@ async function main() {
       b: document.getElementById('bcount').textContent,
       pips: document.querySelectorAll('#pips i').length,
       pipsOn: document.querySelectorAll('#pips i:not(.spent)').length,
-      caught: document.getElementById('caughtTag').textContent,
+      caughtGone: document.getElementById('caughtTag') === null,
+      lampOff: !document.getElementById('aiTurnLamp').classList.contains('on'),
       watch: document.getElementById('watchTag').textContent,
       turn: document.getElementById('turnsign').textContent,
       aiHand: document.getElementById('aiHandN').textContent,
     }));
-    expect('顶栏读数：牌库 38 / 叛徒 7 / 子弹 10 发 10 芯', dom.deck === '38' && dom.trait === '7' && dom.b === '10' && dom.pips === 10 && dom.pipsOn === 10);
-    expect('已铲除 0/7 · 已布控 · 夜枭手牌 5', dom.caught.includes('0/7') && dom.watch === '已布控' && dom.aiHand === '5');
+    expect('顶栏读数：牌库 38 / 叛徒 7/7 / 子弹 10 发 10 芯', dom.deck === '38' && dom.trait === '7/7' && dom.b === '10' && dom.pips === 10 && dom.pipsOn === 10);
+    expect('已铲除条目已移除 · 已布控 · 夜枭手牌 5', dom.caughtGone && dom.watch === '已布控' && dom.aiHand === '5');
     expect('回合指示为玩家', dom.turn.includes('你的回合'));
+    expect('轮到你时夜枭回合标记熄灭', dom.lampOff);
     await shot('m4-open.png');
   }
 
@@ -496,8 +498,9 @@ async function main() {
       vis: !document.getElementById('alertbar').classList.contains('hidden'),
       txt: document.getElementById('alertbar').textContent,
       turn: document.getElementById('turnsign').textContent,
+      lampOn: document.getElementById('aiTurnLamp').classList.contains('on'),
     }));
-    expect('夜枭行动中：提示条点名', dom.vis && dom.txt.includes('夜枭正在行动') && dom.turn.includes('夜枭'));
+    expect('夜枭行动中：提示条点名 · 回合标记亮起', dom.vis && dom.txt.includes('夜枭正在行动') && dom.turn.includes('夜枭') && dom.lampOn);
     await shot('m18-ai-turn.png');
     await page.waitForFunction(() => {
       const S = window.INFIL_UI.state();
@@ -506,6 +509,7 @@ async function main() {
     const s = await st();
     expect('AI 打出一张情报后交还回合', s.turn === 0 && s.turnNo === 4 && s.aiHand === 2 && s.intel === 3);
     expect('夜枭手牌计数随出牌更新为 2', await page.evaluate(() => document.getElementById('aiHandN').textContent === '2'));
+    expect('交还回合后夜枭标记熄灭', await page.evaluate(() => !document.getElementById('aiTurnLamp').classList.contains('on')));
     await shot('m19-ai-done.png');
   }
 

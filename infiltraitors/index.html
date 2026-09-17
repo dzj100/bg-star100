@@ -36,13 +36,13 @@
     <svg class="deco d4" viewBox="0 0 100 100" aria-hidden="true"><use href="#hole"/></svg>
     <div class="menu-inner">
       <div class="logo-block">
-        <div class="logo-kicker">机密档案 · 深夜行动</div>
+        <div class="logo-kicker">特工行动 · 铲除叛徒</div>
         <div class="logo-zh">渗透因子</div>
         <div class="logo-en">Infiltraitors</div>
-        <div class="logo-sub">双人协作 · 推理缉凶 · 人机搭档</div>
+        <div class="logo-sub">双人协作 · 推理清剿 · 人机搭档</div>
       </div>
 
-      <button class="btn-main primary" id="btnStart">开始任务<span class="sub">夜枭搭档 · 你负责推理与枪法</span></button>
+      <button class="btn-main primary" id="btnStart">开始任务<span class="sub">夜枭盯梢 · 你负责推理与铲除</span></button>
       <div class="menu-meta" id="menuMeta"></div>
       <button class="btn-main hidden" id="btnResume">继续上次任务<span class="sub" id="resumeSub">上次对局未结束</span></button>
       <button class="btn-link" id="btnRules">规则速览</button>
@@ -74,7 +74,7 @@
       <div id="turnsign" class="c0">你的回合</div>
       <div id="table">
         <button class="pile p-deck" id="pileDeck"><b id="dcount">39</b><span>牌库</span></button>
-        <button class="pile p-trait" id="pileTrait"><b id="tcount">6</b><span>叛徒</span></button>
+        <button class="pile p-trait" id="pileTrait"><b id="tcount">7/7</b><span>叛徒</span></button>
         <button class="pile p-down" id="pileDown"><b id="dncount">1</b><span>暗弃</span></button>
         <button class="pile p-up" id="pileUp"><b id="upcount">0</b><span>明弃</span></button>
       </div>
@@ -88,14 +88,18 @@
 
     <div id="aiarea">
       <div class="ai-head">
-        <span class="ai-name">夜枭</span>
-        <span class="ai-role">盯梢 · 情报</span>
-        <span class="ai-hand" id="aiHandChip" title="夜枭手牌张数（内容隐藏）"><i></i><b id="aiHandN">5</b></span>
-        <button class="watch" id="watchSlot" title="夜枭盯梢的叛徒（内容隐藏）">
-          <span class="watch-back">?</span>
-          <span class="watch-tag" id="watchTag">已布控</span>
-        </button>
-        <span class="ai-caught" id="caughtTag"></span>
+        <span class="ai-id">
+          <span class="ai-name">夜枭</span>
+          <span class="ai-hand" id="aiHandChip" title="夜枭手牌张数（内容隐藏）"><i></i><b id="aiHandN">5</b></span>
+        </span>
+        <span class="ai-mid">
+          <span class="ai-role">盯梢</span>
+          <button class="watch" id="watchSlot" title="夜枭盯梢的叛徒（内容隐藏）">
+            <span class="watch-back">?</span>
+            <span class="watch-tag" id="watchTag">已布控</span>
+          </button>
+        </span>
+        <i class="turn-lamp" id="aiTurnLamp" title="轮到夜枭时亮起"></i>
       </div>
       <button class="intel-row" id="rowRel" data-zone="rel">
         <span class="stamp rel">有关</span>

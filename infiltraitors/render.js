@@ -221,7 +221,7 @@
   function renderTop() {
     const left = G.traitorsLeft(S);
     $('#dcount').textContent = S.deck.length;
-    $('#tcount').textContent = S.traitorPile.length + (S.aiWatch ? 1 : 0);
+    $('#tcount').textContent = left + '/' + S.cfg.traitors;
     $('#dncount').textContent = S.discardDown.length;
     $('#upcount').textContent = S.discardUp.length;
     $('#bcount').textContent = Math.max(0, S.bullets);
@@ -235,8 +235,7 @@
     turn.className = 'c' + tv;
     turn.textContent = S.over ? '任务结束'
       : tv === 0 ? '你的回合 · 第 ' + S.round + ' 轮' : '夜枭行动中 · 第 ' + S.round + ' 轮';
-    const caught = $('#caughtTag');
-    caught.textContent = '已铲除 ' + S.caught + '/' + S.cfg.traitors + ' · 剩 ' + left + ' 名';
+    $('#aiTurnLamp').classList.toggle('on', !S.over && tv === 1);
     const alert = $('#alertbar');
     if (!S.over && left > 0 && S.bullets <= left) {
       alert.classList.remove('hidden');
@@ -748,8 +747,9 @@
     $('#autoChk').checked = autoBoard;
     const nums = [];
     for (let n = S.cfg.one ? 1 : 2; n <= 15; n++) nums.push(n);
-    const head = '<div class="bRow"><span class="browlabel">色 \\ 数</span>' +
-      nums.map(n => '<span class="bcell bnumhead" style="border:none;background:none">' + n + '</span>').join('') + '</div>';
+    // const head = '<div class="bRow"><span class="browlabel">色 \\ 数</span>' +
+    //   nums.map(n => '<span class="bcell bnumhead" style="border:none;background:none">' + n + '</span>').join('') + '</div>';
+    const head = '';
     const rows = [];
     for (let c = 0; c < S.cfg.colors; c++) {
       const cells = nums.map(n => {
