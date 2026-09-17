@@ -2,8 +2,8 @@
    渗透因子 Infiltraitors · 规则引擎（纯逻辑，浏览器 + Node 通用）
    牌: 整数 id = (色 << 4) | 数字；色 0红 1黄 2绿 3蓝 4黑；数字 1~15
    人机分工: 玩家 = 通讯/潜伏/铲除；AI(夜枭) = 盯梢/情报/潜伏
-   有关判定: 同色 | 同数 | 倍数 | 因数
-   胜负: 全歼叛徒 = 胜；牌库摸空 = 负；未铲除叛徒 > 剩余子弹 = 负
+   有关判定: 同色 | 同数 | 倍数 | 因数（1 不参与倍数/因数，只认同色/同数）
+   胜负: 全歼叛徒 = 胜；未铲除叛徒 > 剩余子弹 = 负；轮到的一方五类行动全不可执行（死局）= 负
    ============================================================ */
 'use strict';
 const G = (() => {
@@ -41,18 +41,29 @@ const G = (() => {
   }
   /* 开局牌库张数 = 入局牌 - 叛徒 - 双方各 5 张手牌 */
   const deckSizeOf = cfg => combos(cfg).length - cfg.traitors - 10;
-  /* 难度评估：查清 1 名叛徒约需 5 次探测（≈5 张牌库）；多余子弹各可顶 1 次探测 */
+  /* 难度评级（2026-09-17 按用户标准重写，四原则）：① 5 色恒严于 4 色；② 叛徒越多越难；
+     ③ 额外子弹越少越难；④ 数字 1 不改变评级。评级基准用「不含 1」牌库（= 每色 14 张 − 叛徒
+     − 10），数字 1 的 +5 张只进实际牌库（deck 字段，展示用）不进评级；每名叛徒探测需求
+     per = 5 ×（5 色 ? 1.5 : 1）——5 色候选空间 70 vs 56 且需沿 5 条色轴排除，1.5 倍系数
+     保证任意叛徒/子弹组合下 5 色分数恒低于 4 色（需 > 1.4，最紧角 11 叛徒 +0 弹取到）。
+     score = (基准牌库 + 额外子弹) / (per × 叛徒)：标签四档为粗粒度，同档内严格分序、跨色永不倒挂 */
   function difficultyOf(cfgIn) {
     const cfg = normCfg(cfgIn);
-    const deck = deckSizeOf(cfg);
-    const need = 5 * cfg.traitors;
-    const score = (deck + cfg.extra) / need;
-    return { deck, need, score, tag: score >= 1.5 ? '轻松' : score >= 1.2 ? '标准' : score >= 1.0 ? '紧张' : '绝望' };
+    const base = 14 * cfg.colors - cfg.traitors - 10;
+    const per = 5 * (cfg.colors >= 5 ? 1.5 : 1);
+    const need = per * cfg.traitors;
+    const score = (base + cfg.extra) / need;
+    return {
+      deck: deckSizeOf(cfg), need, score,
+      tag: score >= 1.15 ? '轻松' : score >= 1.0 ? '标准' : score >= 0.8 ? '紧张' : '绝望',
+    };
   }
-  /* 提示牌 a 与叛徒 b 是否「有关」：同色 | 同数 | 倍数 | 因数 */
+  /* 提示牌 a 与叛徒 b 是否「有关」：同色 | 同数 | 倍数 | 因数
+     （数字 1 不参与倍数/因数匹配，只认同色/同数） */
   function related(a, b) {
     const ac = cOf(a), bc = cOf(b), an = nOf(a), bn = nOf(b);
     if (ac === bc || an === bn) return true;
+    if (an === 1 || bn === 1) return false;
     return an % bn === 0 || bn % an === 0;
   }
 
@@ -177,7 +188,18 @@ const G = (() => {
     eliminate: !!S.aiWatch,
   });
 
-  /* 通讯：手牌 → 判定 → 情报区 → 摸 1 张 */
+  /* 死局判定：轮到的一方五类行动全都不可执行才判负 */
+  /* 玩家：盯梢/情报属夜枭；通讯需手牌+盯梢，潜伏需牌库+未满手，铲除需盯梢 */
+  const playerHasAction = S =>
+    !!(S.aiWatch && (S.hand.length || S.bullets > 0)) ||
+    !!(S.deck.length && S.hand.length < HAND_MAX);
+  /* 夜枭：盯梢需尚未布控且叛徒区有牌；情报需手牌；潜伏需牌库+未满手 */
+  const aiHasAction = S =>
+    !!(!S.aiWatch && S.traitorPile.length) ||
+    !!(S.aiWatch && S.aiHand.length) ||
+    !!(S.deck.length && S.aiHand.length < HAND_MAX);
+
+  /* 通讯：手牌 → 判定 → 情报区；牌库有牌时进入「是否摸 1 张」选择 */
   function playerProbe(S, idx) {
     if (S.over || S.turn !== 0 || S.pending || !S.aiWatch) return { ok: false, evs: [] };
     if (idx < 0 || idx >= S.hand.length) return { ok: false, evs: [] };
@@ -186,16 +208,37 @@ const G = (() => {
     S.intel[zone].push(card);
     S.stat.probes++;
     logPush(S, 'you', '你通讯【' + cardName(card) + '】：' + (zone === 'rel' ? '有关' : '无关'));
-    const got = doDraw(S, 1, 'hand');
-    if (got.length) logPush(S, 'you', '你从牌库摸到【' + cardName(got[0]) + '】');
-    const evs = [{ k: 'play', card, from: 'hand', zone }, { k: 'draw', cards: got, to: 'hand' }];
+    const evs = [{ k: 'play', card, from: 'hand', zone }];
+    if (S.deck.length && S.hand.length < HAND_MAX) {
+      S.pending = 'draw';                     // 摸牌选择子阶段：摸或不摸后才轮到 AI
+    } else {
+      if (!S.deck.length) logPush(S, 'you', '牌库已空，无可摸牌');
+      finishAction(S, evs);
+    }
+    return { ok: true, evs };
+  }
+
+  /* 通讯后的摸牌选择：take=true 摸 1 张，否则不摸；随后结算回合 */
+  function drawPick(S, take) {
+    if (S.over || S.pending !== 'draw') return { ok: false, evs: [] };
+    const evs = [];
+    if (take) {
+      const got = doDraw(S, 1, 'hand');
+      if (got.length) {
+        logPush(S, 'you', '你从牌库摸到【' + cardName(got[0]) + '】');
+        evs.push({ k: 'draw', cards: got, to: 'hand' });
+      }
+    } else {
+      logPush(S, 'you', '你选择不摸牌');
+    }
+    S.pending = null;
     finishAction(S, evs);
     return { ok: true, evs };
   }
 
-  /* 潜伏：摸 1~3（上限 7）→ 牌库顶 1 张暗弃 */
+  /* 潜伏：摸 1~3（上限 7）→ 牌库顶 1 张暗弃；牌库无牌不可用 */
   function playerLurk(S, k) {
-    if (S.over || S.turn !== 0 || S.pending) return { ok: false, evs: [] };
+    if (S.over || S.turn !== 0 || S.pending || !S.deck.length) return { ok: false, evs: [] };
     const max = Math.min(3, HAND_MAX - S.hand.length);
     k = clamp(Math.round(k), 1, Math.max(1, max));
     if (max <= 0) return { ok: false, evs: [] };
@@ -288,45 +331,47 @@ const G = (() => {
       S.over = { win: false, why: 'bullets', stats: statLine(S) };
       return true;
     }
-    if (S.deck.length === 0) {
-      logPush(S, 'sys', '牌库已被摸空 —— 任务失败');
-      S.over = { win: false, why: 'deck', stats: statLine(S) };
-      return true;
-    }
     return false;
   }
   function finishAction(S, evs) {
     if (checkEnd(S)) return;
     endTurn(S);
   }
+  /* 死局：刚接手回合的一方五类行动全都不可执行 —— 任务失败（取代旧的「牌库摸空即负」） */
+  function checkStuck(S) {
+    if (S.over) return true;
+    if (S.turn === 0 ? playerHasAction(S) : aiHasAction(S)) return false;
+    logPush(S, 'sys', '任务陷入僵局：' + (S.turn === 0 ? NAMES.you : NAMES.ai) + '已无任何行动可执行 —— 任务失败');
+    S.over = { win: false, why: 'stuck', stats: statLine(S) };
+    return true;
+  }
   function endTurn(S) {
     if (S.over) return;
     S.turn = 1 - S.turn;
     S.turnNo++;
     if (S.turn === 0) S.round++;
+    checkStuck(S);
   }
 
-  /* ---- AI 回合：盯梢 / 情报 / 潜伏 三选一 ---- */
-  /* 补牌线：牌库要能留下「玩家自己查清剩余叛徒」的探测预算（约 4 张/名）才补；
-     潜伏补 3 张要摸 3 弃 1，是全局牌库时钟的最大开销，牌库吃紧时必须停手 */
-  const aiRefillOk = S => S.deck.length > 4 * traitorsLeft(S) + 2;
+  /* ---- AI 回合：盯梢 / 情报 / 潜伏 三选一（必须行动，无「按兵不动」） ---- */
   function aiTakeTurn(S, rnd = Math.random) {
     if (S.over || S.turn !== 1) return { op: null, evs: [] };
     let op, evs;
-    if (!S.aiWatch) { evs = doStake(S, rnd); op = { k: 'stake' }; if (!evs.length) { endTurn(S); return { op, evs }; } }
+    if (!S.aiWatch) { evs = doStake(S, rnd); op = { k: 'stake' }; if (!evs.length) { checkEnd(S); if (!S.over) endTurn(S); return { op, evs }; } }
     else if (S.aiHand.length) {
       const idx = chooseHintIdx(S, rnd);
       evs = doHint(S, idx);
       op = { k: 'hint', idx };
-    } else if (aiRefillOk(S)) {
+    } else if (S.deck.length) {
       const r = doLurkDraw(S, 'aiHand');
       logPush(S, 'ai', '夜枭潜伏：补 ' + r.got.length + ' 张手牌' + (r.milled.length ? '，牌库顶 1 张置入暗弃堆' : ''));
       evs = [{ k: 'draw', cards: r.got, to: 'aiHand' }, { k: 'mill', n: r.milled.length }];
       op = { k: 'lurk' };
     } else {
-      logPush(S, 'ai', '夜枭按兵不动：牌库吃紧，暂不补牌');
+      op = { k: 'none' };                    // 无任何行动可执行：立即死局判负
       evs = [];
-      op = { k: 'hold' };
+      checkStuck(S);
+      return { op, evs };
     }
     checkEnd(S);
     if (!S.over) endTurn(S);
@@ -335,7 +380,12 @@ const G = (() => {
 
   /* 代打玩家（平衡模拟用的参考打法）：能省牌就省牌，子弹该花就花，绝不无谓潜伏 */
   function autoPlayerAct(S, rnd = Math.random) {
-    if (S.over || S.turn !== 0 || S.pending) return null;
+    if (S.over || S.turn !== 0) return null;
+    if (S.pending === 'reward') return null;
+    if (S.pending === 'draw') {
+      /* 摸牌余量：留下「查清剩余叛徒」的探测预算（约 4 张/名）才摸 */
+      return { act: 'draw', take: S.deck.length > 4 * traitorsLeft(S) };
+    }
     const cands = publicCandidates(S);
     const left = traitorsLeft(S);
     const spare = Math.max(0, S.bullets - left);            // 还能浪费几发
@@ -360,11 +410,14 @@ const G = (() => {
     if (S.hand.length && S.aiWatch && cands.length) {
       return { act: 'elim', c: cOf(cands[0]), n: nOf(cands[0]) };
     }
-    if (S.hand.length < HAND_MAX) return { act: 'lurk', k: Math.min(3, HAND_MAX - S.hand.length) };
+    if (S.deck.length && S.hand.length < HAND_MAX) return { act: 'lurk', k: Math.min(3, HAND_MAX - S.hand.length) };
+    /* 手牌枯竭且牌库见底：孤注一掷按候选开火 */
+    if (S.aiWatch && cands.length) return { act: 'elim', c: cOf(cands[0]), n: nOf(cands[0]) };
     return null;
   }
   function applyPlayerAct(S, a, rnd = Math.random) {
     if (!a) return { ok: false, evs: [] };
+    if (a.act === 'draw') return drawPick(S, a.take);
     if (a.act === 'probe') return playerProbe(S, a.idx);
     if (a.act === 'lurk') return playerLurk(S, a.k);
     if (a.act === 'elim') return playerEliminate(S, a.c, a.n);
@@ -384,7 +437,7 @@ const G = (() => {
     if (S.aiWatch !== null && !Number.isInteger(S.aiWatch)) return false;
     if (!Number.isInteger(S.bullets) || !Number.isInteger(S.bulletsMax)) return false;
     if (!Number.isInteger(S.caught) || !Number.isInteger(S.turn) || !Number.isInteger(S.round)) return false;
-    if (S.pending !== null && S.pending !== 'reward') return false;
+    if (S.pending !== null && S.pending !== 'reward' && S.pending !== 'draw') return false;
     if (S.over && typeof S.over.win !== 'boolean') return false;
     if (!Array.isArray(S.log)) return false;
     return true;
@@ -393,10 +446,10 @@ const G = (() => {
   return {
     COLORS, GLYPH, NAMES, HAND_MAX, TRAIT_MIN, TRAIT_MAX, EXTRA_MAX,
     cOf, nOf, mk, cardName, normCfg, bulletsOf, combos, deckSizeOf, difficultyOf, related,
-    newGame, analyze, publicCandidates, traitorsLeft, playerActions,
-    playerProbe, playerLurk, playerEliminate, rewardPick, rewardSkip,
+    newGame, analyze, publicCandidates, traitorsLeft, playerActions, playerHasAction, aiHasAction,
+    playerProbe, drawPick, playerLurk, playerEliminate, rewardPick, rewardSkip,
     aiTakeTurn, chooseHintIdx, autoPlayerAct, applyPlayerAct,
-    checkEnd, statLine, validate, logPush,
+    checkEnd, checkStuck, statLine, validate, logPush,
   };
 })();
 

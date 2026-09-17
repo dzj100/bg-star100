@@ -77,10 +77,13 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
     radial-gradient(900px 420px at 50% -8%, rgba(63, 199, 184, .12), transparent 70%),
     radial-gradient(700px 400px at 100% 108%, rgba(232, 165, 58, .09), transparent 70%);
 }
-.deco { position: absolute; pointer-events: none; border: 2px solid var(--line); opacity: .5; }
-.deco.d1 { width: 90px; height: 90px; top: 4%; left: -26px; transform: rotate(24deg); border-radius: 10px; }
-.deco.d2 { width: 54px; height: 54px; top: 10%; right: -12px; border-radius: 50%; border-color: var(--ai); }
-.deco.d3 { width: 130px; height: 8px; bottom: 12%; left: -30px; transform: rotate(-9deg); background: var(--line); }
+.hole-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* 弹孔（图形见 #hole 符号）：碎屑环 + 弹孔 + 放射裂纹 */
+.deco { position: absolute; pointer-events: none; }
+.deco.d1 { width: 98px; height: 98px; top: 5%; left: -30px; transform: rotate(18deg); opacity: .95; }
+.deco.d2 { width: 58px; height: 58px; top: 13%; right: -14px; transform: rotate(-42deg); opacity: .8; }
+.deco.d3 { width: 44px; height: 44px; bottom: 18%; left: 7%; transform: rotate(64deg); opacity: .55; }
+.deco.d4 { width: 124px; height: 124px; bottom: -38px; right: -26px; transform: rotate(-12deg); opacity: .7; }
 .menu-inner { position: relative; margin: auto 0; width: 100%; max-width: 430px; }
 .logo-block { text-align: center; margin-bottom: 16px; }
 .logo-kicker {
@@ -126,6 +129,13 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .tag-标准 { color: #ffe08a; border-color: #ffe08a; }
 .tag-紧张 { color: #ffb26b; border-color: #ffb26b; }
 .tag-绝望 { color: #ff7b6b; border-color: #ff7b6b; }
+/* 抽屉里的配置面板：去掉嵌套卡片框 */
+#cfgMask .cfg-panel { border: 0; background: none; box-shadow: none; padding: 0; border-radius: 0; }
+.menu-meta {
+  margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 10px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--dim); text-align: center;
+}
+.menu-meta b { color: var(--text); }
 
 /* ---------- 对局界面 ---------- */
 #screen-game { display: none; flex-direction: column; height: 100dvh; overflow: hidden; }
@@ -153,6 +163,11 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 #gunbar b { font-family: var(--mono); font-size: 14px; min-width: 18px; text-align: right; }
 #gunbar.low { border-color: var(--red); animation: lowPulse 1.1s infinite; }
 @keyframes lowPulse { 50% { box-shadow: 0 0 0 3px rgba(210, 72, 60, .18); } }
+/* 弹药条（对局内，牌桌上方） */
+#gunrow { display: flex; align-items: center; gap: 7px; padding: 8px 10px 0; }
+#gunrow #gunbar { flex: 1; padding: 5px 9px; }
+#gunrow .pips { max-width: none; flex: 1; }
+#gunrow #btnBoard { min-height: 40px; padding: 0 14px; }
 
 #alertbar {
   padding: 6px 12px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-align: center;
@@ -232,13 +247,20 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .intel-n { font-family: var(--mono); font-size: 11px; color: var(--dim2); flex: 0 0 auto; }
 
 /* 手牌 */
-#handwrap { padding: 8px 10px 2px; min-height: calc(var(--ch) + 18px); }
+#handwrap { padding: 8px 10px 2px; min-height: calc(var(--ch) + 18px); margin-top: auto; }
 #hand { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+/* 单行放不下（窄屏 7 张）时由 fitHand 挂 .fit 并给 --hs：zoom 参与布局，整行（含间距）均匀缩小 */
+#hand.fit { flex-wrap: nowrap; gap: calc(6px * var(--hs, .86)); }
+#hand.fit .card { zoom: var(--hs, .86); }
+/* 摸牌/拾牌：新到手的牌先隐形占位，飞行落点到位再亮牌（落桌轻弹一拍） */
+.card.incoming { visibility: hidden; }
+.card.arrive { animation: cardArrive .18s ease-out; }
+@keyframes cardArrive { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
 #handtip { text-align: center; font-size: 11.5px; color: var(--dim2); letter-spacing: 1px; margin-top: 4px; }
 #handtip.hidden { display: none !important; }
 
 /* 行动栏 */
-#actbar { display: flex; gap: 7px; padding: 6px 10px; margin-top: auto; }
+#actbar { display: flex; gap: 7px; padding: 6px 10px max(8px, env(safe-area-inset-bottom)); }
 .act {
   flex: 1; min-height: 58px; border-radius: 12px; border: 1.5px solid var(--line2);
   background: linear-gradient(180deg, #1d2938, #16202b); cursor: pointer; padding: 6px 4px; line-height: 1.15;
@@ -251,17 +273,32 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .act[disabled] { opacity: .38; }
 .act.elim b { color: #ffc9bf; }
 
-/* 日志条 */
+/* 日志条（牌桌下方） */
 #notebar {
   display: flex; align-items: center; gap: 7px; cursor: pointer;
-  margin: 0 10px max(8px, env(safe-area-inset-bottom)); padding: 8px 10px;
+  margin: 8px 10px 0; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: 9px; background: rgba(12, 17, 25, .72);
 }
 #notebar .nb-ico { font-size: 12px; opacity: .5; }
 #notebar .nb-t { flex: 1; font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #notebar .nb-open { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--you); }
-#notebar.warn { animation: warnFlash .45s 2; }
-@keyframes warnFlash { 50% { border-color: var(--red); background: rgba(90, 32, 24, .5); } }
+
+/* 吐司提示（浮层，不占用日志条） */
+#toasts {
+  position: fixed; left: 0; right: 0; bottom: calc(80px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0 14px; pointer-events: none; z-index: 58;
+}
+.toast {
+  max-width: min(440px, calc(100vw - 28px));
+  background: rgba(24, 34, 47, .97); border: 1px solid var(--line2); border-left: 3px solid var(--brass);
+  border-radius: 9px; padding: 9px 13px; font-size: 12.5px; letter-spacing: .3px; line-height: 1.4;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .5);
+}
+.toast.in { animation: toastIn .2s ease-out; }
+.toast.out { animation: toastOut .22s ease-in forwards; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(6px) scale(.97); } }
 
 /* ---------- 牌 ---------- */
 .card {
@@ -482,10 +519,9 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 @media (min-width: 620px) {
   :root { --cw: 62px; --ch: 86px; --mwc: 38px; --mch: 53px; }
   /* 注意：flex 列里 auto 外边距会关掉拉伸，必须显式 width:100% 才能被 max-width 夹紧并居中 */
-  #topbar, #tablewrap, #aiarea, #handwrap, #actbar, #notebar { width: 100%; max-width: 660px; margin-left: auto; margin-right: auto; }
+  #topbar, #gunrow, #tablewrap, #aiarea, #handwrap, #actbar, #notebar { width: 100%; max-width: 660px; margin-left: auto; margin-right: auto; }
   #aiarea { margin-top: 10px; }
   #handwrap { padding-left: 0; padding-right: 0; }
-  #notebar { margin-bottom: 12px; }
 }
 @media (max-height: 680px) {
   :root { --cw: 50px; --ch: 70px; --mwc: 30px; --mch: 42px; }

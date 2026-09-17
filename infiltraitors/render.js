@@ -17,6 +17,10 @@
   let S = null, live = false, busy = false, fxOn = true;
   let sel = -1, pickC = -1, pickN = -1, autoBoard = true, lastAiHand = -1;
   let pend = null, overFired = null;
+  /* 演出期间的显示行动方（0 玩家 / 1 夜枭），null 跟随 S.turn。
+     引擎在行动结算时就会换手（铲除命中要等拾牌、开局布控也属夜枭），
+     顶部回合指示若直接读 S.turn，会在演出未完时就提前切换 */
+  let acting = null;
   const timers = [];
   const sleep = ms => new Promise(r => timers.push(setTimeout(r, ms)));
   function clearTimers() { while (timers.length) clearTimeout(timers.pop()); }
@@ -102,6 +106,7 @@
     fxTweens.length = 0; fxClock = 0; fxHold = 0;
     fxWaits.splice(0).forEach(w => w.res());          // 放掉在等的演出，避免调用方永久挂起
     fxRunning = false;
+    intelGhosts = [];
     trauma = 0; $('#screen-game').style.transform = '';
   }
   const rectOf = el => el ? el.getBoundingClientRect() : null;
@@ -133,10 +138,28 @@
       },
     });
   }
-  function fadeOut(el, t, dur) {
-    tween({ t, dur, upd(p) { el.style.opacity = (1 - p).toFixed(2); }, });
+  /* 到点隐没：不透明度直接钉到 0，再下一帧移除。
+     原先用 1ms 补间收尾 (1-p)：帧落在 (at, at+1) 时会按 1-p 把已淡出的元素拉回近全亮 —— 收尾回闪的根源 */
+  function vanish(el, t, dur) {
+    const at = (t || 0) + (dur || 120);
+    tween({ t: at, dur: 1, upd() { el.style.opacity = '0'; } });
+    tween({ t: at + 1, dur: 1, upd() { el.remove(); } });
   }
-  function vanish(el, t, dur) { fadeOut(el, (t || 0) + (dur || 120), 1); tween({ t: (t || 0) + (dur || 120) + 1, dur: 1, upd() { el.remove(); } }); }
+
+  /* 铲除命中瞬间冻结情报区视觉：把两区卡片原样克隆进 fx 层，待叛徒牌揭示后再飞入明弃堆 */
+  let intelGhosts = [];
+  function freezeIntel() {
+    clearIntelGhosts();
+    for (const c of $$('#relCards .card, #unrelCards .card')) {
+      const r = localPt(c);
+      if (!r) continue;
+      intelGhosts.push(spawn(c.outerHTML, 'intel-ghost', { x: r.x, y: r.y }, { w: r.w, h: r.h }));
+    }
+  }
+  function clearIntelGhosts() {
+    intelGhosts.forEach(el => el.remove());
+    intelGhosts = [];
+  }
 
   function burst(pt, n, cls, spread) {
     for (let i = 0; i < n; i++) {
@@ -207,17 +230,18 @@
     const pips = [];
     for (let i = 0; i < S.bulletsMax; i++) pips.push('<i class="' + (i < S.bullets ? '' : 'spent') + '"></i>');
     $('#pips').innerHTML = pips.join('');
+    const tv = acting == null ? S.turn : acting;
     const turn = $('#turnsign');
-    turn.className = 'c' + S.turn;
+    turn.className = 'c' + tv;
     turn.textContent = S.over ? '任务结束'
-      : S.turn === 0 ? '你的回合 · 第 ' + S.round + ' 轮' : '夜枭行动中 · 第 ' + S.round + ' 轮';
+      : tv === 0 ? '你的回合 · 第 ' + S.round + ' 轮' : '夜枭行动中 · 第 ' + S.round + ' 轮';
     const caught = $('#caughtTag');
     caught.textContent = '已铲除 ' + S.caught + '/' + S.cfg.traitors + ' · 剩 ' + left + ' 名';
     const alert = $('#alertbar');
     if (!S.over && left > 0 && S.bullets <= left) {
       alert.classList.remove('hidden');
       alert.textContent = '⚠ 弹药告急：剩 ' + left + ' 名叛徒 > ' + Math.max(0, S.bullets) + ' 发子弹 —— 再落空就完了';
-    } else if (S.turn === 1 && !S.over) {
+    } else if (tv === 1 && !S.over) {
       alert.classList.remove('hidden');
       alert.classList.add('turn-ai');
       alert.textContent = '夜枭正在行动…';
@@ -240,22 +264,39 @@
     $('#unrelN').textContent = S.intel.unrel.length;
     ['#relCards', '#unrelCards'].forEach(s => { const el = $(s); el.scrollLeft = el.scrollWidth; });
   }
+  /* 手牌单行放不下时给整行统一缩放：先按自然宽度量一次，超出可用宽度才挂 .fit */
+  function fitHand() {
+    const hand = $('#hand');
+    hand.classList.remove('fit');
+    hand.style.removeProperty('--hs');
+    const n = S.hand.length, first = hand.firstElementChild;
+    if (n < 2 || !first || !hand.clientWidth) return;      // 隐藏/未布局时跳过
+    const gap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+    const need = n * first.offsetWidth + (n - 1) * gap;
+    if (need > hand.clientWidth) {
+      hand.classList.add('fit');
+      hand.style.setProperty('--hs', Math.max(.6, hand.clientWidth / need).toFixed(3));
+    }
+  }
   function renderHand() {
     const acts = G.playerActions(S);
     const my = S.turn === 0 && !S.over && !busy;
     $('#hand').innerHTML = S.hand.map((id, i) =>
       cardHtml(id, (i === sel ? 'pick ' : '') + (my && acts.probe ? '' : 'dead'))).join('');
     $('#handtip').classList.toggle('hidden', !(my && acts.probe) || sel >= 0);
+    fitHand();
   }
   function renderAct() {
     const acts = G.playerActions(S);
     const my = S.turn === 0 && !S.over && !busy && !S.pending;
     const bp = $('#btnProbe'), bl = $('#btnLurk'), be = $('#btnElim');
+    const lurkOk = acts.lurkMax > 0 && S.deck.length > 0;
     bp.disabled = !my || !acts.probe;
-    bl.disabled = !my || acts.lurkMax <= 0;
+    bl.disabled = !my || !lurkOk;
     be.disabled = !my || !acts.eliminate;
     bp.classList.toggle('on', my && sel >= 0 && acts.probe);
-    bl.querySelector('span').textContent = acts.lurkMax > 0 ? '摸 1~' + acts.lurkMax + ' 张 · 暗弃 1' : '手牌已满';
+    bl.querySelector('span').textContent = acts.lurkMax <= 0 ? '手牌已满' :
+      !S.deck.length ? '牌库已空' : '摸 1~' + acts.lurkMax + ' 张 · 暗弃 1';
     be.querySelector('span').textContent = acts.eliminate ? '指认 · 剩 ' + Math.max(0, S.bullets) + ' 发' : '需先有目标';
   }
   function renderNote() {
@@ -268,27 +309,54 @@
   }
 
   /* ---------------- 行动：玩家 ---------------- */
+  /* 吐司提示：底部浮层短暂展示后自动消隐，不占用日志条 */
   function toast(msg) {
-    const nb = $('#notebar');
-    $('#nbText').textContent = msg;
-    nb.classList.remove('warn'); void nb.offsetWidth; nb.classList.add('warn');
+    const wrap = $('#toasts');
+    let el = wrap.lastElementChild;
+    if (el && el.dataset.msg === msg) {               // 连点同一条：重播动画并续时
+      el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+    } else {
+      el = document.createElement('div');
+      el.className = 'toast in';
+      el.dataset.msg = msg;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      while (wrap.children.length > 3) wrap.removeChild(wrap.firstElementChild);
+    }
+    clearTimeout(el._hide); clearTimeout(el._gone);
+    el._hide = setTimeout(() => {
+      el.classList.remove('in'); el.classList.add('out');
+      el._gone = setTimeout(() => el.remove(), 260);
+    }, 2300);
+  }
+  function clearToasts() {
+    const wrap = $('#toasts');
+    if (!wrap) return;
+    [...wrap.children].forEach(el => { clearTimeout(el._hide); clearTimeout(el._gone); });
+    wrap.textContent = '';
   }
   async function doAct(a) {
     const isReward = a.act === 'pick' || a.act === 'skip';
+    const isDraw = a.act === 'draw';
     if (!S || S.over || busy || S.turn !== 0) return { ok: false };
-    if (isReward ? S.pending !== 'reward' : !!S.pending) return { ok: false };
-    busy = true; renderAll();
+    if (isReward ? S.pending !== 'reward' : isDraw ? S.pending !== 'draw' : !!S.pending) return { ok: false };
+    busy = true; acting = 0; renderAll();                  // 玩家发起的整段演出（含结算）都显示己方回合
     let r;
     if (a.act === 'probe') r = G.playerProbe(S, a.idx);
+    else if (a.act === 'draw') r = G.drawPick(S, a.take);
     else if (a.act === 'lurk') r = G.playerLurk(S, a.k);
     else if (a.act === 'elim') r = G.playerEliminate(S, a.c, a.n);
     else if (a.act === 'pick') r = G.rewardPick(S, a.pile, a.idx);
     else if (a.act === 'skip') r = G.rewardSkip(S);
-    if (!r || !r.ok) { busy = false; renderAll(); return { ok: false }; }
+    if (!r || !r.ok) { busy = false; acting = null; renderAll(); return { ok: false }; }
     sel = -1;
-    saveGame();                                   // 先落盘再演出：中途关页不丢步
+    /* 命中且将清扫情报区：此刻 DOM 尚未重绘，先冻结情报区副本，揭示后演出清空 */
+    if (fxOn && r.evs.some(e => e.k === 'sweep')) freezeIntel();
+    saveGame(true);                               // 先落盘再演出：中途刷新不丢步（含终局，落结算见 showOver 清档）
     closeAllSheets();
     await playEvs(r.evs);
+    acting = null;                                // 结算演出完毕，之后显示交还引擎实际回合
+    clearIntelGhosts();
     renderAll();
     busy = false;
     drainPending();
@@ -301,6 +369,7 @@
     doAct({ act: 'probe', idx: sel });
   }
   function openLurk() {
+    if (!S.deck.length) { toast('牌库已空，无法潜伏'); return; }
     const max = G.playerActions(S).lurkMax;
     if (max <= 0) return;
     const box = $('#lurkOpts');
@@ -425,25 +494,42 @@
     $('#pileDown').classList.remove('hot'); void $('#pileDown').offsetWidth; $('#pileDown').classList.add('hot');
     await sleep(120);
   }
+  /* 新手牌先隐形占位（visibility 保持布局，slot 坐标可作飞行落点），
+     落点到位那一帧再亮牌 —— 渲染顺序反过来会与飞行动画同帧出现（先飞入、后入手） */
+  function hideHandTail(ids) {
+    const els = [];
+    for (const id of ids || []) {
+      const el = $('#hand [data-id="' + id + '"]');
+      if (el) { el.classList.add('incoming'); els.push(el); }
+    }
+    return els;
+  }
   async function animDraw(ev) {
     const from = localPt($('#pileDeck'));
     const to = ev.to === 'aiHand' ? localPt($('#aiarea')) : localPt($('#hand'));
     if (!from || !to) return;
+    const cards = ev.cards || [];
+    const slots = ev.to === 'hand' ? hideHandTail(cards) : [];
     $('#pileDeck').classList.remove('hot'); void $('#pileDeck').offsetWidth; $('#pileDeck').classList.add('hot');
-    const n = Math.min(3, (ev.cards || []).length || 1);
+    const n = Math.min(3, cards.length || 1);
     for (let i = 0; i < n; i++) {
-      const html = (ev.to === 'hand' && ev.cards[i] != null) ? cardHtml(ev.cards[i], 'mini') : cardBack('');
+      const html = (ev.to === 'hand' && cards[i] != null) ? cardHtml(cards[i], 'mini') : cardBack('');
       const el = spawn(html, '', { x: from.x + from.w / 2 - 17, y: from.y + from.h / 2 - 23 }, { w: 34, h: 47 });
-      const tx = to.x + to.w / 2 - 17 - (from.x + from.w / 2 - 17) + (i - (n - 1) / 2) * 22;
-      const ty = to.y + to.h / 2 - 23 - (from.y + from.h / 2 - 23);
+      const hit = slots[i] ? localPt(slots[i]) : null;
+      const cx = hit ? hit.x + hit.w / 2 : to.x + to.w / 2 + (i - (n - 1) / 2) * 22;
+      const cy = hit ? hit.y + hit.h / 2 : to.y + to.h / 2;
+      const tx = cx - 17 - (from.x + from.w / 2 - 17);
+      const ty = cy - 23 - (from.y + from.h / 2 - 23);
+      const land = i * 70 + 300;
       tween({
         dur: 300, t: i * 70, ease: easeOutCubic,
         upd(p) {
           el.style.transform = 'translate(' + (tx * p).toFixed(1) + 'px,' + (ty * p - 26 * Math.sin(Math.PI * p)).toFixed(1) + 'px) scale(' + (1 - 0.2 * p).toFixed(3) + ') rotate(' + (-12 + 12 * p).toFixed(1) + 'deg)';
-          el.style.opacity = p < 0.15 ? (p / 0.15).toFixed(2) : 1;
+          el.style.opacity = p < 0.15 ? (p / 0.15).toFixed(2) : (p > 0.8 ? ((1 - p) / 0.2).toFixed(2) : 1);
         },
       });
-      vanish(el, i * 70 + 295, 60);
+      tween({ t: land, dur: 1, upd() { if (slots[i]) { slots[i].classList.remove('incoming'); slots[i].classList.add('arrive'); } } });
+      vanish(el, land, 60);
     }
     await fxRunUntil(fxClock + 300 + n * 70);
     burst(centerOf($('#hand')), 5, 'spark', 30);
@@ -513,11 +599,20 @@
   }
   async function animSweep(ev) {
     const up = localPt($('#pileUp'));
-    const cards = document.querySelectorAll('#relCards .card, #unrelCards .card');
-    for (let i = 0; i < cards.length; i++) {
-      const r = localPt(cards[i]);
+    const ghosts = intelGhosts; intelGhosts = [];
+    /* 优先用命中瞬间冻结的情报区副本（「先揭示、后清空」）；无副本时退回按当前区克隆 */
+    const list = ghosts.length ? ghosts
+      : [...document.querySelectorAll('#relCards .card, #unrelCards .card')].map(node => {
+          const rr = localPt(node);
+          if (!rr) return null;
+          const el = spawn(node.outerHTML, '', { x: rr.x, y: rr.y }, { w: rr.w, h: rr.h });
+          node.style.visibility = 'hidden';
+          return el;
+        }).filter(Boolean);
+    for (let i = 0; i < list.length; i++) {
+      const el = list[i];
+      const r = localPt(el);
       if (!r) continue;
-      const el = spawn(cards[i].outerHTML, '', { x: r.x, y: r.y }, { w: r.w, h: r.h });
       const tx = (up ? up.x + up.w / 2 - r.w / 2 : innerWidth - 80) - r.x;
       const ty = (up ? up.y + up.h / 2 - r.h / 2 : 60) - r.y;
       tween({
@@ -528,10 +623,9 @@
         },
       });
       vanish(el, i * 45 + 296, 60);
-      cards[i].style.visibility = 'hidden';
     }
-    if (cards.length) $('#pileUp').classList.remove('hot'), void $('#pileUp').offsetWidth, $('#pileUp').classList.add('hot');
-    await fxRunUntil(fxClock + 320 + cards.length * 45);
+    if (list.length) $('#pileUp').classList.remove('hot'), void $('#pileUp').offsetWidth, $('#pileUp').classList.add('hot');
+    await fxRunUntil(fxClock + 320 + list.length * 45);
     burst(centerOf($('#pileUp')), 6, 'spark', 30);
     await sleep(140);
   }
@@ -552,10 +646,15 @@
     const hand = localPt($('#hand'));
     const src = ev.from === 'up' ? localPt($('#pileUp')) : localPt($('#pileDown'));
     if (!hand || !src) return;
+    const slot = hideHandTail(ev.card != null ? [ev.card] : [])[0] || null;
     const el = spawn(cardHtml(ev.card, 'mini'), '', { x: src.x + src.w / 2 - 17, y: src.y + src.h / 2 - 23 }, { w: 34, h: 47 });
-    const tx = hand.x + hand.w / 2 - 17 - (src.x + src.w / 2 - 17);
-    const ty = hand.y + hand.h / 2 - 23 - (src.y + src.h / 2 - 23);
-    tween({ dur: 340, ease: easeOutCubic, upd(p) { el.style.transform = 'translate(' + (tx * p).toFixed(1) + 'px,' + (ty * p - 24 * Math.sin(Math.PI * p)).toFixed(1) + 'px) scale(' + (1 + 0.3 * p).toFixed(2) + ')'; el.style.opacity = p < 0.12 ? (p / 0.12).toFixed(2) : 1; } });
+    const hit = slot ? localPt(slot) : null;
+    const cx = hit ? hit.x + hit.w / 2 : hand.x + hand.w / 2;
+    const cy = hit ? hit.y + hit.h / 2 : hand.y + hand.h / 2;
+    const tx = cx - 17 - (src.x + src.w / 2 - 17);
+    const ty = cy - 23 - (src.y + src.h / 2 - 23);
+    tween({ dur: 340, ease: easeOutCubic, upd(p) { el.style.transform = 'translate(' + (tx * p).toFixed(1) + 'px,' + (ty * p - 24 * Math.sin(Math.PI * p)).toFixed(1) + 'px) scale(' + (1 + 0.3 * p).toFixed(2) + ')'; el.style.opacity = p < 0.12 ? (p / 0.12).toFixed(2) : (p > 0.8 ? ((1 - p) / 0.2).toFixed(2) : 1); } });
+    tween({ t: 340, dur: 1, upd() { if (slot) { slot.classList.remove('incoming'); slot.classList.add('arrive'); } } });
     await fxRunUntil(fxClock + 350);
     vanish(el, 0, 60);
     burst(centerOf($('#hand')), 5, 'spark', 26);
@@ -564,13 +663,14 @@
 
   /* ---------------- 结算 ---------------- */
   function showOver() {
+    clearSave();                                       // 局终清档：结算界面之后只能重开
     if (overFired === S.over) { $('#overlay-win').classList.remove('hidden'); return; }
     overFired = S.over;
     const w = S.over.win, st = S.over.stats;
     const pips = [];
     for (let i = 0; i < S.cfg.traitors; i++) pips.push('<i class="' + (i < st.caught ? 'on' : 'gone') + '"></i>');
     const why = w ? '全部 ' + S.cfg.traitors + ' 名叛徒已铲除，收队。'
-      : S.over.why === 'deck' ? '牌库被摸空 —— 叛徒还有 ' + (S.cfg.traitors - st.caught) + ' 名没抓到。'
+      : S.over.why === 'stuck' ? '行动全部枯竭 —— 死局，还有 ' + (S.cfg.traitors - st.caught) + ' 名叛徒没抓到。'
         : '弹药告急：未铲除的叛徒比子弹还多。';
     $('#overlay-win').innerHTML =
       '<div class="win-card">' +
@@ -590,6 +690,7 @@
     if (!live || !S) return;
     if (S.over) { showOver(); return; }
     if (S.pending === 'reward') { openReward(); return; }
+    if (S.pending === 'draw') { openDraw(); return; }
     renderAll();
     if (S.turn === 1) aiRun();
   }
@@ -598,13 +699,11 @@
     busy = true; renderAll();
     await sleep(fxOn ? 560 : 20);                     // 演出关闭（走查）时压缩思考时间
     if (!live || !S || S.over || S.turn !== 1) { busy = false; return; }
+    acting = 1;                                       // 夜枭行动结算即换手，演出期间显示仍归夜枭
     const t = G.aiTakeTurn(S, Math.random);
-    saveGame();
-    if (t.op && t.op.k === 'hold') {          // 按兵不动：引擎不产出事件，这里补一条横幅
-      bannerAt('夜枭按兵不动', '');
-      await fxRunUntil(fxClock + 980);
-    }
+    saveGame(true);                                   // 同上：AI 结算演出前落盘（含死局终局）
     await playEvs(t.evs);
+    acting = null;
     renderAll();
     busy = false;
     drainPending();
@@ -679,21 +778,26 @@
     $('#btnSkipReward').textContent = S.hand.length >= G.HAND_MAX ? '手牌已满 · 跳过' : '跳过';
     $('#rewardMask').classList.remove('hidden');
   }
+  function openDraw() {
+    $('#drawInfo').innerHTML = '牌库剩余 <b>' + S.deck.length + '</b> 张 · 手牌 ' + S.hand.length + '/' + G.HAND_MAX;
+    $('#drawMask').classList.remove('hidden');
+  }
   function openLog() {
     const items = S.log.slice().reverse().map(l =>
       '<div class="log-item ' + l.who + '"><span class="lg-no">R' + l.no + '</span><span>' + l.text + '</span></div>');
     $('#logList').innerHTML = items.join('') || '<div class="zone-empty">暂无记录</div>';
     $('#logMask').classList.remove('hidden');
   }
-  const closeAllSheets = () => ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#lurkMask', '#intelMask']
+  const closeAllSheets = () => ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#drawMask', '#lurkMask', '#intelMask']
     .forEach(s => $(s).classList.add('hidden'));
 
   /* ---------------- 存档续玩 ---------------- */
   const SAVE_KEY = 'infiltraitors-state';
   const CFG_KEY = 'infiltraitors-cfg';
   const SAVE_V = 1;
-  function saveGame() {
-    if (!S || !live) return;
+  /* force：终局动作也先落盘（演出中途刷新直接回结算界面）；局终清档由 showOver 负责 */
+  function saveGame(force) {
+    if (!S || !live || (S.over && !force)) return;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, S, cfg: S.cfg })); } catch (e) { /* 隐私模式：忽略 */ }
   }
   const clearSave = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } };
@@ -709,8 +813,8 @@
   function tryRestore() {
     const st = readSave();
     if (!st) return false;
-    S = st; live = false; busy = false; sel = -1; pend = null; overFired = null;
-    clearFx(); closeAllSheets();
+    S = st; live = false; busy = false; acting = null; sel = -1; pend = null; overFired = null;
+    clearFx(); clearToasts(); closeAllSheets();
     $('#screen-menu').classList.add('hidden');
     $('#screen-game').classList.add('on');
     renderAll();
@@ -750,45 +854,77 @@
       }
     });
     const d = G.difficultyOf(cfg), bul = G.bulletsOf(G.normCfg(cfg));
-    $('#cfgRead').innerHTML =
-      '牌库 <b>' + d.deck + '</b> 张 · 叛徒 <b>' + cfg.traitors + '</b> 名 · 子弹 <b>' + bul + '</b> 发 · ' +
+    const read = '牌库 <b>' + d.deck + '</b> 张 · 叛徒 <b>' + cfg.traitors + '</b> 名 · 子弹 <b>' + bul + '</b> 发 · ' +
       '难度 <span class="tag-diff tag-' + d.tag + '">' + d.tag + '</span>';
+    $('#cfgRead').innerHTML = read;
+    $('#menuMeta').innerHTML = read;
     const hasSave = !!readSave();
     $('#btnResume').classList.toggle('hidden', !hasSave);
+    $('#btnStart').classList.toggle('primary', !hasSave);      // 有存档时把「继续」提为主按钮
+    $('#btnResume').classList.toggle('primary', hasSave);
     if (hasSave) {
       const st = readSave();
       $('#resumeSub').textContent = '第 ' + st.round + ' 轮 · 已铲除 ' + st.caught + '/' + st.cfg.traitors +
         ' · 牌库 ' + st.deck.length + ' 张';
     }
   }
+  const openCfg = () => { renderCfg(); $('#cfgMask').classList.remove('hidden'); };
+  const closeCfg = () => $('#cfgMask').classList.add('hidden');
   function startGame() {
-    clearTimers(); clearFx(); live = false; busy = false; sel = -1; pend = null; overFired = null;
+    clearTimers(); clearFx(); clearToasts(); live = false; busy = false; sel = -1; pend = null; overFired = null; acting = null;
     S = G.newGame(cfg, Math.random);
     closeAllSheets();
     $('#screen-menu').classList.add('hidden');
     $('#screen-game').classList.add('on');
+    acting = 1;                                        // 开局布控（盯梢+暗弃）是夜枭的演出
+    busy = true;                                       // 演出期间不收输入（也让测试的 idle() 覆盖整段布控）
     live = true;
     renderAll();
     saveGame();
-    playEvs(S.openEvs).then(() => { renderAll(); afterChange(); });
+    playEvs(S.openEvs).then(() => {
+      acting = null; busy = false;
+      renderAll(); drainPending(); afterChange();
+    });
+  }
+  function resetGame() {
+    if (!S) return;
+    const c = S.cfg;
+    clearTimers(); clearFx(); clearToasts(); live = false; busy = false; sel = -1; pend = null; overFired = null; acting = null;
+    S = G.newGame(c, Math.random);
+    closeAllSheets();
+    acting = 1;
+    busy = true;
+    live = true;
+    renderAll();
+    saveGame();
+    playEvs(S.openEvs).then(() => {
+      acting = null; busy = false;
+      renderAll(); drainPending(); afterChange();
+    });
   }
   function goMenu() {
-    clearTimers(); clearFx(); live = false; busy = false; sel = -1; S = null; pend = null; overFired = null;
+    saveGame();                                        // 回菜单保留存档：靠【继续任务】原样回到牌局
+    clearTimers(); clearFx(); clearToasts(); live = false; busy = false; sel = -1; S = null; pend = null; overFired = null; acting = null;
     closeAllSheets();
     $('#screen-menu').classList.remove('hidden');
     $('#screen-game').classList.remove('on');
     $('#screen-game').style.transform = '';
     $('#overlay-win').classList.add('hidden');
-    clearSave();
     renderCfg();
   }
 
   /* ---------------- 事件绑定 ---------------- */
   function bind() {
+    window.addEventListener('resize', () => { if (S) fitHand(); });
     $$('#cfgPanel .seg[data-k="colors"] button').forEach(b => b.addEventListener('click', () => { cfg.colors = +b.dataset.v; saveCfg(); renderCfg(); }));
     $$('#cfgPanel .seg[data-k="one"] button').forEach(b => b.addEventListener('click', () => { cfg.one = b.dataset.v === '1'; saveCfg(); renderCfg(); }));
-    $('#btnStart').addEventListener('click', startGame);
-    $('#btnResume').addEventListener('click', () => { if (!tryRestore()) startGame(); });
+    $('#btnStart').addEventListener('click', openCfg);
+    $('#btnCfgGo').addEventListener('click', () => { closeCfg(); startGame(); });
+    $('#btnCfgBack').addEventListener('click', closeCfg);
+    $('#btnReset').addEventListener('click', () => $('#resetMask').classList.remove('hidden'));
+    $('#btnResetGo').addEventListener('click', () => { $('#resetMask').classList.add('hidden'); resetGame(); });
+    $('#btnResetBack').addEventListener('click', () => $('#resetMask').classList.add('hidden'));
+    $('#btnResume').addEventListener('click', () => { if (!tryRestore()) openCfg(); });
     $('#btnRules').addEventListener('click', () => $('#rulesMask').classList.remove('hidden'));
     $('#btnRulesGame').addEventListener('click', () => $('#rulesMask').classList.remove('hidden'));
     $('#btnCloseRules').addEventListener('click', () => $('#rulesMask').classList.add('hidden'));
@@ -801,9 +937,9 @@
     $('#btnCloseLog').addEventListener('click', () => $('#logMask').classList.add('hidden'));
     $('#btnCancelElim').addEventListener('click', () => $('#elimMask').classList.add('hidden'));
     $('#btnCancelLurk').addEventListener('click', () => $('#lurkMask').classList.add('hidden'));
-    /* 点遮罩空白处收起抽屉；拾牌是必选阶段，收起就没法继续，所以除外 */
+    /* 点遮罩空白处收起抽屉；拾牌与摸牌选择是必选阶段，收起就没法继续，所以除外 */
     $$('.sheet-mask').forEach(m => m.addEventListener('click', e => {
-      if (e.target === m && m.id !== 'rewardMask') m.classList.add('hidden');
+      if (e.target === m && m.id !== 'rewardMask' && m.id !== 'drawMask') m.classList.add('hidden');
     }));
     $('#btnFire').addEventListener('click', fireElim);
     $$('#elimMask .sheet').forEach(sh => sh.addEventListener('click', e => {
@@ -813,6 +949,8 @@
     }));
     $('#btnBlind').addEventListener('click', () => { $('#rewardMask').classList.add('hidden'); doAct({ act: 'pick', pile: 'down' }); });
     $('#btnSkipReward').addEventListener('click', () => { $('#rewardMask').classList.add('hidden'); doAct({ act: 'skip' }); });
+    $('#btnDrawTake').addEventListener('click', () => { $('#drawMask').classList.add('hidden'); doAct({ act: 'draw', take: true }); });
+    $('#btnDrawSkip').addEventListener('click', () => { $('#drawMask').classList.add('hidden'); doAct({ act: 'draw', take: false }); });
     $('#rewardUp').addEventListener('click', e => {
       const c = e.target.closest('.card[data-i]');
       if (!c) return;
@@ -820,7 +958,7 @@
       doAct({ act: 'pick', pile: 'up', idx: +c.dataset.i });
     });
     $('#pileUp').addEventListener('click', openDisc);
-    $('#pileDeck').addEventListener('click', () => toast('牌库剩 ' + S.deck.length + ' 张 —— 摸空即失败'));
+    $('#pileDeck').addEventListener('click', () => toast('牌库剩 ' + S.deck.length + ' 张 —— 牌库空后不能再潜伏或摸牌'));
     $('#pileTrait').addEventListener('click', () => toast('叛徒区 ' + S.traitorPile.length + ' 名 + 盯梢 ' + (S.aiWatch ? 1 : 0) + ' 名'));
     $('#pileDown').addEventListener('click', () => toast('暗弃堆 ' + S.discardDown.length + ' 张（只见张数）'));
     $('#watchSlot').addEventListener('click', () => toast(S.aiWatch ? '夜枭已锁定 1 名目标（内容对你也保密）' : '夜枭还没锁定目标'));
@@ -853,16 +991,16 @@
     saveKey: SAVE_KEY,
     cfgKey: CFG_KEY,
     save: saveGame, clear: clearSave, restore: tryRestore,
-    start: startGame, goMenu,
+    start: startGame, reset: resetGame, openCfg, closeCfg, goMenu,
     cfg: v => { if (v) { cfg = G.normCfg(v); saveCfg(); renderCfg(); } return cfg; },
     setFx: v => { fxOn = !!v; },
     renderAll,
-    openBoard, openDisc, openLog, openElim, openReward, openIntel, openLurk,
+    openBoard, openDisc, openLog, openElim, openReward, openDraw, openIntel, openLurk,
     fire(a) { doAct(a); return S; },
     doAct,
     setState(obj, opts) {
-      clearTimers(); clearFx();
-      live = false; busy = false; sel = -1; pend = null; overFired = null;
+      clearTimers(); clearFx(); clearToasts();
+      live = false; busy = false; sel = -1; pend = null; overFired = null; acting = null;
       S = obj;
       closeAllSheets();
       $('#overlay-win').classList.add('hidden');
