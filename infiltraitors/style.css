@@ -534,6 +534,7 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .stampFx {
   font-family: var(--mono); font-weight: 900; letter-spacing: 3px; padding: 5px 10px; border: 4px solid;
   border-radius: 6px; transform-origin: center; font-size: 22px; opacity: .96;
+  white-space: nowrap; width: max-content;   /* 靠右缘时绝对定位的收缩宽度会夹住文字致换行，锁死单行 */
 }
 .stampFx.rel { color: #a8f5c2; border-color: #46b26e; background: rgba(70, 178, 110, .14); }
 .stampFx.unrel { color: #f3bcb2; border-color: #b0574c; background: rgba(176, 87, 76, .14); }

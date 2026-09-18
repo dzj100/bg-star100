@@ -340,8 +340,8 @@ async function main() {
       label: document.querySelector('#btnLurk span').textContent,
       max: window.INFIL.playerActions(window.INFIL_UI.state()).lurkMax,
     }));
-    expect('牌库 2 张：潜伏可用 · 按钮标「摸 1 张」',
-      !l2.dis && l2.max === 1 && l2.label.includes('摸 1 张') && !l2.label.includes('1~'));
+    expect('牌库 2 张：潜伏可用 · 只提供摸 1（不出现摸 2/3）',
+      !l2.dis && l2.max === 1 && l2.label.includes('摸 1') && !/摸 1~[23]/.test(l2.label));
     await page.click('#btnLurk');
     await page.waitForTimeout(220);
     const l3 = await page.evaluate(() => ({
@@ -641,7 +641,7 @@ async function main() {
         warn: document.getElementById('notebar').classList.contains('warn'),
       };
     });
-    expect('未选牌点通讯 → 吐司「先点一张手牌」', t1.n >= 1 && t1.txt.includes('先点一张手牌'));
+    expect('未选牌点通讯 → 吐司「先选中一张手牌」', t1.n >= 1 && t1.txt.includes('先选中一张手牌'));
     expect('吐司不劫持日志条（文案与警告态都不变）', t1.nb === nbBefore && !t1.warn);
     await shot('m23-toast.png');
     await page.click('#pileDeck');                        // 不同文案：新吐司接续堆叠
