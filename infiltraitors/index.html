@@ -63,7 +63,23 @@
 
     <div id="gunrow">
       <div id="gunbar" title="剩余子弹">
-        <span class="gun">🔫</span>
+        <span class="gun" aria-hidden="true"><!-- 手枪图形：顶部弹药条与铲除动画共用此 SVG -->
+          <svg viewBox="0 0 44 30">
+            <path d="M3 4.2 L0.8 5.6 V10.4 L3 9 Z" fill="#3c4550"/>
+            <path d="M35.6 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"/>
+            <path d="M5.2 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"/>
+            <path d="M3 3 H40 V12.4 H3 Z" fill="#525d6b"/>
+            <path d="M3 3 H40 V6 H3 Z" fill="#6b7787"/>
+            <path d="M14.6 7 h6.4 v1.8 h-6.4 Z" fill="#2c333d"/>
+            <circle cx="37.4" cy="7.7" r="2.3" fill="#1a1f26"/>
+            <circle cx="37.6" cy="7.7" r="1.1" fill="#39424e"/>
+            <path d="M9 12.4 H24.6 V15.6 H9 Z" fill="#46505c"/>
+            <path d="M10 15.6 H24.6 L21 28.6 H7.4 Z" fill="#3c4550"/>
+            <path d="M10 15.6 H17.4 L14.6 28.6 H7.4 Z" fill="#46505c"/>
+            <path d="M24.6 15.6 H31.8 V19.2 Q31.8 22.8 28.2 22.8 Q24.6 22.8 24.6 19.2 Z" fill="#313a44"/>
+            <path d="M28.2 16.2 v4.4" stroke="#d9a94b" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
         <span class="pips" id="pips"></span>
         <b id="bcount">10</b>
       </div>
@@ -175,8 +191,8 @@
   <!-- ============ 规则速览 ============ -->
   <div class="sheet-mask hidden" id="rulesMask">
     <div class="sheet">
-      <h3>规则速览<small class="sheet-sub">双人协作 · 叛徒全都藏在人群里</small></h3>
-      <p>你和搭档<b>夜枭</b>追查一群叛徒。叛徒区面朝下扣着 <b>N 名叛徒</b>，夜枭每次<b>盯梢</b>锁定 1 名目标，你和它轮流给出线索，由你推理出目标<b>确切的颜色和数字</b>，然后开枪<b>铲除</b>。</p>
+      <h3>规则速览<small class="sheet-sub">双人协作，清剿人群里的叛徒</small></h3>
+      <p>你和搭档<b>夜枭</b>追查一群叛徒。叛徒区面朝下扣着 <b>N 名叛徒</b>，夜枭每次<b>盯梢</b>锁定 1 名目标，你和ta通讯，ta会及时告知你叛徒情报，由你推理出目标<b>（确切的颜色和数字）</b>，然后开枪<b>铲除</b>。</p>
       <p><b>有关 / 无关（判定规则）：</b>线索牌与叛徒<b>同色</b>、<b>同数字</b>、数字互为<b>倍数或因数</b> → 有关；否则无关。数字 <b>1</b> 只按同色/同数判定（不参与倍数/因数）。判定永远真实。</p>
       <p><b>你的行动（每次一选）：</b></p>
       <ol>
@@ -186,7 +202,7 @@
       </ol>
       <p><b>夜枭的行动：</b>盯梢（锁定新目标，暗弃 1 张）· 情报（打出一张线索）· 潜伏补牌（没有手牌时必须补，牌库空则不可补）。双方回合内<b>必须</b>从五类行动中执行一个。它名字旁的<b>牌背计数</b>就是它的手牌张数。</p>
       <p><b>胜利：</b>铲除全部叛徒。<b>失败：</b>未铲除的叛徒比剩余子弹还多（弹药告急），或轮到的一方五类行动全都无法执行（死局）。</p>
-      <p><b>提示：</b>手牌、情报区、明弃堆里的牌都<b>不可能</b>是当前目标 —— 用「推论」面板自动圈定候选；线索牌选「切得最开」的那张，效率最高；剩下两三个候选时，直接赌一发可能比继续摸牌更划算。</p>
+      <p><b>提示：</b>手牌、情报区、明弃堆里的牌都<b>不可能</b>是当前目标 —— 用「推论」面板自动圈定候选。</p>
       <button class="btn-main" id="btnCloseRules">知道了</button>
     </div>
   </div>
@@ -277,6 +293,10 @@
       <div id="rewardUp"></div>
       <button class="btn-main" id="btnBlind">暗弃堆盲抽 1 张</button>
       <button class="btn-main" id="btnSkipReward">跳过</button>
+      <div class="pick-hand">
+        <div class="pick-title">你的手牌 <b id="rewardHandN">0/7</b></div>
+        <div class="pick-hand-cards" id="rewardHand"></div>
+      </div>
     </div>
   </div>
 

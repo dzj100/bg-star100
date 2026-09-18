@@ -36,7 +36,15 @@
 
   /* ---------------- 屏幕震动：trauma 衰减 + sin 采样 ---------------- */
   let trauma = 0, shakeT = 0, shakeOn = false;
-  function shakeAdd(a) { trauma = Math.min(1, trauma + a); if (!shakeOn) { shakeOn = true; requestAnimationFrame(shakeLoop); } }
+  function shakeAdd(a) {
+    trauma = Math.min(1, trauma + a);
+    if (!shakeOn) {
+      shakeOn = true;
+      /* 震动期间整屏每帧 transform：先提升为合成层，避免全屏重绘 */
+      $('#screen-game').style.willChange = 'transform';
+      requestAnimationFrame(shakeLoop);
+    }
+  }
   function shakeLoop(now) {
     if (!shakeOn) return;
     const dt = Math.min(50, now - (shakeLoop._t || now));
@@ -50,7 +58,7 @@
         'translate(' + (Math.sin(shakeT * 0.024) * 10 * s).toFixed(1) + 'px,' +
         (Math.sin(shakeT * 0.032 + 1.7) * 7 * s).toFixed(1) + 'px)';
     } else {
-      trauma = 0; root.style.transform = '';
+      trauma = 0; root.style.transform = ''; root.style.willChange = '';
       shakeOn = false; shakeLoop._t = 0;
     }
     if (shakeOn) requestAnimationFrame(shakeLoop);
@@ -90,7 +98,7 @@
       }
       const waiting = fxWaits.some(w => fxClock < w.end);
       if (waiting || alive || fxHold > 0) requestAnimationFrame(loop);
-      else { fxRunning = false; fxWaits.splice(0).forEach(w => w.res()); }
+      else { fxRunning = false; fxTweens.length = 0; fxWaits.splice(0).forEach(w => w.res()); }
     }
     requestAnimationFrame(loop);
   }
@@ -107,7 +115,7 @@
     fxWaits.splice(0).forEach(w => w.res());          // 放掉在等的演出，避免调用方永久挂起
     fxRunning = false;
     intelGhosts = [];
-    trauma = 0; $('#screen-game').style.transform = '';
+    trauma = 0; $('#screen-game').style.transform = ''; $('#screen-game').style.willChange = '';
   }
   const rectOf = el => el ? el.getBoundingClientRect() : null;
   const centerOf = el => { const r = rectOf(el); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: innerWidth / 2, y: innerHeight / 2 }; };
@@ -537,12 +545,21 @@
   async function animShot(ev) {
     const slot = localPt($('#watchSlot'));
     const aim = slot ? { x: slot.x + slot.w / 2, y: slot.y + slot.h / 2 } : { x: innerWidth / 2, y: 140 };
-    /* 手枪自底部滑入并抬枪瞄准 */
-    const gun = spawn('<div class="pistolFx">🔫</div>', '', { x: innerWidth / 2 - 22, y: innerHeight + 20 });
+    /* 手枪自底部滑入并抬枪瞄准（图形与顶部弹药条共用） */
+    const gun = spawn('<div class="pistolFx">' + $('#gunbar .gun svg').outerHTML + '</div>', '', { x: innerWidth / 2 - 22, y: innerHeight + 20 });
     const gEnd = { x: innerWidth / 2 - 22, y: innerHeight - 190 };
-    fly(gun, { x: 0, y: 0 }, { x: 0, y: gEnd.y - (innerHeight + 20) }, 280, { ease: easeOutCubic, r0: 8, r1: 0 });
+    const gy = gEnd.y - (innerHeight + 20);
+    /* 平举滑入：进场时枪口朝右、无偏移角 */
+    fly(gun, { x: 0, y: 0 }, { x: 0, y: gy }, 280, { ease: easeOutCubic, r0: 0, r1: 0 });
     await fxRunUntil(fxClock + 290);
-    const muzzle = { x: gEnd.x + 40, y: gEnd.y + 8 };
+    /* 瞄准：开火前绕枪身中心甩向盯梢位（快甩 80ms），枪管方向与弹道一致 */
+    const gc = { x: gEnd.x + 22, y: gEnd.y + 15 };
+    const aimDeg = Math.atan2(aim.y - gc.y, aim.x - gc.x) * 180 / Math.PI;
+    const rad = aimDeg * Math.PI / 180, cosA = Math.cos(rad), sinA = Math.sin(rad);
+    tween({ dur: 80, ease: easeOutCubic, upd(p) { gun.style.transform = 'translate(0px,' + gy.toFixed(1) + 'px) rotate(' + (aimDeg * p).toFixed(1) + 'deg)'; } });
+    await fxRunUntil(fxClock + 90);
+    /* 枪口 = 中心 + 随枪身旋转后的枪管口偏移（44×30 内枪口在 (37.4,7.7)） */
+    const muzzle = { x: gc.x + 15.4 * cosA + 7.3 * sinA, y: gc.y + 15.4 * sinA - 7.3 * cosA };
     /* 枪口火光 + 弹道 */
     const mz = spawn('', 'muzzle', { x: muzzle.x - 13, y: muzzle.y - 13 });
     tween({ dur: 130, upd(p) { mz.style.transform = 'scale(' + (1.6 - 0.9 * p).toFixed(2) + ')'; mz.style.opacity = (1 - p).toFixed(2); } });
@@ -559,9 +576,10 @@
     const sh = spawn('', 'shell', { x: muzzle.x - 6, y: muzzle.y - 6 });
     fly(sh, { x: 0, y: 0 }, { x: 54 + Math.random() * 22, y: 74 }, 520, { ease: easeOutCubic, r0: 0, r1: 320, fadeOut: true });
     vanish(sh, 0, 540);
-    /* 后坐（枪身后拉 + 抬枪口） */
-    tween({ dur: 90, upd(p) { gun.style.transform = 'translate(-10px,6px) rotate(-14deg)'; }, });
-    tween({ t: 95, dur: 200, ease: easeOutCubic, upd(p) { gun.style.transform = 'translate(' + (-10 + 10 * p).toFixed(1) + 'px,' + (6 - 6 * p).toFixed(1) + 'px) rotate(' + (-14 + 14 * p).toFixed(1) + 'deg)'; } });
+    /* 后坐（沿枪管后座 + 抬枪口）：位移叠加滑入落位 gy，旋转在瞄准角上再抬 14° */
+    const rx = -10 * cosA, ry = -10 * sinA;
+    tween({ dur: 90, upd() { gun.style.transform = 'translate(' + rx.toFixed(1) + 'px,' + (gy + ry).toFixed(1) + 'px) rotate(' + (aimDeg - 14).toFixed(1) + 'deg)'; } });
+    tween({ t: 95, dur: 200, ease: easeOutCubic, upd(p) { gun.style.transform = 'translate(' + (rx * (1 - p)).toFixed(1) + 'px,' + (gy + ry * (1 - p)).toFixed(1) + 'px) rotate(' + (aimDeg - 14 * (1 - p)).toFixed(1) + 'deg)'; } });
     hitStop(ev.hit ? 120 : 62);
     shakeAdd(ev.hit ? 0.82 : 0.46);
     if (ev.hit) {
@@ -776,6 +794,10 @@
       : '<div class="zone-empty">明弃堆是空的（只能盲抽或跳过）。</div>';
     $('#btnBlind').disabled = !S.discardDown.length || S.hand.length >= G.HAND_MAX;
     $('#btnSkipReward').textContent = S.hand.length >= G.HAND_MAX ? '手牌已满 · 跳过' : '跳过';
+    $('#rewardHandN').textContent = S.hand.length + '/' + G.HAND_MAX;
+    $('#rewardHand').innerHTML = S.hand.length
+      ? S.hand.map(id => miniHtml(id)).join('')
+      : '<div class="zone-empty">手牌已空</div>';
     $('#rewardMask').classList.remove('hidden');
   }
   function openDraw() {
@@ -980,6 +1002,7 @@
     $('#overlay-win').addEventListener('click', e => {
       if (e.target.closest('#btnAgain')) { $('#overlay-win').classList.add('hidden'); startGame(); }
       else if (e.target.closest('#btnHome')) goMenu();
+      else if (e.target === e.currentTarget) $('#overlay-win').classList.add('hidden');   // 点遮罩收起：可回看日志 / 推论
     });
   }
 
@@ -998,6 +1021,7 @@
     openBoard, openDisc, openLog, openElim, openReward, openDraw, openIntel, openLurk,
     fire(a) { doAct(a); return S; },
     doAct,
+    animShot: ev => animShot(Object.assign({ k: 'shot', hit: true }, ev)),
     setState(obj, opts) {
       clearTimers(); clearFx(); clearToasts();
       live = false; busy = false; sel = -1; pend = null; overFired = null; acting = null;

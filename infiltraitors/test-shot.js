@@ -406,8 +406,11 @@ async function main() {
       open: !document.getElementById('rewardMask').classList.contains('hidden'),
       cards: document.querySelectorAll('#rewardUp .card[data-i]').length,
       blind: document.getElementById('btnBlind').disabled,
+      handN: document.getElementById('rewardHandN').textContent,
+      handCards: document.querySelectorAll('#rewardHand .card').length,
     }));
     expect('拾牌抽屉自动弹出：明弃可选 · 盲抽可用', rw.open && rw.cards >= 4 && !rw.blind);
+    expect('抽屉底部独立展示你的手牌（' + rw.handN + '）', rw.handN === s.hand + '/7' && rw.handCards === s.hand);
     await page.mouse.click(12, 40);                       // 点遮罩空白
     await page.waitForTimeout(180);
     expect('拾牌是必选阶段：点遮罩不收起', await page.evaluate(() => !document.getElementById('rewardMask').classList.contains('hidden')));
@@ -621,6 +624,21 @@ async function main() {
     expect('胜利结算：任务成功 + 7 芯全亮', w.open && w.stamp.includes('任务成功') && w.cls.includes('ok') && w.dots === 7);
     expect('终局自动清档（结算后没有可续的对局）', await page.evaluate(() => localStorage.getItem(window.INFIL_UI.saveKey) === null));
     await shot('m24-win.png');
+
+    await page.mouse.click(12, 40);                       // 点结算遮罩空白处
+    await page.waitForTimeout(180);
+    expect('结算弹窗可点遮罩收起', await page.evaluate(() => document.getElementById('overlay-win').classList.contains('hidden')));
+    await page.click('#notebar');
+    await page.waitForTimeout(160);
+    const logOpen = await page.evaluate(() => !document.getElementById('logMask').classList.contains('hidden'));
+    await page.click('#btnCloseLog');
+    await page.waitForTimeout(140);
+    await page.click('#btnBoard');
+    await page.waitForTimeout(160);
+    const boardOpen = await page.evaluate(() => !document.getElementById('boardMask').classList.contains('hidden'));
+    await page.click('#btnCloseBoard');
+    await page.waitForTimeout(140);
+    expect('收起结算后日志与推论板可自由查看', logOpen && boardOpen);
 
     const L = scene({ bullets: 0, aiWatch: G.mk(0, 3), caught: 0 });
     L.over = { win: false, why: 'bullets', stats: G.statLine(L) };
