@@ -1,7 +1,7 @@
 /* ============================================================
    渗透因子 Infiltraitors · 截图走查（node test-shot.js）
    覆盖：菜单（弹孔装饰/读数）/ 配置抽屉（叛徒降档 · 5色恒严于4色联动）/ 开局布控演出 / 通讯判定印章（含摸牌选择）/
-        推论板 / 潜伏摸牌抽屉 / 铲除指认与开枪演出（命中·落空·情报区揭示后清空）/
+        推论板 / 潜伏摸牌抽屉（含牌库约束：摸 k 须牌库 ≥ k+1）/ 铲除指认与开枪演出（命中·落空·情报区揭示后清空）/
         拾牌抽屉 / 日志·弃牌·情报抽屉 / 弹药告急 / 夜枭整回合 / 胜负结算（含死局）/
         对局布局（顶栏·弹药条·日志顺序·贴底行动栏）/ 重置对局 /
         存档续玩（重载恢复 / 回菜单留档 / 继续任务 / 终局清档 / AI 断点续跑 / 演出中途刷新兜底）/
@@ -327,6 +327,53 @@ async function main() {
     expect('7 张手牌单行放下且不溢出（整行缩放 ' + row.w + 'px · zoom ' + row.z + '）',
       row.n === 7 && row.oneRow && row.inside && row.w < 56 && parseFloat(row.z) < 1);
     await shot('m10b-hand-seven.png');
+  }
+
+  console.log('■ 7b 潜伏的牌库约束（必暗弃 1 张）');
+  {
+    const saved = await page.evaluate(() => JSON.parse(JSON.stringify(window.INFIL_UI.state())));
+    /* 牌库剩 2：只能摸 1（摸完必须留 1 张给暗弃） */
+    const s2 = scene(); s2.deck = s2.deck.slice(-2);
+    await setState2(s2);
+    const l2 = await page.evaluate(() => ({
+      dis: document.getElementById('btnLurk').disabled,
+      label: document.querySelector('#btnLurk span').textContent,
+      max: window.INFIL.playerActions(window.INFIL_UI.state()).lurkMax,
+    }));
+    expect('牌库 2 张：潜伏可用 · 按钮标「摸 1 张」',
+      !l2.dis && l2.max === 1 && l2.label.includes('摸 1 张') && !l2.label.includes('1~'));
+    await page.click('#btnLurk');
+    await page.waitForTimeout(220);
+    const l3 = await page.evaluate(() => ({
+      open: !document.getElementById('lurkMask').classList.contains('hidden'),
+      n: document.querySelectorAll('#lurkOpts .lurk-opt').length,
+      txt: document.querySelector('#lurkOpts .lurk-opt').textContent,
+    }));
+    expect('抽屉只有 1 个选项（不提供摸 2 / 摸 3）', l3.open && l3.n === 1 && l3.txt.includes('牌库 -2'));
+    await shot('m10c-lurk-deck2.png');
+    const b2 = await st();
+    await page.click('#lurkOpts .lurk-opt');
+    await idle();
+    const a2 = await st();
+    expect('摸 1 暗弃 1：手牌 5→6 · 牌库 2→0 · 暗弃 +1', a2.hand === 6 && a2.deck === 0 && a2.down === b2.down + 1);
+    /* 牌库剩 1：潜伏整体不可用 */
+    const s1 = scene(); s1.deck = s1.deck.slice(-1);
+    await setState2(s1);
+    const l1 = await page.evaluate(() => ({
+      dis: document.getElementById('btnLurk').disabled,
+      label: document.querySelector('#btnLurk span').textContent,
+      max: window.INFIL.playerActions(window.INFIL_UI.state()).lurkMax,
+    }));
+    expect('牌库 1 张：潜伏禁用 · 按钮标「牌库不足」', l1.dis && l1.max === 0 && l1.label.includes('牌库不足'));
+    /* 引擎侧钳制（不依赖 UI） */
+    const sc = scene(); sc.deck = sc.deck.slice(-2);
+    const r = G.playerLurk(sc, 3);
+    expect('引擎：牌库 2 传入摸 3 → 钳到摸 1 · 牌库清 0 · 暗弃 +1',
+      r.ok && r.evs[0].cards.length === 1 && sc.deck.length === 0 && sc.discardDown.length === 2);
+    const sc1 = scene(); sc1.deck = sc1.deck.slice(-1);
+    expect('引擎：牌库 1 张 → 潜伏拒绝且牌库不动',
+      G.playerLurk(sc1, 1).ok === false && sc1.deck.length === 1);
+    await setState2(saved);
   }
 
   console.log('■ 8 铲除抽屉：色 + 数 指认');

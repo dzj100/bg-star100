@@ -242,7 +242,7 @@
     const turn = $('#turnsign');
     turn.className = 'c' + tv;
     turn.textContent = S.over ? '任务结束'
-      : tv === 0 ? '你的回合 · 第 ' + S.round + ' 轮' : '夜枭行动中 · 第 ' + S.round + ' 轮';
+      : tv === 0 ? '你的回合 · 第 ' + S.round + ' 轮' : '夜枭行动 · 第 ' + S.round + ' 轮';
     $('#aiTurnLamp').classList.toggle('on', !S.over && tv === 1);
     const alert = $('#alertbar');
     if (!S.over && left > 0 && S.bullets <= left) {
@@ -297,13 +297,14 @@
     const acts = G.playerActions(S);
     const my = S.turn === 0 && !S.over && !busy && !S.pending;
     const bp = $('#btnProbe'), bl = $('#btnLurk'), be = $('#btnElim');
-    const lurkOk = acts.lurkMax > 0 && S.deck.length > 0;
+    const lurkOk = acts.lurkMax > 0;
     bp.disabled = !my || !acts.probe;
     bl.disabled = !my || !lurkOk;
     be.disabled = !my || !acts.eliminate;
     bp.classList.toggle('on', my && sel >= 0 && acts.probe);
-    bl.querySelector('span').textContent = acts.lurkMax <= 0 ? '手牌已满' :
-      !S.deck.length ? '牌库已空' : '摸 1~' + acts.lurkMax + ' 张 · 暗弃 1';
+    bl.querySelector('span').textContent =
+      acts.lurkMax <= 0 ? (S.hand.length >= G.HAND_MAX ? '手牌已满' : '牌库不足') :
+      '摸 1~' + acts.lurkMax + ' 张 · 暗弃 1';
     be.querySelector('span').textContent = acts.eliminate ? '指认 · 剩 ' + Math.max(0, S.bullets) + ' 发' : '需先有目标';
   }
   function renderNote() {
@@ -372,11 +373,12 @@
   }
   function probe() {
     if (!S || S.over || busy) return;
-    if (sel < 0) { toast('先点一张手牌，再按【通讯】'); return; }
+    if (sel < 0) { toast('先选中一张手牌再【通讯】'); return; }
     doAct({ act: 'probe', idx: sel });
   }
   function openLurk() {
-    if (!S.deck.length) { toast('牌库已空，无法潜伏'); return; }
+    /* 潜伏必暗弃 1 张：牌库至少留 1 张给弃牌，摸 k 张需牌库 ≥ k+1 */
+    if (S.deck.length < 2) { toast(S.deck.length ? '牌库不足，无法潜伏' : '牌库已空，无法潜伏'); return; }
     const max = G.playerActions(S).lurkMax;
     if (max <= 0) return;
     const box = $('#lurkOpts');
@@ -656,7 +658,7 @@
     await fxRunUntil(fxClock + 410);
     vanish(el, 0, 60);
     $('#pileDeck').classList.remove('hot'); void $('#pileDeck').offsetWidth; $('#pileDeck').classList.add('hot');
-    bannerAt('重新混入人群', 'back');
+    bannerAt('重新加入牌库', 'back');
     await sleep(320);
   }
   async function animPick(ev) {
@@ -980,7 +982,7 @@
       doAct({ act: 'pick', pile: 'up', idx: +c.dataset.i });
     });
     $('#pileUp').addEventListener('click', openDisc);
-    $('#pileDeck').addEventListener('click', () => toast('牌库剩 ' + S.deck.length + ' 张 —— 牌库空后不能再潜伏或摸牌'));
+    $('#pileDeck').addEventListener('click', () => toast('牌库剩 ' + S.deck.length + ' 张，潜伏必暗弃 1 张'));
     $('#pileTrait').addEventListener('click', () => toast('叛徒区 ' + S.traitorPile.length + ' 名 + 盯梢 ' + (S.aiWatch ? 1 : 0) + ' 名'));
     $('#pileDown').addEventListener('click', () => toast('暗弃堆 ' + S.discardDown.length + ' 张（只见张数）'));
     $('#watchSlot').addEventListener('click', () => toast(S.aiWatch ? '夜枭已锁定 1 名目标（内容对你也保密）' : '夜枭还没锁定目标'));

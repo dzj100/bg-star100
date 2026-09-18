@@ -174,7 +174,8 @@ const G = (() => {
   }
   function doLurkDraw(S, to) {
     const cur = to === 'aiHand' ? S.aiHand.length : S.hand.length;
-    const k = Math.min(3, HAND_MAX - cur);
+    /* 摸 k 张后还须暗弃 1 张：k 至多留 1 张给暗弃 */
+    const k = Math.max(0, Math.min(3, HAND_MAX - cur, S.deck.length - 1));
     const got = k > 0 ? doDraw(S, k, to) : [];
     const milled = mill(S, 1);
     S.stat.lurks++;
@@ -184,20 +185,21 @@ const G = (() => {
   /* ---- 玩家行动 ---- */
   const playerActions = S => ({
     probe: !!(S.aiWatch && S.hand.length),
-    lurkMax: Math.min(3, HAND_MAX - S.hand.length),
+    /* 摸 k 张须给必弃的 1 张留余量：k ≤ 牌库 - 1 */
+    lurkMax: Math.max(0, Math.min(3, HAND_MAX - S.hand.length, S.deck.length - 1)),
     eliminate: !!S.aiWatch,
   });
 
   /* 死局判定：轮到的一方五类行动全都不可执行才判负 */
-  /* 玩家：盯梢/情报属夜枭；通讯需手牌+盯梢，潜伏需牌库+未满手，铲除需盯梢 */
+  /* 玩家：盯梢/情报属夜枭；通讯需手牌+盯梢，潜伏需牌库≥2+未满手，铲除需盯梢 */
   const playerHasAction = S =>
     !!(S.aiWatch && (S.hand.length || S.bullets > 0)) ||
-    !!(S.deck.length && S.hand.length < HAND_MAX);
-  /* 夜枭：盯梢需尚未布控且叛徒区有牌；情报需手牌；潜伏需牌库+未满手 */
+    !!(S.deck.length >= 2 && S.hand.length < HAND_MAX);
+  /* 夜枭：盯梢需尚未布控且叛徒区有牌；情报需手牌；潜伏需牌库≥2+未满手 */
   const aiHasAction = S =>
     !!(!S.aiWatch && S.traitorPile.length) ||
     !!(S.aiWatch && S.aiHand.length) ||
-    !!(S.deck.length && S.aiHand.length < HAND_MAX);
+    !!(S.deck.length >= 2 && S.aiHand.length < HAND_MAX);
 
   /* 通讯：手牌 → 判定 → 情报区；牌库有牌时进入「是否摸 1 张」选择 */
   function playerProbe(S, idx) {
@@ -236,12 +238,12 @@ const G = (() => {
     return { ok: true, evs };
   }
 
-  /* 潜伏：摸 1~3（上限 7）→ 牌库顶 1 张暗弃；牌库无牌不可用 */
+  /* 潜伏：摸 1~3（上限 7）→ 牌库顶 1 张暗弃；摸 k 张须牌库 ≥ k+1 */
   function playerLurk(S, k) {
-    if (S.over || S.turn !== 0 || S.pending || !S.deck.length) return { ok: false, evs: [] };
-    const max = Math.min(3, HAND_MAX - S.hand.length);
-    k = clamp(Math.round(k), 1, Math.max(1, max));
+    if (S.over || S.turn !== 0 || S.pending) return { ok: false, evs: [] };
+    const max = Math.min(3, HAND_MAX - S.hand.length, S.deck.length - 1);
     if (max <= 0) return { ok: false, evs: [] };
+    k = clamp(Math.round(k), 1, max);
     const got = doDraw(S, k, 'hand');
     const milled = mill(S, 1);
     S.stat.lurks++;
@@ -273,7 +275,7 @@ const G = (() => {
       S.deck.push(traitor); shuffle(S.deck, Math.random);
       evs.push({ k: 'back', card: traitor });
       logPush(S, 'you', '铲除成功！【' + cardName(traitor) + '】已被清除，' +
-        (S.caught < S.cfg.traitors ? '该叛徒重新混入人群（牌库 +1），剩 ' + traitorsLeft(S) + ' 名' : ''));
+        (S.caught < S.cfg.traitors ? '该牌加入牌库并洗混，剩 ' + traitorsLeft(S) + ' 名' : ''));
       if (S.caught >= S.cfg.traitors) {
         won = true;
         logPush(S, 'sys', '全部 ' + S.cfg.traitors + ' 名叛徒已铲除 —— 任务成功！');
@@ -362,7 +364,7 @@ const G = (() => {
       const idx = chooseHintIdx(S, rnd);
       evs = doHint(S, idx);
       op = { k: 'hint', idx };
-    } else if (S.deck.length) {
+    } else if (S.deck.length >= 2) {
       const r = doLurkDraw(S, 'aiHand');
       logPush(S, 'ai', '夜枭潜伏：补 ' + r.got.length + ' 张手牌' + (r.milled.length ? '，牌库顶 1 张置入暗弃堆' : ''));
       evs = [{ k: 'draw', cards: r.got, to: 'aiHand' }, { k: 'mill', n: r.milled.length }];
@@ -410,7 +412,7 @@ const G = (() => {
     if (S.hand.length && S.aiWatch && cands.length) {
       return { act: 'elim', c: cOf(cands[0]), n: nOf(cands[0]) };
     }
-    if (S.deck.length && S.hand.length < HAND_MAX) return { act: 'lurk', k: Math.min(3, HAND_MAX - S.hand.length) };
+    if (S.deck.length >= 2 && S.hand.length < HAND_MAX) return { act: 'lurk', k: Math.min(3, HAND_MAX - S.hand.length, S.deck.length - 1) };
     /* 手牌枯竭且牌库见底：孤注一掷按候选开火 */
     if (S.aiWatch && cands.length) return { act: 'elim', c: cOf(cands[0]), n: nOf(cands[0]) };
     return null;
