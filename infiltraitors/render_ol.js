@@ -130,6 +130,7 @@
     fxTweens.length = 0; fxClock = 0; fxHold = 0;
     fxWaits.splice(0).forEach(w => w.res());
     fxRunning = false;
+    killFz = null;
     trauma = 0; $('#screen-game').style.transform = ''; $('#screen-game').style.willChange = '';
   }
   const rectOf = el => el ? el.getBoundingClientRect() : null;
@@ -391,6 +392,7 @@
   function renderAll() {
     if (!S) return;
     renderTop(); renderPlayers(); renderHand(); renderAct(); renderNote(); renderRoom();
+    reapplyKillFz();
   }
 
   /* ---------------- 吐司 ---------------- */
@@ -443,6 +445,8 @@
     if (!r || !r.ok) { busy = false; acting = null; renderAll(); return { ok: false }; }
     sel = -1;
     closeAllSheets();
+    /* 命中事件带 reveal：此刻 DOM 还是行动前画面，先冻结目标座位的盯梢牌与情报区 */
+    if (fxOn) { const rv = r.evs.find(e => e.k === 'reveal'); if (rv) freezeKill(rv.seat); }
     pushLocal(a.act, r.evs);          // 上报房间：先推送再演出（他人即时跟上，刷新不丢步）
     await playEvs(r.evs);
     acting = null;
@@ -556,6 +560,7 @@
       renderAll();
       await animEv(ev);
     }
+    clearKillFz();
     renderAll();
   }
   async function animEv(ev) {
@@ -573,6 +578,38 @@
   const watchEl = seat => $('#players .pl-watch[data-seat="' + seat + '"]');
   const handEl = seat => (seat === myOf() ? $('#hand') : $('#players .pl-hand[data-seat="' + seat + '"]'));
   const chipEl = (seat, zone) => $('#players .intel-cards[data-seat="' + seat + '"][data-zone="' + zone + '"]');
+
+  /* 铲除命中的「先揭示、后清空」：房间状态是整盘一次到位，直接重绘会让盯梢的叛徒牌在枪响前先消失。
+     命中瞬间把目标座位的盯梢牌与两行情报区冻结成 DOM 快照，每次重绘后原样贴回；
+     揭示时放行盯梢牌（让位给翻出的大牌），清扫时放行情报区（卡片从原处飞入明弃堆），事件收尾整体解冻 */
+  let killFz = null;
+  function freezeKill(seat) {
+    const w = watchEl(seat);
+    const row = z => { const c = chipEl(seat, z); return c ? c.closest('.intel-row') : null; };
+    const rel = row('rel'), unrel = row('unrel');
+    killFz = {
+      seat,
+      watchHTML: w ? w.innerHTML : null, watchCls: w ? w.className : null,
+      relHTML: rel ? rel.innerHTML : null, unrelHTML: unrel ? unrel.innerHTML : null,
+    };
+  }
+  function reapplyKillFz() {
+    if (!killFz) return;
+    const w = watchEl(killFz.seat);
+    if (w && killFz.watchHTML != null) { w.innerHTML = killFz.watchHTML; w.className = killFz.watchCls; }
+    [['rel', 'relHTML'], ['unrel', 'unrelHTML']].forEach(pair => {
+      if (killFz[pair[1]] == null) return;
+      const c = chipEl(killFz.seat, pair[0]);
+      const r = c ? c.closest('.intel-row') : null;
+      if (!r) return;
+      r.innerHTML = killFz[pair[1]];
+      const ic = r.querySelector('.intel-cards');
+      if (ic) ic.scrollLeft = ic.scrollWidth;      // 复原后滚回最右：最新一张仍在视野里
+    });
+  }
+  function unfreezeKillWatch() { if (killFz) { killFz.watchHTML = null; killFz.watchCls = null; } }
+  function unfreezeKillIntel() { if (killFz) { killFz.relHTML = null; killFz.unrelHTML = null; } }
+  function clearKillFz() { killFz = null; }
 
   async function animStake(ev) {
     const mine = ev.seat === myOf();
@@ -740,6 +777,8 @@
     await sleep(120);
   }
   async function animReveal(ev) {
+    /* 揭示：盯梢位的小牌到这一刻才让位给翻出的大牌（此前靠冻结顶住，枪响时叛徒还在场） */
+    unfreezeKillWatch(); renderAll();
     const slot = localPt(watchEl(ev.seat)) || { x: innerWidth / 2, y: 120, w: 30, h: 42 };
     const el = spawn(cardHtml(ev.card, ''), '', { x: slot.x + slot.w / 2 - 28, y: slot.y + slot.h / 2 - 39 }, { w: 56, h: 78 });
     el.style.transform = 'scale(0.4) rotate(0deg)';
@@ -758,10 +797,22 @@
     const up = localPt($('#pileUp'));
     const cards = ev.cards || [];
     const seat = ev.seat == null ? myOf() : ev.seat;
-    const src = localPt(chipEl(seat, 'rel')) || localPt(chipEl(seat, 'unrel')) || localPt($('#players')) || { x: innerWidth / 2, y: 220, w: 60, h: 20 };
+    /* 冻结中的情报区还在场：先按每张卡的原位拍快照，解冻重绘后再从原位飞入明弃堆 */
+    const snap = [];
+    for (const z of ['rel', 'unrel']) {
+      const row = chipEl(seat, z);
+      if (!row) continue;
+      for (const c of row.querySelectorAll('.card')) {
+        const r = localPt(c);
+        if (r) snap.push({ html: c.outerHTML, x: r.x, y: r.y });
+      }
+    }
+    unfreezeKillIntel(); renderAll();
     const box = microBox();
-    for (let i = 0; i < cards.length; i++) {
-      const el = spawn(microHtml(cards[i]), '', { x: src.x, y: src.y }, { w: box.w, h: box.h });
+    const src = localPt(chipEl(seat, 'rel')) || localPt(chipEl(seat, 'unrel')) || localPt($('#players')) || { x: innerWidth / 2, y: 220, w: 60, h: 20 };
+    const list = snap.length ? snap : cards.map(id => ({ html: microHtml(id), x: src.x, y: src.y }));
+    for (let i = 0; i < list.length; i++) {
+      const el = spawn(list[i].html, '', { x: list[i].x, y: list[i].y }, { w: box.w, h: box.h });
       const r = localPt(el) || src;
       const tx = (up ? up.x + up.w / 2 - r.w / 2 : innerWidth - 80) - r.x;
       const ty = (up ? up.y + up.h / 2 - r.h / 2 : 60) - r.y;
@@ -774,8 +825,8 @@
       });
       vanish(el, i * 45 + 296, 60);
     }
-    if (cards.length) { $('#pileUp').classList.remove('hot'); void $('#pileUp').offsetWidth; $('#pileUp').classList.add('hot'); }
-    await fxRunUntil(fxClock + 320 + cards.length * 45);
+    if (list.length) { $('#pileUp').classList.remove('hot'); void $('#pileUp').offsetWidth; $('#pileUp').classList.add('hot'); }
+    await fxRunUntil(fxClock + 320 + list.length * 45);
     burst(centerOf($('#pileUp')), 6, 'spark', 30);
     await sleep(140);
   }
@@ -1054,6 +1105,8 @@
     clearTimers(); clearFx(); clearToasts();
     S = st; live = true; busy = !!evs; sel = -1; acting = evs ? actor : null;
     if (S.introId !== lastIntroId && opts.intro === false) lastIntroId = S.introId;
+    /* 远端同一拍：重绘前先冻结被铲除目标的盯梢牌与情报区，别让它们在枪响前先消失 */
+    if (evs && fxOn) { const rv = evs.find(e => e.k === 'reveal'); if (rv) freezeKill(rv.seat); }
     renderAll(); refreshOpenSheets();
     if (evs) {
       if (actor != null && actor !== myOf()) {

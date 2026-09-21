@@ -6,9 +6,10 @@
         五类行动人人可用：盯梢 / 情报 / 通讯（多目标抽屉 + 摸牌子阶段）/ 潜伏 / 铲除（多目标 + 指认 + 落空·命中 + 拾牌）/
         推论板（多目标切换 + 长按自动分析）/ 抽屉三连（叛徒区保密 / 弃牌堆 / 情报明细）/
         他方子阶段提示 / 他方行动横幅（中文标签）/ 打出落点（落在区域最后一张）/
+        铲除命中的「先揭示、后清空」（盯梢牌与情报区不被重绘提前清掉）/
         结算（房主·成员按钮差异）/ 5 人布局 / 桌面横排 /
         联机不写单机 localStorage（req8）· 全程无页面错误
-   说明：Supabase CDN 用桩替换（离线可跑），本脚本不触网、不读写真实房间行。
+   说明：Supabase 用桩替换（CDN 与本地 supabase.min.js 两个来源都拦，离线可跑），本脚本不触网、不读写真实房间行。
    ============================================================ */
 'use strict';
 const { chromium } = require('playwright');
@@ -99,7 +100,9 @@ async function main() {
   const page = await browser.newPage({ viewport: MOBILE });
   page.on('pageerror', e => errors.push('PAGE: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); });
+  /* 页面已把 supabase 换成本地 supabase.min.js（file://），CDN 路由留着兼容旧版 */
   await page.route('https://cdn.jsdelivr.net/**', route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
+  await page.route('**/supabase.min.js', route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
 
   const shot = async name => { await page.screenshot({ path: path.join(SHOTS, name) }); console.log('  shot:', name); };
   const setState = async (s, opts) => {
@@ -516,7 +519,7 @@ async function main() {
       const el = document.querySelector('#fx .banner');
       return { txt: el ? el.textContent : null, act: !!el && el.classList.contains('act') };
     });
-    expect('他方盯梢横幅：中文标签「秦二 · 盯梢」（无 raw key "stake"）', b1.txt === '秦二 · 盯梢' && b1.act && b1.txt.indexOf('stake') < 0);
+    expect('他方盯梢横幅：中文标签「秦二 盯梢」（无 raw key "stake"）', b1.txt === '秦二 盯梢' && b1.act && b1.txt.indexOf('stake') < 0);
     /* 回归：横幅类名 act 曾命中行动按钮的 .act 样式（min-height clamp）被撑成高盒子；
        按钮外观限定 button.act 后，.banner.act 显式恢复为贴合文字的带框徽章
        （1.5px 边框在 Chromium 计算值会取整成 1px，故只校验「有实线边框」） */
@@ -543,7 +546,7 @@ async function main() {
       const el = document.querySelector('#fx .banner');
       return el ? el.textContent : null;
     });
-    expect('他方潜伏横幅：中文标签「赵三 · 潜伏」', b2 === '赵三 · 潜伏');
+    expect('他方潜伏横幅：中文标签「赵三 潜伏」', b2 === '赵三 潜伏');
     await idle(9000);
     /* 未收录的键兜底为「行动」，不裸奔英文 */
     await fireRemote(1, 'zzz');
@@ -552,7 +555,7 @@ async function main() {
       const el = document.querySelector('#fx .banner');
       return el ? el.textContent : null;
     });
-    expect('未知行动键兜底为「行动」', b3 === '秦二 · 行动');
+    expect('未知行动键兜底为「行动」', b3 === '秦二 行动');
     await idle(9000);
     await fx(false);
   }
@@ -645,6 +648,42 @@ async function main() {
     await fx(false);
   }
 
+  console.log('■ 8e 他方铲除命中：重绘先冻结，盯梢牌与情报区「先揭示、后清空」');
+  {
+    await fx(true);
+    const S = scene({}, 4);
+    await setState(S, { live: true });
+    /* 构造远端推来的铲除命中：座位 2 铲除座位 1 的盯梢目标（状态整盘一次到位） */
+    const P = await page.evaluate(async () => {
+      const st = JSON.parse(JSON.stringify(window.INFIL_OL_TEST.state()));
+      const tra = st.watches[1];
+      const swept = st.intel[1].rel.concat(st.intel[1].unrel);
+      st.watches[1] = null; st.intel[1] = { rel: [], unrel: [] };
+      st.discardUp.push(...swept); st.deck.push(tra);
+      st.bullets--; st.caught = 1; st.pending = 'reward'; st.pendingSeat = 2;
+      st._src = 2; st._act = 'elim';
+      st._evs = [{ k: 'shot', seat: 2, target: 1, hit: true, guess: tra },
+        { k: 'reveal', seat: 1, card: tra },
+        { k: 'sweep', seat: 1, cards: swept },
+        { k: 'back', card: tra }];
+      const snap = () => {
+        const w = document.querySelector('.pl-watch[data-seat="1"]');
+        return { set: w.classList.contains('set'), face: !!w.querySelector('.card, .watch-back'),
+          cards: document.querySelectorAll('.pl-row[data-seat="1"] .intel-cards .card').length,
+          busy: window.INFIL_OL_UI.busy() };
+      };
+      const pr = window.INFIL_OL_UI.applyRemote(st, { replay: true });   // 不 await：同步重绘后立刻取画面
+      const early = snap();
+      await pr;
+      return { early, late: snap(), stWatch: window.INFIL_OL_TEST.state().watches[1] === null };
+    });
+    expect('远端命中重绘当拍：状态已清但画面顶住（1 号盯梢牌与 2 张情报卡仍在）· 演出进行中',
+      P.stWatch && P.early.busy && P.early.set && P.early.face && P.early.cards === 2);
+    expect('回放结束：盯梢位与情报区按「揭示 · 清扫」顺序清空（冻结解除）',
+      !P.late.busy && !P.late.set && !P.late.face && P.late.cards === 0);
+    await fx(false);
+  }
+
   console.log('■ 9 铲除：多目标 + 色数指认 → 落空 / 命中（公示 · 清扫 · 洗回）+ 拾牌');
   {
     const S = scene({}, 4);
@@ -695,8 +734,27 @@ async function main() {
     await page.click('#pickNums .pn[data-n="6"]');
     await page.click('#btnFire');
     await page.waitForTimeout(620);                        // 手枪滑入 + 枪口火光
+    /* 回归：命中已落进状态（watches[1]=null / intel[1] 清空），但演出期间目标座位的盯梢牌与
+       情报区要「先揭示、后清空」——枪响阶段画面仍顶住行动前的样子 */
+    const mid = await page.evaluate(() => {
+      const S = window.INFIL_OL_TEST.state();
+      const w = document.querySelector('.pl-watch[data-seat="1"]');
+      return {
+        stWatch: S.watches[1] === null, stIntel: S.intel[1].rel.length + S.intel[1].unrel.length,
+        busy: window.INFIL_OL_UI.busy(), set: w.classList.contains('set'), face: !!w.querySelector('.card, .watch-back'),
+        cards: document.querySelectorAll('.pl-row[data-seat="1"] .intel-cards .card').length,
+      };
+    });
+    expect('枪响阶段：状态已清但画面顶住（1 号盯梢牌与 2 张情报卡仍在）· 演出进行中',
+      mid.stWatch && mid.stIntel === 0 && mid.busy && mid.set && mid.face && mid.cards === 2);
     await shot('ol13-shot-mid.png');
     await page.waitForFunction(() => window.INFIL_OL_TEST.state().pending === 'reward' && !window.INFIL_OL_UI.busy(), null, { timeout: 15000 });
+    const done = await page.evaluate(() => {
+      const w = document.querySelector('.pl-watch[data-seat="1"]');
+      return { set: w.classList.contains('set'), face: !!w.querySelector('.card, .watch-back'),
+        cards: document.querySelectorAll('.pl-row[data-seat="1"] .intel-cards .card').length };
+    });
+    expect('揭示与清扫后：1 号盯梢位清空 · 情报区清空（冻结解除）', !done.set && !done.face && done.cards === 0);
     const h = await st();
     expect('命中：铲除 1 · 1 号盯梢位清空 · 子弹 9', h.caught === 1 && h.watches[1] === null && h.bullets === 9);
     expect('命中：1 号情报区清扫（2 → 0）· 明弃 +2 · 叛徒洗回牌库', h.intel[1] === 0 && h.up === H.discardUp.length + 2 && h.left === 6);
@@ -947,6 +1005,7 @@ async function main() {
     dpage.on('pageerror', e => errors.push('DPAGE: ' + e.message));
     dpage.on('console', m => { if (m.type() === 'error') errors.push('DCONSOLE: ' + m.text()); });
     await dpage.route('https://cdn.jsdelivr.net/**', route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
+    await dpage.route('**/supabase.min.js', route => route.fulfill({ contentType: 'application/javascript', body: SUPABASE_STUB }));
     await dpage.goto(URL);
     await dpage.waitForTimeout(420);
     await dpage.screenshot({ path: path.join(SHOTS, 'd-ol1-menu.png') });
