@@ -813,7 +813,7 @@
   function openReward() {
     const up = S.discardUp.map((id, i) => ({ id, i }));
     $('#rewardUp').innerHTML = up.length
-      ? up.map(o => '<button class="card mini c' + G.cOf(o.id) + '" data-i="' + o.i + '" style="padding:0">' +
+      ? up.map(o => '<button class="card mini c' + G.cOf(o.id) + '" data-i="' + o.i + '">' +
         '<div class="band"><span class="glyph">' + G.GLYPH[G.cOf(o.id)] + '</span><span>' + G.COLORS[G.cOf(o.id)] + '</span></div><div class="num">' + G.nOf(o.id) + '</div></button>').join('')
       : '<div class="zone-empty">明弃堆是空的（只能盲抽或跳过）。</div>';
     $('#btnBlind').disabled = !S.discardDown.length || S.hand.length >= G.HAND_MAX;

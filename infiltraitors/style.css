@@ -330,8 +330,11 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
   width: var(--cw); height: var(--ch); border-radius: 7px; flex: 0 0 auto; position: relative;
   background: linear-gradient(170deg, var(--paper), var(--paper2)); color: var(--ptext);
   border: 2px solid #0c0f14; box-shadow: 0 3px 0 rgba(0, 0, 0, .45); overflow: hidden;
-  display: flex; flex-direction: column; cursor: pointer;
+  display: flex; flex-direction: column; align-items: stretch; cursor: pointer;
 }
+/* <button> 卡（如明弃堆）要清掉 UA 默认：部分浏览器的 button UA 会改 flex 子项横向对齐，
+   让 .band 收缩到内容宽、不通铺；appearance/padding 同理，须与 <div> 卡完全一致 */
+button.card { appearance: none; -webkit-appearance: none; padding: 0; }
 .card .band {
   height: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 4px;
   font-size: 9px; font-weight: 800; color: rgba(255, 255, 255, .95); letter-spacing: .5px;
@@ -609,3 +612,200 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* ============================================================
+   联机模式（index_ol.html）
+   #online 承载大厅 / 等候室；对局界面与抽屉复用上面单机样式，
+   这里只补联机专属部件：玩家区、5 行动栏、目标选择、开局弹窗、大厅弹层
+   ============================================================ */
+
+#online { min-height: 100dvh; background: radial-gradient(120% 80% at 50% 0%, #16202c 0%, var(--bg) 62%); }
+
+/* ---------- 大厅 / 等候室 ---------- */
+.ol-lobby, .ol-room {
+  width: 100%; max-width: 430px; min-height: 100dvh; margin: 0 auto;
+  padding: 18px 16px max(20px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ol-head, .ol-room-top { display: flex; align-items: center; justify-content: space-between; }
+.ol-head-title, .ol-title { margin: 0; font-size: 17px; letter-spacing: 1px; }
+.icon-btn {
+  min-height: 32px; padding: 0 12px; border-radius: 9px; border: 1.5px solid var(--line2);
+  background: #101823; font-size: 12.5px; font-weight: 800; cursor: pointer;
+}
+.icon-btn:active { transform: translateY(1px); }
+.ol-btn { width: 100%; }
+.ol-btn.dis { opacity: .4; }
+.ol-divider { text-align: center; font-size: 11.5px; color: var(--dim2); letter-spacing: 1px; margin: 4px 0; }
+.ol-label { font-size: 12px; font-weight: 700; color: var(--dim); letter-spacing: 1px; margin-bottom: -5px; }
+.ol-input {
+  min-height: 42px; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--line2);
+  background: #0d141d; color: var(--text); font-size: 14px; font-family: inherit;
+}
+.ol-input:focus { outline: none; border-color: var(--you); box-shadow: 0 0 0 2px rgba(63, 199, 184, .2); }
+.ol-code-input { font-family: var(--mono); font-size: 20px; letter-spacing: 8px; text-align: center; }
+.ol-credit {
+  margin-top: auto; padding-top: 14px; text-align: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim2); letter-spacing: 2px;
+}
+.ol-code {
+  text-align: center; font-family: var(--mono); font-size: 40px; font-weight: 900;
+  letter-spacing: 10px; color: var(--text); text-shadow: 0 0 24px rgba(63, 199, 184, .32);
+}
+.ol-sub { text-align: center; font-size: 12px; color: var(--dim); letter-spacing: .5px; margin-top: -6px; }
+.ol-card {
+  border: 1.5px solid var(--line); border-radius: var(--r); background: rgba(24, 34, 47, .82);
+  padding: 10px 12px; box-shadow: var(--sh);
+}
+.ol-card.ol-w { display: flex; flex-direction: column; gap: 6px; }
+.ol-seat {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px;
+  border: 1.5px solid var(--line2); background: #101823;
+}
+.ol-seat.host { border-color: var(--ai); }
+.ol-seat.me { border-color: var(--you); }
+.ol-seat.empty { border-style: dashed; opacity: .5; }
+.os-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--you); flex: 0 0 auto; }
+.ol-seat.host .os-dot { background: var(--ai); }
+.ol-seat.empty .os-dot { background: #3a4655; }
+.os-name { flex: 1; font-size: 13.5px; font-weight: 800; letter-spacing: .5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-tag { font-family: var(--mono); font-size: 10px; color: var(--dim2); letter-spacing: 1px; }
+.ol-wait-note { font-size: 12px; color: var(--dim); text-align: center; padding: 8px 0 2px; letter-spacing: .5px; }
+/* 成员侧只读配置：选中项保持高亮，未选中与不可点一同弱化 */
+.seg.ro button { cursor: default; }
+.seg.ro button:not(.on) { opacity: .34; }
+.ol-room .cfg-row { gap: 8px; }
+.ol-room .cfg-read { margin-top: 10px; }
+/* 房间页的标签紧贴着下方的配置卡/配置面板：留出间距（默认 -5px 是给表单输入用的） */
+.ol-room .ol-label { margin-bottom: 6px; }
+
+/* ---------- 玩家区（每人一块「夜枭区」式面板：头行 + 两行情报区） ---------- */
+#players {
+  margin: 9px 10px 0; display: flex; flex-direction: column; gap: 7px;
+  max-height: 50dvh; overflow-y: auto; scrollbar-width: none;
+}
+#players::-webkit-scrollbar { display: none; }
+.pl-row {
+  border: 1.5px solid var(--line); border-radius: var(--r); background: rgba(24, 34, 47, .72);
+  padding: 6px 8px 10px; cursor: pointer;
+}
+.pl-row.me { background: rgba(63, 199, 184, .07); }
+.pl-row.on { border-color: var(--you); box-shadow: 0 0 0 1px rgba(63, 199, 184, .22); }
+.pl-row:active { background: rgba(12, 17, 25, .75); }
+/* 长名字在头行内省略，不挤压盯梢位与回合灯 */
+.pl-row .ai-head { grid-template-columns: minmax(0, auto) auto 1fr; }
+.pl-name { font-size: 13.5px; font-weight: 800; letter-spacing: .5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row.me .pl-name { color: var(--you); }
+.pl-you {
+  flex: 0 0 auto; font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .5px;
+  padding: 1px 5px; border-radius: 20px; color: var(--you); border: 1px solid var(--you); background: rgba(63, 199, 184, .1);
+}
+.pl-pending {
+  flex: 0 0 auto; font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .5px;
+  padding: 1px 5px; border-radius: 20px; color: #ffd79a; border: 1px solid var(--ai); background: rgba(232, 165, 58, .12);
+}
+.pl-hand.pop { animation: handPop .45s ease-out; }
+/* 盯梢位：尺寸随迷你牌（+边框），自己的正面可见、他人的牌背 '?' */
+.pl-watch { width: calc(var(--mwc) + 3px); height: calc(var(--mch) + 3px); flex: 0 0 auto; }
+.pl-watch.set { border-style: solid; border-color: var(--ai); }
+.pl-watch.mine { width: var(--mwc); height: var(--mch); border: 0; background: none; }
+.pl-row .intel-row { min-height: 0; margin-top: 6px; padding: 3px 6px; gap: 6px; }
+
+/* ---------- 五种行动（5 按钮一栏） ---------- */
+.actbar5 .act { flex: 1 1 0; min-width: 0; padding: 6px 3px; }
+.actbar5 .act b { font-size: 13.5px; letter-spacing: 0; }
+.actbar5 .act span { font-size: 8.5px; letter-spacing: 0; line-height: 1.25; }
+
+/* ---------- 目标选择（通讯 / 铲除 / 推论 抽屉内的对象行） ---------- */
+.pick-targets { display: flex; flex-wrap: wrap; gap: 6px; }
+.tchip {
+  min-height: 34px; padding: 0 12px; border-radius: 20px; border: 1.5px solid var(--line2);
+  background: #101823; font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.tchip.on { border-color: var(--you); background: linear-gradient(180deg, #24485c, #173042); color: #eafcff; box-shadow: 0 0 0 1px rgba(63, 199, 184, .35); }
+.tchip:active { transform: translateY(1px); }
+.pick-list { display: flex; flex-direction: column; gap: 7px; }
+.pick-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  padding: 9px 12px; border-radius: var(--r); border: 1.5px solid var(--line2);
+  background: #101823; text-align: left; cursor: pointer;
+}
+.pick-row b { font-size: 14px; letter-spacing: .5px; }
+.pick-row span { font-size: 11px; color: var(--dim); }
+.pick-row:active { transform: translateY(1px); background: rgba(12, 17, 25, .8); }
+
+/* ---------- 开局弹窗（配置 + 发牌 + 随机先手） ---------- */
+#introMask { z-index: 70; }
+.intro-sheet { max-width: 520px; }
+.intro-stage { margin: 10px 0 2px; }
+.intro-deck {
+  width: 46px; height: 64px; margin: 0 auto 10px; border-radius: 7px; border: 1.5px solid var(--line2);
+  background: repeating-linear-gradient(45deg, #16202b, #16202b 4px, #1d2938 4px, #1d2938 8px);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--dim2); letter-spacing: 2px;
+}
+.intro-seats { display: flex; flex-direction: column; gap: 7px; }
+.intro-seat {
+  border: 1.5px solid var(--line); border-radius: var(--r); background: rgba(24, 34, 47, .72);
+  padding: 6px 9px 8px;
+}
+.intro-seat.first { border-color: var(--ai); }
+.intro-seat.me { border-color: var(--you); }
+.intro-seat b { font-size: 13px; letter-spacing: .5px; }
+.isfirst {
+  font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 20px;
+  font-size: 9.5px; font-weight: 800; color: #ffd79a; border: 1px solid var(--ai); background: rgba(232, 165, 58, .12);
+}
+.iseat-cards { display: flex; gap: 4px; margin-top: 5px; }
+.icard { display: inline-block; }
+.icard.deal { animation: introDeal .34s cubic-bezier(.2, .9, .3, 1) both; }
+@keyframes introDeal {
+  from { transform: translate(var(--dx, 0), var(--dy, 0)) scale(.55); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.intro-first { text-align: center; font-size: 13.5px; color: var(--dim); margin: 12px 0 2px; letter-spacing: .5px; }
+.intro-first b { color: var(--you); font-size: 17px; letter-spacing: 1px; }
+.intro-count { text-align: center; font-family: var(--mono); font-size: 11.5px; color: var(--dim2); margin-bottom: 8px; }
+.intro-count b { color: var(--you); font-size: 14px; }
+
+/* ---------- 结算补充 / 提示条 ---------- */
+.win-tip { font-size: 11px; color: var(--dim2); margin-top: 10px; letter-spacing: .5px; }
+#alertbar.over { background: rgba(63, 199, 184, .13); color: #bff3ec; border-bottom-color: rgba(63, 199, 184, .35); cursor: pointer; }
+
+/* ---------- 弹窗 / 网络提示 / 加载 ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(6, 9, 15, .74);
+}
+.modal-overlay.show { display: flex; animation: fadeIn .18s ease-out; }
+.modal {
+  width: 100%; max-width: 360px; padding: 16px; border-radius: var(--r); border: 1.5px solid var(--line2);
+  background: linear-gradient(180deg, #18222f, #111925); box-shadow: var(--sh);
+  display: flex; flex-direction: column; gap: 9px;
+}
+.modal h3 { margin: 0; font-size: 16px; letter-spacing: 1px; }
+.modal p { margin: 0; font-size: 13px; line-height: 1.65; color: rgba(233, 239, 248, .82); }
+.ol-net-toast {
+  position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%); z-index: 95;
+  padding: 8px 14px; border-radius: 20px; border: 1.5px solid var(--line2);
+  background: rgba(16, 24, 35, .96); box-shadow: var(--sh);
+  font-size: 12.5px; letter-spacing: .5px; transition: opacity .28s, transform .28s;
+}
+.ol-net-toast.hide { opacity: 0; transform: translateX(-50%) translateY(10px); }
+.ol-busy {
+  position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px; background: rgba(6, 9, 15, .78);
+}
+.ob-spin {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid rgba(63, 199, 184, .22); border-top-color: var(--you);
+  animation: obSpin .8s linear infinite;
+}
+@keyframes obSpin { to { transform: rotate(360deg); } }
+.ob-text { font-size: 12.5px; color: var(--dim); letter-spacing: 1px; }
+
+/* 桌面宽度：与对局其余区块同宽居中 */
+@media (min-width: 620px) {
+  #players { width: 100%; max-width: 660px; margin: 9px auto 0; }
+}
+
