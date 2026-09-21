@@ -468,6 +468,20 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .sw.disc { background: rgba(150, 150, 160, .3); border-color: #9aa2b1; }
 .sw.judge { background: rgba(210, 72, 60, .3); border-color: var(--red); }
 
+/* 叛徒区抽屉（真相 / 盯梢 / 已铲除） */
+.stamp.trait { color: #ffb3a8; border-color: var(--red); background: rgba(210, 72, 60, .1); }
+/* 盯梢标签：不复用 .watch（局内盯梢卡片的固定尺寸/牌背花纹），避免印章被撑成卡片 */
+.stamp.onwatch { color: #ffd79a; border-color: var(--ai); background: rgba(232, 165, 58, .12); }
+.stamp.caught { color: #cfd4dd; border-color: #9aa2b1; background: rgba(150, 150, 160, .12); }
+.zcell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.zcell .wtag {
+  font-family: var(--mono); font-style: normal; font-size: 9px; font-weight: 700;
+  letter-spacing: .5px; color: var(--dim); white-space: nowrap;
+}
+#tCaughtCards { opacity: .6; }                       /* 已铲除：置灰弱化，区分活跃叛徒 */
+.card.facedown .band, .card.facedown .num, .card.facedown .cname { display: none; }
+.card.facedown { background: repeating-linear-gradient(45deg, #16202b, #16202b 4px, #1d2938 4px, #1d2938 8px); border-color: #0c0f14; }
+
 /* 弃牌堆 */
 #discUp, #rewardUp { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
 .dgroup { display: flex; align-items: center; gap: 5px; width: 100%; }

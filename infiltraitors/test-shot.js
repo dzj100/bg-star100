@@ -469,8 +469,10 @@ async function main() {
       blind: document.getElementById('btnBlind').disabled,
       handN: document.getElementById('rewardHandN').textContent,
       handCards: document.querySelectorAll('#rewardHand .card').length,
+      named: [...document.querySelectorAll('#rewardUp .card[data-i] .band')].every(b => b.children.length === 2 && b.lastElementChild.textContent.trim()),
     }));
     expect('拾牌抽屉自动弹出：明弃可选 · 盲抽可用', rw.open && rw.cards >= 4 && !rw.blind);
+    expect('拾牌小卡色带右侧标色名', rw.named);
     expect('抽屉底部独立展示你的手牌（' + rw.handN + '）', rw.handN === s.hand + '/7' && rw.handCards === s.hand);
     await page.mouse.click(12, 40);                       // 点遮罩空白
     await page.waitForTimeout(180);
@@ -612,10 +614,15 @@ async function main() {
         down: document.getElementById('discDownN').textContent,
         crowded: cards.length, lines: new Set(cards.map(c => c.offsetTop)).size,
         over: Math.max(sheet.scrollWidth - sheet.clientWidth, up.scrollWidth - up.clientWidth),
+        named: [...document.querySelectorAll('#discUp .card')].every(c => {
+          const b = c.querySelector('.band');
+          return b && b.children.length === 2 && b.lastElementChild.textContent.trim();
+        }),
       };
     });
     expect('弃牌堆：明弃按色分组', disc.open && disc.groups >= 2);
     expect('组内数字升序', disc.nums.every(a => a.every((v, i) => i === 0 || a[i - 1] <= v)));
+    expect('明弃小卡色带右侧标色名（与手牌/叛徒区一致）', disc.named);
     expect('暗弃只报张数', disc.down.includes('张'));
     expect('同色 9 张自动换行（多行且不横向溢出）', disc.crowded >= 9 && disc.lines >= 2 && disc.over <= 1);
     await shot('m21-disc.png');
@@ -1149,6 +1156,57 @@ async function main() {
       why: document.querySelector('.win-why') ? document.querySelector('.win-why').textContent : '',
     }));
     expect('终局落空（弹药告急）中途刷新 → 直接落失败结算', g.open && g.stamp.includes('任务失败') && g.why.includes('弹药告急'));
+  }
+
+  console.log('■ 22 叛徒区抽屉：真相隐藏 · 结算后翻开');
+  {
+    await setFx(false);
+    /* 固定局面：已铲除 1 名（黄3 的 14），盯梢红3，叛徒区剩 6 名 */
+    await setState2(scene({ caught: 1, caughtCards: [G.mk(1, 14)] }), { live: true });
+    const cardN = () => page.evaluate(() => {
+      const N = id => parseInt(document.getElementById(id).textContent, 10);
+      const txt = s => [...document.querySelectorAll(s + ' .card')].map(c => (c.querySelector('.num') || {}).textContent || 'back');
+      return {
+        open: !document.getElementById('traitorMask').classList.contains('hidden'),
+        sub: document.getElementById('traitSub').textContent,
+        n: [N('tPileN'), N('tWatchN'), N('tCaughtN')],
+        down: ['#tPileCards', '#tWatchCards', '#tCaughtCards'].map(s => document.querySelectorAll(s + ' .card.facedown').length),
+        up: ['#tPileCards', '#tWatchCards', '#tCaughtCards'].map(s => document.querySelectorAll(s + ' .card:not(.facedown)').length),
+        cards: [txt('#tPileCards'), txt('#tWatchCards'), txt('#tCaughtCards')],
+        watchTag: document.querySelector('#tWatchCards .wtag') ? document.querySelector('#tWatchCards .wtag').textContent : '',
+      };
+    });
+    await page.click('#pileTrait');
+    await page.waitForTimeout(200);
+    const T = await cardN();
+    expect('点叛徒区弹出抽屉（三区齐备）', T.open);
+    expect('叛徒区 6 + 盯梢 1 + 已铲除 1 计数正确', T.n[0] === 6 && T.n[1] === 1 && T.n[2] === 1);
+    expect('对局中：叛徒区 / 盯梢全为牌背 · 已铲除正面', T.down[0] === 6 && T.down[1] === 1 && T.down[2] === 0 && T.up[2] === 1);
+    expect('对局中不泄露真相（牌背无数字）', T.cards[0].every(v => v === 'back') && T.cards[1].every(v => v === 'back'));
+    expect('已铲除区显示真实牌面 · 盯梢标持有者', T.cards[2][0] === '14' && T.watchTag === '夜枭');
+    await shot('m9b-traitor-hidden.png');
+    await page.click('#btnCloseTraitor');
+    await page.waitForTimeout(140);
+    /* 失败结算场景：叛徒区仍有存货、盯梢未铲除 → 结算后打开抽屉应全部翻开真相 */
+    const lose = scene({ caught: 3, caughtCards: [G.mk(0, 9), G.mk(1, 10), G.mk(2, 12)], bullets: 4 });
+    lose.over = { win: false, why: 'bullets', stats: G.statLine(lose) };
+    await setState2(lose, { live: true });
+    await page.waitForTimeout(220);
+    await page.click('#overlay-win', { position: { x: 8, y: 8 } });   // 点结算面板边缘空白 → 回牌桌（失败后仍可回看）
+    await page.waitForTimeout(160);
+    await page.click('#pileTrait');
+    await page.waitForTimeout(200);
+    const W = await cardN();
+    expect('结算后：叛徒区 6 名 + 盯梢 1 名全部翻开真相', W.up[0] === 6 && W.up[1] === 1 && W.down[0] === 0 && W.down[1] === 0);
+    expect('结算后：已铲除 3 名均真实牌面', W.up[2] === 3 && W.n[2] === 3 && W.cards[2].every(v => v !== 'back'));
+    expect('结算后副标题提示信息已公开（不再是“不公开”）', W.sub.includes('公开') && !W.sub.includes('不公开'));
+    await shot('m9c-traitor-revealed.png');
+    await page.click('#btnCloseTraitor');
+    await page.waitForTimeout(140);
+    expect('抽屉关闭后牌桌仍可继续回看', await page.evaluate(() =>
+      document.getElementById('traitorMask').classList.contains('hidden') &&
+      !document.getElementById('screen-game').classList.contains('hidden')));
+    await setFx(true);
   }
 
   console.log('\n断言: ' + ok + '/' + total);

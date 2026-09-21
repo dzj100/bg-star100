@@ -224,7 +224,7 @@
       '<div class="cname">' + G.COLORS[c] + n + '</div></div>';
   }
   const miniHtml = (id, cls) => cardHtml(id, 'mini' + (cls ? ' ' + cls : ''));
-  const cardBack = cls => '<div class="card ' + (cls || '') + '" style="background:repeating-linear-gradient(45deg,#16202b,#16202b 4px,#1d2938 4px,#1d2938 8px);border-color:#0c0f14"></div>';
+  const cardBack = cls => '<div class="card ' + (cls || '') + ' facedown"></div>';
 
   function renderTop() {
     const left = G.traitorsLeft(S);
@@ -731,15 +731,37 @@
 
   /* ---------------- 弃牌 / 情报 / 推论 抽屉 ---------------- */
   const cdot = c => '<i class="cdot" style="background:var(--c' + c + ')"></i>';
+  /* ---------------- 叛徒区抽屉：真相 / 盯梢 / 已铲除 ---------------- */
+  /* 对局中三区只给张数与牌背；结算后翻开真相 —— 失败时也能看清叛徒分别是谁。
+     联机预留：盯梢区收「所有玩家的盯梢牌」列表（by = 持有者名，现仅夜枭一处） */
+  function openTraitor() {
+    const watches = S.aiWatch != null ? [{ by: '夜枭', card: S.aiWatch }] : [];
+    /* 已铲除名单：老档 / 测试构局可能缺 caughtCards，按铲除数从牌库顺位兜底 */
+    const caught = S.caughtCards && S.caughtCards.length === S.caught ? S.caughtCards : S.deck.slice(0, S.caught);
+    const over = !!S.over;
+    $('#traitSub').textContent = over ? '任务已结束 · 叛徒信息公开' : '执行任务中 · 叛徒区、盯梢区信息不公开';
+    $('#tPileN').textContent = S.traitorPile.length + ' 名';
+    $('#tWatchN').textContent = watches.length + ' 名';
+    $('#tCaughtN').textContent = caught.length + ' 名';
+    $('#tPileCards').innerHTML = zoneCards(S.traitorPile.map(card => ({ card })), over);
+    $('#tWatchCards').innerHTML = zoneCards(watches, over);
+    $('#tCaughtCards').innerHTML = zoneCards(caught.map(card => ({ card })), true);
+    $('#traitorMask').classList.remove('hidden');
+  }
+  /* over=false 一律牌背（按持有者补署名）；over=true 翻开正面 */
+  function zoneCards(items, faceUp) {
+    if (!items.length) return '<div class="zone-empty">暂无</div>';
+    return items.map(it => '<span class="zcell">' +
+      (it.by ? '<i class="wtag">' + it.by + '</i>' : '') +
+      (faceUp ? cardHtml(it.card, 'mini') : cardBack('mini')) + '</span>').join('');
+  }
   function openDisc() {
     const groups = [];
     for (let c = 0; c < S.cfg.colors; c++) {
       const ids = S.discardUp.filter(id => G.cOf(id) === c).sort((a, b) => G.nOf(a) - G.nOf(b));
       if (!ids.length) continue;
       groups.push('<div class="dgroup"><span class="dg-label">' + cdot(c) + G.COLORS[c] + '</span>' +
-        '<span class="dg-cards">' +
-        ids.map(id => '<span class="card mini c' + c + '"><div class="band"><span>' + G.GLYPH[c] + '</span></div><div class="num">' + G.nOf(id) + '</div></span>').join('') +
-        '</span></div>');
+        '<span class="dg-cards">' + ids.map(id => miniHtml(id)).join('') + '</span></div>');
     }
     $('#discUp').innerHTML = groups.join('') || '<div class="zone-empty">明弃堆还是空的。</div>';
     $('#discDownN').textContent = S.discardDown.length + ' 张';
@@ -792,7 +814,7 @@
     const up = S.discardUp.map((id, i) => ({ id, i }));
     $('#rewardUp').innerHTML = up.length
       ? up.map(o => '<button class="card mini c' + G.cOf(o.id) + '" data-i="' + o.i + '" style="padding:0">' +
-        '<div class="band"><span>' + G.GLYPH[G.cOf(o.id)] + '</span></div><div class="num">' + G.nOf(o.id) + '</div></button>').join('')
+        '<div class="band"><span class="glyph">' + G.GLYPH[G.cOf(o.id)] + '</span><span>' + G.COLORS[G.cOf(o.id)] + '</span></div><div class="num">' + G.nOf(o.id) + '</div></button>').join('')
       : '<div class="zone-empty">明弃堆是空的（只能盲抽或跳过）。</div>';
     $('#btnBlind').disabled = !S.discardDown.length || S.hand.length >= G.HAND_MAX;
     $('#btnSkipReward').textContent = S.hand.length >= G.HAND_MAX ? '手牌已满 · 跳过' : '跳过';
@@ -814,7 +836,7 @@
   }
   const closeAllSheets = () => {
     autoHold = false;                                   // 按住途中被收起时，别让自动分析留在开启态
-    ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#drawMask', '#lurkMask', '#intelMask']
+    ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#drawMask', '#lurkMask', '#intelMask', '#traitorMask']
       .forEach(s => $(s).classList.add('hidden'));
   };
 
@@ -994,7 +1016,8 @@
     });
     $('#pileUp').addEventListener('click', openDisc);
     $('#pileDeck').addEventListener('click', () => toast('牌库剩 ' + S.deck.length + ' 张，潜伏必暗弃 1 张'));
-    $('#pileTrait').addEventListener('click', () => toast('叛徒区 ' + S.traitorPile.length + ' 名 + 盯梢 ' + (S.aiWatch ? 1 : 0) + ' 名'));
+    $('#pileTrait').addEventListener('click', openTraitor);
+    $('#btnCloseTraitor').addEventListener('click', () => $('#traitorMask').classList.add('hidden'));
     $('#pileDown').addEventListener('click', () => toast('暗弃堆 ' + S.discardDown.length + ' 张（只见张数）'));
     $('#watchSlot').addEventListener('click', () => toast(S.aiWatch ? '夜枭已锁定 1 名目标（内容对你也保密）' : '夜枭还没锁定目标'));
     $('#rowRel').addEventListener('click', () => openIntel('rel'));
@@ -1031,7 +1054,7 @@
     cfg: v => { if (v) { cfg = G.normCfg(v); saveCfg(); renderCfg(); } return cfg; },
     setFx: v => { fxOn = !!v; },
     renderAll,
-    openBoard, openDisc, openLog, openElim, openReward, openDraw, openIntel, openLurk,
+    openBoard, openDisc, openLog, openElim, openReward, openDraw, openIntel, openLurk, openTraitor,
     fire(a) { doAct(a); return S; },
     doAct,
     animShot: ev => animShot(Object.assign({ k: 'shot', hit: true }, ev)),

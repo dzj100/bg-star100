@@ -117,7 +117,7 @@ const G = (() => {
       aiWatch: null,
       intel: { rel: [], unrel: [] },
       discardDown: [], discardUp: [],
-      bulletsMax: bulletsOf(cfg), bullets: bulletsOf(cfg), caught: 0,
+      bulletsMax: bulletsOf(cfg), bullets: bulletsOf(cfg), caught: 0, caughtCards: [],
       turn: 0, turnNo: 1, round: 1,
       pending: null, over: null, log: [], openEvs: [],
       stat: { shots: 0, hits: 0, misses: 0, probes: 0, hints: 0, lurks: 0 },
@@ -270,7 +270,7 @@ const G = (() => {
       const swept = [...S.intel.rel, ...S.intel.unrel];
       if (swept.length) { S.discardUp.push(...swept); evs.push({ k: 'sweep', cards: swept }); }
       S.intel = { rel: [], unrel: [] };
-      S.aiWatch = null; S.caught++;
+      S.aiWatch = null; S.caught++; S.caughtCards.push(traitor);
       /* 叛徒洗回牌库（重新混入人群） */
       S.deck.push(traitor); shuffle(S.deck, Math.random);
       evs.push({ k: 'back', card: traitor });
@@ -439,6 +439,9 @@ const G = (() => {
     if (S.aiWatch !== null && !Number.isInteger(S.aiWatch)) return false;
     if (!Number.isInteger(S.bullets) || !Number.isInteger(S.bulletsMax)) return false;
     if (!Number.isInteger(S.caught) || !Number.isInteger(S.turn) || !Number.isInteger(S.round)) return false;
+    /* caughtCards（已铲除的叛徒牌，UI 讲真相用）为后加字段：旧档按铲除数从牌库顺位补出 */
+    if (!Array.isArray(S.caughtCards) || S.caughtCards.length !== S.caught || !S.caughtCards.every(Number.isInteger))
+      S.caughtCards = S.deck.slice(0, S.caught);
     if (S.pending !== null && S.pending !== 'reward' && S.pending !== 'draw') return false;
     if (S.over && typeof S.over.win !== 'boolean') return false;
     if (!Array.isArray(S.log)) return false;

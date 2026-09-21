@@ -199,6 +199,7 @@ sec('5 铲除命中：公示 / 情报清扫 / 叛徒洗回 / 拾牌');
   expect('命中', r.ok && r.hit);
   expect('子弹 -1', S.bullets === bullets0 - 1);
   expect('caught +1', S.caught === 1);
+  expect('已铲除名单记下这张叛徒牌（叛徒区抽屉用）', S.caughtCards.length === 1 && S.caughtCards[0] === target);
   expect('盯梢区清空（等 AI 下回合重新布控）', S.aiWatch === null);
   expect('情报区已清扫并入明弃堆', S.intel.rel.length === 0 && S.intel.unrel.length === 0 &&
     S.discardUp.length >= intelN);
@@ -374,6 +375,11 @@ sec('9 存档校验 validate');
   expect('AI 盯梢为 id 通过 / 非整数拒绝', G.validate(S) && !G.validate({ ...clone(S), aiWatch: 'a' }));
   const S2 = clone(S); delete S2.intel;
   expect('缺 intel 拒绝', !G.validate(S2));
+  /* caughtCards 为后加字段：旧档 len 不符时按铲除数补齐（不整档作废） */
+  const L = clone(S); L.caught = 2; delete L.caughtCards;
+  expect('旧档补齐 caughtCards', G.validate(L) && L.caughtCards.length === 2 && L.caughtCards.every(x => Number.isInteger(x)));
+  const B = clone(S); B.caughtCards = ['x'];
+  expect('坏 caughtCards 也被补正而非废档', G.validate(B) && B.caughtCards.length === B.caught);
 }
 
 /* ---------------- 10 全流程模拟（autoPlayerAct 代打） ---------------- */

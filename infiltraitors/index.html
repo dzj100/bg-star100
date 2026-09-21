@@ -269,6 +269,26 @@
     </div>
   </div>
 
+  <!-- ============ 叛徒区（真相 / 盯梢 / 已铲除） ============ -->
+  <div class="sheet-mask hidden" id="traitorMask">
+    <div class="sheet sheet-wide">
+      <h3>叛徒信息<small class="sheet-sub" id="traitSub"></small></h3>
+      <div class="zone-block">
+        <div class="pick-title"><span class="stamp trait">叛徒区</span><span id="tPileN" aria-label="叛徒区张数">0 名</span></div>
+        <div class="zone-cards" id="tPileCards"></div>
+      </div>
+      <div class="zone-block">
+        <div class="pick-title"><span class="stamp onwatch">盯梢</span><span id="tWatchN" aria-label="盯梢张数">0 名</span></div>
+        <div class="zone-cards" id="tWatchCards"></div>
+      </div>
+      <div class="zone-block">
+        <div class="pick-title"><span class="stamp caught">已铲除</span><span id="tCaughtN" aria-label="已铲除张数">0 名</span></div>
+        <div class="zone-cards" id="tCaughtCards"></div>
+      </div>
+      <button class="btn-main" id="btnCloseTraitor">关闭</button>
+    </div>
+  </div>
+
   <!-- ============ 弃牌堆（明弃 / 暗弃） ============ -->
   <div class="sheet-mask hidden" id="discMask">
     <div class="sheet sheet-wide">
