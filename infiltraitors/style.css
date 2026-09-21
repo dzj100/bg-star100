@@ -362,7 +362,8 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 }
 @keyframes fadeIn { from { opacity: 0; } }
 .sheet {
-  width: 100%; max-height: 86dvh; overflow-y: auto; background: var(--bg2);
+  width: 100%; max-width: 660px; margin:0 auto;
+  max-height: 86dvh; overflow-y: auto; background: var(--bg2);
   border-radius: 18px 18px 0 0; border-top: 2px solid var(--line2);
   padding: 14px 14px max(20px, env(safe-area-inset-bottom)); animation: sheetUp .2s ease-out;
   box-shadow: 0 -12px 30px rgba(0, 0, 0, .5);
@@ -428,8 +429,16 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 .board-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .cand-big { font-size: 12.5px; color: var(--dim); }
 .cand-big b { font-family: var(--mono); font-size: 22px; color: var(--text); margin-right: 3px; }
-.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--dim); cursor: pointer; }
-.switch input { width: 18px; height: 18px; accent-color: var(--you); }
+/* 自动分析：按住才开（看清局势前先让玩家自己推） */
+#boardMask .hold-btn {
+  border: 1.5px solid var(--line2); background: #131c28; border-radius: 9px;
+  min-height: 34px; padding: 0 12px; font-size: 12.5px; font-weight: 800; color: var(--dim);
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+#boardMask .hold-btn.on {
+  border-color: var(--you); color: #eafcff;
+  background: linear-gradient(180deg, #24485c, #173042); box-shadow: 0 0 0 1px rgba(63, 199, 184, .35);
+}
 #boardGrid { display: grid; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
 .bcan { display: flex; align-items: center; gap: 4px; }
 .bRow { display: flex; gap: 3px; }

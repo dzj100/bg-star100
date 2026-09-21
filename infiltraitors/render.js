@@ -15,7 +15,7 @@
   const MAIN = 'c0';                                  // 玩家主色（回合提示）
 
   let S = null, live = false, busy = false, fxOn = true;
-  let sel = -1, pickC = -1, pickN = -1, autoBoard = true, lastAiHand = -1;
+  let sel = -1, pickC = -1, pickN = -1, autoHold = false, lastAiHand = -1;
   let pend = null, overFired = null;
   /* 演出期间的显示行动方（0 玩家 / 1 夜枭），null 跟随 S.turn。
      引擎在行动结算时就会换手（铲除命中要等拾牌、开局布控也属夜枭），
@@ -758,13 +758,13 @@
     $('#intelMask').classList.remove('hidden');
   }
   function openBoard() {
-    const a = G.analyze(S, autoBoard);
+    const a = G.analyze(S, autoHold);
     const inHand = new Set(S.hand);
     const inIntel = new Set([...S.intel.rel, ...S.intel.unrel]);
     const inDisc = new Set(S.discardUp);
     const cand = new Set(a.cand);
     $('#candN').textContent = a.cand.length;
-    $('#autoChk').checked = autoBoard;
+    $('#autoHold').classList.toggle('on', autoHold);
     const nums = [];
     for (let n = S.cfg.one ? 1 : 2; n <= 15; n++) nums.push(n);
     // const head = '<div class="bRow"><span class="browlabel">色 \\ 数</span>' +
@@ -812,8 +812,11 @@
     $('#logList').innerHTML = items.join('') || '<div class="zone-empty">暂无记录</div>';
     $('#logMask').classList.remove('hidden');
   }
-  const closeAllSheets = () => ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#drawMask', '#lurkMask', '#intelMask']
-    .forEach(s => $(s).classList.add('hidden'));
+  const closeAllSheets = () => {
+    autoHold = false;                                   // 按住途中被收起时，别让自动分析留在开启态
+    ['#rulesMask', '#logMask', '#boardMask', '#discMask', '#elimMask', '#rewardMask', '#drawMask', '#lurkMask', '#intelMask']
+      .forEach(s => $(s).classList.add('hidden'));
+  };
 
   /* ---------------- 存档续玩 ---------------- */
   const SAVE_KEY = 'infiltraitors-state';
@@ -955,7 +958,15 @@
     $('#btnMenu').addEventListener('click', goMenu);
     $('#btnBoard').addEventListener('click', openBoard);
     $('#btnCloseBoard').addEventListener('click', () => $('#boardMask').classList.add('hidden'));
-    $('#autoChk').addEventListener('change', e => { autoBoard = e.target.checked; openBoard(); });
+    /* 自动分析只在按住时临时开启：松开即回到仅已知位置排除（看清了才给答案） */
+    $('#autoHold').addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+      autoHold = true; openBoard();
+    });
+    $('#autoHold').addEventListener('pointerup', () => { autoHold = false; openBoard(); });
+    $('#autoHold').addEventListener('pointercancel', () => { autoHold = false; openBoard(); });
+    $('#autoHold').addEventListener('contextmenu', e => e.preventDefault());   // 手机长按不弹系统菜单
     $('#btnCloseDisc').addEventListener('click', () => $('#discMask').classList.add('hidden'));
     $('#btnCloseIntel').addEventListener('click', () => $('#intelMask').classList.add('hidden'));
     $('#btnCloseLog').addEventListener('click', () => $('#logMask').classList.add('hidden'));

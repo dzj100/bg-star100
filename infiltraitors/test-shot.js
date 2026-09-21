@@ -265,7 +265,7 @@ async function main() {
     await shot('m7-probe-done.png');
   }
 
-  console.log('■ 6 推论板：自动分析开关');
+  console.log('■ 6 推论板：自动分析按住才开');
   {
     await page.click('#btnBoard');
     await page.waitForTimeout(260);
@@ -274,22 +274,36 @@ async function main() {
       cells: document.querySelectorAll('#boardGrid .bcell.cand').length,
       judge: document.querySelectorAll('#boardGrid .bcell.judge').length,
       hand: document.querySelectorAll('#boardGrid .bcell.hand').length,
-      auto: document.getElementById('autoChk').checked,
+      on: document.getElementById('autoHold').classList.contains('on'),
     }));
-    expect('自动分析默认开启', b1.auto);
+    expect('默认不自动分析（仅已知位置排除 · 无判定冲突）', !b1.on && b1.judge === 0);
     expect('候选格数与读数一致', b1.cand === b1.cells && b1.cand > 0 && b1.cand < 56);
-    expect('手牌 5 格标出 · 存在判定冲突格', b1.hand === 5 && b1.judge > 0);
-    await shot('m8-board-auto.png');
-    await page.evaluate(() => { const c = document.getElementById('autoChk'); c.checked = false; c.dispatchEvent(new Event('change')); });
+    expect('手牌 5 格标出', b1.hand === 5);
+    await shot('m9-board-manual.png');
+    await page.evaluate(() => {
+      const b = document.getElementById('autoHold');
+      b.setPointerCapture = () => {};                    // 无真实指针会话时绕过捕获
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7 }));
+    });
     await page.waitForTimeout(220);
     const b2 = await page.evaluate(() => ({
       cand: +document.getElementById('candN').textContent,
       judge: document.querySelectorAll('#boardGrid .bcell.judge').length,
+      on: document.getElementById('autoHold').classList.contains('on'),
     }));
-    expect('关闭自动分析 → 候选变多且无判定冲突', b2.cand > b1.cand && b2.judge === 0);
-    await shot('m9-board-manual.png');
-    await page.evaluate(() => { const c = document.getElementById('autoChk'); c.checked = true; c.dispatchEvent(new Event('change')); });
-    await page.waitForTimeout(160);
+    expect('按住 → 自动分析开启：候选变少且出现判定冲突', b2.on && b2.cand < b1.cand && b2.judge > 0);
+    await shot('m8-board-auto.png');
+    await page.evaluate(() => {
+      const b = document.getElementById('autoHold');
+      b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7 }));
+    });
+    await page.waitForTimeout(220);
+    const b3 = await page.evaluate(() => ({
+      cand: +document.getElementById('candN').textContent,
+      judge: document.querySelectorAll('#boardGrid .bcell.judge').length,
+      on: document.getElementById('autoHold').classList.contains('on'),
+    }));
+    expect('松开 → 自动分析关闭：恢复仅已知位置排除', !b3.on && b3.judge === 0 && b3.cand === b1.cand);
     await page.click('#btnCloseBoard');
     await page.waitForTimeout(140);
   }

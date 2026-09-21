@@ -192,7 +192,8 @@
   <div class="sheet-mask hidden" id="rulesMask">
     <div class="sheet sheet-wide">
       <h3>规则速览<small class="sheet-sub">双人协作，清剿人群里的叛徒</small></h3>
-      <p>你和搭档<b>夜枭</b>正在追查一群叛徒。叛徒区面朝下扣着 <b>N 名叛徒</b>，夜枭逐一<b>盯梢</b>锁定 1 名目标，你可和 ta 通讯，ta 会及时告知你叛徒情报，由你推理出目标<b>（确切的颜色和数字）</b>，然后开枪<b>铲除</b>。</p>
+      <p>你和搭档<b>夜枭</b>正在追查一群叛徒。叛徒区面朝下扣着 <b>N 名叛徒</b>，夜枭逐一<b>盯梢</b>锁定 1 名目标，你可和 ta 通讯，ta 会及时告知你叛徒情报，由你推理出目标<b>（确切的颜色和数字）</b>，然后开枪将其<b>铲除</b>。</p>
+      <p class="rt-note">⚠ 基础牌库（含叛徒）由 4 种颜色（红黄蓝绿）的数字 2~15 组成，可选加入第 5 种颜色（黑色）和数字 1 进入牌库</p>
 
       <div class="rt-title">情报判定规则「有关 / 无关」</div>
       <table class="rt">
@@ -202,7 +203,7 @@
           <tr><td class="k-unrel">无关</td><td>以上三条都不满足</td></tr>
         </tbody>
       </table>
-      <p class="rt-note">⚠ 数字 1 只参与同色 / 同数判定</p>
+      <p class="rt-note">⚠ 数字 1 只参与同色 / 同数字判定</p>
 
       <div class="rt-title">你的行动（每回合选一）</div>
       <table class="rt">
@@ -234,14 +235,14 @@
         </tbody>
       </table>
 
-      <p><b>提示：</b>手牌、情报区、明弃堆里的牌都<b>不可能</b>是当前目标 —— 适时使用「推论」面板自动圈定候选</p>
+      <p><b>提示：</b>手牌、情报区、明弃堆里的牌都<b>不可能</b>是当前目标，适时使用「推论」面板自动圈定候选</p>
       <button class="btn-main" id="btnCloseRules">知道了</button>
     </div>
   </div>
 
   <!-- ============ 对局日志（倒序） ============ -->
   <div class="sheet-mask hidden" id="logMask">
-    <div class="sheet">
+    <div class="sheet sheet-wide">
       <h3>行动日志<small class="sheet-sub">最新在前 · 点底部日志条随时查看</small></h3>
       <div id="logList"></div>
       <button class="btn-main" id="btnCloseLog">关闭</button>
@@ -251,10 +252,10 @@
   <!-- ============ 推论板 ============ -->
   <div class="sheet-mask hidden" id="boardMask">
     <div class="sheet sheet-wide">
-      <h3>推论板<small class="sheet-sub">公开信息自动分析 · 圈定盯梢叛徒的可能身份</small></h3>
+      <h3>推论板<small class="sheet-sub">公开信息采集 · 推论盯梢叛徒的可能身份</small></h3>
       <div class="board-top">
         <span class="cand-big"><b id="candN">0</b> 个候选</span>
-        <label class="switch"><input type="checkbox" id="autoChk" checked><span>自动分析</span></label>
+        <button class="hold-btn" id="autoHold" type="button" title="长按/按住查看自动分析结果，松开恢复">长按分析</button>
       </div>
       <div id="boardGrid"></div>
       <div class="board-legend">
@@ -283,7 +284,7 @@
 
   <!-- ============ 铲除（指认） ============ -->
   <div class="sheet-mask hidden" id="elimMask">
-    <div class="sheet">
+    <div class="sheet sheet-wide">
       <h3>铲除 · 指认<small class="sheet-sub">颜色 + 数字都正确才算命中 · 开枪即耗 1 发</small></h3>
       <div class="pick-block">
         <div class="pick-title">颜色</div>
@@ -301,8 +302,8 @@
 
   <!-- ============ 潜伏（摸牌数） ============ -->
   <div class="sheet-mask hidden" id="lurkMask">
-    <div class="sheet">
-      <h3>潜伏 · 摸牌<small class="sheet-sub">摸得越多，牌库时钟走得越快；随后还要暗弃 1 张</small></h3>
+    <div class="sheet sheet-wide">
+      <h3>潜伏 · 摸牌<small class="sheet-sub">无论摸几张，都要暗弃 1 张，手牌上限 7 张</small></h3>
       <div class="lurk-opts" id="lurkOpts"></div>
       <button class="btn-main" id="btnCancelLurk">取消</button>
     </div>
@@ -334,7 +335,7 @@
 
   <!-- ============ 通讯后摸牌（可选） ============ -->
   <div class="sheet-mask hidden" id="drawMask">
-    <div class="sheet">
+    <div class="sheet sheet-wide">
       <h3>通讯完毕<small class="sheet-sub">可选择从牌库摸 1 张补充手牌，也可不摸</small></h3>
       <div class="pick-state" id="drawInfo"></div>
       <button class="btn-main primary" id="btnDrawTake">摸 1 张</button>
