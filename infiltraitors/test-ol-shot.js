@@ -393,7 +393,7 @@ async function main() {
     expect('顶部读数：你的回合 · 第 2 轮 · 房间 1234', d.turn.includes('你的回合') && d.turn.includes('第 2 轮') && d.room.includes('1234'));
     expect('轮到我时提示条隐藏', d.alertHidden);
     expect('五类行动（盯梢已有目标 → 禁用并说明）', JSON.stringify(d.btns) === JSON.stringify([false, true, true, true, true]) && d.stakeLabel.includes('已有目标'));
-    expect('通讯按钮说明「打给队友目标」· 潜伏 1~2', d.commLabel.includes('打给队友目标') && d.lurkLabel.includes('摸 1~2'));
+    expect('通讯按钮说明「打给队友目标」· 潜伏「摸牌并暗弃 1」', d.commLabel.includes('打给队友目标') && d.lurkLabel.includes('摸牌并暗弃 1'));
     await page.click('#hand .card:nth-child(2)');
     await page.waitForTimeout(160);
     expect('点选手牌抬起（.pick）', await page.evaluate(() => !!document.querySelector('#hand .card.pick')));
@@ -517,6 +517,24 @@ async function main() {
       return { txt: el ? el.textContent : null, act: !!el && el.classList.contains('act') };
     });
     expect('他方盯梢横幅：中文标签「秦二 · 盯梢」（无 raw key "stake"）', b1.txt === '秦二 · 盯梢' && b1.act && b1.txt.indexOf('stake') < 0);
+    /* 回归：横幅类名 act 曾命中行动按钮的 .act 样式（min-height clamp）被撑成高盒子；
+       按钮外观限定 button.act 后，.banner.act 显式恢复为贴合文字的带框徽章
+       （1.5px 边框在 Chromium 计算值会取整成 1px，故只校验「有实线边框」） */
+    const b1geo = await page.evaluate(() => {
+      const el = document.querySelector('#fx .banner');
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      const rg = document.createRange(); rg.selectNodeContents(el);
+      const t = rg.getBoundingClientRect();
+      return {
+        h: r.height, bg: cs.backgroundImage, bw: cs.borderTopWidth, bs: cs.borderTopStyle,
+        pad: cs.paddingTop, rad: cs.borderTopLeftRadius,
+        dy: Math.abs((r.top + r.height / 2) - (t.top + t.height / 2)),
+      };
+    });
+    expect('横幅为带框徽章（实线边框 + 深色渐变底 + 12px 圆角，贴合文字不被撑高）· 文字垂直居中',
+      b1geo.h < 50 && b1geo.bg.indexOf('linear-gradient') === 0 && parseFloat(b1geo.bw) >= 1
+      && b1geo.bs === 'solid' && b1geo.pad === '6px' && b1geo.rad === '12px' && b1geo.dy <= 2);
     await shot('ol11b-remote-banner.png');
     await idle(9000);
     await fireRemote(2, 'lurk');
@@ -580,6 +598,49 @@ async function main() {
     await page.waitForFunction(() => !window.INFIL_OL_UI.busy(), null, { timeout: 9000 });
     const L2 = await measure(1, 'rel');
     expect('通讯：落点 = 队友区域的最后一张（dx/dy≈0）', !!L2 && L2.dx <= 2 && L2.dy <= 2);
+    await page.waitForFunction(() => !window.INFIL_OL_UI.busy(), null, { timeout: 9000 });
+    await fx(false);
+  }
+
+  console.log('■ 8d 他方拾牌（铲除奖励）：飞行牌落向拾牌人，而不是吸进本机手牌');
+  {
+    await fx(true);
+    const S = scene({}, 4);
+    await setState(S, { live: true });
+    /* 逐帧采样飞行克隆：记录最后落点到「拾牌人手牌叠」与「本机 #hand」的距离（克隆收尾后 best 停在落点） */
+    const measure = (seat, from, card) => page.evaluate(async ({ seat, from, card }) => {
+      const plSel = '#players .pl-hand[data-seat="' + seat + '"]';
+      const st = JSON.parse(JSON.stringify(window.INFIL_OL_TEST.state()));
+      st.hands[seat].push(card);
+      (from === 'up' ? st.discardUp : st.discardDown).push(card);
+      st._src = seat; st._act = 'pick';
+      st._evs = [{ k: 'pick', seat: seat, card: card, from: from }];
+      window.INFIL_OL_UI.applyRemote(st, { replay: true });
+      let best = null;
+      for (let i = 0; i < 90; i++) {
+        const f = [...document.querySelectorAll('#fx .fxc')].find(e => e.querySelector('.card'));
+        if (f) {
+          const r = f.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const ph = document.querySelector(plSel).getBoundingClientRect();
+          const hh = document.querySelector('#hand').getBoundingClientRect();
+          best = {
+            toPl: Math.round(Math.hypot(cx - (ph.left + ph.width / 2), cy - (ph.top + ph.height / 2))),
+            toHand: Math.round(Math.hypot(cx - (hh.left + hh.width / 2), cy - (hh.top + hh.height / 2))),
+            fd: !!f.querySelector('.card.facedown'),
+          };
+        }
+        await new Promise(r => setTimeout(r, 12));
+      }
+      return best;
+    }, { seat, from, card });
+    const P = await measure(2, 'up', OL.mk(1, 11));
+    expect('他方拾牌（明弃）：落点贴近拾牌人手牌叠 · 不再吸进本机 #hand · 牌面公开',
+      !!P && P.toPl <= 15 && P.toHand >= 80 && !P.fd);
+    await page.waitForFunction(() => !window.INFIL_OL_UI.busy(), null, { timeout: 9000 });
+    const Q = await measure(1, 'down', OL.mk(2, 13));
+    expect('他方拾牌（暗弃盲抽）：落点同样在拾牌人处 · 对本机只露牌背（盲抽结果不泄露）',
+      !!Q && Q.toPl <= 15 && Q.toHand >= 80 && Q.fd);
     await page.waitForFunction(() => !window.INFIL_OL_UI.busy(), null, { timeout: 9000 });
     await fx(false);
   }
@@ -723,9 +784,10 @@ async function main() {
     const b2 = await page.evaluate(() => ({
       on: document.querySelector('#boardTargets .tchip.on').textContent,
       cand: parseInt(document.getElementById('candN').textContent, 10) || 0,
-      mine: document.getElementById('candN').textContent.includes('按你的视角'),
+      cells: document.querySelectorAll('#boardGrid .bcell.cand').length,
     }));
-    expect('切到「秦二的目标」：读数按我的视角重算', b2.on.includes('秦二') && b2.mine);
+    expect('切到「秦二的目标」：板面按所选目标重算（读数与高亮格一致）',
+      b2.on.includes('秦二') && b2.cand > 0 && b2.cand === b2.cells);
     await shot('ol17-board.png');
     await page.evaluate(() => {
       const b = document.getElementById('autoHold');

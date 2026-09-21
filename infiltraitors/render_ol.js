@@ -108,9 +108,13 @@
         tw.upd(tw.ease(p));
         if (p >= 1) tw.done = true; else alive = true;
       }
-      const waiting = fxWaits.some(w => fxClock < w.end);
-      if (waiting || alive || fxHold > 0) requestAnimationFrame(loop);
-      else { fxRunning = false; fxTweens.length = 0; fxWaits.splice(0).forEach(w => w.res()); }
+      /* 等待到点即各自兑现：横幅 / 印章等收尾补间会活到 1 秒开外，
+         若攒到「整层空闲」才统一放行，后面的 await（亮牌、盖章）会被硬拖到淡出之后 */
+      for (let i = fxWaits.length - 1; i >= 0; i--) {
+        if (fxClock >= fxWaits[i].end) fxWaits.splice(i, 1)[0].res();
+      }
+      if (fxWaits.length || alive || fxHold > 0) requestAnimationFrame(loop);
+      else { fxRunning = false; fxTweens.length = 0; }
     }
     requestAnimationFrame(loop);
   }
@@ -215,6 +219,17 @@
       '<div class="cname">' + G.COLORS[c] + n + '</div></div>';
   }
   const miniHtml = (id, cls) => cardHtml(id, 'mini' + (cls ? ' ' + cls : ''));
+  /* 玩家区紧凑迷你牌：与飞出/飞入克隆同尺寸（--pwc/--pch 由 #players、#fx 共享） */
+  const microHtml = (id, cls) => cardHtml(id, 'micro' + (cls ? ' ' + cls : ''));
+  const microBox = () => {
+    const cs = getComputedStyle($('#players'));
+    return { w: parseFloat(cs.getPropertyValue('--pwc')) || 22, h: parseFloat(cs.getPropertyValue('--pch')) || 30 };
+  };
+  /* 盯梢位牌面与弃牌堆同档（--mwc×--mch）：飞出克隆读同一对值，落点尺寸才严丝合缝 */
+  const miniBox = () => {
+    const cs = getComputedStyle($('#players'));
+    return { w: parseFloat(cs.getPropertyValue('--mwc')) || 34, h: parseFloat(cs.getPropertyValue('--mch')) || 47 };
+  };
   const cardBack = cls => '<div class="card ' + (cls || '') + ' facedown"></div>';
 
   const cfgReadHtml = function (cfg, n) {
@@ -265,7 +280,7 @@
     }
   }
 
-  /* 玩家区：每人一块「夜枭区」式面板（回合灯 / 名字 / 手牌张数 / 盯梢位 / 两行情报区）
+  /* 玩家区：每人一行紧凑三栏（左=昵称+手牌张数 / 中=盯梢位 / 右=有关·无关两行）
      差异：自己的盯梢目标正面可见（只有本机能看到），他人的仍为牌背 '?' */
   function renderPlayers() {
     const tv = acting == null ? S.turnSeat : acting;
@@ -283,28 +298,28 @@
         '<button class="intel-row" data-seat="' + i + '" data-zone="' + key + '" title="' +
           (me ? '你' : esc(st.name)) + ' 的' + label + '情报（公开区）">' +
           '<span class="stamp ' + cls + '">' + label + '</span>' +
-          '<span class="intel-cards" data-seat="' + i + '" data-zone="' + key + '">' + z[key].map(id => miniHtml(id)).join('') + '</span>' +
+          '<span class="intel-cards" data-seat="' + i + '" data-zone="' + key + '">' + z[key].map(id => microHtml(id)).join('') + '</span>' +
           '<span class="intel-n">' + z[key].length + '</span>' +
         '</button>';
       return '<div class="pl-row' + (me ? ' me' : '') + (on ? ' on' : '') + '" data-seat="' + i + '">' +
-        '<div class="ai-head">' +
-          '<span class="ai-id">' +
+        '<i class="turn-lamp' + (on ? ' on' : '') + '" title="' + (on ? '当前行动方' : '') + '"></i>' +
+        '<div class="pl-left">' +
+          '<span class="pl-id">' +
             '<b class="pl-name">' + esc(st.name) + '</b>' +
             (me ? '<i class="pl-you">你</i>' : '') +
             (deciding ? '<i class="pl-pending">决策中</i>' : '') +
-            '<span class="ai-hand pl-hand" data-seat="' + i + '" title="手牌张数（内容隐藏）"><i></i><b>' + S.hands[i].length + '</b></span>' +
           '</span>' +
-          '<span class="ai-mid">' +
-            '<span class="ai-role">盯梢</span>' +
-            '<button class="watch pl-watch' + (hasWatch ? ' set' : '') + (me && hasWatch ? ' mine' : '') + '" data-seat="' + i + '" ' +
-              'title="' + (me ? '你的盯梢目标' + (hasWatch ? '（只有你能看到内容）' : '') : esc(st.name) + ' 的盯梢目标（内容保密）') + '">' +
-              slotBody +
-              '<span class="watch-tag">' + (hasWatch ? '已布控' : '待布控') + '</span>' +
-            '</button>' +
-          '</span>' +
-          '<i class="turn-lamp' + (on ? ' on' : '') + '" title="' + (on ? '当前行动方' : '') + '"></i>' +
+          '<span class="ai-hand pl-hand" data-seat="' + i + '" title="手牌张数（内容隐藏）"><i></i><b>' + S.hands[i].length + '</b></span>' +
         '</div>' +
-        zone('rel', '有关', 'rel') + zone('unrel', '无关', 'unrel') +
+        '<div class="pl-mid">' +
+          '<span class="ai-role">盯梢</span>' +
+          '<button class="watch pl-watch' + (hasWatch ? ' set' : '') + (me && hasWatch ? ' mine' : '') + '" data-seat="' + i + '" ' +
+            'title="' + (me ? '你的盯梢目标' + (hasWatch ? '（只有你能看到内容）' : '') : esc(st.name) + ' 的盯梢目标（内容保密）') + '">' +
+            slotBody +
+            '<span class="watch-tag">' + (hasWatch ? '已布控' : '待布控') + '</span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="pl-right">' + zone('rel', '有关', 'rel') + zone('unrel', '无关', 'unrel') + '</div>' +
       '</div>';
     }).join('');
     /* 情报卡条滚到最右（最新一张可见）+ 手牌张数变化的轻弹 */
@@ -360,7 +375,7 @@
     bc.querySelector('span').textContent =
       acts.comm ? '打给队友目标' : (S.hands[my].length ? '队友暂无目标' : '手牌已空');
     bl.querySelector('span').textContent =
-      acts.lurkMax > 0 ? '摸1~3张、暗弃 1' :
+      acts.lurkMax > 0 ? '摸牌并暗弃 1' :
         (S.hands[my].length >= G.HAND_MAX ? '手牌已满' : '牌库不足');
     be.querySelector('span').textContent =
       acts.eliminate ? '剩' + Math.max(0, S.bullets) + '发' :
@@ -561,10 +576,14 @@
 
   async function animStake(ev) {
     const mine = ev.seat === myOf();
-    const to = localPt(watchEl(ev.seat)) || { x: innerWidth / 2, y: 120, w: 34, h: 47 };
+    const rect = localPt(watchEl(ev.seat));
+    const box = rect ? { w: rect.w, h: rect.h } : miniBox();
+    const to = rect || { x: innerWidth / 2, y: 120, w: box.w, h: box.h };
     const from = localPt($('#pileTrait')) || to;
-    const el = spawn(mine && ev.card != null ? cardHtml(ev.card, 'mini') : cardBack(''), 'fxc-c',
-      { x: from.x + from.w / 2 - 17, y: from.y + from.h / 2 - 23 }, { w: 34, h: 47 });
+    const sx = from.x + from.w / 2 - box.w / 2, sy = from.y + from.h / 2 - box.h / 2;
+    const gx = to.x + to.w / 2 - box.w / 2, gy = to.y + to.h / 2 - box.h / 2;
+    const el = spawn(mine && ev.card != null ? cardHtml(ev.card, 'mini') : cardBack('mini'), 'fxc-c',
+      { x: sx, y: sy }, { w: box.w, h: box.h });
     if (!mine) {
       const q = spawn('<div class="qmark">?</div>', '', { x: to.x + to.w / 2 - 8, y: to.y - 2 });
       q.style.opacity = '0';
@@ -575,14 +594,14 @@
       vanish(q, 800, 1);
     }
     $('#pileTrait').classList.remove('hot'); void $('#pileTrait').offsetWidth; $('#pileTrait').classList.add('hot');
-    fly(el, { x: 0, y: 0 }, { x: to.x + to.w / 2 - 17 - (from.x + from.w / 2 - 17), y: to.y + to.h / 2 - 23 - (from.y + from.h / 2 - 23) }, 420, { ease: easeOutCubic, lift: 26, r0: -14, r1: 0 });
+    fly(el, { x: 0, y: 0 }, { x: gx - sx, y: gy - sy }, 420, { ease: easeOutCubic, lift: 26, r0: -14, r1: 0 });
     hitStop(35);
     await fxRunUntil(fxClock + 460);
     vanish(el, 400, 120);
     ringAt({ x: to.x + to.w / 2, y: to.y + to.h / 2 }, 40);
-    floatAt({ x: to.x + to.w / 2, y: to.y - 6 },
-      mine ? (ev.card != null ? '你的目标 · ' + G.cardName(ev.card) : '你的目标') : esc(seatName(ev.seat)) + ' 的目标',
-      mine ? '' : 'dim');
+    // floatAt({ x: to.x + to.w / 2, y: to.y - 6 },
+    //   mine ? (ev.card != null ? '你的目标 · ' + G.cardName(ev.card) : '你的目标') : esc(seatName(ev.seat)) + ' 的目标',
+    //   mine ? '' : 'dim');
     await sleep(160);
   }
   async function animPlay(ev) {
@@ -591,10 +610,11 @@
     /* 目标 = 区域里已渲染的最后一张牌（刚打出的这张）：占位牌先隐，飞行牌落位再亮 */
     const cells = row ? row.querySelectorAll('.card') : [];
     const targetEl = cells[cells.length - 1];
-    const to = localPt(targetEl) || localPt(row) || { x: innerWidth / 2, y: 220, w: 34, h: 47 };
+    const box = microBox();
+    const to = localPt(targetEl) || localPt(row) || { x: innerWidth / 2, y: 220, w: box.w, h: box.h };
     const srcEl = ev.seat === myOf() ? $('#hand') : handEl(ev.seat);
     const from = localPt(srcEl) || { x: innerWidth / 2, y: innerHeight - 140, w: 56, h: 78 };
-    const el = spawn(cardHtml(card, 'mini'), '', { x: to.x, y: to.y }, { w: to.w, h: to.h });
+    const el = spawn(cardHtml(card, 'micro'), '', { x: to.x, y: to.y }, { w: to.w, h: to.h });
     el.style.left = from.x + from.w / 2 - to.w / 2 + 'px';
     el.style.top = from.y + from.h / 2 - to.h / 2 + 'px';
     if (targetEl) targetEl.style.visibility = 'hidden';
@@ -739,8 +759,9 @@
     const cards = ev.cards || [];
     const seat = ev.seat == null ? myOf() : ev.seat;
     const src = localPt(chipEl(seat, 'rel')) || localPt(chipEl(seat, 'unrel')) || localPt($('#players')) || { x: innerWidth / 2, y: 220, w: 60, h: 20 };
+    const box = microBox();
     for (let i = 0; i < cards.length; i++) {
-      const el = spawn(miniHtml(cards[i]), '', { x: src.x, y: src.y }, { w: 34, h: 47 });
+      const el = spawn(microHtml(cards[i]), '', { x: src.x, y: src.y }, { w: box.w, h: box.h });
       const r = localPt(el) || src;
       const tx = (up ? up.x + up.w / 2 - r.w / 2 : innerWidth - 80) - r.x;
       const ty = (up ? up.y + up.h / 2 - r.h / 2 : 60) - r.y;
@@ -761,10 +782,12 @@
   async function animBack(ev) {
     const up = localPt($('#pileDeck'));
     const from = localPt(chipEl(ev.seat, 'rel')) || { x: innerWidth / 2, y: 120, w: 30, h: 42 };
-    const el = spawn(cardHtml(ev.card, 'mini'), '', { x: from.x + from.w / 2 - 17, y: from.y + from.h / 2 - 23 }, { w: 34, h: 47 });
-    const tx = (up ? up.x + up.w / 2 - 17 : innerWidth - 80) - (from.x + from.w / 2 - 17);
-    const ty = (up ? up.y + up.h / 2 - 23 : 60) - (from.y + from.h / 2 - 23);
-    tween({ dur: 400, ease: easeOutCubic, upd(p) { el.style.transform = 'translate(' + (tx * p).toFixed(1) + 'px,' + (ty * p - 30 * Math.sin(Math.PI * p)).toFixed(1) + 'px) rotate(' + (360 * p).toFixed(0) + 'deg) scale(' + (1 - 0.35 * p).toFixed(2) + ')'; el.style.opacity = p > 0.85 ? ((1 - p) / 0.15).toFixed(2) : 1; } });
+    const box = microBox();
+    const sx = from.x + from.w / 2 - box.w / 2, sy = from.y + from.h / 2 - box.h / 2;
+    const gx = (up ? up.x + up.w / 2 : innerWidth - 80) - box.w / 2;
+    const gy = (up ? up.y + up.h / 2 : 60) - box.h / 2;
+    const el = spawn(cardHtml(ev.card, 'micro'), '', { x: sx, y: sy }, { w: box.w, h: box.h });
+    tween({ dur: 400, ease: easeOutCubic, upd(p) { el.style.transform = 'translate(' + ((gx - sx) * p).toFixed(1) + 'px,' + ((gy - sy) * p - 30 * Math.sin(Math.PI * p)).toFixed(1) + 'px) rotate(' + (360 * p).toFixed(0) + 'deg) scale(' + (1 - 0.35 * p).toFixed(2) + ')'; el.style.opacity = p > 0.85 ? ((1 - p) / 0.15).toFixed(2) : 1; } });
     await fxRunUntil(fxClock + 410);
     vanish(el, 0, 60);
     $('#pileDeck').classList.remove('hot'); void $('#pileDeck').offsetWidth; $('#pileDeck').classList.add('hot');
@@ -772,11 +795,17 @@
     await sleep(320);
   }
   async function animPick(ev) {
-    const hand = localPt($('#hand'));
+    const seat = ev.seat == null ? myOf() : ev.seat;
+    const mine = seat === myOf();
+    /* 落点跟随拾牌人：自己 → 手牌；他人 → 其座位的手牌叠（曾写死 #hand，他人拾牌会飞进自己手里） */
+    const targetEl = handEl(seat);
+    const hand = localPt(targetEl);
     const src = ev.from === 'up' ? localPt($('#pileUp')) : localPt($('#pileDown'));
     if (!hand || !src) return;
-    const slot = hideHandTail(ev.card != null ? [ev.card] : [])[0] || null;
-    const el = spawn(cardHtml(ev.card, 'mini'), '', { x: src.x + src.w / 2 - 17, y: src.y + src.h / 2 - 23 }, { w: 34, h: 47 });
+    const slot = mine ? (hideHandTail(ev.card != null ? [ev.card] : [])[0] || null) : null;
+    /* 明弃堆拾取是公开信息（日志带牌名）→ 露牌面；暗弃盲抽对他方只露牌背 */
+    const face = mine || ev.from === 'up';
+    const el = spawn(face ? cardHtml(ev.card, 'mini') : cardBack('mini'), '', { x: src.x + src.w / 2 - 17, y: src.y + src.h / 2 - 23 }, { w: 34, h: 47 });
     const hit = slot ? localPt(slot) : null;
     const cx = hit ? hit.x + hit.w / 2 : hand.x + hand.w / 2;
     const cy = hit ? hit.y + hit.h / 2 : hand.y + hand.h / 2;
@@ -786,7 +815,7 @@
     tween({ t: 340, dur: 1, upd() { if (slot) { slot.classList.remove('incoming'); slot.classList.add('arrive'); } } });
     await fxRunUntil(fxClock + 350);
     vanish(el, 0, 60);
-    burst(centerOf($('#hand')), 5, 'spark', 26);
+    burst(centerOf(targetEl), 5, 'spark', 26);
     await sleep(140);
   }
 
@@ -1027,7 +1056,12 @@
     if (S.introId !== lastIntroId && opts.intro === false) lastIntroId = S.introId;
     renderAll(); refreshOpenSheets();
     if (evs) {
-      if (actor != null && actor !== myOf()) bannerAt(seatName(actor) + ' · ' + (ACT_LABEL[act] || '行动'), 'act');
+      if (actor != null && actor !== myOf()) {
+        bannerAt(seatName(actor) + ' ' + (ACT_LABEL[act] || '行动'), 'act');
+        /* 人多时玩家区会滚动：把行动方的座位行带进视野，演出别发生在屏幕外 */
+        const row = $('#players .pl-row[data-seat="' + actor + '"]');
+        if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
       await playEvs(evs);
     }
     acting = null; busy = false;

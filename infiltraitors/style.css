@@ -286,17 +286,19 @@ button { font-family: inherit; touch-action: manipulation; color: inherit; }
 
 /* 行动栏 */
 #actbar { display: flex; gap: 7px; padding: 6px 10px max(15px, env(safe-area-inset-bottom)); }
-.act {
+/* 这套外观只属于行动按钮（button）：他方行动横幅 .banner.act 也带 act 类，
+   若不限定 button，就会被 min-height/padding/边框/底色一起命中（曾把横幅撑成高盒子） */
+button.act {
   flex: 1; min-height: clamp(58px, 8.4dvh, 78px); border-radius: 12px; border: 1.5px solid var(--line2);
   background: linear-gradient(180deg, #1d2938, #16202b); cursor: pointer; padding: 6px 4px; line-height: 1.15;
 }
-.act b { display: block; font-size: 15.5px; font-weight: 900; letter-spacing: 1px; }
-.act span { display: block; font-size: 9.5px; color: var(--dim); margin-top: 2px; letter-spacing: .3px; }
-.act:active { transform: translateY(2px); }
-.act.on { border-color: var(--you); background: linear-gradient(180deg, #24485c, #173042); }
-.act.elim.on { border-color: var(--red); background: linear-gradient(180deg, #5a2018, #351310); }
-.act[disabled] { opacity: .38; }
-.act.elim b { color: #ffc9bf; }
+button.act b { display: block; font-size: 15.5px; font-weight: 900; letter-spacing: 1px; }
+button.act span { display: block; font-size: 9.5px; color: var(--dim); margin-top: 2px; letter-spacing: .3px; }
+button.act:active { transform: translateY(2px); }
+button.act.on { border-color: var(--you); background: linear-gradient(180deg, #24485c, #173042); }
+button.act.elim.on { border-color: var(--red); background: linear-gradient(180deg, #5a2018, #351310); }
+button.act[disabled] { opacity: .38; }
+button.act.elim b { color: #ffc9bf; }
 
 /* 日志条（牌桌下方） */
 #notebar {
@@ -591,6 +593,15 @@ button.card { appearance: none; -webkit-appearance: none; padding: 0; }
   font-size: 20px; font-weight: 900; letter-spacing: 3px; color: var(--ai);
   text-shadow: 0 3px 12px rgba(0, 0, 0, .8);
 }
+/* 他方行动横幅（.banner.act）：贴合文字的带框徽章（37px 高）。外观曾在与行动按钮
+   通用类 .act 撞名时被动带上，按钮限定 button.act 后此处显式写回；左内边距多补 3px ——
+   letter-spacing 会在行尾多留一格空隙，补掉才是视觉居中 */
+.banner.act {
+  padding: 6px 15px 6px 18px;
+  border: 1.5px solid var(--line2); border-radius: 12px;
+  background: linear-gradient(180deg, #1d2938, #16202b);
+  line-height: 1.15;
+}
 
 /* 桌面宽度：居中列 + 放大牌面 */
 @media (min-width: 620px) {
@@ -679,37 +690,59 @@ button.card { appearance: none; -webkit-appearance: none; padding: 0; }
 /* 房间页的标签紧贴着下方的配置卡/配置面板：留出间距（默认 -5px 是给表单输入用的） */
 .ol-room .ol-label { margin-bottom: 6px; }
 
-/* ---------- 玩家区（每人一块「夜枭区」式面板：头行 + 两行情报区） ---------- */
+/* ---------- 玩家区（紧凑三栏：左=昵称+手牌数 / 中=盯梢位 / 右=有关·无关两行） ---------- */
 #players {
-  margin: 9px 10px 0; display: flex; flex-direction: column; gap: 7px;
+  margin: 9px 10px 0; display: flex; flex-direction: column; gap: 6px;
   max-height: 50dvh; overflow-y: auto; scrollbar-width: none;
 }
 #players::-webkit-scrollbar { display: none; }
+/* 玩家区迷你牌一档（22×30）：飞出/飞入的克隆也读同一对变量，落点尺寸才对齐 */
+#players, #fx { --pwc: 22px; --pch: 30px; }
 .pl-row {
+  position: relative; display: flex; align-items: center; gap: 9px;
   border: 1.5px solid var(--line); border-radius: var(--r); background: rgba(24, 34, 47, .72);
-  padding: 6px 8px 10px; cursor: pointer;
+  padding: 4px 8px 4px 10px; cursor: pointer;
 }
 .pl-row.me { background: rgba(63, 199, 184, .07); }
 .pl-row.on { border-color: var(--you); box-shadow: 0 0 0 1px rgba(63, 199, 184, .22); }
 .pl-row:active { background: rgba(12, 17, 25, .75); }
-/* 长名字在头行内省略，不挤压盯梢位与回合灯 */
-.pl-row .ai-head { grid-template-columns: minmax(0, auto) auto 1fr; }
-.pl-name { font-size: 13.5px; font-weight: 800; letter-spacing: .5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 回合灯：竖条贴在行左缘（不再单独占一行高度） */
+.pl-row .turn-lamp { position: absolute; left: -1.5px; top: 8px; bottom: 8px; width: 3px; height: auto; border-radius: 2px; }
+/* 左栏：昵称 + 「你 / 决策中」 + 手牌张数 */
+.pl-left { flex: 0 0 64px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.pl-id { display: flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; }
+.pl-name { font-size: 12px; font-weight: 800; letter-spacing: .3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-row.me .pl-name { color: var(--you); }
-.pl-you {
-  flex: 0 0 auto; font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .5px;
-  padding: 1px 5px; border-radius: 20px; color: var(--you); border: 1px solid var(--you); background: rgba(63, 199, 184, .1);
+.pl-you, .pl-pending {
+  flex: 0 0 auto; font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .2px;
+  padding: 0 3px; border-radius: 20px; line-height: 12px;
 }
-.pl-pending {
-  flex: 0 0 auto; font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .5px;
-  padding: 1px 5px; border-radius: 20px; color: #ffd79a; border: 1px solid var(--ai); background: rgba(232, 165, 58, .12);
-}
+.pl-you { color: var(--you); border: 1px solid var(--you); background: rgba(63, 199, 184, .1); }
+.pl-pending { color: #ffd79a; border: 1px solid var(--ai); background: rgba(232, 165, 58, .12); }
+.pl-row .pl-hand { padding: 1px 5px 1px 2px; }
 .pl-hand.pop { animation: handPop .45s ease-out; }
-/* 盯梢位：尺寸随迷你牌（+边框），自己的正面可见、他人的牌背 '?' */
-.pl-watch { width: calc(var(--mwc) + 3px); height: calc(var(--mch) + 3px); flex: 0 0 auto; }
+/* 中栏：盯梢位（「盯梢」标题在牌上、布控标签悬在牌下）
+   牌面与弃牌堆同档（--mwc×--mch，比情报区 micro 大一档）；已布控/待布控同尺寸 */
+.pl-mid { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.pl-mid .ai-role { font-size: 8.5px; letter-spacing: .5px; line-height: 1; margin-top: -10px; }
+.pl-watch { margin-left: 0; width: var(--mwc); height: var(--mch); flex: 0 0 auto; }
 .pl-watch.set { border-style: solid; border-color: var(--ai); }
-.pl-watch.mine { width: var(--mwc); height: var(--mch); border: 0; background: none; }
-.pl-row .intel-row { min-height: 0; margin-top: 6px; padding: 3px 6px; gap: 6px; }
+.pl-watch.mine { border: 0; background: none; }
+.pl-watch .watch-back { font-size: 16px; }
+/* 标签完全悬在牌下方（复写 .watch .watch-tag 的底缘定位，字号回到基准档） */
+.pl-watch .watch-tag { bottom: auto; top: calc(100% + 1px); font-size: 8px; letter-spacing: .2px; padding: 1px 4px; border-radius: 3px; }
+/* 右栏：有关 / 无关 两行（min-height 36 给 30px 迷你牌留出上下呼吸） */
+.pl-right { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pl-right .intel-row { margin-top: 0; min-height: 36px; padding: 0 4px; gap: 5px; border-radius: 7px; }
+.pl-right .intel-cards { padding: 0; gap: 2px; }
+.pl-right .stamp { font-size: 9px; letter-spacing: 0; padding: 1px 3px; border-width: 1px; }
+.pl-right .intel-n { font-size: 9px; }
+/* 紧凑迷你牌：尺寸与 #players 的变量同源，飞出克隆在 #fx 里也会读同一对值 */
+.card.micro { width: var(--pwc, 22px); height: var(--pch, 30px); border-radius: 4px; border-width: 1.5px; box-shadow: none; }
+.card.micro .band { height: 8px; font-size: 6px; padding: 0 2px; letter-spacing: 0; }
+.card.micro .band .glyph { font-size: 6px; }
+.card.micro .num { font-size: 11px; }
+.card.micro .cname { display: none; }
 
 /* ---------- 五种行动（5 按钮一栏） ---------- */
 .actbar5 .act { flex: 1 1 0; min-width: 0; padding: 6px 3px; }
@@ -807,5 +840,10 @@ button.card { appearance: none; -webkit-appearance: none; padding: 0; }
 /* 桌面宽度：与对局其余区块同宽居中 */
 @media (min-width: 620px) {
   #players { width: 100%; max-width: 660px; margin: 9px auto 0; }
+  /* 桌面把玩家区迷你牌放大一档（克隆读同一对变量，落点依旧对齐） */
+  #players, #fx { --pwc: 24px; --pch: 34px; }
+  .card.micro .band { height: 9px; font-size: 6.5px; }
+  .card.micro .band .glyph { font-size: 6.5px; }
+  .card.micro .num { font-size: 12px; }
 }
 
