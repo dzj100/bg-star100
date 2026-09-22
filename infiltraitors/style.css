@@ -482,6 +482,9 @@ button.card { appearance: none; -webkit-appearance: none; padding: 0; }
 .zcell .wtag {
   font-family: var(--mono); font-style: normal; font-size: 9px; font-weight: 700;
   letter-spacing: .5px; color: var(--dim); white-space: nowrap;
+  /* 固定行盒：中文名与英文名回退到的字体度量不同（Edge 实测行盒 12px vs 10px），
+     normal 行高会把名下的卡牌顶出 2px 错位 */
+  line-height: 12px; height: 12px;
 }
 #tCaughtCards { opacity: .6; }                       /* 已铲除：置灰弱化，区分活跃叛徒 */
 .card.facedown .band, .card.facedown .num, .card.facedown .cname { display: none; }

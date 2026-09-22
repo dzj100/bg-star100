@@ -878,13 +878,15 @@ async function main() {
 
   console.log('■ 12 抽屉三连：叛徒区（保密）/ 弃牌堆 / 情报明细');
   {
-    const S = scene({}, 4);
+    /* 中英混名：英文名与中文名的回退字体度量不同，盯梢格的卡牌曾被顶出 2px 错位 */
+    const S = scene({ seats: [{ name: '你' }, { name: 'LM' }, { name: '昵称' }, { name: '周四' }] }, 4);
     await setState(S, { live: true });
     await page.click('#pileTrait');
     await page.waitForTimeout(240);
     const t = await page.evaluate(() => {
       const N = id => parseInt(document.getElementById(id).textContent, 10);
       const txt = s => [...document.querySelectorAll(s + ' .card')].map(c => (c.querySelector('.num') || {}).textContent || 'back');
+      const cells = [...document.querySelectorAll('#tWatchCards .zcell')];
       return {
         open: !document.getElementById('traitorMask').classList.contains('hidden'),
         sub: document.getElementById('traitSub').textContent,
@@ -893,13 +895,17 @@ async function main() {
         up: ['#tPileCards', '#tWatchCards', '#tCaughtCards'].map(s => document.querySelectorAll(s + ' .card:not(.facedown)').length),
         cards: [txt('#tPileCards'), txt('#tWatchCards'), txt('#tCaughtCards')],
         tags: [...document.querySelectorAll('#tWatchCards .wtag')].map(e => e.textContent),
+        tagH: cells.map(c => c.querySelector('.wtag').getBoundingClientRect().height),
+        cardTop: cells.map(c => c.querySelector('.card').getBoundingClientRect().top),
       };
     });
     expect('叛徒区抽屉：4 名待查 + 3 名盯梢 + 0 名已铲除', t.open && t.n.join(',') === '4,3,0');
     expect('对局中：叛徒区全为牌背（不泄露真相）', t.down[0] === 4 && t.cards[0].every(v => v === 'back'));
     expect('盯梢区：只有自己的目标正面（红3）· 他人的仍是牌背（2 背 + 1 面）',
       t.up[1] === 1 && t.down[1] === 2 && t.cards[1][0] === '3' && t.cards[1][1] === 'back' && t.cards[1][2] === 'back');
-    expect('盯梢牌按持有者署名（本机显示「你」）', t.tags.join(',') === '你,秦二,赵三');
+    expect('盯梢牌按持有者署名（本机显示「你」）', t.tags.join(',') === '你,LM,昵称');
+    expect('盯梢格：中英名标签行盒同高（固定 12px）· 三张卡顶严格对齐',
+      t.tagH.every(h => h === 12) && t.cardTop.every(v => Math.abs(v - t.cardTop[0]) < 0.5));
     expect('抽屉副标题：只有你自己的盯梢目标可见', t.sub.includes('执行任务中') && t.sub.includes('只有你自己的盯梢目标可见'));
     await shot('ol19-traitor-hidden.png');
     await page.click('#btnCloseTraitor');
@@ -934,7 +940,7 @@ async function main() {
       rel: document.querySelectorAll('#intelBody .zone-block:nth-child(1) .card').length,
       unrel: document.querySelectorAll('#intelBody .zone-block:nth-child(2) .card').length,
     }));
-    expect('情报明细：按玩家查看（公开区 · 有关/无关两区）', i.open && i.sub.includes('秦二') && i.rel === 1 && i.unrel === 1);
+    expect('情报明细：按玩家查看（公开区 · 有关/无关两区）', i.open && i.sub.includes('LM') && i.rel === 1 && i.unrel === 1);
     await shot('ol21-intel.png');
     await page.click('#btnCloseIntel');
     await page.waitForTimeout(140);

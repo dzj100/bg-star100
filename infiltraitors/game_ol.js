@@ -279,7 +279,7 @@ const GO = (() => {
       const got = drawTop(S, 1);
       if (got.length) {
         S.hands[seat].push(...got);
-        logPush(S, seat, nameOf(S, seat) + ' 从牌库摸到【' + cardName(got[0]) + '】');
+        logPush(S, seat, nameOf(S, seat) + ' 从牌库摸到 1 张');   // 日志公开，不暴露暗摸的牌面
         evs.push({ k: 'draw', cards: got, to: seat });
       }
     } else {

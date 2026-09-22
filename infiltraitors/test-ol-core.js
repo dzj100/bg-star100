@@ -179,6 +179,11 @@ sec('6 通讯：判定入他人情报区 + 摸牌选择子阶段（pending=draw�
   expect('摸 1 张：手牌回 ' + th + ' · 牌库 -1 · 事件含 draw',
     T.hands[1].length === th && T.deck.length === td - 1 && tr.evs.some(e => e.k === 'draw'));
   expect('摸牌后换手（→ 2 号）', T.turnSeat === 2 && T.pending === null);
+  /* 日志全员可见：暗摸的牌面（色 + 数）不得写进日志，只记数量 */
+  const drew = T.hands[1][T.hands[1].length - 1];
+  const dl = T.log.filter(l => l.text.includes('从牌库摸到')).pop();
+  expect('摸牌日志只记数量，不暴露摸到的牌面',
+    !!dl && dl.text === G.nameOf(T, 1) + ' 从牌库摸到 1 张' && !T.log.some(l => l.text.includes(G.cardName(drew))));
   /* 通讯非法路径 */
   const U = G.newGame({ traitors: 7, extra: 3 }, seatsOf(3), seeded(1236));
   U.turnSeat = 0; G.stake(U, 0);
