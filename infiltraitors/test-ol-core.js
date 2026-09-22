@@ -235,6 +235,8 @@ sec('8 铲除：落空耗弹 · 命中公示 + 情报清扫 + 叛徒洗回 + 拾
   const mr = G.eliminate(S, 1, 0, wc, wn);
   expect('落空：子弹 -1 · 目标仍在 · 换手', mr.ok && !mr.hit && S.bullets === 9 && S.watches[0] === target && S.turnSeat === 2);
   expect('落空事件与日志', mr.evs.some(e => e.k === 'miss') && S.log.some(l => l.text.includes('落空')));
+  expect('落空计入开枪数（1 号 1 枪 0 中 · 他人不受影响）',
+    S.seatStat[1].shots === 1 && S.seatStat[1].hits === 0 && S.seatStat[0].shots === 0 && S.seatStat[2].shots === 0);
   /* 命中：0 号指认 1 号的目标（铲除不含自己的盯梢） */
   const T = G.newGame({ traitors: 7, extra: 3 }, seatsOf(3), seeded(56));
   T.turnSeat = 1; G.stake(T, 1);                   // 1 号布控（供 0 号铲除）
@@ -247,6 +249,8 @@ sec('8 铲除：落空耗弹 · 命中公示 + 情报清扫 + 叛徒洗回 + 拾
   const up0 = T.discardUp.length;
   const hr = G.eliminate(T, 0, 1, G.cOf(tgt), G.nOf(tgt));
   expect('命中：子弹 -1 · 铲除 +1', hr.ok && hr.hit && T.bullets === 9 && T.caught === 1);
+  expect('命中计入开枪与命中（0 号 1 枪 1 中 · 被铲目标的持有者不计）',
+    T.seatStat[0].shots === 1 && T.seatStat[0].hits === 1 && T.seatStat[1].shots === 0 && T.seatStat[1].hits === 0);
   expect('命中：盯梢位清空 · 已铲除名单记牌', T.watches[1] === null && T.caughtCards.length === 1 && T.caughtCards[0] === tgt);
   expect('命中：情报区清扫进明弃堆', T.intel[1].rel.length === 0 && T.intel[1].unrel.length === 0 && T.discardUp.length === up0 + intelN);
   expect('命中：叛徒洗回牌库', T.deck.includes(tgt));

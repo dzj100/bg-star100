@@ -129,6 +129,7 @@ const GO = (() => {
       pending: null, pendingSeat: null, over: null, log: [],
       introId: 'g' + Date.now().toString(36) + '-' + Math.floor(rnd() * 1e6).toString(36),
       stat: { shots: 0, hits: 0, misses: 0, stakes: 0, intels: 0, comms: 0, lurks: 0 },
+      seatStat: Array.from({ length: n }, () => ({ shots: 0, hits: 0 })),   // 逐人开枪/命中（结算列表）
     };
     logPush(S, 'sys', '任务开始：' + cfg.colors + ' 色 · ' + (cfg.one ? '含 1' : '不含 1') +
       ' · 叛徒 ' + cfg.traitors + ' 名 · 子弹 ' + S.bullets + ' 发 · ' + n + ' 人协作');
@@ -232,14 +233,14 @@ const GO = (() => {
     if (targetSeat === seat) return { ok: false, evs: [] };      // 只能铲除他人盯梢的目标
     if (S.watches[targetSeat] == null) return { ok: false, evs: [] };
     if (c == null || n == null) return { ok: false, evs: [] };
-    S.bullets--; S.stat.shots++;
+    S.bullets--; S.stat.shots++; S.seatStat[seat].shots++;
     const guess = mk(c, n);
     const traitor = S.watches[targetSeat];
     const hit = guess === traitor;
     const evs = [{ k: 'shot', seat, target: targetSeat, hit, guess }];
     let won = false, reward = null;
     if (hit) {
-      S.stat.hits++;
+      S.stat.hits++; S.seatStat[seat].hits++;
       evs.push({ k: 'reveal', seat: targetSeat, card: traitor });
       /* 该目标的情报区两区 → 明弃堆（正面向上） */
       const swept = [...S.intel[targetSeat].rel, ...S.intel[targetSeat].unrel];

@@ -558,6 +558,17 @@ button.card { appearance: none; -webkit-appearance: none; padding: 0; }
 .vs-dots i { width: 12px; height: 16px; border-radius: 3px; background: #2c3a4d; }
 .vs-dots i.on { background: var(--rel); }
 .vs-dots i.gone { background: #4a2320; }
+/* 结算逐人战绩（开枪 / 命中） */
+.win-list { margin: 12px 0 14px; border: 1px solid var(--line2); border-radius: 10px; overflow: hidden; }
+.win-row {
+  display: grid; grid-template-columns: 1fr 44px 44px; align-items: center; padding: 5px 10px;
+  font-size: 12px; color: var(--dim); text-align: center;
+}
+.win-row.head { font-size: 10px; letter-spacing: .5px; color: var(--dim2); background: rgba(255, 255, 255, .03); }
+.win-row + .win-row { border-top: 1px solid rgba(255, 255, 255, .05); }
+.win-row .who { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win-row span:not(.who) { font-family: var(--mono); }
+.win-row .hit { color: var(--rel); }
 
 /* ---------- 演出层 ---------- */
 #fx { position: fixed; inset: 0; pointer-events: none; z-index: 55; overflow: hidden; }

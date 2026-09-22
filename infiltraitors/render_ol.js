@@ -1077,6 +1077,14 @@
       '<div class="win-why">' + why + '</div>' +
       '<div class="win-stats">回合 ' + st.rounds + ' · 开枪 ' + st.shots + '（中 ' + st.hits + ' / 落 ' + st.misses + '）<br>' +
       '铲除 ' + st.caught + '/' + st.traitors + ' · 子弹余 ' + Math.max(0, st.bullets) + ' · 牌库余 ' + st.deck + '</div>' +
+      '<div class="win-list">' +
+      '<div class="win-row head"><span class="who">玩家</span><span>开枪</span><span>命中</span></div>' +
+      S.seats.map((se, i) => {
+        const t = (S.seatStat && S.seatStat[i]) || { shots: 0, hits: 0 };
+        return '<div class="win-row"><span class="who">' + (i === myOf() ? '你' : esc(seatName(i))) + '</span>' +
+          '<span>' + t.shots + '</span><span' + (t.hits ? ' class="hit"' : '') + '>' + t.hits + '</span></div>';
+      }).join('') +
+      '</div>' +
       (host ? '<button class="btn-main primary" id="btnAgain">再来一局</button>' : '') +
       '<button class="btn-main' + (host ? '' : ' primary') + '" id="btnBackRoom">' + (host ? '返回房间改配置' : '返回房间等待') + '</button>' +
       '<button class="btn-main" id="btnHome">退出房间</button>' +

@@ -952,6 +952,7 @@ async function main() {
       const S = scene({ turnSeat: 1 }, n);
       S.caught = 7; S.caughtCards = S.traitorPile.slice(); S.traitorPile = [];
       S.watches = [null, null, null, null, null].slice(0, n);
+      S.seatStat = [{ shots: 3, hits: 1 }, { shots: 2, hits: 1 }, { shots: 1, hits: 0 }, { shots: 0, hits: 0 }, { shots: 2, hits: 2 }].slice(0, n);
       S.over = { win: true, why: 'done', stats: OL.statLine(S) };
       return S;
     };
@@ -965,9 +966,15 @@ async function main() {
       dots: document.querySelectorAll('.vs-dots i.on').length,
       again: !!document.getElementById('btnAgain'),
       back: document.getElementById('btnBackRoom').textContent,
+      list: [...document.querySelectorAll('.win-list .win-row')].map(r => [...r.querySelectorAll('span')].map(s => s.textContent.trim()).join(',')),
+      hitCls: !!document.querySelector('.win-row .hit'),
     }));
     expect('胜利结算：任务成功 + 7 芯全亮', h.open && h.stamp.includes('任务成功') && h.cls.includes('ok') && h.dots === 7);
     expect('房主视角：可再来一局 · 返回房间改配置', h.again && h.back.includes('返回房间改配置'));
+    expect('结算列表：表头 + 逐人开枪/命中（座位序 · 本机显示「你」· 0 枪也列出）',
+      h.list.length === 5 && h.list[0] === '玩家,开枪,命中' &&
+      h.list[1] === '你,3,1' && h.list[2] === '秦二,2,1' && h.list[3] === '赵三,1,0' && h.list[4] === '周四,0,0');
+    expect('命中列有命中高亮标记', h.hitCls);
     await shot('ol22-over-host.png');
     await page.evaluate(() => window.INFIL_OL_TEST.setSeat(2));
     await setState(mkOver(4), { live: true });
@@ -976,8 +983,10 @@ async function main() {
       again: !!document.getElementById('btnAgain'),
       back: document.getElementById('btnBackRoom').textContent,
       primary: document.getElementById('btnBackRoom').classList.contains('primary'),
+      who: [...document.querySelectorAll('.win-list .win-row .who')].map(s => s.textContent).join(','),
     }));
     expect('成员视角：无「再来一局」· 按钮为「返回房间等待」且升为主按钮', !m.again && m.back.includes('返回房间等待') && m.primary);
+    expect('成员视角：列表按自己的座位标「你」（2 号）', m.who === '玩家,林一,秦二,你,周四');
     await shot('ol23-over-member.png');
     await page.evaluate(() => window.INFIL_OL_TEST.setSeat(0));
   }
