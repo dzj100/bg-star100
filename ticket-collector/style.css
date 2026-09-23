@@ -1,0 +1,1392 @@
+/* ============================================================
+   《车票收藏家》Ticket Collector · 样式表
+   白天都会地铁：白瓷砖站台 + 暖琥珀顶光 + 银白列车 + 蓝灰软阴影。
+   深板岩色的顶栏 / HUD 只是画框，明亮的舞台才是主角。
+
+   三条铁律（改动前先读 SPEC 7.6）：
+   1. 游戏层所有长度 = calc(N * var(--wu))，N 是世界单位；JS 往
+      document.documentElement 写 --k（px / 世界单位）。chrome 层才用 px/rem。
+   2. 只允许动 transform / opacity。禁止 transition/animation
+      width/height/top/left/filter/box-shadow/background/clip-path/stroke-dasharray。
+      box-shadow 只能出现在静态元素上；全局禁用 backdrop-filter。
+   3. [data-limb] [data-bag] [data-door] .cr-door .lk-door 的 transform 由 JS 写
+      SVG 属性，样式层永不涉足（CSS transform 会盖掉属性，动画立刻坏掉）。
+
+   台上文字的可读性地板：**任何字号不得低于 6.4 世界单位**（最窄的手机上 ≈ 7px）。
+   跟随纵深缩放的字（背包名 / 徽章）一律写成 max(地板, 基准 × --fs) —— max 里
+   两项都随纵深单调不减，所以地板只抬高远处那一端，绝不会把近大远小倒过来。
+   ============================================================ */
+
+/* ============================================================
+   0. 变量与地基
+   ============================================================ */
+:root {
+  /* —— 世界缩放（唯一长度基准）—— */
+  --k: 1;                        /* JS 写：px / 世界单位 */
+  --wu: calc(var(--k) * 1px);    /* 1 世界单位 */
+  --shake-scale: .8;             /* 震屏强度（无障碍） */
+  --fx-pace: 1;                  /* JS 写：CSS 过场的放慢倍率（结算慢放时 = 5）。见 .car-stop 上的用法 */
+
+  /* —— 画框：深板岩 —— */
+  --page: #0f1721;
+  --chrome: #101a26;
+  --chrome2: #16222f;
+  --chrome3: #1d2b3a;
+  --line: rgba(255, 255, 255, .10);
+  --line2: rgba(255, 255, 255, .20);
+  --text: #e9f0f7;
+  --dim: #71818f;
+  --dim2: rgba(233, 240, 247, .44);
+
+  /* —— 浅色舞台上的字 —— */
+  --ink: #2b3a4a;
+  --ink2: #5c6b7c;
+  --stage-bg: #dfe8f2;
+
+  /* —— 强调色 —— */
+  --amber: #e8a53a;              /* 主按钮 / 顶光 */
+  --amber-d: #c9822a;
+  --danger: #d94f5c;             /* 停运 / 最后一轮 */
+  --ok: #3fae6b;                 /* 得手 */
+
+  /* —— 粒子用的明亮一档（落在浅舞台上仍读得清）—— */
+  --fx-red: #e0503f;
+  --fx-yellow: #e8b53a;
+  --fx-green: #3fae6b;
+  --fx-purple: #8a5cd6;
+
+  /* —— 四色车票：墨 = 饱和色，纸 = 极浅同色 ——
+     明度阶梯（色盲冗余第三重）：黄最亮 → 红 → 绿 → 紫最暗 */
+  --tk0-ink: #c4392d;  --tk0-paper: #fbe2de;
+  --tk1-ink: #c8901a;  --tk1-paper: #fdf4d8;
+  --tk2-ink: #2f8b48;  --tk2-paper: #e2f2e6;
+  --tk3-ink: #6d47bd;  --tk3-paper: #e7dffa;
+
+  /* —— 形状 / 字体 —— */
+  --r-card: 16px;
+  --sh-card: 0 10px 26px rgba(5, 14, 24, .42);
+  --sh-inset: 0 2px 6px rgba(24, 42, 62, .18);
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+          "Microsoft YaHei", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.45;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+input { font: inherit; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+b, strong { font-weight: 800; }
+
+#app { min-height: 100dvh; }
+
+.hidden { display: none !important; }
+.dim { color: var(--dim); }
+
+/* 细滚动条（只给可滚动的浮层） */
+.rules-card, .sheet-card, #roster, .roster, .ranking, #overList, #hudListIn, .rank-detail {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .22) transparent;
+}
+.rules-card::-webkit-scrollbar, .sheet-card::-webkit-scrollbar, #roster::-webkit-scrollbar,
+.roster::-webkit-scrollbar, .ranking::-webkit-scrollbar, #overList::-webkit-scrollbar,
+#hudListIn::-webkit-scrollbar, .rank-detail::-webkit-scrollbar { width: 6px; height: 6px; }
+.rules-card::-webkit-scrollbar-track, .sheet-card::-webkit-scrollbar-track, #roster::-webkit-scrollbar-track,
+.roster::-webkit-scrollbar-track, .ranking::-webkit-scrollbar-track, #overList::-webkit-scrollbar-track,
+#hudListIn::-webkit-scrollbar-track, .rank-detail::-webkit-scrollbar-track { background: transparent; }
+.rules-card::-webkit-scrollbar-thumb, .sheet-card::-webkit-scrollbar-thumb, #roster::-webkit-scrollbar-thumb,
+.roster::-webkit-scrollbar-thumb, .ranking::-webkit-scrollbar-thumb, #overList::-webkit-scrollbar-thumb,
+#hudListIn::-webkit-scrollbar-thumb, .rank-detail::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .18);
+  border-radius: 3px;
+}
+
+/* ============================================================
+   1. 屏幕 / 层级梯（z-index 值固定，勿动）
+   ============================================================ */
+#screen-menu, #screen-setup, #screen-game, #screen-over, #curtain, #rules, #palette, #logbox { display: none; }
+#screen-menu.on, #screen-setup.on, #screen-game.on, #screen-over.on,
+#curtain.on, #rules.on, #palette.on, #logbox.on { display: flex; }
+
+/* z 1 —— 封面 */
+#screen-menu {
+  position: fixed; inset: 0; z-index: 1;
+  flex-direction: column; align-items: center; justify-content: center;
+  padding: max(22px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background:
+    radial-gradient(120% 58% at 50% -12%, rgba(232, 165, 58, .18), transparent 64%),
+    radial-gradient(90% 46% at 50% 112%, rgba(63, 174, 107, .10), transparent 70%),
+    linear-gradient(180deg, #13202f 0%, #0d1621 58%, #0a121a 100%);
+}
+
+/* z 2 —— 对局！position:relative + z-index 是舞台各层的解析基准 */
+#screen-game {
+  position: relative; z-index: 2;
+  flex-direction: column; height: 100dvh;
+  overflow: hidden;
+  background: var(--chrome);
+}
+
+/* z 10 —— 名单 */
+#screen-setup {
+  position: fixed; inset: 0; z-index: 10;
+  flex-direction: column;
+  padding-top: max(6px, env(safe-area-inset-top));
+  background: linear-gradient(180deg, #13202f, #0c151f);
+}
+
+/* z 20 —— 结算 */
+#screen-over {
+  position: fixed; inset: 0; z-index: 20;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px;
+  background: radial-gradient(120% 76% at 50% 0%, #17273a 0%, #0a1219 66%);
+}
+
+/* z 30 —— 传手机遮罩（不透明到看不见下层，且绝不用 backdrop-filter） */
+#curtain {
+  position: fixed; inset: 0; z-index: 30;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 24px; text-align: center;
+  background: rgba(9, 14, 22, .975);
+  animation: riseIn .2s ease-out;
+}
+
+/* z 50 —— 规则 */
+#rules {
+  position: fixed; inset: 0; z-index: 50;
+  align-items: center; justify-content: center;
+  padding: 14px;
+  background: rgba(5, 11, 18, .74);
+}
+
+/* z 51 —— 配色抽屉 */
+#palette {
+  position: fixed; inset: 0; z-index: 51;
+  align-items: flex-end; justify-content: center;
+  background: rgba(5, 11, 18, .52);
+}
+
+/* z 52 —— 运行日志（比配色抽屉高一层：日志可以在任何界面喊出来） */
+#logbox {
+  position: fixed; inset: 0; z-index: 52;
+  align-items: center; justify-content: center;
+  padding: 14px;
+  background: rgba(5, 11, 18, .74);
+}
+
+/* z 60 —— 特效层：视口坐标，永不接事件 */
+#fx {
+  position: fixed; inset: 0; z-index: 60;
+  pointer-events: none; overflow: hidden;
+}
+
+/* ============================================================
+   2. 舞台与层序
+   ============================================================ */
+#stagewrap {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 6px;
+  background: radial-gradient(96% 66% at 50% 42%, #1b2b3c 0%, #101a26 74%);
+}
+
+/* 注意：不给 #stage 定 aspect-ratio —— 宽高一律由 JS 写 inline px */
+#stage {
+  position: relative; overflow: hidden;
+  border-radius: calc(6 * var(--wu));
+  background: var(--stage-bg);
+  box-shadow: 0 calc(6 * var(--wu)) calc(18 * var(--wu)) rgba(20, 40, 62, .34);
+}
+
+/* 层序：场景在最下，列车压住场景，背包与储物柜再压住列车 —— 谁离观众近谁在上面。
+   角色不在这个梯子里（见下） */
+#scenery  { position: absolute; inset: 0; z-index: 1; }
+#coach    { position: absolute; inset: 0; z-index: 2; }
+#packs    { position: absolute; inset: 0; z-index: 3; }
+#lockers  { position: absolute; inset: 0; z-index: 4; }
+
+/* ⚠ #figs 绝不能有 z-index / opacity / transform / filter / will-change / contain：
+   这些属性会建立层叠上下文，把角色关进自己的笼子里。角色需要拿着
+   z-index: 10 + (y/8|0)（约 24..94）去和上面四层比大小：越靠画面下方 ——
+   也就是越靠近观众 —— 的角色越后画，于是走到柜前的角色压住柜体、被近处的
+   车厢压住的永远是站在远处的角色。只有 #figs 不建上下文，这套交错才成立。 */
+#figs { position: absolute; inset: 0; }
+
+/* 静止的装饰层整层交给下层：满幅 wrapper 若吃事件，背包/储物柜就永远点不到 */
+#scenery, #coach, #packs, #lockers, #figs { pointer-events: none; }
+/* 可交互的实体再单独打开（pointer-events 不影响层叠上下文） */
+.pack, .locker, .fig, .coach-car, .loco { pointer-events: auto; }
+
+/* ============================================================
+   3. 车票 · 筹码 · 徽章（art.js 的图元）
+   ============================================================ */
+.tk { display: block; }
+/* 图元内部一律是 SVG 用户单位（viewBox 0 0 32 20），不要混进 --wu */
+.tk-paper { fill: var(--tk-paper, #f4f7fa); stroke: var(--tk-ink, #4a5560); stroke-width: 1.15; }
+.tk-band  { fill: var(--tk-ink, #4a5560); opacity: .62; }
+.tk-dot   { fill: var(--tk-paper, #fff); }
+.tk-perf  { fill: var(--tk-ink, #4a5560); opacity: .3; }
+.tk-glyph path { fill: var(--tk-ink, #4a5560); }
+.tk-ring  { fill: none; stroke: var(--tk-ink, #4a5560); stroke-width: .85; }
+
+/* 四色变量挂在每一张票 svg 上（车厢筹码 / 柜内陈列 / 徽章色点同源） */
+.tk-0 { --tk-ink: var(--tk0-ink); --tk-paper: var(--tk0-paper); }
+.tk-1 { --tk-ink: var(--tk1-ink); --tk-paper: var(--tk1-paper); }
+.tk-2 { --tk-ink: var(--tk2-ink); --tk-paper: var(--tk2-paper); }
+.tk-3 { --tk-ink: var(--tk3-ink); --tk-paper: var(--tk3-paper); }
+
+/* ×n 张数（车厢筹码下的数字）：压在票色上，必须描边才读得清 */
+.tk-n {
+  fill: #fff; font-weight: 800; text-anchor: middle;
+  paint-order: stroke; stroke: rgba(13, 23, 35, .55); stroke-width: 1.5;
+}
+
+/* 色点（徽章上的辅助编码）。尺寸走 em —— 跟着徽章自己的字号走，
+   背包（近大远小）与柜子（固定）两个挂载点都不用各写一份。 */
+.dot {
+  display: inline-block;
+  width: .3em; height: .3em;
+  border-radius: 50%;
+  outline: .075em solid rgba(20, 34, 50, .42);
+}
+.dot-0 { background: var(--tk0-ink); }
+.dot-1 { background: var(--tk1-ink); }
+.dot-2 { background: var(--tk2-ink); }
+.dot-3 { background: var(--tk3-ink); }
+
+/* 弹药带式徽章：总数 + 色点。背包 / 柜子共用。
+   内边距与色点走 em（跟着字号一起缩放），字号本身两个挂载点各自给：
+   背包那份吃纵深（近大远小），柜子那份固定。 */
+.tk-badge {
+  display: inline-flex; align-items: center;
+  padding: .16em .44em;
+  background: #fff;
+  color: #26313d;
+  border: .08em solid rgba(20, 34, 50, .16);
+  border-radius: 2em;
+  box-shadow: 0 calc(.5 * var(--wu)) calc(1.5 * var(--wu)) rgba(17, 34, 52, .3);
+  font-size: calc(7.6 * var(--wu));       /* 可读性地板；两处挂载点各自再调大（见 .pk-badge / .lk-badge） */
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  animation: popIn .22s ease-out;
+}
+.tk-badge.off { display: none; }
+.bd-n { font-style: normal; font-variant-numeric: tabular-nums; }
+.bd-dots { display: inline-flex; gap: .1em; margin-left: .24em; }
+
+/* ============================================================
+   4. 列车（全车都在 #coach 一层：车厢、车门、车头，压住场景、被角色压住）
+   车内图元一律走 SVG 用户单位（viewBox 就是这节车厢的盒子，等于世界坐标），
+   近大远小由 art.js 把深度缩放乘进数字里 —— 样式层只染颜色与线宽。
+   ============================================================ */
+/* wrapper 只负责定位容器：left/top/width/height 是 JS 写的 calc 串，
+   transform / 尺寸样式层一个都不许碰（关门抖动等也走 JS 的 inline style） */
+.coach-car, .loco { position: absolute; }
+
+.cr-svg, .lo-svg, .cr-chips-box, .cr-chips-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+}
+
+/* —— 车厢：车影 → 贯通道 → 车壁环 → 地板 → 内饰 → 门槽 / 门槛 → 两扇门叶 ——
+   地板取「中间调的石板」而不是深色：车票是浅色纸、角色是彩色，深地板会把两边都压死；
+   内饰只放壁脚 / 拼缝 / 立柱，不给座椅留位置 —— 那块地板要摊筹码也要站人。 */
+.cr-shadow { fill: #0b1520; opacity: .2; }
+.cr-shell  { fill: #f2f6fb; stroke: #c2cedb; stroke-width: .8; }
+.cr-floor  { fill: #9aa8b6; }
+.cr-skirt  { fill: #c6d2de; }                 /* 两侧壁脚长凳带 */
+.cr-seam   { fill: none; stroke: rgba(255, 255, 255, .3); }   /* 地板拼缝 */
+.cr-pole   { fill: #6f7d8c; }                 /* 过道立柱（俯看是一颗点） */
+.cr-pole-hi { fill: #dfe7ef; }
+.cr-gang   { fill: #3a4552; }                 /* 贯通道（车厢之间的软篷） */
+.cr-slot   { fill: #35404d; }                 /* 门槽：门叶滑开后露出的暗腔 */
+.cr-sill   { fill: #dfe7ef; }                 /* 门槛 */
+.cr-leaf      { fill: #e4ecf5; stroke: #b7c4d3; stroke-width: .7; }
+.cr-leaf-win  { fill: #9ec2db; }
+/* .cr-door 承载 data-door / data-hy，transform 由 JS 写属性 —— 只染子图元 */
+
+/* —— 车头：银白车体 + 红色腰带 + 深色风挡 —— */
+.lo-shadow { fill: #0b1520; opacity: .2; }
+.lo-body   { fill: #f2f6fb; stroke: #c2cedb; stroke-width: .8; }
+.lo-stripe { fill: #d94f5c; }
+.lo-hatch  { fill: #d3dfea; }
+.lo-vent   { fill: #c2cedb; }
+.lo-face   { fill: #fbfdff; stroke: #c2cedb; stroke-width: .8; }
+.lo-glass  { fill: #2f4356; }
+.lo-sign   { fill: #ffe6ad; }
+.lo-lamp   { fill: #ffe0a4; }
+.lo-bumper { fill: #9fabb9; }
+
+/* —— 车厢号 / 车顶总数：常驻字号，不随纵深缩小（可读性优先）——
+   两颗药丸骑在车厢近端的那道横梁上：左边是「第 N 节」，右边是「共 N 张」。
+   10 世界单位是用户的指定值：这两颗药丸是全局最要紧的数字（哪节车、几张票）。 */
+.car-no, .roof-total {
+  position: absolute; z-index: 1;
+  top: calc(100% - 4.6 * var(--wu));
+  display: flex; align-items: center; gap: calc(1.4 * var(--wu));
+  padding: calc(1.1 * var(--wu)) calc(2.4 * var(--wu));
+  border-radius: 2em;
+  background: rgba(255, 255, 255, .93);
+  border: calc(.5 * var(--wu)) solid rgba(24, 40, 58, .12);
+  box-shadow: 0 calc(.6 * var(--wu)) calc(1.8 * var(--wu)) rgba(17, 34, 52, .22);
+  color: var(--ink);
+  font-size: calc(10 * var(--wu));
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.car-no     { left: calc(2 * var(--wu)); }
+.roof-total { right: calc(2 * var(--wu)); }
+
+/* 停运：门叶滑拢、车内熄灯（票券压成灰剪影），另挂一颗「本轮停运」说明为什么这轮没人拿。
+   唯独不能去划掉总数 —— 车票并没有作废（下一轮该车算「非空」，剩票照旧可取），
+   划一道红线会让人以为那几张票没了。所以总数药丸保持原样，一颗信号比两颗半信号清楚。
+   药丸落在正中是安全的：停运 = 无人选择 = 按定义车里不会站人（不同于「已放完」要躲开人脸）。
+   时长一律乘 --fx-pace：这几条 CSS 过场都发生在结算慢放窗口里，
+   不跟着放慢的话 JS 那侧慢成 5 倍、它们还 .3s 一闪而过，看起来就像漏帧。 */
+.coach-car.closed .cr-chips-svg { opacity: .34; transition: opacity calc(.3s * var(--fx-pace)); }
+.car-stop {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0; pointer-events: none;
+  transition: opacity calc(.24s * var(--fx-pace));
+  padding: calc(1.2 * var(--wu)) calc(2.8 * var(--wu));
+  border-radius: 2em;
+  background: rgba(217, 79, 92, .95);
+  color: #fff;
+  font-size: calc(8 * var(--wu));
+  font-weight: 800;
+  letter-spacing: .12em;
+  white-space: nowrap;
+  box-shadow: 0 calc(.7 * var(--wu)) calc(2 * var(--wu)) rgba(74, 14, 22, .34);
+}
+.coach-car.closed .car-stop { opacity: 1; }
+
+/* —— 票池见底的车厢：车内筹码压暗，在「筹码那一条」上挂「已放完」暗药丸 ——
+   top 取 26% 而不是 50%：50% 那一带是登车角色的上半身（脚在 78% 处、头在 43% 上下），
+   药丸压在那儿会正好糊住人脸。26% 是筹码带的中心，反正这时筹码已经压到 .18 了。 */
+.coach-car.short .cr-chips-svg { opacity: .18; transition: opacity calc(.2s * var(--fx-pace)); }
+.car-short {
+  position: absolute; left: 50%; top: 26%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity calc(.2s * var(--fx-pace));
+  padding: calc(1.1 * var(--wu)) calc(2.8 * var(--wu));
+  border-radius: 2em;
+  background: rgba(24, 33, 44, .86);
+  color: #ffd98a;
+  font-size: calc(7 * var(--wu));
+  font-weight: 700;
+  white-space: nowrap;
+}
+.coach-car.short .car-short { opacity: 1; }
+
+/* ============================================================
+   5. 站台场景（#scenery 只写一次，纵向鸟瞰）
+   内部 px 数值是 SVG 用户单位（viewBox 0 0 360 680），不要换成 --wu
+   ============================================================ */
+.scenery-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* —— 站台之外：左墙外侧与轨道尽头之外的暗底、轨道床 —— */
+.sc-void { fill: url(#tc-void); }
+.sc-bed  { fill: url(#tc-bedg); }
+.sc-duct { fill: #6c7784; }                    /* 电缆槽 */
+.sc-sleep { fill: none; stroke: #8f7a58; stroke-width: 3; }    /* 枕木 */
+.sc-rail  { fill: none; stroke: #c7d2de; stroke-width: 2; }    /* 双轨 */
+
+/* —— 远端墙：瓷砖 + 线脚 + 储物柜壁龛 —— */
+.sc-wall  { fill: url(#tc-wallg); }
+.sc-wallT { fill: url(#tc-wallT); }
+.sc-mold  { fill: #c3cfdc; }
+.sc-niche { fill: #adbccd; }
+
+/* —— 左墙：一条窄带（墙脚到墙顶），墙脚就是站台左缘 —— */
+.sc-lwall { fill: url(#tc-lwg); }
+.sc-lwtop { fill: none; stroke: #f6faff; stroke-width: 1.6; }
+
+/* —— 站台地面 —— */
+.sc-plat  { fill: url(#tc-platg); }
+.sc-tiles path { fill: none; stroke: #cfdae6; stroke-width: 1; }
+.sc-tact  { fill: #e8c65a; }                   /* 盲道 */
+.sc-dot   { fill: #d9b545; }
+.sc-edge  { fill: #f2c94c; }                   /* 警戒黄线 */
+.sc-lip   { fill: #cddae8; }                   /* 近端台唇（画面最下那条） */
+.fl-pool  { fill: url(#tc-glow); opacity: .3; }   /* 灯下的光池 */
+
+/* —— 远端墙上的固定设施 —— */
+.sg-line { fill: #9fb0c2; }
+.sg-case { fill: #24343f; }
+.sg-zh   { fill: #f4f9ff; font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+.sg-en   { fill: #9fb8cc; font-size: 7.2px; letter-spacing: .18em; }
+
+.led-case { fill: #131c26; }
+.led-txt  { fill: #ffd98a; font-size: 9px; font-weight: 600; letter-spacing: .02em; }
+.led-dot  { fill: #5fe08c; }
+
+.tn-frame { fill: #39434f; }
+.tn-arch  { fill: url(#tc-mouth); }
+
+.ad-case { fill: #e8eef5; stroke: rgba(20, 34, 48, .25); stroke-width: 1; }
+.ad-sky  { fill: #bfe0f2; }
+.ad-sun  { fill: #ffd98a; }
+.ad-city { fill: #7f9cb2; }
+.ad-band { fill: #d94f5c; }
+.ad-txt  { fill: #fff; font-size: 9px; font-weight: 800; text-anchor: middle; letter-spacing: .08em; }
+
+.ck-case { fill: #2e3a46; }
+.ck-face { fill: #f4f8fc; }
+.ck-hand { fill: none; stroke: #2e3a46; stroke-width: 1.6; stroke-linecap: round; }
+.ck-pin  { fill: #d94f5c; }
+
+/* —— 壁灯：灯臂从墙上伸出来，灯罩朝站台一侧 —— */
+.lm-arm   { fill: #b9c4d2; }
+.lm-shade { fill: #dbe3ec; }
+.lm-bulb  { fill: #ffe0a4; }
+/* art.js 不写 fill，缺了这条会渲染成黑色 */
+.lm-glow  { fill: url(#tc-glow); }
+
+/* —— 站台边的小件：金属长椅 / 垃圾桶（纯装饰，不接事件）—— */
+.bn-shadow { fill: #0b1520; opacity: .14; }
+.bn-leg    { fill: #8d9aa9; }
+.bn-seat   { fill: #cfd8e2; }
+.bn-hi     { fill: #f2f6fa; }
+.bn-body   { fill: #b9c4d0; }
+.bn-lid    { fill: #9fabb9; }
+.bn-slot   { fill: #3c4653; }
+
+/* 纯语义分组（外形全由子图元承担，自身只负责不吃事件） */
+.sc-lamp, .sc-sgn, .sc-led, .sc-tun, .sc-ad, .sc-clock, .bench, .bin { pointer-events: none; }
+
+/* ============================================================
+   6. 角色（一份模板 + 7 个 CSS 变量换装）
+   ============================================================ */
+.fig {
+  position: absolute; left: 0; top: 0;
+  width: calc(24 * var(--wu)); height: calc(40 * var(--wu));
+  transform-origin: 50% 100%;      /* JS 的走路 / 压扁 / 旋转数学依赖它 */
+  will-change: transform;
+}
+.fig-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  overflow: visible;               /* 身份椭圆画在 y=40 之下，必须露出来 */
+  transform-origin: 50% 100%;      /* 呼吸从脚底起，脚不离地 */
+}
+/* 待机呼吸放在内层 svg 上：外层 .fig 的 transform 归 JS 专用 */
+.fig:not(.moving) .fig-svg { animation: breathe 2.6s ease-in-out infinite; }
+
+.p-top    { fill: var(--top); }
+.p-bottom { fill: var(--bottom); }
+.p-shoe   { fill: var(--shoe); }
+.p-hat, .p-hat * { fill: var(--hat); }
+.p-bag    { fill: var(--bag); }
+.bag-pocket { fill: var(--bag); stroke: rgba(12, 22, 32, .34); stroke-width: .6; }
+.bag-line { fill: rgba(12, 22, 32, .22); }
+.bag-strap path { fill: none; stroke: rgba(12, 22, 32, .34); stroke-width: .9; }
+.p-skin   { fill: var(--skin); }
+.p-ink    { fill: #33302c; }
+/* ⚠ 必须排在 .p-ink 之后：art.js 的嘴是 class="p-ink p-mouth"，同权重靠顺序取胜 */
+.p-mouth  { fill: none; stroke: #33302c; stroke-width: .55; stroke-linecap: round; }
+.p-blush  { fill: #e0736a; opacity: .3; }
+.p-mark   { fill: var(--mark, #8fa1b5); opacity: .26; }
+.p-shadow { fill: #0b1520; opacity: .16; }
+/* .bag-wrap 由 data-bag 写 scale 属性 —— 不设 transform */
+
+/* 头顶名牌：故意允许溢出 24 单位宽的 .fig 盒子。
+   名牌 / 气泡都跟着角色一起被纵深缩小（站台上最远 0.75 倍、柜前 0.65 倍），
+   所以基准字号要按最坏那一档倒推：9.6 × 0.75 = 7.2 世界单位，仍在 6.4 的地板之上。 */
+.fig-tag {
+  position: absolute; left: 50%; bottom: calc(41 * var(--wu));
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: calc(9.6 * var(--wu));
+  font-weight: 600;
+  padding: calc(.6 * var(--wu)) calc(1.8 * var(--wu));
+  border-radius: calc(3 * var(--wu));
+  background: rgba(16, 26, 38, .78);
+  color: #fff;
+}
+/* 走到远端（柜前排）时把名牌收掉：那里是储物柜名字与徽章的地盘 */
+.fig.far .fig-tag { opacity: 0; }
+
+/* 台词气泡：默认隐形，.on 才浮出来 */
+.fig-bubble {
+  position: absolute; left: 50%; bottom: calc(48 * var(--wu));
+  --bub-bg: #fff;
+  transform: translateX(-50%) translateY(calc(1.6 * var(--wu)));
+  white-space: nowrap;
+  font-size: calc(9.2 * var(--wu));
+  font-weight: 800;
+  padding: calc(.6 * var(--wu)) calc(2 * var(--wu));
+  border-radius: calc(3.4 * var(--wu));
+  background: var(--bub-bg);
+  color: #1b2733;
+  box-shadow: 0 calc(.6 * var(--wu)) calc(2 * var(--wu)) rgba(10, 20, 30, .28);
+  opacity: 0;
+  transition: opacity calc(.16s * var(--fx-pace)), transform calc(.16s * var(--fx-pace));
+}
+.fig-bubble.on { opacity: 1; transform: translateX(-50%); }
+.fig-bubble::after {
+  content: "";
+  position: absolute; left: 50%; top: 100%;
+  margin-left: calc(-1.5 * var(--wu));
+  width: 0; height: 0;
+  border-left: calc(1.5 * var(--wu)) solid transparent;
+  border-right: calc(1.5 * var(--wu)) solid transparent;
+  border-top: calc(1.6 * var(--wu)) solid var(--bub-bg);
+}
+.fig-bubble.bad  { background: #e4574f; color: #fff; --bub-bg: #e4574f; }
+.fig-bubble.good { background: #3fae6b; color: #fff; --bub-bg: #3fae6b; }
+
+/* ============================================================
+   7. 背包（贴左墙站） / 储物柜（贴远端墙站）
+
+   背包的 wrapper 宽高是 JS 按纵深缩放的 calc 串（近大远小）。包里所有定位一律用
+   百分比（相对包身），而**字号必须自己乘回纵深比** —— 这些字是外层 HTML 层的，
+   并不吃包身的缩放：`--fs` 就是这只包所在处的纵深比（JS 写在 .pack 上），
+   写成 max(地板, 基准 × --fs) 才是「跟着包一起近大远小」。
+   **别写 1/--fs**：那是「抵回常驻字号」的老写法，包缩了字却不缩，远处反而比近处大。
+   储物柜不随纵深缩放，JS 直接把 124/N 世界单位宽的柜子摆上墙，字号用 --wu 即可。
+   ============================================================ */
+.pack { position: absolute; }
+.pack-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.pk-shadow { fill: #0b1520; opacity: .16; }
+.pk-body   { fill: var(--bag); stroke: rgba(12, 22, 32, .3); stroke-width: .9; }
+.pk-pocket { fill: rgba(12, 22, 32, .2); }
+.pk-line   { fill: none; stroke: rgba(255, 255, 255, .45); stroke-width: .9; }
+.pk-handle { fill: none; stroke: rgba(12, 22, 32, .45); stroke-width: 1.4; }
+.pk-strap  { fill: none; stroke: rgba(12, 22, 32, .32); stroke-width: 1.2; }
+.pk-buckle { fill: #e9eef4; stroke: rgba(12, 22, 32, .38); stroke-width: .6; }
+
+.pk-name {
+  position: absolute; left: 0; right: 0; top: 21%;
+  text-align: center;
+  /* 「近大远小」：--fs 是这只包所在处的纵深比，字号跟着包一起缩；
+     但压了一条可读性地板 —— 最远的那只包上的字也不低于 6.6 世界单位。
+     注意 max() 里两项都随纵深单调不减，所以地板只会抬高远处那一端，绝不会再倒过来。
+     基准 8.4 而不是更大：包只有 40 世界单位宽，字再大「乘客 1」就被省略号截了。 */
+  font-size: max(calc(6.6 * var(--wu)), calc(8.4 * var(--wu) * var(--fs, 1)));
+  font-weight: 700;
+  color: var(--name-ink, #fff);              /* 浅包上由 JS 换成深字，见 game.js 的 inkOn */
+  text-shadow: 0 1px 1px var(--name-halo, rgba(10, 20, 30, .45));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 3%;
+}
+/* 背包徽章：**吊在包身上沿之上**（工牌位，和柜子那只一个语法）。
+   锚在包身上沿，而不是给负的 top%：徽章的高度和字一起随 --fs 缩（近端 ≈30px、最远
+   ≈23px），包名那一行却钉在 21% —— 同一个 -20% 在两种高度下让出的缝不一样宽，
+   近端算够、远端就压字。bottom: calc(100% - 3px) 把徽章**下沿**钉在包顶往下 3px，
+   压住一点上沿当「挂着」，不管徽章多高，整只都在包名之上。
+   字号 8 → 11.6 世界单位（近端 ≈ 12px），地板 6.4 → 10（最远那只包上也 ≈9.3px；
+   留出 HUD 换行的余量 ——「存放（N 张）」一折行，--wu 就从 1.03 落到 0.96，
+   9 单位的字在那种版面上只剩 8.6px）；
+   字号比包名大是故意的：包名被 40 单位宽的包身卡着（见 .pk-name 那条注释），
+   而「几张、哪几色」才是要一眼看清的情报。 */
+.pk-badge { position: absolute; right: -6%; bottom: calc(100% - 3px); }
+.pk-badge .tk-badge { font-size: max(calc(10 * var(--wu)), calc(11.6 * var(--wu) * var(--fs, 1))); }
+
+/* —— 储物柜 —— */
+.locker { position: absolute; }
+.locker-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.lk-case     { fill: #dbe3ec; stroke: rgba(20, 34, 48, .25); stroke-width: 1; }
+.lk-in       { fill: #2c3744; }
+/* .lk-inner 里的嵌套 <svg class="tk"> 靠 x/y/width/height 属性定尺寸，样式层不要碰它 */
+.li-n {
+  fill: #fff; font-size: 6.6px; font-weight: 700; text-anchor: middle;
+  paint-order: stroke; stroke: rgba(13, 23, 35, .5); stroke-width: 1.3;
+}
+.li-c {
+  fill: #fff; font-weight: 800; paint-order: stroke; text-anchor: middle;
+  stroke: rgba(13, 23, 35, .5); stroke-width: 1.2;
+}
+/* 窄柜（N≥5）里数字挂在票右边，锚点要改成左对齐（见 art.js 的 lockerInner） */
+.li-c.side { text-anchor: start; }
+.li-empty { fill: #6d7a89; font-size: 7.4px; text-anchor: middle; }
+/* .lk-0/.lk-1/.lk-2/.lk-3 是 .li-c 旁边的惰性类名 —— 故意不写规则 */
+
+/* .lk-door 承载 data-door / data-hy，transform 由 JS 写属性 —— 只染子图元 */
+.lk-panel    { fill: #e8eef5; }
+.lk-panel-hi { fill: #f7fafd; }
+.lk-vent     { fill: #c2cedb; }
+.lk-grip     { fill: #a9b6c5; }
+
+/* 柜名挂在柜体下方（远端墙的踢脚线上），压暗底药丸保证在瓷砖上读得清 */
+.lk-name {
+  position: absolute; left: 50%; top: calc(100% + .8 * var(--wu));
+  transform: translateX(-50%);
+  max-width: 150%;
+  padding: calc(.5 * var(--wu)) calc(1.6 * var(--wu));
+  border-radius: 2em;
+  background: rgba(16, 26, 38, .72);
+  color: #fff;
+  font-size: calc(6.4 * var(--wu));
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 徽章吊在柜门上方（工牌位）：6.8 → 9 世界单位，跟背包那只一个量级 */
+.lk-badge { position: absolute; left: 50%; bottom: calc(100% + 1.6 * var(--wu)); transform: translateX(-50%); }
+.lk-badge .tk-badge { font-size: calc(9 * var(--wu)); }
+/* 柜门顶沿的色条：用主人的衣服色（--cloth 由 JS 写在 .locker 上） */
+.locker::after {
+  content: "";
+  position: absolute; left: 16%; right: 16%;
+  top: calc(3.4 * var(--wu)); height: calc(1.8 * var(--wu));
+  border-radius: 1em;
+  background: var(--cloth, transparent);
+  opacity: .55;
+  pointer-events: none;
+}
+
+/* ============================================================
+   8. 特效层（JS 写 left/top 视口 px，transform/opacity 串；CSS 只给外形）
+   ============================================================ */
+.fxc { position: absolute; will-change: transform, opacity; pointer-events: none; }
+
+/* —— 粒子 —— */
+.fx-dot {
+  width: calc(2.6 * var(--wu)); height: calc(2.6 * var(--wu));
+  margin-left: calc(-1.3 * var(--wu)); margin-top: calc(-1.3 * var(--wu));
+  border-radius: 50%;
+  background: #cdd9e6;
+}
+/* 变体：既认 .fx-dot.x，也认 JS 只挂变体名的写法（限 #fx 内，避免撞名） */
+#fx .dust, #fx .red, #fx .yellow, #fx .green, #fx .purple, #fx .gold, #fx .spark {
+  width: calc(2.6 * var(--wu)); height: calc(2.6 * var(--wu));
+  margin-left: calc(-1.3 * var(--wu)); margin-top: calc(-1.3 * var(--wu));
+  border-radius: 50%;
+}
+#fx .dust, .fx-dot.dust     { background: #c6d3e2; }
+#fx .red, .fx-dot.red       { background: var(--fx-red); }
+#fx .yellow, .fx-dot.yellow { background: var(--fx-yellow); }
+#fx .green, .fx-dot.green   { background: var(--fx-green); }
+#fx .purple, .fx-dot.purple { background: var(--fx-purple); }
+#fx .gold, .fx-dot.gold     { background: #f0c247; }
+#fx .spark, .fx-dot.spark   { background: #ffffff; }
+
+/* —— 冲击环 —— */
+.ringFx {
+  border: calc(2.2 * var(--wu)) solid rgba(255, 255, 255, .85);
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+}
+.ringFx.ringStamp { border-color: rgba(217, 79, 92, .9); }
+.ringFx.pulse { animation: pulseRing 1.2s ease-out infinite; }   /* JS 可给静态环挂 .pulse */
+
+/* —— 飘分 —— */
+.floatTxt {
+  font-size: calc(8 * var(--wu));
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 calc(.5 * var(--wu)) calc(1.6 * var(--wu)) rgba(8, 16, 24, .65);
+  white-space: nowrap;
+}
+
+/* —— 印章（transform 全在 JS 的 inline style 里，CSS 一个都不写）—— */
+.stampFx {
+  position: absolute;
+  font-size: calc(10 * var(--wu));
+  font-weight: 900;
+  letter-spacing: .08em;
+  padding: calc(.3 * var(--wu)) calc(1.6 * var(--wu));
+  border-radius: calc(1.6 * var(--wu));
+  border: calc(.9 * var(--wu)) solid currentColor;
+  background: rgba(255, 255, 255, .9);
+  white-space: nowrap;
+}
+.stampFx.small { font-size: calc(7.2 * var(--wu)); }
+.stampStop { color: var(--danger); }
+.stampGot  { color: #2f8b48; }
+.stampFail { color: #71818f; }
+.stampWin  { color: #b9812a; }
+
+/* —— 闪屏 —— */
+.flashLayer {
+  width: 100vw; height: 100vh;
+  background: radial-gradient(circle at 50% 45%, #fff 0%, rgba(255, 255, 255, .6) 45%, rgba(255, 255, 255, 0) 75%);
+  opacity: 0;
+}
+
+/* —— 大字横幅（transform 归 JS 的补间）—— */
+.banner {
+  position: absolute; left: 50%; top: 36%;
+  font-size: calc(15 * var(--wu));
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 calc(1 * var(--wu)) calc(4 * var(--wu)) rgba(6, 14, 22, .6);
+  white-space: nowrap;
+  padding: calc(1.4 * var(--wu)) calc(4 * var(--wu));
+  border-radius: calc(3 * var(--wu));
+  background: linear-gradient(180deg, rgba(23, 36, 52, .94), rgba(15, 25, 38, .94));
+  border: 1px solid rgba(255, 255, 255, .18);
+}
+.banner.bannerLast {
+  color: #ffe6c9;
+  background: linear-gradient(180deg, rgba(150, 38, 52, .95), rgba(94, 22, 33, .95));
+  border-color: rgba(255, 190, 180, .38);
+  text-shadow: 0 calc(1 * var(--wu)) calc(4 * var(--wu)) rgba(48, 6, 12, .7);
+}
+
+/* —— 飞行中的车票 —— */
+.fly-tk .tk { width: calc(10 * var(--wu)); height: auto; }
+
+/* ============================================================
+   9. 顶栏 / HUD（chrome 层，px 随意）
+   ============================================================ */
+#topbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(7px + env(safe-area-inset-top)) 10px 7px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+}
+#tbRound { font-size: 14.5px; font-weight: 900; letter-spacing: .02em; }
+#tbPool { font-size: 12px; color: var(--dim); margin-right: auto; letter-spacing: .02em; }
+
+.tb-btn {
+  flex: 0 0 auto;
+  min-height: 32px; padding: 0 10px;
+  border-radius: 9px; border: 1.5px solid var(--line2);
+  background: #131e2a; color: var(--text);
+  font-size: 12.5px; font-weight: 800;
+  transition: transform .1s ease-out;
+}
+.tb-btn:active { transform: translateY(1px); }
+.tb-btn:disabled, .tb-btn[disabled] { opacity: .36; pointer-events: none; }
+
+#hud {
+  --pad-x: 10px;                 /* 左右内缩：桌面下由媒体查询改写，选择气泡跟着对齐 */
+  position: relative;            /* #hudList 的悬浮基准 */
+  min-height: 96px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 9px var(--pad-x) calc(12px + env(safe-area-inset-bottom));
+  background: var(--chrome2);
+  border-top: 1px solid var(--line);
+}
+#hudPrompt { font-size: 13px; color: rgba(233, 240, 247, .92); line-height: 1.45; }
+#hudBtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* HUD 上方的两只浮层：选择筹码（#hudList）与「看一眼」卡片（#peek）。
+   选择项从点开它的那颗行动按钮那排向上展开。**绝不能摆回文档流**：点一次「选车厢」
+   就多一排，HUD 长高，flex:1 的 #stagewrap 跟着缩一截 —— 舞台整块上下跳一次，
+   看着就是画面被挤了一下。两张皮同一套：都浮在 HUD 上方、都不进流、都不吃 --fx-pace
+   （只出现在选择阶段，慢放窗口只包着结算那四步）。 */
+#hudList, #peek {
+  position: absolute;
+  z-index: 120;                  /* 要压过角色的 10 + (y/8|0)（最高 95，见 #figs 那条注释） */
+  display: none;
+  width: max-content; max-width: calc(100% - 2 * var(--pad-x));
+  padding: 9px;
+  border: 1.5px solid var(--line2);
+  border-radius: 14px;
+  background: var(--chrome3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .5);
+  animation: hudFloat .16s ease-out;
+}
+#hudList.on, #peek.on { display: block; }
+/* 外层只管「浮」与「皮」，滚动交给里层：overflow 会把长在自己身上的尖角裁掉 */
+#hudList {
+  left: var(--left-x, var(--pad-x)); bottom: calc(100% + 8px);
+  transform-origin: var(--tail-x, 22px) 100%;   /* 从尖角那儿长出来 */
+}
+/* 「看一眼」卡片：--peek-b 由 JS 写 —— 选择气泡也开着时要叠在它上面
+   （「顺走」前挨个翻背包，正是两只浮层都要用的场景） */
+#peek {
+  left: var(--pad-x); bottom: calc(100% + var(--peek-b, 8px));
+  transform-origin: 26px 100%;
+}
+#hudListIn {
+  display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start;
+  max-height: 30dvh; overflow-y: auto; overscroll-behavior: contain;
+}
+/* 尖角指到点开它的那颗按钮上（--tail-x 由 JS 量按钮位置写进来，写不到就落在左边） */
+#hudList::after {
+  content: ""; position: absolute;
+  top: 100%; left: var(--tail-x, 22px);
+  width: 13px; height: 13px; margin: -7px 0 0 -7px;
+  transform: rotate(45deg);
+  background: var(--chrome3);
+  border-right: 1.5px solid var(--line2);
+  border-bottom: 1.5px solid var(--line2);
+}
+@keyframes hudFloat {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 「看一眼」卡片的内容：谁 · 哪个容器 · 共几张，下面一排票样 + ×张数。
+   与车内筹码、柜内陈列是同一套「容器里有什么」的语法，区别只是这层坐在 HUD 上 ——
+   台外界面，字号一律 ≥ 12px，不跟纵深缩放。 */
+#peek .pk-head { display: flex; align-items: center; gap: 7px; margin: 1px 3px 9px; }
+#peek .pk-mark {
+  flex: none; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--cloth, #7c8899);
+  outline: 1.5px solid rgba(255, 255, 255, .22);
+}
+#peek .pk-who { font-size: 13.5px; font-weight: 800; color: #fff; }
+#peek .pk-kind { font-size: 12px; font-weight: 800; color: rgba(233, 240, 247, .66); letter-spacing: .04em; }
+#peek .pk-tot {
+  margin-left: auto; padding-left: 12px;
+  font-size: 12.5px; font-weight: 800; color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+#peek .pk-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+#peek .pk-ch {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 12px;
+  border: 1.5px solid var(--line2); border-radius: 11px;
+  background: #0d1620;
+}
+#peek .pk-ch .tk { width: 26px; height: auto; }      /* 盖过 #hud .tk 的 14 世界单位 */
+#peek .pk-ch b { font-size: 13.5px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+#peek .pk-none { font-size: 12.5px; font-weight: 700; color: var(--dim); letter-spacing: .06em; }
+
+/* 通用按钮 */
+.btn {
+  appearance: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line2);
+  background: linear-gradient(180deg, #243445, #1a2634);
+  color: var(--text);
+  font-size: 14.5px; font-weight: 800; letter-spacing: .04em;
+  box-shadow: var(--sh-inset);
+  transition: transform .1s ease-out;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: linear-gradient(180deg, #f2b752, var(--amber));
+  border-color: #f6ca7c;
+  color: #3a2506;
+  box-shadow: 0 4px 12px rgba(150, 94, 12, .34);
+}
+.btn-ghost { background: transparent; border-color: var(--line2); box-shadow: none; color: var(--text); }
+.btn:disabled, .btn[disabled] { opacity: .38; pointer-events: none; box-shadow: none; }
+
+/* 可选筹码（选车厢 / 选人 / 存放） */
+.chip-btn {
+  appearance: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 38px; padding: 0 13px;
+  border-radius: 19px;
+  border: 1.5px solid var(--line2);
+  background: #0d1620; color: var(--text);
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  transition: transform .1s ease-out;
+}
+.chip-btn:active { transform: translateY(1px); }
+.chip-btn.on {
+  background: linear-gradient(180deg, #f2b752, var(--amber));
+  border-color: #f6ca7c;
+  color: #3a2506;
+  font-weight: 900;
+}
+.chip-btn:disabled, .chip-btn[disabled] { opacity: .38; pointer-events: none; }
+/* HUD 里的车票（选车厢时 JS 可能直接塞 .tk）：chrome 层给一档固定大小 */
+#hud .tk { width: calc(14 * var(--wu)); height: auto; }
+
+.hud-hint { font-size: 12px; color: var(--dim); letter-spacing: .02em; }
+.hud-warn { font-size: 12.5px; font-weight: 800; color: #ff9e93; letter-spacing: .02em; }
+
+/* ============================================================
+   10. 传手机遮罩
+   ============================================================ */
+#curtainKicker { font-size: 12px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
+#curtainName {
+  font-size: clamp(34px, 12vw, 56px);
+  font-weight: 900; letter-spacing: .06em; line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+}
+#curtainHint { max-width: 300px; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+#curtainOk {
+  margin-top: 12px;
+  min-width: 210px;
+  background: linear-gradient(180deg, #f2b752, var(--amber));
+  border-color: #f6ca7c;
+  color: #3a2506;
+  animation: popIn .26s ease-out;
+}
+
+/* ============================================================
+   11. 封面 #screen-menu
+   ============================================================ */
+.menu-card, .menu-inner {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 26px 20px 22px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(29, 45, 63, .94), rgba(16, 26, 38, .95));
+  border: 1px solid var(--line2);
+  box-shadow: 0 22px 48px rgba(4, 10, 18, .58);
+  animation: riseIn .34s ease-out;
+}
+
+.logo-kicker {
+  display: inline-block;
+  font-size: 12px; font-weight: 700; letter-spacing: .34em; text-transform: uppercase;
+  color: var(--amber); opacity: .88;
+}
+.logo-zh {
+  margin-top: 6px;
+  font-size: clamp(38px, 13vw, 56px);
+  font-weight: 900; letter-spacing: .06em; line-height: 1.06;
+  color: #f6c76b;
+  background: linear-gradient(180deg, #ffe6ad 6%, #e8a53a 62%, #c9822a 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo-en {
+  margin-top: 7px;
+  font-size: 12px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--dim2);
+}
+.logo-block, .logo-wrap { text-align: center; }
+
+.menu-actions {
+  display: flex; flex-direction: column; gap: 10px;
+  width: 100%; max-width: 300px;
+  margin-top: 24px;
+}
+.menu-actions .btn { width: 100%; }
+.menu-foot {
+  margin-top: 18px;
+  font-size: 12px; letter-spacing: .12em; color: var(--dim2); text-align: center;
+}
+
+/* 打孔纸屑装饰：圆环 + 亮心，两个呼吸一个闪 */
+.menu-deco, #screen-menu .deco {
+  position: absolute; z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1.5px solid rgba(232, 165, 58, .22);
+  background: radial-gradient(closest-side, rgba(232, 165, 58, .12), transparent 74%);
+}
+.menu-deco::before { content: ""; position: absolute; inset: 26%; border-radius: 50%; background: rgba(232, 165, 58, .16); }
+.menu-deco::after  { content: ""; position: absolute; inset: 43%; border-radius: 50%; background: rgba(255, 246, 225, .5); }
+.menu-deco.d1, #screen-menu .deco.d1 { width: 122px; height: 122px; top: -28px; left: -36px; opacity: .9; animation: floatY 5.6s ease-in-out infinite; }
+.menu-deco.d2, #screen-menu .deco.d2 { width: 64px; height: 64px; top: 22%; right: -16px; opacity: .7; animation: sparkle 3.4s ease-in-out infinite; }
+.menu-deco.d3, #screen-menu .deco.d3 { width: 38px; height: 38px; left: 9%; bottom: 15%; opacity: .5; animation: sparkle 4.2s ease-in-out infinite .7s; }
+
+/* ============================================================
+   12. 名单 #screen-setup
+   ============================================================ */
+.setup-head { display: flex; align-items: center; gap: 10px; padding: 4px 14px 10px; }
+.setup-head h2, .setup-head b { flex: 1 1 auto; margin: 0; font-size: 17px; font-weight: 900; letter-spacing: .04em; }
+.setup-head small, .setup-head .dim { font-size: 12px; color: var(--dim); }
+
+#roster, .roster {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 0 12px 6px;
+}
+
+.pl-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px;
+  border-radius: 15px;
+  border: 1.5px solid var(--line);
+  background: linear-gradient(180deg, #1c2b3c, #16222f);
+  box-shadow: var(--sh-inset);
+}
+.pl-row.invalid { border-color: var(--danger); animation: shakeX .42s ease-out; }
+
+.pl-fig {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  min-width: calc(24 * var(--wu));
+  background: radial-gradient(circle at 50% 82%, rgba(255, 255, 255, .10), transparent 64%);
+  border-radius: 12px;
+}
+/* 预览用：把 .fig 从「绝对定位的世界实体」降级成普通盒子 */
+.pl-fig .fig {
+  position: relative; left: auto; top: auto;
+  transform: none;
+  width: calc(24 * var(--wu)); height: calc(40 * var(--wu));
+}
+/* 名牌已被旁边的输入框取代，预览里不再重复 */
+.pl-fig .fig-tag { display: none; }
+
+.pl-name {
+  flex: 1 1 auto; min-width: 0; min-height: 42px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  border: 1.5px solid var(--line2);
+  background: #0d1620; color: var(--text);
+  font-size: 15px; font-weight: 700; letter-spacing: .02em;
+}
+.pl-name::placeholder { color: var(--dim2); }
+.pl-name:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px rgba(232, 165, 58, .3); }
+
+.pl-rand, .pl-del {
+  flex: 0 0 auto;
+  width: 42px; height: 42px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 11px;
+  border: 1.5px solid var(--line2);
+  background: #131e2a; color: var(--text);
+  font-size: 16px; font-weight: 800;
+  transition: transform .1s ease-out;
+}
+.pl-rand:active, .pl-del:active { transform: translateY(1px); }
+.pl-del { color: #ffb3a8; border-color: rgba(217, 79, 92, .5); }
+.pl-rand:disabled, .pl-del:disabled { opacity: .34; pointer-events: none; }
+
+.setup-foot {
+  display: flex; gap: 8px;
+  padding: 9px 12px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: rgba(16, 26, 38, .6);
+}
+.setup-foot .btn { flex: 1 1 auto; }
+
+/* ============================================================
+   13. 配色抽屉 #palette
+   ============================================================ */
+.sheet {
+  position: fixed; inset: 0;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(5, 11, 18, .3);
+}
+.sheet-card {
+  width: 100%; max-width: 470px;
+  max-height: 78dvh;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  border-top: 2px solid var(--line2);
+  background: var(--chrome2);
+  box-shadow: 0 -14px 34px rgba(4, 10, 18, .55);
+  animation: riseIn .22s ease-out;
+}
+.sheet-head {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-head h3, .sheet-head b { flex: 1 1 auto; margin: 0; font-size: 16px; font-weight: 900; letter-spacing: .04em; }
+.sheet-head small, .sheet-head .dim { font-size: 12px; color: var(--dim); }
+
+.sw-group {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+  padding: 9px 2px;
+  border-top: 1px dashed var(--line);
+}
+.sw-group:first-child { border-top: 0; }
+/* 非色块的直接子节点 = 部位标签（占满一行） */
+.sw-group > :not(.sw) {
+  flex: 0 0 100%;
+  font-size: 12px; font-weight: 800; letter-spacing: .06em; color: var(--dim);
+}
+.sw-group > .sw { flex: 0 0 auto; }
+
+.sw {
+  width: 28px; height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, .28);
+  background: var(--c, #888);
+  transition: transform .1s ease-out;
+}
+.sw:active { transform: scale(.94); }
+.sw.on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--c, #888); }
+
+/* ============================================================
+   14. 结算 #screen-over
+   ============================================================ */
+.over-head, .over-foot, .ranking, #overList, .over-card { width: 100%; max-width: 440px; }
+.over-head { text-align: center; }
+.over-head h2, .over-head b { display: block; font-size: 19px; font-weight: 900; letter-spacing: .06em; }
+.over-head small, .over-head .dim { display: block; margin-top: 3px; font-size: 12px; color: var(--dim); }
+
+.ranking, #overList {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.rank-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+  padding: 9px 11px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: linear-gradient(180deg, #1c2b3c, #16222f);
+}
+.rank-row.win {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, rgba(232, 165, 58, .18), rgba(232, 165, 58, .05));
+  box-shadow: 0 0 0 1px rgba(232, 165, 58, .34), 0 8px 22px rgba(120, 78, 12, .28);
+}
+.rank-no { min-width: 26px; font-family: var(--mono); font-size: 16px; font-weight: 900; color: var(--dim); }
+.rank-row.win .rank-no { color: var(--amber); }
+.rank-name { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-score { font-family: var(--mono); font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.rank-row.win .rank-score { color: #ffd98a; }
+
+.rank-detail { display: none; width: 100%; margin-top: 2px; padding-top: 7px; border-top: 1px dashed var(--line2); }
+.rank-row.open .rank-detail { display: block; }
+.score-row {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px; color: var(--dim);
+  border-bottom: 1px dashed rgba(255, 255, 255, .07);
+}
+.score-row > :last-child { margin-left: auto; font-family: var(--mono); font-weight: 800; color: var(--text); }
+.score-total {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-top: 7px; padding-top: 6px;
+  border-top: 1px solid var(--line2);
+  font-size: 14px; font-weight: 900;
+}
+.score-total > :last-child { margin-left: auto; color: #ffd98a; font-family: var(--mono); }
+
+.over-foot { display: flex; gap: 8px; padding-top: 4px; }
+.over-foot .btn { flex: 1 1 auto; }
+
+/* ============================================================
+   15. 规则 #rules
+   ============================================================ */
+.rules-card {
+  width: 100%; max-width: 430px;
+  max-height: 86dvh;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 16px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 18px;
+  border: 1.5px solid var(--line2);
+  background: linear-gradient(180deg, #17232f, #121b25);
+  box-shadow: var(--sh-card);
+  animation: riseIn .24s ease-out;
+}
+.rules-card h3 { font-size: 17px; font-weight: 900; letter-spacing: .05em; margin-bottom: 8px; }
+.rules-card h4 { margin: 14px 0 6px; font-size: 13.5px; font-weight: 900; letter-spacing: .04em; color: var(--amber); }
+.rules-card h4:first-child, .rules-card h3 + h4 { margin-top: 6px; }
+.rules-card p, .rules-card li { font-size: 13px; line-height: 1.72; color: rgba(233, 240, 247, .84); }
+.rules-card p { margin: 6px 0; }
+.rules-card ul, .rules-card ol { margin: 6px 0; padding-left: 19px; }
+.rules-card li { margin: 2px 0; }
+.rules-card b { color: #fff; }
+.rules-card table { width: 100%; margin: 8px 0; border-collapse: collapse; font-size: 12.5px; }
+.rules-card th, .rules-card td { padding: 6px 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; line-height: 1.6; }
+.rules-card th { background: rgba(255, 255, 255, .05); color: var(--dim); font-size: 12px; font-weight: 800; letter-spacing: .06em; }
+.rules-card td:first-child { font-weight: 800; }
+.rules-card .btn { width: 100%; margin-top: 14px; }
+
+/* 两栏定义表 */
+.rules-kv {
+  display: grid;
+  grid-template-columns: 5.2em 1fr;
+  gap: 5px 10px;
+  margin: 7px 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.rules-kv dt, .rules-kv > :nth-child(odd) { color: var(--dim); font-weight: 800; }
+.rules-kv dd, .rules-kv > :nth-child(even) { margin: 0; color: rgba(233, 240, 247, .86); }
+
+#rulesBody > :first-child { margin-top: 0; }
+
+/* ============================================================
+   15b. 运行日志 #logbox
+   ============================================================ */
+.log-card {
+  width: 100%; max-width: 470px;
+  max-height: 86dvh;
+  display: flex; flex-direction: column;
+  padding: 13px 14px calc(13px + env(safe-area-inset-bottom));
+  border-radius: 18px;
+  border: 1px solid var(--line2);
+  background: var(--chrome2);
+  box-shadow: 0 18px 44px rgba(3, 8, 15, .6);
+  animation: riseIn .18s ease-out;
+}
+.log-head {
+  display: flex; align-items: center; gap: 7px;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.log-head b { flex: 0 0 auto; font-size: 15px; font-weight: 900; letter-spacing: .05em; }
+.log-head .dim { flex: 1 1 auto; font-size: 12px; }
+
+#logBody {
+  flex: 1 1 auto; min-height: 120px;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 12px; line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.log-row {
+  display: flex; gap: 7px; align-items: baseline;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+  border-left: 2.5px solid var(--line2);
+}
+.log-row i { flex: 0 0 auto; color: var(--dim); font-style: normal; font-size: 12px; }
+.log-row b { flex: 0 0 auto; color: var(--dim); font-size: 12px; font-weight: 800; }
+.log-row span { flex: 1 1 auto; word-break: break-word; color: rgba(233, 240, 247, .9); }
+.log-row.act  { border-left-color: #4f9be0; }
+.log-row.good { border-left-color: #46b877; }
+.log-row.warn { border-left-color: var(--amber); }
+.log-row.err  { border-left-color: #e05b5b; background: rgba(224, 91, 91, .12); }
+.log-row.err span { color: #ffc9c9; }
+.log-empty { padding: 22px 0; text-align: center; color: var(--dim); font-size: 12.5px; }
+
+.log-foot {
+  display: flex; align-items: center; gap: 8px;
+  padding-top: 8px; margin-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.log-foot .dim { flex: 1 1 auto; font-size: 12px; }
+.log-foot .btn { flex: 0 0 auto; min-height: 34px; padding: 0 12px; font-size: 12.5px; }
+
+/* ============================================================
+   16. 关键帧（只动 transform / opacity）
+   ============================================================ */
+/* 待机呼吸：内层 svg 缩放，脚底为原点 */
+@keyframes breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.02) translateY(calc(-1 * var(--wu))); }
+}
+
+/* 吊灯三连闪（.flicker 由 JS 挂到灯珠上） */
+@keyframes lampFlicker {
+  0%, 100% { opacity: 1; }
+  7%       { opacity: .26; }
+  16%      { opacity: 1; }
+  33%      { opacity: .34; }
+  44%      { opacity: 1; }
+  61%      { opacity: .2; }
+  72%      { opacity: 1; }
+}
+.flicker { animation: lampFlicker .9s linear; }
+
+/* 留在场上的静态冲击环 */
+@keyframes pulseRing {
+  0%   { transform: scale(.9);  opacity: .85; }
+  70%  { opacity: .18; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+/* 浮层 / 卡片入场 */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 按钮 / 徽章出现 */
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(.86); }
+  62%  { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* 名字非法时的小幅横抖（强度跟随 --shake-scale） */
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  15%      { transform: translateX(calc(-7px * var(--shake-scale))); }
+  32%      { transform: translateX(calc(6px * var(--shake-scale))); }
+  49%      { transform: translateX(calc(-4.5px * var(--shake-scale))); }
+  66%      { transform: translateX(calc(3px * var(--shake-scale))); }
+  83%      { transform: translateX(calc(-1.5px * var(--shake-scale))); }
+}
+
+/* 菜单装饰的闪烁 */
+@keyframes sparkle {
+  0%, 100% { opacity: .28; transform: scale(.92); }
+  50%      { opacity: .82; transform: scale(1.08); }
+}
+
+/* 菜单装饰的缓慢漂浮 */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* ============================================================
+   17. 桌面窗口 / 无障碍
+   ============================================================ */
+/* 桌面：舞台仍由 JS 居中定尺寸，只把 chrome 收成一条居中的窄列 */
+@media (min-width: 620px) {
+  #topbar {
+    padding-left: max(14px, calc((100vw - 680px) / 2));
+    padding-right: max(14px, calc((100vw - 680px) / 2));
+  }
+  /* 顶栏和 HUD 收成同一条窄列，所以 HUD 的内缩走变量 —— 悬浮的选择气泡要跟它对齐 */
+  #hud { --pad-x: max(14px, calc((100vw - 680px) / 2)); }
+  #curtainName { font-size: 56px; }
+  .btn { min-height: 46px; }
+}
+
+/* 矮屏：给舞台多留一点高度 */
+@media (max-height: 640px) {
+  #hud { min-height: 82px; gap: 6px; }
+  #hudListIn { max-height: 22dvh; }
+}
+
+/* 窄屏：顶栏挤进 5 个按钮（规则/快进/跳过/演出/日志）后不能再溢出，
+   390px 是主战场 —— 收紧按钮内边距，字体小半档，标签一律不换行 */
+@media (max-width: 430px) {
+  #topbar { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  #tbRound { font-size: 13px; }
+  #tbPool { font-size: 12px; }
+  .tb-btn { padding: 0 7px; font-size: 12px; }
+}
+@media (max-width: 366px) {
+  #tbPool { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    transition-delay: 0ms !important;
+  }
+  /* 装饰性关键帧一律停掉 */
+  .fig:not(.moving) .fig-svg,
+  .flicker, .ringFx.pulse,
+  .menu-deco, #screen-menu .deco { animation: none !important; }
+  .fig-bubble { transform: translateX(-50%); }
+}
+
+/* ============================================================
+   18. 追加：接口补齐
+   ============================================================ */
+/* 候车阶段靠 pointermove 拖站台走路，必须掐掉浏览器自己的手势解析 */
+#stage { touch-action: none; }
+
+/* 结算行：render.js 在 .rank-row 里先放 .rank-main 再放 .rank-detail，
+   所以横排布局与点击区都落在 .rank-main 上 */
+.rank-main { display: flex; align-items: center; gap: 9px; width: 100%; cursor: pointer; }
+/* 榜单圆点也是主人的衣服色（--cloth 由 JS 写在 .rank-mark 上） */
+.rank-mark {
+  flex: 0 0 auto;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cloth, #71818f);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .22);
+}
+/* 明细里的「储物柜 / 背包」小节标题 */
+.score-sub { margin-top: 7px; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--dim2); }
+.score-sub:first-child { margin-top: 0; }
+.score-row i { font-style: normal; }

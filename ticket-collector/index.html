@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101a26">
+<meta name="description" content="车票收藏家">
+<title>车票收藏家 · Ticket Collector</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 封面 ============ -->
+  <div id="screen-menu">
+    <div class="deco d1"></div>
+    <div class="deco d2"></div>
+    <div class="deco d3"></div>
+    <div class="menu-card">
+      <div class="logo-wrap">
+        <span class="logo-kicker">Board Game Assistant</span>
+        <div class="logo-zh">车票收藏家</div>
+        <div class="logo-en">Ticket Collector</div>
+      </div>
+      <div class="menu-actions">
+        <button id="btnStart" class="btn btn-primary" type="button">开始游戏</button>
+        <button id="btnRules" class="btn btn-ghost" type="button">游戏规则</button>
+        <button class="btn btn-ghost js-log" type="button">运行日志</button>
+        <!-- <a class="btn btn-ghost" href="../index.html">返回合集</a> -->
+      </div>
+      <div class="menu-foot">3 ~ 6 人 · 欢乐聚会博弈竞争</div>
+    </div>
+  </div>
+
+  <!-- ============ 名单 ============ -->
+  <div id="screen-setup">
+    <div class="setup-head">
+      <button id="btnSetupBack" class="tb-btn" type="button">‹ 返回</button>
+      <b>乘客名单</b>
+      <small class="dim">3 ~ 6 人 · 点角色换配色</small>
+    </div>
+    <div id="roster"></div>
+    <div class="setup-foot">
+      <button id="btnAdd" class="btn btn-ghost" type="button">＋ 添加乘客</button>
+      <button id="btnBegin" class="btn btn-primary" type="button">发车</button>
+    </div>
+  </div>
+
+  <!-- ============ 对局 ============ -->
+  <div id="screen-game">
+    <div id="topbar">
+      <b id="tbRound">第 1 轮</b>
+      <span id="tbPool">票池 60</span>
+      <button id="btnHelp" class="tb-btn" type="button">规则</button>
+      <button id="btnSpeed" class="tb-btn" type="button">快进</button>
+      <button id="btnLog" class="tb-btn" type="button">日志</button>
+    </div>
+    <div id="stagewrap">
+      <div id="stage">
+        <div id="scenery"></div>
+        <div id="packs"></div>
+        <div id="lockers"></div>
+        <div id="coach"></div>
+        <div id="figs"></div>
+      </div>
+    </div>
+    <div id="hud">
+      <div id="hudPrompt"></div>
+      <div id="hudBtns"></div>
+      <div id="hudList"><div id="hudListIn"></div></div>
+      <div id="peek"><div id="peekBody"></div></div>
+    </div>
+  </div>
+
+  <!-- ============ 结算 ============ -->
+  <div id="screen-over">
+    <div class="over-head">
+      <b>收藏结算</b>
+      <small class="dim">点任意一行看计分公式</small>
+    </div>
+    <div id="overList"></div>
+    <div class="over-foot">
+      <button id="btnAgain" class="btn btn-primary" type="button">再来一局</button>
+      <button id="btnBackHome" class="btn btn-ghost" type="button">返回封面</button>
+      <button class="btn btn-ghost js-log" type="button">日志</button>
+    </div>
+  </div>
+
+  <!-- ============ 弹层 ============ -->
+  <div id="curtain">
+    <div id="curtainKicker">请把手机交给</div>
+    <div id="curtainName">乘客</div>
+    <div id="curtainHint">确认后进入你的回合 · 其他人请勿偷看</div>
+    <button id="curtainOk" class="btn" type="button">我准备好了</button>
+  </div>
+
+  <div id="rules">
+    <div class="rules-card">
+      <h3>车票收藏家 · 规则</h3>
+      <div id="rulesBody">
+        <h4>开场</h4>
+        <p>站台上停着 <b>玩家数 − 1</b> 节车厢。票池里共有 <b>红 18 / 黄 18 / 绿 18 / 紫 6</b>，一共 60 枚。</p>
+        <h4>每回合：三选一</h4>
+        <ul>
+          <li><b>选车厢</b> —— 上哪节车？车上票数完全公开。</li>
+          <li><b>存放</b> —— 把背包里的票全部存进自己的储物柜，避免被顺走，人也会<b>留在柜前不动</b>；<b>下一回合轮到你时只能「回到站台」</b>。</li>
+          <li><b>顺走</b> —— 拿走某位乘客背包里的全部车票。只有对方背包里有票时才可选。</li>
+        </ul>
+        <h4>补票</h4>
+        <p>每轮开始：<b>空车补 2 枚、非空车补 1 枚</b>。票池不够时按车厢顺序优先满足前面的车。</p>
+        <h4>结算（按此顺序演出）</h4>
+        <ol>
+          <li>存放的玩家走到柜前，把票收进储物柜，然后<b>就留在柜前</b>（下一回合从这里走回站台）。</li>
+          <li>没人选的车厢关门。</li>
+          <li>顺走与登车同时发生。</li>
+          <li>清点：<b>一节车厢只站了一个人</b>，他拿走车内全部车票；<b>两人以上</b>挤同一节车，谁都没拿到。顺走也只对「单人前往且目标玩家没存放」时成立，否则啥也没拿到。</li>
+        </ol>
+        <h4>计分</h4>
+        <table>
+          <tr><th>组合</th><th>分数</th></tr>
+          <tr><td>紫票</td><td>每枚 2 分</td></tr>
+          <tr><td>成套（红+黄+绿 各 1 枚）</td><td>每套 5 分</td></tr>
+          <tr><td>散红 / 散黄 / 散绿（凑不成套的部分）</td><td>每 2 枚 2 分</td></tr>
+        </table>
+        
+        <h4>结束</h4>
+        <p>票池见底的那一轮就是<b>最后一轮</b>，该轮结算完即进入排名。背包与储物柜的分都算数。</p>
+      </div>
+      <button id="rulesClose" class="btn btn-primary" type="button">知道了</button>
+    </div>
+  </div>
+
+  <div id="palette">
+    <div class="sheet">
+      <div class="sheet-card">
+        <div class="sheet-head">
+          <b>挑一套配色</b>
+          <small class="dim">随机也能很好看</small>
+          <button id="palClose" class="tb-btn" type="button">收起</button>
+        </div>
+        <div id="palBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 特效层：视口坐标，永不接事件。必须在各屏之外 —— 它用 z 60 压住所有界面 -->
+  <div id="fx"></div>
+
+  <!-- ============ 运行日志（倒序） ============ -->
+  <div id="logbox">
+    <div class="log-card">
+      <div class="log-head">
+        <b>运行日志</b>
+        <small class="dim" id="logCount">0 条</small>
+        <button id="logCopy" class="tb-btn" type="button">复制</button>
+        <button id="logClear" class="tb-btn" type="button">清空</button>
+        <button id="logClose" class="tb-btn" type="button">收起</button>
+      </div>
+      <div id="logBody"></div>
+      <div class="log-foot">
+        <small class="dim">存档：<span id="logSaveInfo">无</span></small>
+        <button id="logWipe" class="btn btn-ghost" type="button">清空存档并回到封面</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="art.js"></script>
+<script src="game.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
