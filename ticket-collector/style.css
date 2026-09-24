@@ -25,7 +25,7 @@
   --k: 1;                        /* JS 写：px / 世界单位 */
   --wu: calc(var(--k) * 1px);    /* 1 世界单位 */
   --shake-scale: .8;             /* 震屏强度（无障碍） */
-  --fx-pace: 1;                  /* JS 写：CSS 过场的放慢倍率（结算慢放时 = 5）。见 .car-stop 上的用法 */
+  --fx-pace: 1;                  /* JS 写：CSS 过场的放慢倍率（结算慢放 40% 时 = 2.5）。见 .car-stop 上的用法 */
 
   /* —— 画框：深板岩 —— */
   --page: #0f1721;
@@ -46,7 +46,7 @@
   /* —— 强调色 —— */
   --amber: #e8a53a;              /* 主按钮 / 顶光 */
   --amber-d: #c9822a;
-  --danger: #d94f5c;             /* 停运 / 最后一轮 */
+  --danger: #d94f5c;             /* 无人光顾 / 最后一轮 */
   --ok: #3fae6b;                 /* 得手 */
 
   /* —— 粒子用的明亮一档（落在浅舞台上仍读得清）—— */
@@ -117,9 +117,9 @@ b, strong { font-weight: 800; }
 /* ============================================================
    1. 屏幕 / 层级梯（z-index 值固定，勿动）
    ============================================================ */
-#screen-menu, #screen-setup, #screen-game, #screen-over, #curtain, #rules, #palette, #logbox { display: none; }
+#screen-menu, #screen-setup, #screen-game, #screen-over, #curtain, #rules, #palette, #logbox, #summary { display: none; }
 #screen-menu.on, #screen-setup.on, #screen-game.on, #screen-over.on,
-#curtain.on, #rules.on, #palette.on, #logbox.on { display: flex; }
+#curtain.on, #rules.on, #palette.on, #logbox.on, #summary.on { display: flex; }
 
 /* z 1 —— 封面 */
 #screen-menu {
@@ -184,6 +184,16 @@ b, strong { font-weight: 800; }
 /* z 52 —— 运行日志（比配色抽屉高一层：日志可以在任何界面喊出来） */
 #logbox {
   position: fixed; inset: 0; z-index: 52;
+  align-items: center; justify-content: center;
+  padding: 14px;
+  background: rgba(5, 11, 18, .74);
+}
+
+/* z 40 —— 本轮战报：结算演完到下一轮之间那一格。压住舞台与 HUD（选择都在它之下），
+   比规则 / 配色 / 日志低一层。**不支持点背景关掉** —— 「确认」是流程的一部分（散场与补票
+   排在它后面），不是关个弹窗。 */
+#summary {
+  position: fixed; inset: 0; z-index: 40;
   align-items: center; justify-content: center;
   padding: 14px;
   background: rgba(5, 11, 18, .74);
@@ -353,12 +363,13 @@ b, strong { font-weight: 800; }
 .car-no     { left: calc(2 * var(--wu)); }
 .roof-total { right: calc(2 * var(--wu)); }
 
-/* 停运：门叶滑拢、车内熄灯（票券压成灰剪影），另挂一颗「本轮停运」说明为什么这轮没人拿。
+/* 无人光顾：门叶同步滑拢、车内熄灯（票券压成灰剪影），正中浮起一颗「本轮无人光顾」
+   说明为什么这轮没人拿。全场只有这一行字 —— 门关完它就亮，不再有第二行同字同址的飘字。
    唯独不能去划掉总数 —— 车票并没有作废（下一轮该车算「非空」，剩票照旧可取），
    划一道红线会让人以为那几张票没了。所以总数药丸保持原样，一颗信号比两颗半信号清楚。
-   药丸落在正中是安全的：停运 = 无人选择 = 按定义车里不会站人（不同于「已放完」要躲开人脸）。
+   药丸落在正中是安全的：无人光顾 = 没人选这趟车 = 按定义车里不会站人（不同于「已放完」要躲开人脸）。
    时长一律乘 --fx-pace：这几条 CSS 过场都发生在结算慢放窗口里，
-   不跟着放慢的话 JS 那侧慢成 5 倍、它们还 .3s 一闪而过，看起来就像漏帧。 */
+   不跟着放慢的话 JS 那侧慢成 2.5 倍、它们还 .3s 一闪而过，看起来就像漏帧。 */
 .coach-car.closed .cr-chips-svg { opacity: .34; transition: opacity calc(.3s * var(--fx-pace)); }
 .car-stop {
   position: absolute; left: 50%; top: 50%;
@@ -379,8 +390,10 @@ b, strong { font-weight: 800; }
 
 /* —— 票池见底的车厢：车内筹码压暗，在「筹码那一条」上挂「已放完」暗药丸 ——
    top 取 26% 而不是 50%：50% 那一带是登车角色的上半身（脚在 78% 处、头在 43% 上下），
-   药丸压在那儿会正好糊住人脸。26% 是筹码带的中心，反正这时筹码已经压到 .18 了。 */
-.coach-car.short .cr-chips-svg { opacity: .18; transition: opacity calc(.2s * var(--fx-pace)); }
+   药丸压在那儿会正好糊住人脸。26% 是筹码带的中心，反正这时筹码已经压到 .18 了。
+   两者都只属于**通报的那几秒**：`.short-told` 一到（refreshCar 的计时器，约 3 秒）就从选择器里
+   掉出去 —— 药丸淡回 0、筹码回到原亮度，车里还剩什么票这才看得见。`.short` 状态类本身不摘。 */
+.coach-car.short:not(.short-told) .cr-chips-svg { opacity: .18; transition: opacity calc(.2s * var(--fx-pace)); }
 .car-short {
   position: absolute; left: 50%; top: 26%;
   transform: translate(-50%, -50%);
@@ -394,7 +407,7 @@ b, strong { font-weight: 800; }
   font-weight: 700;
   white-space: nowrap;
 }
-.coach-car.short .car-short { opacity: 1; }
+.coach-car.short:not(.short-told) .car-short { opacity: 1; }
 
 /* ============================================================
    5. 站台场景（#scenery 只写一次，纵向鸟瞰）
@@ -714,7 +727,6 @@ b, strong { font-weight: 800; }
   white-space: nowrap;
 }
 .stampFx.small { font-size: calc(7.2 * var(--wu)); }
-.stampStop { color: var(--danger); }
 .stampGot  { color: #2f8b48; }
 .stampFail { color: #71818f; }
 .stampWin  { color: #b9812a; }
@@ -1015,15 +1027,18 @@ b, strong { font-weight: 800; }
 .pl-fig {
   flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
-  min-width: calc(24 * var(--wu));
+  min-width: 24px;
   background: radial-gradient(circle at 50% 82%, rgba(255, 255, 255, .10), transparent 64%);
   border-radius: 12px;
 }
-/* 预览用：把 .fig 从「绝对定位的世界实体」降级成普通盒子 */
+/* 预览用：把 .fig 从「绝对定位的世界实体」降级成普通盒子。
+   这里是 chrome 层，尺寸写死 px 不跟 --wu 走：名单显示时游戏屏是 display:none，
+   --k 要么是 CSS 初值 1、要么是上一次对局留下的残值，跟着它走就会时大时小
+   （k=1 时对局内的 .fig 正是 24×40，这里取同一个数，两边看起来一样大）。 */
 .pl-fig .fig {
   position: relative; left: auto; top: auto;
   transform: none;
-  width: calc(24 * var(--wu)); height: calc(40 * var(--wu));
+  width: 24px; height: 40px;
 }
 /* 名牌已被旁边的输入框取代，预览里不再重复 */
 .pl-fig .fig-tag { display: none; }
@@ -1258,6 +1273,66 @@ b, strong { font-weight: 800; }
 }
 .log-foot .dim { flex: 1 1 auto; font-size: 12px; }
 .log-foot .btn { flex: 0 0 auto; min-height: 34px; padding: 0 12px; font-size: 12.5px; }
+
+/* ============================================================
+   15c. 本轮战报 #summary
+   ============================================================ */
+.sum-card {
+  width: 100%; max-width: 430px;
+  max-height: 86dvh;
+  display: flex; flex-direction: column;
+  padding: 15px 15px calc(15px + env(safe-area-inset-bottom));
+  border-radius: 18px;
+  border: 1px solid var(--line2);
+  background: var(--chrome2);
+  box-shadow: 0 18px 44px rgba(3, 8, 15, .6);
+  animation: riseIn .18s ease-out;
+}
+.sum-card h3 { font-size: 16px; font-weight: 900; letter-spacing: .05em; margin-bottom: 9px; }
+#sumBody {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  margin-bottom: 11px;
+}
+.sum-row {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+}
+.sum-row:first-child { border-top: 0; }
+.sum-mark {
+  flex: none; width: 9px; height: 9px; margin-top: 5px;
+  border-radius: 50%;
+  background: var(--cloth, #7c8899);
+  outline: 1.5px solid rgba(255, 255, 255, .22);
+}
+.sum-who { flex: 1 1 auto; min-width: 0; }
+.sum-who > b { display: block; font-size: 13.5px; font-weight: 800; color: #fff; }
+.sum-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+.sum-line .sum-txt { font-size: 12px; line-height: 1.4; color: rgba(233, 240, 247, .72); }
+.sum-line.good .sum-txt { color: #6fd39a; }
+.sum-line.bad .sum-txt { color: #e88a92; }
+.sum-line.store .sum-txt { color: var(--amber); }
+.sum-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+/* 票样比「看一眼」卡片小一号：这里一行里要塞下几条说明，26px 的票会把人名挤到换行 */
+#summary .pk-ch {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--line2); border-radius: 8px;
+  background: #0d1620;
+}
+#summary .pk-ch .tk { width: 17px; height: auto; }
+#summary .pk-ch b { font-size: 11.5px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+.sum-net {
+  flex: none; min-width: 34px; margin-top: 1px; text-align: right;
+  font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.sum-net.good { color: #6fd39a; }
+.sum-net.bad { color: #e88a92; }
+.sum-net.store { font-size: 12.5px; color: var(--amber); }
+.sum-net.dim { color: var(--dim); }
+.sum-hint { margin-bottom: 10px; font-size: 12px; line-height: 1.6; color: var(--dim); }
+.sum-card .btn { width: 100%; }
 
 /* ============================================================
    16. 关键帧（只动 transform / opacity）

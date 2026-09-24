@@ -1,6 +1,6 @@
 /* 《车票收藏家》程序化音效 —— 零音频文件，全部由 WebAudio 现场合成。
    window.TC_SFX ／ <script src> 直接加载；无模块、无网络请求。
-   未初始化、无 WebAudio、被系统挂起、已静音时，公开方法一律静默降级。 */
+   未初始化、无 WebAudio、已静音时公开方法静默降级；被系统挂起时先唤醒再补发（见 SFX.play）。 */
 'use strict';
 (function (root) {
   const SFX = {};
@@ -23,7 +23,9 @@
   const T = t => tsBase + (t - tsBase) * TS;
   const D = d => d * TS;
 
-  function live() { return !!(ctx && ctx.state !== 'closed' && ctx.state !== 'suspended'); }
+  /* 能不能现在排声：只有 state 是 'running' 算可发声（Safari 私有的 'interrupted' 也不能）。
+     老环境与无头假上下文没有 state，按 running 放行。 */
+  function awake() { return !!ctx && (!ctx.state || ctx.state === 'running'); }
   function safeResume() {
     try { const p = ctx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
   }
@@ -69,7 +71,7 @@
       get: function () { return muted; }, set: function (v) { SFX.setMuted(v); }, enumerable: true,
     });
   } catch (e) { SFX.muted = false; }
-  try { Object.defineProperty(SFX, 'ready', { get: live, enumerable: true }); } catch (e) { SFX.ready = false; }
+  try { Object.defineProperty(SFX, 'ready', { get: awake, enumerable: true }); } catch (e) { SFX.ready = false; }
 
   /* ---------------- 合成原语 ---------------- */
   /* 每段波形都必须 ≥3ms 起振、收尾归零：增益突变的样本跳变就是爆音 */
@@ -160,12 +162,9 @@
   /* ---------------- 入口 ---------------- */
   /* opt 可选：{ gain: 0..1.5 本发倍率, stretch: 慢放倍率（>1 才生效） } */
 
-  SFX.play = function (name, opt) {
+  function emit(name, build, g, st) {
     try {
-      const build = SOUNDS[name];
-      if (!build || muted || !live() || !room() || throttled(name)) return;
-      const g = opt && typeof opt.gain === 'number' ? Math.max(0, Math.min(1.5, opt.gain)) : 1;
-      const st = opt && typeof opt.stretch === 'number' && opt.stretch > 1 ? Math.min(12, opt.stretch) : 1;
+      if (!room() || throttled(name)) return;
       const now = ctx.currentTime + 0.005;
       tsBase = now; TS = st;
       /* build 是同步跑完的，所以这两个模块级变量在这段里独占，不会串到别的发音上 */
@@ -173,6 +172,25 @@
       voices.push(shotEnd);
     } catch (e) { /* 合成失败绝不能影响游戏主流程 */ }
     finally { TS = 1; }
+  }
+
+  SFX.play = function (name, opt) {
+    try {
+      const build = SOUNDS[name];
+      if (!build || muted || !ctx || ctx.state === 'closed') return;
+      const g = opt && typeof opt.gain === 'number' ? Math.max(0, Math.min(1.5, opt.gain)) : 1;
+      const st = opt && typeof opt.stretch === 'number' && opt.stretch > 1 ? Math.min(12, opt.stretch) : 1;
+      if (!awake()) {
+        /* 上下文被系统挂起过：手机锁屏 / 来电 / 切后台被冻结 / 音频焦点被别的应用抢走。
+           挂起时 currentTime 冻住不动，硬排进去的发声会攒到恢复那一刻一起炸，所以先唤醒。
+           resume 需要在用户手势里，而 play 的调用点全都来自手势 —— 这里就是最好的唤醒时机，
+           唤醒成功后把这一发补上（自动播放的、没手势的那些会被拒，丢掉即可）。 */
+        const p = ctx.resume && ctx.resume();
+        if (p && p.then) p.then(function () { if (awake()) emit(name, build, g, st); }, function () {});
+        return;
+      }
+      emit(name, build, g, st);
+    } catch (e) { /* 合成失败绝不能影响游戏主流程 */ }
   };
 
   /* ---------------- 音效表 ---------------- */

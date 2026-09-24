@@ -497,9 +497,12 @@
     if (t[3]) rows.push({ k: '紫票', n: t[3], expr: t[3] + ' 枚 × 2 分', pts: t[3] * 2 });
     if (sets) rows.push({ k: '成套', n: sets, expr: '红黄绿各 1 枚为 1 套 × 5 分', pts: sets * 5 });
     const pairRow = function (label, cnt) {
-      const p = Math.floor(cnt / 2) * 2;
-      if (p) rows.push({ k: label, n: Math.floor(cnt / 2), expr: cnt + ' 枚 ÷ 2 × 2 分', pts: p });
-      if (cnt % 2) rows.push({ k: label, n: 0, expr: cnt + ' 枚，单张不成对', pts: 0 });
+      const pairs = Math.floor(cnt / 2), odd = cnt % 2;
+      /* 两行写的是**两堆不相交的票**：配掉的那几枚写在配对行，单张行只写剩下的那一枚。
+         两行都写总数（「5 枚 ÷ 2 × 2 分」+「5 枚，单张不成对」）会被读成两堆 5 枚 ——
+         明明是一堆 5 枚拆成 4 + 1，眼睛加不出总数。 */
+      if (pairs) rows.push({ k: label, n: pairs, expr: (pairs * 2) + ' 枚 ÷ 2 × 2 分', pts: pairs * 2 });
+      if (odd) rows.push({ k: label, n: 0, expr: odd + ' 枚，单张不成对', pts: 0 });
     };
     pairRow('散红', rr); pairRow('散黄', yy); pairRow('散绿', gg);
     let total = 0;
@@ -509,10 +512,14 @@
 
   G.rank = function (S) {
     const list = S.players.map(function (p) {
-      const lb = G.score(p.locker), bb = G.score(p.bag);
+      /* 计分把背包和储物柜**合成一池**再算：柜里 3 张散黄 + 包里 1 张散黄，分开算是两边各剩
+         单张（都是 0 分），合起来是 4 张 = 两对 = 4 分；成套同理，红黄绿分在两个容器里也能成一套。
+         容器只决定「会不会被顺走」，不决定值多少分 —— merged 就是这一池，明细照它列。 */
+      const merged = [p.locker[0] + p.bag[0], p.locker[1] + p.bag[1],
+        p.locker[2] + p.bag[2], p.locker[3] + p.bag[3]];
       return {
         id: p.id, name: p.name, seat: p.seat, colors: p.colors,
-        lockerScore: lb, bagScore: bb, total: lb + bb,
+        total: G.score(merged), merged: merged,
         locker: p.locker.slice(), bag: p.bag.slice(),
       };
     });

@@ -29,7 +29,10 @@ function node(k) {
 }
 const CTX = {
   currentTime: 10, sampleRate: 48000, state: 'running', destination: {},
-  resume: () => Promise.resolve(),
+  resume: () => {
+    if (CTX.rejectResume) return Promise.reject(new Error('not allowed'));
+    CTX.state = 'running'; return Promise.resolve();
+  },
   createGain: () => node('gain'),
   createOscillator: () => node('osc'),
   createBufferSource: () => node('src'),
@@ -98,5 +101,39 @@ const span = (n, opt) => {
 const sPlain = span('warn', undefined), sSlow = span('warn', { stretch: 5 });
 ok('慢放让最长的一发明显变长（' + sPlain.toFixed(2) + 's → ' + sSlow.toFixed(2) + 's）', sSlow > sPlain * 4);
 
-console.log((fail === 0 ? '✅' : '❌') + ' 音效拉伸：' + pass + ' 通过 / ' + fail + ' 失败');
-process.exit(fail ? 1 : 0);
+/* 挂起 → 唤醒补发：真机上「忽然就没声了」走的就是这条路（锁屏 / 来电 / 切后台 / 焦点被抢）。
+   只在 boot 里做一次性解锁的话，挂起一次就是此后永久静音 —— 而且是静默失败，没有断言看不见。 */
+(async () => {
+  CTX.currentTime += 30;
+  CTX.state = 'suspended';
+  REC.length = 0;
+  SFX.play('tap');
+  ok('挂起时不当场排声（挂起的时钟冻着，排进去会攒成一炸）', REC.length === 0);
+  await Promise.resolve();                        // 假 resume 立刻兑现，补发排在微任务里
+  ok('唤醒成功后这一发被补上（' + REC.length + ' 个时刻）', REC.length > 0);
+  ok('唤醒后 ready 恢复', SFX.ready === true);
+
+  CTX.currentTime += 30;
+  REC.length = 0;
+  SFX.play('tap');
+  ok('之后的操作照常发声（' + REC.length + ' 个时刻）', REC.length > 0);
+
+  /* 唤不醒也不能抛：不在手势里时浏览器会拒绝 resume，Node 会把未处理的 rejection 当致命错误 */
+  CTX.rejectResume = true;
+  CTX.state = 'suspended';
+  REC.length = 0;
+  SFX.play('tap');
+  await Promise.resolve();
+  await Promise.resolve();
+  ok('唤醒被拒时静默放弃（不抛、不排声、状态不动）',
+    REC.length === 0 && CTX.state === 'suspended');
+  CTX.rejectResume = false;
+  CTX.currentTime += 30;
+  CTX.state = 'running';                          // 用户下一次手势里唤醒了
+  REC.length = 0;
+  SFX.play('tap');
+  ok('唤醒被拒过之后照常发声（' + REC.length + ' 个时刻）', REC.length > 0);
+
+  console.log((fail === 0 ? '✅' : '❌') + ' 音效拉伸：' + pass + ' 通过 / ' + fail + ' 失败');
+  process.exit(fail ? 1 : 0);
+})();

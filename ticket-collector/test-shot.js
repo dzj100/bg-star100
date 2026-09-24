@@ -54,6 +54,25 @@ async function open(browser, opt) {
   });
   if (opt && opt.reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(FREEZE, SEED);
+  /* 音效探针：数 createOscillator 的次数 —— 「有没有真的合成出声」只能这样量。
+     play 吞掉全部异常，静默失败在 assert 里必须能看见（见 SPEC §6 音效同步）。 */
+  if (opt && opt.audio) {
+    await page.addInitScript(function () {
+      window.__osc = 0;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const Wrapped = function () {
+        const c = new AC();
+        window.__ctx = c;
+        const o = c.createOscillator.bind(c);
+        c.createOscillator = function () { window.__osc++; return o(); };
+        return c;
+      };
+      Wrapped.prototype = AC.prototype;
+      window.AudioContext = Wrapped;
+      try { window.webkitAudioContext = Wrapped; } catch (e) { /* 忽略 */ }
+    });
+  }
   await page.goto(PAGE);
   await page.waitForTimeout(300);
   page.__errs = errs;
@@ -88,6 +107,23 @@ async function waitFor(page, ms, fn, arg) {
 /* 下一轮的传手机遮罩出现 = 上一轮结算演出彻底跑完（pickAll 在 animResolve 之后）；
    结算页出现 = 整局结束。两者都是干净的轮次边界，不靠猜时间。 */
 const atBoundary = () => !!(document.querySelector('#curtain.on') || document.querySelector('#screen-over.on'));
+/* 结算演完到下一轮之间还夹着一格「本轮战报」：它是流程的一半 —— 确认之后才散场
+   （回站台 + 补票 + 下一轮），不点就永远等不到边界。所以「等边界」的页面谓词一律
+   带上它，见着就点掉，别让整段测试停在那一格上。 */
+const atSummary = () => !!document.querySelector('#summary.on');
+async function toBoundary(page, ms) {
+  const t0 = Date.now();
+  for (;;) {
+    if (await page.evaluate(atBoundary)) return true;
+    if (await page.evaluate(atSummary)) {             // 战报摊着：点掉它，接着等
+      await page.click('#sumOk');
+      await page.waitForTimeout(80);
+      continue;
+    }
+    if (Date.now() - t0 >= ms) return false;
+    await page.waitForTimeout(100);
+  }
+}
 
 /* ---------- 屏幕数字 ↔ 引擎状态 对账 ---------- */
 async function assertBoard(page, tag) {
@@ -121,7 +157,7 @@ async function assertBoard(page, tag) {
       chk(i + ' 号车顶', roofs[i].textContent, TC.total(c.tickets));
       /* 关门与「已放完」都是本轮状态：屏幕上的类必须和引擎里的旗标一致，
          而且上一轮贴上的类要能自己掉下来（曾经只 add 不 remove，关过一次的车一直熄灯） */
-      if (carNodes[i].classList.contains('closed') !== !!c.closed) bad.push((i + 1) + ' 号车 停运样式与状态不符');
+      if (carNodes[i].classList.contains('closed') !== !!c.closed) bad.push((i + 1) + ' 号车 无人光顾样式与状态不符');
       if (carNodes[i].classList.contains('short') !== !!c.short) bad.push((i + 1) + ' 号车 已放完样式与状态不符');
     });
     return bad;
@@ -154,8 +190,17 @@ async function doPick(page, k) {
   await go.click();
 }
 
+/* 全员提交后的结算闸门：HUD 上只剩一颗【开始结算】，不点就不开演。
+   返回是否真的点到（没摆出闸门 = 这一轮没走到头）。 */
+async function clickSettle(page) {
+  if (!(await waitFor(page, 20000, () => !!document.querySelector('#btnSettle')))) return false;
+  await page.click('#btnSettle');
+  await page.waitForTimeout(80);
+  return true;
+}
+
 /* 按剧本走完一整轮选择：spec[i] 是第 i 位乘客怎么选 —— 数字 = 上第几节车厢，'store' = 存放。
-   按座位顺序等遮罩、选、提交；返回是否全部走到。 */
+   按座位顺序等遮罩、选、提交；收尾点掉闸门（不点的话这一轮永远停在选择阶段）。 */
 async function pickRound(page, spec) {
   for (let i = 0; i < spec.length; i++) {
     if (!(await waitFor(page, 40000, () => !!document.querySelector('#curtain.on')))) return false;
@@ -170,6 +215,7 @@ async function pickRound(page, spec) {
     await page.locator('#hudBtns .btn').nth(3).click();     // 提交
     await page.waitForTimeout(120);
   }
+  ok('全员提交后摆出【开始结算】闸门（' + spec.length + ' 人）', await clickSettle(page));
   return true;
 }
 
@@ -181,14 +227,26 @@ async function pickRound(page, spec) {
    page.__fast 为真时，趁遮罩落下的窗口按一次「快进」——顶栏在遮罩之下，
    只有这个窗口按得到；快进是时钟变速、跨轮保留，所以整局按一次就够。 */
 async function settleSegment(page, waitMs) {
-  if (!(await waitFor(page, waitMs, atBoundary))) return 0;
+  if (!(await toBoundary(page, waitMs))) return 0;
   const r0 = (await S(page)).round;
   let n = 0;
   for (let guard = 0; guard < 16; guard++) {
-    /* 等下一个人的遮罩立起来；轮次一旦前进就立刻收工，不白等 */
+    /* 等下一个人的遮罩立起来、全员提交后的结算闸门、或演完摊出来的本轮战报；
+       轮次一旦前进就立刻收工，不白等 */
     if (!(await waitFor(page, 40000, r => !!document.querySelector('#curtain.on') ||
+      document.querySelector('#btnSettle') || document.querySelector('#summary.on') ||
       window.TC_UI.state().round !== r, r0))) break;
     if ((await S(page)).round !== r0) break;
+    if (await page.locator('#btnSettle').count()) {    // 人都交完了：闸门一点，这一轮才开始结算
+      await page.click('#btnSettle');
+      await page.waitForTimeout(80);
+      continue;
+    }
+    if (await page.evaluate(atSummary)) {              // 结算演完了：点掉战报，回站台 + 补票
+      await page.click('#sumOk');
+      await page.waitForTimeout(80);
+      continue;
+    }
     await page.click('#curtainOk');
     await page.waitForTimeout(50);
     if (await page.locator('#curtain.on').count()) continue;   // 遮罩还在，防抖
@@ -238,7 +296,7 @@ async function paceWatchStart(page) {
           if (st.win > st.maxWin) st.maxWin = st.win;
         }
         st.last = now; st.lastClk = clk;
-        /* 车厢熄灯 / 停运药丸 / 气泡走 CSS transition，靠 --fx-pace 跟同一个节奏；
+        /* 车厢熄灯 / 无人光顾药丸 / 气泡走 CSS transition，靠 --fx-pace 跟同一个节奏；
            这里顺手把它也验了 —— 只慢 JS 那半截会像丢帧 */
         const css = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fx-pace'));
         if (!(Math.abs(css - 1 / p) < 1e-6)) st.cssBad++;
@@ -398,6 +456,18 @@ async function playTo(page, maxRounds, shots) {
 
   /* ---- 逐轮推进：快进只在第一个「传手机」窗口按一次，之后全程 3 倍速 ---- */
   page.__fast = true;
+  /* 无人光顾不再有印章：整局盯着 #fx，凡是塞进来带 .stampStop 的节点就记一笔。
+     印章包在 .fxc 里进 #fx（spawn 的 className 只有 fxc），得往下找一层。 */
+  await page.evaluate(() => {
+    window.__stopStamps = 0;
+    new MutationObserver(function (ms) {
+      ms.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) {
+          if (n.querySelector && n.querySelector('.stampStop')) window.__stopStamps++;
+        });
+      });
+    }).observe(document.querySelector('#fx'), { childList: true });
+  });
   let rounds = 0;
   for (let r = 0; r < maxRounds; r++) {
     const s0 = await S(page);
@@ -405,10 +475,40 @@ async function playTo(page, maxRounds, shots) {
     const n = await settleSegment(page, 25000);
     ok('第 ' + s0.round + ' 轮至少有一位乘客做了选择', n >= 1);
     if (!n) break;
-    if (!(await waitFor(page, 25000, atBoundary))) { ok('第 ' + s0.round + ' 轮能走到下一轮边界', false); break; }
+    if (!(await toBoundary(page, 25000))) { ok('第 ' + s0.round + ' 轮能走到下一轮边界', false); break; }
     const s1 = await S(page);
     rounds++;
     await assertBoard(page, '第 ' + s1.round + ' 轮开始前');
+    if (rounds === 1) {
+      /* ---- 无人光顾只剩一行字：门扣上时正中浮起的状态药丸（.car-stop，红底白字）。
+         曾经另有一枚同字同址的印章（白底红字）叠在它上面，两行几乎同字，看着像
+         「无人光顾闪了两次」—— 印章已删，药丸也就不必再等谁退场：两侧都不带延迟，
+         .closed 一挂就淡进来，摘掉就立刻熄。 */
+      const pill = await page.evaluate(() => {
+        const node = document.querySelectorAll('.coach-car')[0];
+        const p = node.querySelector('.car-stop');
+        const S = window.TC_UI.state(), c0 = S.cars[0], keep = !!c0.closed;
+        c0.closed = false; window.TC_UI.redraw();
+        const off = parseFloat(getComputedStyle(p).transitionDelay) || 0;
+        c0.closed = true; window.TC_UI.redraw();
+        const on = parseFloat(getComputedStyle(p).transitionDelay) || 0;
+        c0.closed = keep; window.TC_UI.redraw();
+        return { off: off, on: on };
+      });
+      ok('药丸出场不带延迟（不再等谁退场）', pill.on === 0);
+      ok('摘掉无人光顾时药丸不带延迟（下一轮开局立刻熄）', pill.off === 0);
+      const lit = await page.evaluate(async () => {
+        const p = document.querySelectorAll('.coach-car')[0].querySelector('.car-stop');
+        const S = window.TC_UI.state(), c0 = S.cars[0], keep = !!c0.closed;
+        const fx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fx-pace')) || 1;
+        c0.closed = true; window.TC_UI.redraw();
+        await new Promise(r => setTimeout(r, 240 * fx + 500));    // 过场走完（静默演出下是 .001ms，也算走完）
+        const op = +getComputedStyle(p).opacity;
+        c0.closed = keep; window.TC_UI.redraw();
+        return op;
+      });
+      ok('药丸真的浮起来（不是一直透明）', lit > 0.9);
+    }
     if (shots && rounds === 1) {
       /* 轮次边界正好是遮罩立着的时候，拍不到版面。这里只把遮罩的 .on 摘掉——
          和给下一位乘客前自己按「我准备好了」是同一件事，游戏状态一点没动。 */
@@ -423,8 +523,10 @@ async function playTo(page, maxRounds, shots) {
   const sFin = await S(page);
   ok('票池见底后确实收局了', sFin.phase === 'over');
   ok('打满了至少 6 轮', rounds >= 6);
+  const stopStamps = await page.evaluate(() => window.__stopStamps);
+  ok('整局一枚「无人光顾」印章都没有（' + stopStamps + ' 枚）', stopStamps === 0);
 
-  /* ---- 停运 / 已放完都是「本轮」状态：屏幕上的类得能跟着状态上下 ----
+  /* ---- 无人光顾 / 已放完都是「本轮」状态：屏幕上的类得能跟着状态上下 ----
      曾经这两句只 add 不 remove，关过一次关的车会一路熄灯到重开。 */
   const cls = await page.evaluate(() => {
     const S = window.TC_UI.state(), c0 = S.cars[0];
@@ -438,8 +540,52 @@ async function playTo(page, maxRounds, shots) {
     const off = { closed: node.classList.contains('closed'), short: node.classList.contains('short') };
     return { on: on, off: off, keep: keep };
   });
-  ok('本轮停运类能跟着状态点亮', cls.on.closed && cls.on.short);
-  ok('本轮停运类能跟着状态熄灭（不是只 add 不 remove）', !cls.off.closed && !cls.off.short);
+  ok('本轮无人光顾类能跟着状态点亮', cls.on.closed && cls.on.short);
+  ok('本轮无人光顾类能跟着状态熄灭（不是只 add 不 remove）', !cls.off.closed && !cls.off.short);
+
+  /* ---- 「车票已全部放置完」只是一句通报：药丸正落在筹码带上，一直摊着就看不见
+     车里还剩什么票。摊几秒必须自己收掉（淡出），筹码跟着回到原亮度 ——
+     而 `.short` 这个**状态类**不许跟着掉（屏幕与引擎仍然逐轮一致）。 */
+  await page.evaluate(() => {
+    const c0 = window.TC_UI.state().cars[0];
+    window.__shortKeep = { closed: !!c0.closed, short: !!c0.short };
+    /* 终局这节车可能本来就 short / closed（通报早收掉了）：先落回干净状态让计时从零开始，
+       再只强开 short —— 验的是「短票通报会自己收、筹码回到该有的亮度」，
+       别让上一轮烧完的计时或「无人光顾」的 .34 亮度混进读数。 */
+    c0.closed = false;
+    c0.short = false; window.TC_UI.redraw();
+    c0.short = true; window.TC_UI.redraw();
+  });
+  await page.waitForTimeout(320);                    // 药丸淡入（.2s × --fx-pace）
+  const hint = await page.evaluate(() => {
+    const node = document.querySelectorAll('.coach-car')[0];
+    return {
+      pill: +getComputedStyle(node.querySelector('.car-short')).opacity,
+      chips: +getComputedStyle(node.querySelector('.cr-chips-svg')).opacity,
+    };
+  });
+  ok('票池见底时药丸亮着、车内筹码压暗（' + hint.pill.toFixed(2) + ' / ' + hint.chips.toFixed(2) + '）',
+    hint.pill > 0.9 && hint.chips < 0.2);
+  await page.waitForTimeout(3600);                   // 停留时长（SHORT_TOLD = 3.2s）过完
+  const told = await page.evaluate(() => {
+    const c0 = window.TC_UI.state().cars[0];
+    const node = document.querySelectorAll('.coach-car')[0];
+    const out = {
+      pill: +getComputedStyle(node.querySelector('.car-short')).opacity,
+      chips: +getComputedStyle(node.querySelector('.cr-chips-svg')).opacity,
+      short: node.classList.contains('short'), told: node.classList.contains('short-told'),
+      keep: window.__shortKeep,
+    };
+    c0.closed = out.keep.closed;                       // 还原：真实状态归位
+    c0.short = out.keep.short; window.TC_UI.redraw();
+    out.after = { short: node.classList.contains('short'), told: node.classList.contains('short-told') };
+    return out;
+  });
+  ok('几秒之后药丸自己收掉（淡到 ' + told.pill.toFixed(2) + '，.short 状态留着）',
+    told.pill < 0.05 && told.short && told.told);
+  ok('筹码跟着回到原亮度（' + told.chips.toFixed(2) + '）：车里还剩什么票看得见了', told.chips > 0.9);
+  ok('状态落回去时连通报标记一起摘掉（下一轮补票能重新通报）',
+    !told.after.told && told.after.short === told.keep.short);
   if (sFin.phase === 'over') {
     await page.waitForTimeout(3600);                 // 等冠军庆祝 + 数字滚动
     if (shots) await shot(page, '05-ranking');
@@ -482,11 +628,63 @@ async function playTo(page, maxRounds, shots) {
     await page.waitForTimeout(240);
     ok('点排名行能展开计分明细', await page.locator('#overList .rank-row.open').count() >= 1);
     ok('明细里写出了公式', (await page.locator('#overList .rank-row.open .score-row').count()) >= 1);
+    /* 明细只有一池：标题里两个容器的张数都写着，分数一次算完 —— 按容器分两段算的话，
+       柜里 3 张散黄 + 包里 1 张会各自「单张不成对」，明明是一对却白扔 2 分。 */
+    const det = await page.evaluate(() => {
+      const row = document.querySelectorAll('#overList .rank-row')[0];
+      const subs = row.querySelectorAll('.score-sub');
+      let sum = 0;
+      row.querySelectorAll('.score-row').forEach(function (x) {
+        sum += parseInt(x.querySelector('b').textContent, 10) || 0;
+      });
+      return { n: subs.length, title: subs[0] ? subs[0].textContent : '', sum: sum,
+        total: window.TC.rank(window.TC_UI.state())[0].total };
+    });
+    ok('明细只列一池：' + det.title, det.n === 1 && det.title.indexOf('储物柜') > 0 && det.title.indexOf('背包') > 0);
+    ok('明细各行相加 = 总分（' + det.sum + ' vs ' + det.total + '）', det.sum === det.total);
     if (shots) await shot(page, '06-ranking-detail');
+    /* 「再来一局」的名单从哪来：发车前那份 draft（名字与配色）。中途刷新过的一局打到
+       结算时，内存里的 draft 早被读档路径丢过一次，所以先刷新落回结算屏再点重开，
+       把「名单照旧」钉住：人数、名字、配色都得是刚打完那局的人，行也不是空盒子。 */
+    const played = await page.evaluate(() => {
+      const COL = ['top', 'bottom', 'shoes', 'hat', 'bag'];
+      /* 名单是**座位序**，别拿 TC.rank 去比 —— 那条是按分数重排过的 */
+      return window.TC_UI.state().players.map(p => ({
+        name: p.name, colors: COL.map(k => p.colors[k]),
+      }));
+    });
+    await page.reload();
+    await page.waitForTimeout(700);
+    ok('结算屏刷新后原样回来（读档直达结算，不重演）',
+      await page.locator('#screen-over.on').count() === 1 &&
+      await page.locator('#overList .rank-row').count() === 3);
     await page.click('#btnAgain');
     await page.waitForTimeout(300);
-    ok('「再来一局」回到名单且沿用名单', await page.locator('#screen-setup.on').count() === 1 &&
-      await page.locator('#roster .pl-row').count() === 3);
+    const roster = await page.evaluate(() => {
+      const COL = ['top', 'bottom', 'shoes', 'hat', 'bag'];
+      const rows = [].map.call(document.querySelectorAll('#roster .pl-row'), r => {
+        const fig = r.querySelector('.pl-fig .fig');
+        return {
+          name: r.querySelector('.pl-name').value,
+          h: Math.round(r.getBoundingClientRect().height),
+          fig: Math.round(fig ? fig.getBoundingClientRect().height : 0),
+        };
+      });
+      const sv = window.TC_UI.save();
+      const dr = (sv && sv.draft) || [];
+      return { rows: rows, draft: dr.map(r => ({ name: r.name, colors: COL.map(k => r.colors[k]) })) };
+    });
+    ok('「再来一局」回到名单且人数照旧（' + roster.rows.length + ' 行）',
+      await page.locator('#screen-setup.on').count() === 1 && roster.rows.length === 3);
+    const sameRoster = JSON.stringify(roster.draft) === JSON.stringify(played);
+    ok('名单沿用上一局的人与配色（' + roster.draft.map(r => r.name).join('/') + '）', sameRoster);
+    if (!sameRoster) {
+      console.log('      · 名单 ' + JSON.stringify(roster.draft));
+      console.log('      · 上一局 ' + JSON.stringify(played));
+    }
+    ok('名单行不是摆样子的空盒子（行高 ' + roster.rows.map(r => r.h).join('/') +
+      '，小人身高 ' + roster.rows.map(r => r.fig).join('/') + '）',
+      roster.rows.every(r => r.h >= 40 && r.fig >= 20));
   }
   return sFin;
 }
@@ -521,7 +719,7 @@ async function oneRound(browser, fast) {
      第 2 轮同样的一遍还能证明「上一轮结束后节奏确实还回去了」——
      漏掉 finally 里的 setPace(1)，两段慢放会粘成一段，windows 就少一个。 */
   const n = await settleSegment(page, 25000) + await settleSegment(page, 25000);
-  const reached = await waitFor(page, 90000, atBoundary);   // 第 3 轮的遮罩
+  const reached = await toBoundary(page, 90000);     // 第 3 轮的遮罩
   const pace = await paceWatchStop(page);            // 两轮结算的播放率画像
   const paceEnd = await page.evaluate(() => window.TC_UI.pace());
   const slow = await page.evaluate(() => window.TC_UI.slow());   // 从页面读，不写死档位
@@ -575,9 +773,55 @@ async function oneRound(browser, fast) {
       await page.locator('.pl-del').nth(4).click();
       await page.waitForTimeout(150);
       ok('能删回 4 人', await page.locator('#roster .pl-row').count() === 4);
+      /* 手机上转屏、地址栏收起都会在名单上来一发 resize —— 此刻游戏屏还是 display:none，
+         fitStage 若照着 0×0 量，--k 会被钳成 0.2，头像缩成 4.8×8 且名单自己不重量、缩了回不来。 */
+      await page.setViewportSize({ width: 390, height: 800 });
+      await page.waitForTimeout(300);
+      const rz = await page.evaluate(() => {
+        const r = document.querySelector('#roster .pl-fig .fig').getBoundingClientRect();
+        return { w: Math.round(r.width), h: Math.round(r.height),
+                 k: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--k')) };
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForTimeout(300);
+      ok('名单上改窗口，头像不缩水（' + rz.w + '×' + rz.h + '，--k ' + rz.k.toFixed(2) + '）',
+        rz.w === 24 && rz.h === 40 && rz.k > 0.9);
       await page.click('#btnSetupBack');
       await page.waitForTimeout(200);
       ok('名单能返回封面', await page.locator('#screen-menu.on').count() === 1);
+      await page.close();
+    }
+
+    /* ---------- 1b. 音效：解锁 + 被系统挂起后要能自己醒 ---------- */
+    if (section('音效解锁')) {
+      const page = await open(browser, { audio: true });
+      const sp = () => page.evaluate(() => ({
+        ready: window.TC_SFX.ready,
+        state: window.__ctx ? window.__ctx.state : 'none',
+        osc: window.__osc,
+      }));
+      const s0 = await sp();
+      ok('没触摸过就不建 AudioContext（' + s0.state + '）', s0.state === 'none' && s0.ready === false);
+
+      await page.click('#btnStart');
+      await page.waitForTimeout(250);
+      const s1 = await sp();
+      ok('第一次点按解锁并出声（osc ' + s1.osc + '）', s1.ready === true && s1.osc > 0);
+
+      /* suspend 等价于手机锁屏 / 来电 / 切后台被冻结 / 音频焦点被抢走。
+         只在 boot 里做一次性解锁的话，从这里开始就是此后永久静音 —— 而且是静默失败。 */
+      await page.evaluate(() => window.__ctx.suspend());
+      await page.waitForTimeout(150);
+      const s2 = await sp();
+      ok('挂起后 ready=false（' + s2.state + '）', s2.ready === false && s2.state === 'suspended');
+
+      await page.locator('.pl-rand').first().click();
+      await page.waitForTimeout(300);
+      const s3 = await sp();
+      ok('挂起后下一次操作自己醒过来并补上这一发（osc ' + s2.osc + ' → ' + s3.osc + '）',
+        s3.ready === true && s3.osc > s2.osc);
+      ok('音效一节零报错', page.__errs.length === 0);
+      if (page.__errs.length) page.__errs.slice(0, 6).forEach(e => console.log('      · ' + e));
       await page.close();
     }
 
@@ -843,7 +1087,7 @@ async function oneRound(browser, fast) {
       await pickRound(page, [0, 1, 2, 3, 4, 0]);
       /* 等第 1 轮演出彻底走完（下一轮的遮罩立起来）再装采样器：
          5 号车的车门站位恰好落在柜子那一带（170,151），上一轮上车的人还在走位时会骗过判据 */
-      ok('第 1 轮走到了第 2 轮边界', await waitFor(page, 60000, atBoundary));
+      ok('第 1 轮走到了第 2 轮边界', await toBoundary(page, 60000));
       const bags = await page.evaluate(() =>
         window.TC_UI.state().players.filter(p => window.TC.total(p.bag) > 0).length);
       ok('第 1 轮结算后有 4 个人背包里有票（' + bags + ' 人）', bags === 4);
@@ -874,6 +1118,28 @@ async function oneRound(browser, fast) {
         };
         tick();
       });
+      /* 无人光顾那一拍：三节车**同一拍**合门，门是双倍速（130 演出 ms，别处 260）。
+         量法：门叶第一次 data-open→0 是这一拍合门的起点，车厢挂上 .closed 是合门结束
+         （stepCloseCars 等 doorsOf 落地才挂类，同一拍三节一起）—— 两者之差 ÷ --fx-pace
+         就是门的演出时长（慢放 0.4 时它是 2.5，别把 325ms 墙钟当成 325 演出 ms）；
+         三节车的起点散布 = 是不是同步关门的判据。
+         本轮上车的两位用的是 1/2 号车，0/3/4 号无人光顾，够采三次。 */
+      await page.evaluate(() => {
+        const st = { flips: [], closes: [] };
+        window.__doorWatch = st;
+        const t0 = performance.now();
+        const fx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fx-pace')) || 1;
+        Array.prototype.forEach.call(document.querySelectorAll('.coach-car'), function (car, i) {
+          Array.prototype.forEach.call(car.querySelectorAll('.cr-door'), function (leaf) {
+            new MutationObserver(function () {
+              if (leaf.getAttribute('data-open') === '0') st.flips.push({ car: i, t: performance.now() - t0, fx: fx() });
+            }).observe(leaf, { attributes: true, attributeFilter: ['data-open'] });
+          });
+          new MutationObserver(function () {
+            if (car.classList.contains('closed')) st.closes.push({ car: i, t: performance.now() - t0 });
+          }).observe(car, { attributes: true, attributeFilter: ['class'] });
+        });
+      });
       await pickRound(page, [1, 'store', 'store', 'store', 'store', 2]);
       await page.waitForTimeout(1400);
       await shot(page, '09-store-parallel');           // 四人在路上
@@ -884,6 +1150,46 @@ async function oneRound(browser, fast) {
         clearTimeout(window.__storeWatch.timer);
         return window.__storeWatch;
       });
+      /* 关车门在存放之后：等三节车的 .closed 都挂上再判，别用「等了多久」去猜 */
+      const doorOk = await waitFor(page, 40000, () => window.__doorWatch.closes.length >= 3);
+      const door = await page.evaluate(() => {
+        const st = window.__doorWatch, f1 = {}, c1 = {};
+        /* 一辆车只认第一次翻转 / 第一次挂类：本轮收尾的「全车合拢」也在翻 data-open，
+           但它排在无人光顾之后，且那条路不挂 .closed（见 animResolve 的 allDoors）。 */
+        st.flips.forEach(f => { if (f1[f.car] == null) f1[f.car] = f; });
+        st.closes.forEach(c => { if (c1[c.car] == null) c1[c.car] = c; });
+        const flips = Object.keys(f1).map(k => f1[k]).sort((a, b) => a.t - b.t).slice(0, 3);
+        return {
+          cars: flips.map(f => f.car),
+          spread: flips.length > 1 ? Math.round(flips[flips.length - 1].t - flips[0].t) : -1,
+          ms: flips.map(f => c1[f.car] == null ? -1 : Math.round((c1[f.car].t - f.t) / f.fx)),
+        };
+      });
+      ok('本轮三节无人光顾的车都合了门（' + door.cars.join('/') + ' 号）', doorOk && door.cars.length === 3);
+      await page.waitForTimeout(700);                  // 药丸的 CSS 过场走完（慢放档 240ms × 2.5）
+      /* 灭灯、合门、挂药丸是同一件事的三面：合了门的三节车各自亮一颗「本轮无人光顾」，
+         没合门的两位（有人上车那两节）一颗都不许有 —— 药丸亮错车比不亮更难查。 */
+      const pills = await page.evaluate(() => [].map.call(document.querySelectorAll('.coach-car'), (car, i) => ({
+        car: i,
+        closed: car.classList.contains('closed'),
+        op: +getComputedStyle(car.querySelector('.car-stop')).opacity,
+        txt: car.querySelector('.car-stop').textContent,
+      })));
+      const litCars = pills.filter(p => p.closed);
+      ok('只有无人光顾的那三节车合了门（' + litCars.map(p => (p.car + 1) + ' 号').join('/') + '）',
+        litCars.length === 3 && litCars.map(p => p.car).sort().join() === door.cars.slice().sort().join());
+      ok('合了门的车都亮着「本轮无人光顾」，别的车一颗都没有（' +
+        litCars.map(p => p.op.toFixed(2)).join('/') + ' vs ' + pills.filter(p => !p.closed).map(p => p.op.toFixed(2)).join('/') + '）',
+        litCars.every(p => p.op > 0.9 && p.txt === '本轮无人光顾') &&
+        pills.filter(p => !p.closed).every(p => p.op < 0.05));
+      await shot(page, '09c-cars-closed');             // 三节车同时关着，各自一颗「本轮无人光顾」
+      console.log('      · 无人光顾同步关门：起点散布 ' + door.spread + ' ms / 门时（换算回演出时间）' +
+        door.ms.join(' / ') + ' ms');
+      ok('三节车是同一拍合的门（起点散布 ' + door.spread + ' ms）', door.spread >= 0 && door.spread < 60);
+      /* 上限放到 205：上一拍「关柜」留下的 hitStop（40 演出 ms）压在头上 —— 顿帧吃墙钟不走时钟，
+         那一次会偏大约一百毫秒。改回 260 那一版量出来是 300 上下，照样红。 */
+      ok('无人光顾这一拍的门是双倍速（≈130 演出 ms；别处 260）',
+        door.ms.length === 3 && door.ms.every(v => v >= 95 && v <= 205));
       const went = watch.t.filter(t => t != null).map(t => Math.round(t)).sort((x, y) => x - y);
       const spread = went.length > 1 ? went[went.length - 1] - went[0] : -1;
       console.log('      · 谁在什么时候走到柜前：[座位, ms] ' + JSON.stringify(watch.hits));
@@ -916,12 +1222,12 @@ async function oneRound(browser, fast) {
       await page.waitForTimeout(2900);                 // 列车进站 + 开滑门 + 补票
       /* 第 1 轮：0 号与 2 号挤 1 号车（两人都空手），1 号独占 2 号车拿 2 张 */
       await pickRound(page, [0, 1, 0]);
-      ok('第 1 轮走到第 2 轮边界', await waitFor(page, 60000, atBoundary));
+      ok('第 1 轮走到第 2 轮边界', await toBoundary(page, 60000));
       const got = await page.evaluate(() => window.TC.total(window.TC_UI.state().players[1].bag));
       ok('1 号乘客第 1 轮独得 2 张（下一步才有票可存）', got === 2);
       /* 第 2 轮：1 号存放，另外两位照常上车 */
       await pickRound(page, [0, 'store', 1]);
-      ok('第 2 轮结算完、走到第 3 轮边界', await waitFor(page, 60000, atBoundary));
+      ok('第 2 轮结算完、走到第 3 轮边界', await toBoundary(page, 60000));
       const stay = await page.evaluate(() => {
         const TC = window.TC, S = window.TC_UI.state(), f = window.TC_UI.figs()[1];
         const lk = TC.lockerStand(S.N, 1), h = TC.homeSpot(S.N, 1);
@@ -1013,8 +1319,11 @@ async function oneRound(browser, fast) {
             cnt === 1 && texts[0] === '回到站台');
           await btns.first().click();                        // 单按钮 = 直接提交
         } else if (plan[i] === 'store') {
+          /* 别逐字钉按钮文案（「存放（N 张）」→「存放(N)」就是这么钉坏的）：
+             钉住的是「第二颗就是存放」且**数字与背包一致**（0 号此刻确实有票可存）。 */
+          const bagN = await page.evaluate(() => window.TC.total(window.TC_UI.state().players[0].bag));
           ok('0 号站在站台上，三选一照旧（HUD：' + texts.join(' / ') + '）',
-            cnt === 4 && texts[1].indexOf('存放（') === 0);
+            cnt === 4 && texts[1].indexOf('存放') === 0 && texts[1].indexOf(String(bagN)) > 0);
           /* ---- 趁「选择行动前」量两件事：背包徽章读不读得清、点背包 / 柜子看不看得了 ---- */
           const geo0 = await page.evaluate(() => {
             const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(Math.round).join(','); };
@@ -1137,10 +1446,101 @@ async function oneRound(browser, fast) {
         }
         await page.waitForTimeout(110);
       }
+      /* ---- 本轮战报：演完之后才摊出来，确认之后才散场（回站台 + 补票 + 下一轮）。
+         先记下结算前的账本：卡上的增减要能逐人对上（存放 = 整个背包进柜、独得 = 背包涨的那些张）。 */
+      const before = await page.evaluate(() => {
+        const TC = window.TC, S = window.TC_UI.state();
+        return { bag: S.players.map(p => TC.total(p.bag)), locker: S.players.map(p => TC.total(p.locker)) };
+      });
+      ok('全员提交后摆出【开始结算】闸门', await clickSettle(page));
       /* 「回站台」与「去存放」同时在路上 —— 就在这一刻按快门（慢放档里这一小段 ≈ 1s 墙钟） */
       ok('两股人流真的同时在路上', await waitFor(page, 8000, () => window.__retWatch && window.__retWatch.both > 0));
       await shot(page, '10b-return-traffic');
-      ok('第 3 轮结算完、走到第 4 轮边界', await waitFor(page, 60000, atBoundary));
+
+      ok('结算演完摊出本轮战报', await waitFor(page, 20000, () => !!document.querySelector('#summary.on')));
+      await page.waitForTimeout(240);                    // riseIn .18s 落定再读（顺带给截图一个不透明的卡）
+      const sum = await page.evaluate(() => {
+        const TC = window.TC, S = window.TC_UI.state(), F = window.TC_UI.figs();
+        const box = document.querySelector('#summary');
+        return {
+          on: box.classList.contains('on'),
+          title: box.querySelector('h3').textContent.replace(/\s+/g, ' '),
+          names: S.players.map(p => p.name),
+          rows: [].map.call(box.querySelectorAll('.sum-row'), r => ({
+            name: r.querySelector('.sum-who b').textContent,
+            net: r.querySelector('.sum-net').textContent,
+            text: r.textContent.replace(/\s+/g, ' '),
+          })),
+          bag: S.players.map(p => TC.total(p.bag)),
+          locker: S.players.map(p => TC.total(p.locker)),
+          cars: S.cars.map(c => TC.total(c.tickets)),
+          pool: TC.poolLeft(S),
+          away: S.players.map((p, i) => {
+            const h = TC.homeSpot(S.N, i);
+            return Math.round(Math.hypot(F[i].wx - h.x, F[i].wy - h.y));
+          }),
+        };
+      });
+      ok('战报写着「' + sum.title + '」（补票还没发生，仍是第 3 轮）', sum.on && sum.title.indexOf('第 3 轮') >= 0);
+      ok('战报按座位顺序一人一行（' + sum.rows.map(r => r.name + ' ' + r.net).join(' · ') + '）',
+        sum.rows.length === 3 && sum.rows.every((r, i) => r.name === sum.names[i]));
+      /* 存放：整个背包进柜 —— 卡上写「入柜」而不是 0（票没丢），账上背包清零、柜子同额增加 */
+      ok('0 号存放 ' + before.bag[0] + ' 张：背包清零、柜子同额增加（柜 ' + before.locker[0] + '→' + sum.locker[0] + '）',
+        sum.rows[0].text.indexOf('存放') >= 0 && sum.rows[0].text.indexOf('收进储物柜') >= 0 &&
+        sum.rows[0].net === '入柜' &&
+        before.bag[0] > 0 && sum.bag[0] === 0 && sum.locker[0] === before.locker[0] + before.bag[0]);
+      ok('1 号的回合只有「从储物柜走回站台」，战报净增 0',
+        sum.rows[1].text.indexOf('从储物柜走回站台') >= 0 && sum.rows[1].net === '0');
+      /* 独得：卡上写的张数必须等于背包涨的那几张 —— 同一份账在两个地方写，对不上就是有一处写错了 */
+      const gain2 = sum.bag[2] - before.bag[2];
+      const got2 = parseInt((sum.rows[2].text.match(/独得 \d+ 号车厢 (\d+) 张/) || [])[1] || '0', 10);
+      ok('2 号独得 ' + got2 + ' 张，战报的净增与实际背包一致（+' + gain2 + '）',
+        got2 > 0 && got2 === gain2 && sum.rows[2].net === '+' + gain2);
+      ok('战报摊着时人还站在各自的位置上（2 号离自己站位还有 ' + sum.away[2] + ' 单位）', sum.away[2] > 20);
+      /* 战报不吃「点背景关闭」（与 #curtain 同理）：确认是流程的一半，
+         点背景就关等于替玩家按了确认，散场与补票被一并跳过 */
+      const bd = await page.evaluate(() => {
+        const box = document.querySelector('#summary');
+        const pts = [[6, 6], [innerWidth - 6, 6], [6, innerHeight - 6], [innerWidth - 6, innerHeight - 6]];
+        for (let i = 0; i < pts.length; i++) {
+          if (document.elementFromPoint(pts[i][0], pts[i][1]) === box) return { x: pts[i][0], y: pts[i][1] };
+        }
+        return null;
+      });
+      ok('战报外还留着可点的遮罩（卡片没铺满屏）', !!bd);
+      if (bd) await page.mouse.click(bd.x, bd.y);
+      await page.waitForTimeout(120);
+      ok('点遮罩关不掉战报（只能按「确认」）', await page.locator('#summary.on').count() === 1);
+      await shot(page, '11-round-summary');
+      await page.click('#sumOk');
+      await page.waitForTimeout(120);
+      ok('点「确认」战报收起', await page.locator('#summary.on').count() === 0);
+
+      ok('第 3 轮结算完、走到第 4 轮边界', await toBoundary(page, 60000));
+      /* 确认之后的账：散场的人回到站台（存放的 0 号照旧留在柜前），车厢按补票规则涨了数。
+         补票配额在这里复刻一遍 placeTickets：空车 +2 / 非空 +1，票池见底就按车厢顺序封顶。 */
+      const post = await page.evaluate(() => {
+        const TC = window.TC, S = window.TC_UI.state(), F = window.TC_UI.figs();
+        const lk = TC.lockerStand(S.N, 0);
+        return {
+          cars: S.cars.map(c => TC.total(c.tickets)),
+          pool: TC.poolLeft(S),
+          at: S.players.map(p => p.at),
+          away: S.players.map((p, i) => {
+            const h = TC.homeSpot(S.N, i);
+            return Math.round(Math.hypot(F[i].wx - h.x, F[i].wy - h.y));
+          }),
+          dLocker: Math.round(Math.hypot(F[0].wx - lk.x, F[0].wy - lk.y)),
+        };
+      });
+      let pool = sum.pool;
+      const want = sum.cars.map(t => { const need = t > 0 ? 1 : 2; const got = Math.min(need, pool); pool -= got; return got; });
+      ok('确认后补票：' + want.map((w, i) => (i + 1) + ' 号 +' + w).join('、') +
+        '（' + sum.cars.map((t, i) => t + '→' + post.cars[i]).join(' / ') + '）',
+        post.cars.every((v, i) => v === sum.cars[i] + want[i]) &&
+        post.pool === sum.pool - want.reduce((a, b) => a + b, 0));
+      ok('散场：上过车的人走回站台（2 号离站位 ' + post.away[2] + ' 单位），存放的 0 号留在柜前（离柜 ' + post.dLocker + ' 单位）',
+        post.away[2] < 1.5 && post.at[0] === 'locker' && post.dLocker < 1.5);
       const ret = await page.evaluate(() => { clearTimeout(window.__retWatch.timer); return window.__retWatch; });
       console.log('      · 柜前采样：' + ret.atLocker + ' 帧在柜前 / ' + ret.mid + ' 帧在路上 / ' + ret.home +
         ' 帧到家 / ' + ret.both + ' 帧两股人对着走 · 单按钮 HUD 文案计数：' + JSON.stringify(ret.labels));
@@ -1225,7 +1625,30 @@ async function oneRound(browser, fast) {
         await doPick(page, k);
         await page.waitForTimeout(90);
       }
-      await page.waitForTimeout(320);                   // 3 人提交完 → 结算已发生、演出刚开演（慢放档）
+      /* ---- 三人提交完不会自己开演：HUD 摆出【开始结算】，点了才走结算 ---- */
+      ok('全员提交后摆出【开始结算】闸门', await waitFor(page, 8000, () => !!document.querySelector('#btnSettle')));
+      const gate = await page.evaluate(() => {
+        const S = window.TC_UI.state();
+        return {
+          n: document.querySelectorAll('#hudBtns .btn').length,
+          label: (document.querySelector('#btnSettle') || {}).textContent || '',
+          prompt: document.querySelector('#hudPrompt').textContent,
+          submitted: S.submitted.length, resolved: S.resolved, round: S.round,
+        };
+      });
+      ok('闸门是整排里唯一一颗，写的就是「开始结算」（HUD：' + gate.label + '）',
+        gate.n === 1 && gate.label === '开始结算');
+      ok('闸门上的提示交代了几位都交上来了（' + gate.prompt + '）',
+        gate.prompt.indexOf(gate.submitted + ' 位乘客都已提交') === 0);
+      await page.waitForTimeout(900);                   // 等一会儿：没人点它就不该动
+      const idle = await page.evaluate(() => {
+        const S = window.TC_UI.state();
+        return { resolved: S.resolved, round: S.round, over: document.querySelector('#screen-over').classList.contains('on') };
+      });
+      ok('不点闸门就不结算（resolved 还是 ' + idle.resolved + '，第 ' + idle.round + ' 轮）',
+        idle.resolved === gate.resolved && idle.round === gate.round && !idle.over);
+      await page.click('#btnSettle');
+      await page.waitForTimeout(320);                   // 点了闸门 → 结算已发生、演出刚开演（慢放档）
       const sv1 = await page.evaluate(() => window.TC_UI.save());
       ok('演出开演时状态已落盘且 stage=show', !!sv1 && sv1.stage === 'show');
       ok('落盘的快照里已经有本轮的结算结果',

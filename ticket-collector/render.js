@@ -49,12 +49,12 @@
 
   /* ================= fx 引擎 ================= */
   const SPEED = { v: 1 };
-  /* 两个旋钮，别合并：SPEED 是**玩家按出来的绝对倍率**（1 / 3 / 9），PACE 是**演出的基础节奏**。
-     结算四步慢放到 20%（PACE = 0.2），玩家一按快进/跳过就立刻回到绝对倍速 —— 所以 rate() 取大的那个。
+  /* 两个旋钮，别合并：SPEED 是**玩家按出来的绝对倍率**（1 / 3，快进按钮切换），PACE 是**演出的基础节奏**。
+     结算四步慢放到 40%（SLOW = 0.4），玩家一按快进/跳过就立刻回到绝对倍速 —— 所以 rate() 取大的那个。
      一个变量既当档位又当播放率的话，慢放会顺手改掉按钮的语义（按一下快进反而慢 5 倍）。 */
   const PACE = { v: 1 }, SLOW = 0.4;
   const rate = () => (SPEED.v > 1 ? SPEED.v : PACE.v);
-  /* 结算里也有不吃 fx 时钟的过场（车厢熄灯、停运药丸、气泡弹出走 CSS transition），
+  /* 结算里也有不吃 fx 时钟的过场（车厢熄灯、无人光顾药丸、气泡弹出走 CSS transition），
      它们靠 --fx-pace 跟同一个节奏；不写的话动画放慢了这些还是一闪而过。 */
   function syncPace() { document.documentElement.style.setProperty('--fx-pace', String(1 / rate())); }
   function setPace(v) { PACE.v = v; syncPace(); }
@@ -331,6 +331,10 @@
     const wrap = $('#stagewrap'), st = $('#stage');
     if (!wrap || !st) return;
     const aw = wrap.clientWidth, ah = wrap.clientHeight;
+    /* 舞台藏起来时（封面 / 名单压在上面，游戏屏 display:none）量到的是 0×0：钳到 0.2
+       会把 --k 写成正常值的 1/5，名单上的头像跟着缩水，而且名单自己不重量、缩了回不来。
+       露出真尺寸后再量 —— 从隐藏变可见时 ResizeObserver 会补一次（见 boot）。 */
+    if (aw <= 0 || ah <= 0) return;
     const k = Math.max(0.2, Math.min(aw / TC.WORLD.w, ah / TC.WORLD.h));
     K.v = k;
     st.style.width = Math.round(TC.WORLD.w * k) + 'px';
@@ -543,12 +547,6 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     const L = TC.carLane(S.N, i);
     return toScreen(L.box.x + L.box.w / 2, L.y0 - 18);
   };
-  /* 车门中缝：关门时盖章的位置 */
-  const carDoorMid = function (i) {
-    const L = TC.carLane(S.N, i);
-    const f = L.floor.at(L.d0 + (L.d1 - L.d0) * 0.5);
-    return toScreen(f.l, (L.y0 + L.y1) / 2);
-  };
   const lockerAnchor = function (i) {
     const b = TC.lockerSpot(S.N, i);
     return toScreen(b.x, b.y);
@@ -584,7 +582,7 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
       cc.innerHTML = ART.carShell(lane) +
         '<div class="cr-chips-box">' + ART.carChips(car.tickets, lane) + '</div>' +
         ART.carNo(lane.label) + ART.carTot(0) +
-        '<div class="car-stop">本轮停运</div>' +
+        '<div class="car-stop">本轮无人光顾</div>' +
         '<div class="car-short">车票已全部放置完</div>';
       place(cc, lane.box.x, lane.box.y, lane.box.w, lane.box.h);
       coach.appendChild(cc);
@@ -593,6 +591,7 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
         chips: cc.querySelector('.cr-chips-svg'),
         leaves: cc.querySelectorAll('.cr-door'),
         roof: cc.querySelector('.roof-total'),
+        shortTimer: 0, shortTold: false,
       });
       refreshCar(i);
     });
@@ -606,6 +605,12 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     coach.appendChild(lo);
     view.loco = lo;
   }
+  /* 「车票已全部放置完」只是一句**本轮**的通报：药丸正落在筹码带上，一直摊着就看不见车里
+     还剩什么票 —— 而「还剩什么票」恰恰是这一手要读的信息。摊几秒就收（挂 `.short-told`：
+     药丸淡出、筹码恢复原亮度），`.short` 状态类本身留着 —— 屏幕的类仍与 S.cars[i].short 逐轮
+     一致，能摘掉它的只有下一轮补票。计时是墙钟，不跟 --fx-pace：慢放是演出的事，通报的停留
+     不该被拉成 8 秒。 */
+  const SHORT_TOLD = 3200;
   function refreshCar(i) {
     const car = S.cars[i], v = view.cars[i];
     const tot = TC.total(car.tickets);
@@ -616,10 +621,24 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
        从前这两句是只 add 不 remove，关过一次的车会一直熄着灯到重开。 */
     v.node.classList.toggle('closed', !!car.closed);
     v.node.classList.toggle('short', !!car.short);
+    if (car.short) {
+      /* 同一个短票回合里 updateAll / refreshCar 会连着刷好几遍，计时只许起一次 */
+      if (!v.shortTold && !v.shortTimer) {
+        v.shortTimer = setTimeout(function () {
+          v.shortTimer = 0;
+          v.shortTold = true;
+          v.node.classList.add('short-told');
+        }, SHORT_TOLD);
+      }
+    } else {
+      if (v.shortTimer) { clearTimeout(v.shortTimer); v.shortTimer = 0; }
+      if (v.shortTold) { v.shortTold = false; v.node.classList.remove('short-told'); }
+    }
   }
   /* 双开滑门：门叶沿「纵深方向」向自己那一端缩，缝从中间裂开又合拢。
-     门轴 data-hy 写在车门组上（一门一个），样式层不许碰 transform。 */
-  function setDoor(leaf, open, anim) {
+     门轴 data-hy 写在车门组上（一门一个），样式层不许碰 transform。
+     dur 只给「无人光顾」那一拍催快用（见 stepCloseCars），其余开合一律走默认时长。 */
+  function setDoor(leaf, open, anim, dur) {
     const hy = parseFloat(leaf.getAttribute('data-hy')) || 0;
     const from = leaf.getAttribute('data-open') === '1' ? 0.06 : 1;
     const target = open ? 0.06 : 1;
@@ -631,15 +650,15 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     if (!anim || !fxOn) { write(target); return Promise.resolve(); }
     return new Promise(res => {
       tween({
-        dur: open ? 320 : 260, ease: open ? easeOutQuint : easeInQuad,
+        dur: dur || (open ? 320 : 260), ease: open ? easeOutQuint : easeInQuad,
         upd(p) { write(from + (target - from) * p); },
         after() { res(); },
       });
     });
   }
-  function doorsOf(v, open, anim) {
+  function doorsOf(v, open, anim, dur) {
     const jobs = [];
-    Array.prototype.forEach.call(v.leaves, function (leaf) { jobs.push(setDoor(leaf, open, anim)); });
+    Array.prototype.forEach.call(v.leaves, function (leaf) { jobs.push(setDoor(leaf, open, anim, dur)); });
     return Promise.all(jobs);
   }
   function allDoors(open, anim) {
@@ -734,6 +753,7 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     (btns || []).forEach(function (it) {
       const n = document.createElement('button');
       n.className = 'btn ' + (it.cls || 'btn-ghost');
+      if (it.id) n.id = it.id;                       /* 只有结算闸门要 id：测试与外部得认得出它 */
       n.textContent = it.label;
       if (it.dis) n.disabled = true;
       n.onclick = function () { sfx('tap'); it.fn(); };
@@ -970,18 +990,23 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     await Promise.all(backs.concat(jobs));
   }
 
+  /* 无人光顾的车厢一起关门：这是一拍「这几趟车都没等到人」的合奏，
+     逐节排队关门会把一拍拖成好几条慢吞吞的队尾。门比别处快一倍（130 对 260）：
+     「啪」地扣上，不是慢慢合拢。状态字「本轮无人光顾」由 .closed 这条 CSS 过场浮起来
+     （见 style.css 的 .car-stop），这里只管合门、震屏、顿一下。 */
   async function stepCloseCars(ev) {
-    for (let i = 0; i < ev.close.length; i++) {
-      const c = ev.close[i], v = view.cars[c.car];
-      if (i === 0) hud('无人问津的车厢即将停运', [], []);
-      sfx('slideShut');
-      await doorsOf(v, false, true);
-      v.node.classList.add('closed');
-      stampAt(carDoorMid(c.car), '停运', 'stampStop', false);
-      shakeAdd(i === 0 ? 0.22 : 0.12);
-      hitStop(50);
-      await fxWait(240);
-    }
+    if (!ev.close.length) return;
+    hud('无人光顾的车厢即将关门', [], []);
+    sfx('slideShut');
+    await Promise.all(ev.close.map(function (c) {
+      const v = view.cars[c.car];
+      return doorsOf(v, false, true, 130).then(function () {
+        v.node.classList.add('closed');
+      });
+    }));
+    shakeAdd(0.22);
+    hitStop(50);
+    await fxWait(240);
   }
 
   async function stepMove(ev) {
@@ -1128,13 +1153,20 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
       /* 出错也要把节奏还回去，否则整局卡在慢动作里再也快不起来 */
       setPace(1);
     }
-    /* 全车滑门合拢收尾：这一轮谁上过车都已经站好了，关门就是「本轮结束」的句号 */
+    /* 全车滑门合拢收尾：这一轮谁上过车都已经站好了，关门就是「本轮结束」的句号。
+       到这里「行动」演完了，人就留在各自的位置上 —— 回站台与补票都排在战报的
+       「确认」之后（见 sweepHome / playRound），演出与下一轮之间隔着一张本轮战报。 */
     sfx('slideShut');
     await allDoors(false, true);
+    updateAll();
+  }
+
+  /* 战报确认后的散场：全体走回站台。**刚存放的那几位留在柜前** —— 他下一回合还站在
+     那儿等「走回站台」那个动作（见 stepStore 的 backs），一起扫回去，那条两回合的
+     动线就断了。 */
+  async function sweepHome() {
     hud('回到站台', [], []);
     const backs = figs.map(function (f, i) {
-      /* 刚存放的人**留在柜前**：他下一回合还站在那儿等「走回站台」那个动作（见 stepStore 的 backs）。
-         把他一起扫回站台，柜前那条两回合的动线就断了。 */
       if (f.p.at === 'locker') return Promise.resolve();
       return (async function () {
         await fxWait(i * 60);
@@ -1177,7 +1209,7 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
   function logResolve(rev) {
     rev.ret.forEach(function (pid) { logLine('act', S.players[pid].name + ' 从储物柜走回站台（本回合只能做这一件事）'); });
     rev.store.forEach(function (w) { logLine('good', S.players[w.p].name + ' 存放 ' + w.total + ' 张（' + tokensText(w.tokens) + '）'); });
-    rev.close.forEach(function (c) { logLine('act', (c.car + 1) + ' 号车厢无人选，关门停运（车内 ' + TC.total(c.tokens) + ' 张留存）'); });
+    rev.close.forEach(function (c) { logLine('act', (c.car + 1) + ' 号车厢无人光顾，关门（车内 ' + TC.total(c.tokens) + ' 张留存）'); });
     rev.board.forEach(function (b) { logLine('act', S.players[b.p].name + ' 登上 ' + (b.car + 1) + ' 号车厢'); });
     rev.swipe.forEach(function (s) {
       const t = S.players[s.target].name;
@@ -1213,6 +1245,7 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
   async function runPicks() {
     saveNow('pick');
     await pickAll();
+    await waitSettle();
     /* 选择一律等结算之后才写进日志：日志随时能打开，不能让它提前泄露尚未揭晓的选择。
        文案也得在结算前抓下来 —— 结算会把背包清空，之后再写就成了「存放 0 张」。
        pickText 对「回到站台」返回 null（那条文案由 logResolve 的 ret 承担），这里滤掉。 */
@@ -1223,6 +1256,11 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     /* ⚠ 结果先落盘，演出后开演：演出中途刷新，这一轮也不丢 —— 重放不了动画，但结果已经在手上了 */
     saveNow('show');
     await animResolve(rev);
+    clearFx();
+    /* 演完摊出本轮战报：此刻大家还站在各自的位置上（车里 / 柜前 / 包边），
+       点了「确认」才算散场 —— 回站台、补票、开下一轮。 */
+    await waitSummary(rev);
+    await sweepHome();
     clearFx();
     if (TC.checkEnd(S)) { finish(); return; }
     playRound();
@@ -1243,6 +1281,87 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
       saveNow('pick');
       await fxWait(40);
     }
+  }
+
+  /* 全员提交后的闸门：手机还在最后一位手里，桌面也未必收拾好了 —— 结算由人来开演，
+     不点就一直停在这一格。读档续玩走到这里同样会摆出它（全员都已提交时 pickAll 直接跳过）。
+     数的是 S.submitted 而不是 activePlayers：闸门上那句提示说的是「交上来了几位」。 */
+  function waitSettle() {
+    return new Promise(function (res) {
+      hud(S.submitted.length + ' 位乘客都已提交 · 确认后开始结算', [
+        { id: 'btnSettle', label: '开始结算', cls: 'btn-primary', fn: res },
+      ], []);
+    });
+  }
+
+  /* ================= 本轮战报 =================
+     结算的「行动」演完之后摊出来的那张卡：谁得了、谁失了、谁白跑一趟。数据全从事件表里
+     现算，不另存一份 —— 卡上说不清的地方，就是演出没讲清的地方。
+     一张卡管到一个「确认」为止：演出刚演完时人还站在各自的位置上，回站台与补票
+     都排在确认之后（sweepHome / playRound），所以这一格也顺带成了停给玩家看的落点。 */
+  function roundRows(rev) {
+    const rows = S.players.map(function (p) {
+      return { name: p.name, cloth: p.colors.top, lines: [], plus: 0, minus: 0, store: false };
+    });
+    const line = function (pid, txt, cls, t) {
+      rows[pid].lines.push({ txt: txt, cls: cls || '', t: t || null });
+    };
+    rev.store.forEach(function (w) {
+      rows[w.p].store = true;
+      line(w.p, '存放 ' + w.total + ' 张 · 收进储物柜', 'store', w.tokens);
+    });
+    rev.deal.forEach(function (d) {
+      if (d.winner != null) {
+        rows[d.winner].plus += d.gain;
+        line(d.winner, '独得 ' + (d.car + 1) + ' 号车厢 ' + d.gain + ' 张', 'good', d.tokens);
+      } else {
+        d.contested.forEach(function (pid) {
+          const others = d.contested.filter(function (x) { return x !== pid; })
+            .map(function (x) { return S.players[x].name; }).join('、');
+          line(pid, '与 ' + others + ' 同抢 ' + (d.car + 1) + ' 号车厢 · 空手', 'bad');
+        });
+      }
+    });
+    rev.swipe.forEach(function (s) {
+      const t = S.players[s.target].name, n = TC.total(s.tokens);
+      if (s.ok) {
+        rows[s.p].plus += n; rows[s.target].minus += n;
+        line(s.p, '顺走 ' + t + ' 的 ' + n + ' 张', 'good', s.tokens);
+        line(s.target, '被 ' + S.players[s.p].name + ' 顺走 ' + n + ' 张', 'bad', s.tokens);
+      } else {
+        line(s.p, '顺走 ' + t + ' · ' +
+          ({ crowd: '多人抢同一目标', stored: '对方已存放', empty: '对方背包已空' }[s.reason] || s.reason), 'bad');
+      }
+    });
+    rev.ret.forEach(function (pid) { line(pid, '从储物柜走回站台', ''); });
+    rows.forEach(function (r) {
+      if (!r.lines.length) r.lines.push({ txt: '—', cls: '' });
+      const net = r.plus - r.minus;
+      /* 存放写「入柜」而不是 0：票没丢、也没进背包，只是换了个地方过夜 */
+      if (r.store) { r.net = '入柜'; r.netCls = 'store'; }
+      else if (net > 0) { r.net = '+' + net; r.netCls = 'good'; }
+      else if (net < 0) { r.net = '−' + (-net); r.netCls = 'bad'; }
+      else { r.net = '0'; r.netCls = 'dim'; }
+    });
+    return rows;
+  }
+  function waitSummary(rev) {
+    /* 演出停在最后一拍（关车门的提示还挂在 HUD 上），战报一摊出来就换成它自己的标题 ——
+       底下那行字和卡片说的是同一件事，别让人以为「关门」还没演完 */
+    hud('本轮战报', [], []);
+    $('#sumRound').textContent = String(S.round);
+    $('#sumBody').innerHTML = roundRows(rev).map(ART.sumRow).join('');
+    $('#sumHint').textContent = S.lastRound
+      ? '确认后大家回到站台 · 票池已空，随后进入最终排名'
+      : '确认后大家回到站台 · 车厢补票 · 下一轮开始';
+    show('summary');
+    return new Promise(function (res) {
+      $('#sumOk').onclick = function () {
+        sfx('tap');
+        hide('summary');
+        res();
+      };
+    });
   }
 
   /* ================= 结算排名 ================= */
@@ -1302,7 +1421,6 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     rank.forEach(function (r) {
       const row = document.createElement('div');
       row.className = 'rank-row' + (r.place === 1 ? ' win' : '');
-      const bed = TC.breakdown(r.locker), bbd = TC.breakdown(r.bag);
       const det = [];
       const push = function (title, b) {
         if (!b.rows.length) return;
@@ -1311,8 +1429,11 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
           det.push('<div class="score-row"><span>' + x.k + '</span><i>' + x.expr + '</i><b>' + x.pts + ' 分</b></div>');
         });
       };
-      push('储物柜（' + TC.total(r.locker) + ' 张）', bed);
-      push('背包（' + TC.total(r.bag) + ' 张）', bbd);
+      /* 计分不分容器（见 TC.rank 的 merged）：背包 + 储物柜先合成一池再列公式 —— 分容器列，
+         柜里的 3 张散黄和包里的 1 张就各自「单张不成对」，明明是一对却白扔 2 分。
+         标题仍把两个容器各自的张数写出来：「票在哪儿」是看客要知道的，「分从哪来」只有一池。 */
+      push('全部车票（储物柜 ' + TC.total(r.locker) + ' 张 + 背包 ' + TC.total(r.bag) + ' 张）',
+        TC.breakdown(r.merged));
       if (!det.length) det.push('<div class="score-row"><span>没有收藏到车票</span><i></i><b>0 分</b></div>');
       row.innerHTML =
         '<div class="rank-main">' +
@@ -1419,6 +1540,19 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
   function newDraft(i) {
     return { name: '乘客 ' + (i + 1), colors: TC.randPalette(RNG) };
   }
+  /* 一份铺得出来的名单，来源按优先级：发车前那份（存档 / 内存里的 draft，名字与配色都是
+     用户定的原样）→ 这一局的玩家（beginGame 补过空名与去重后缀）→ 全新三人。
+     读档续玩与结算页的「再来一局」都靠它：中途刷新过的那一局打完时 draft 还是空的，
+     名单空着会直接铺出一屏空白（少于 3 人更是发不了车）。 */
+  function rosterFrom(rows, state) {
+    if (rows && rows.length >= 3) return rows;
+    if (state && state.players && state.players.length >= 3) {
+      return state.players.map(function (p) {
+        return { name: p.name, colors: Object.assign({}, p.colors) };
+      });
+    }
+    return [newDraft(0), newDraft(1), newDraft(2)];
+  }
   function renderRoster() {
     const box = $('#roster');
     box.innerHTML = '';
@@ -1522,6 +1656,10 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
       only('screen-setup');
       return;
     }
+    /* 续玩也要一份名单：结算页的「再来一局」照 draft.rows 铺名单，中途刷新过的那一局
+       打完时点重开就是一屏空白。存档里的 draft 是发车前那份原始名单；老存档缺了它，
+       就从这一局的玩家身上还原（名字照抄，配色拷一份，别和 S 共享同一个对象）。 */
+    draft.rows = rosterFrom(sv.draft, sv.S);
     logLine('sys', '读取存档：' + stageName(sv.stage) + ' · 第 ' + Math.max(1, sv.S.round) + ' 轮');
     mountGame(sv.S);
     if (sv.stage === 'over') {
@@ -1588,7 +1726,8 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
 
     /* 点遮罩关弹窗：落点必须正好是遮罩本身。
        #palette 多一层 .sheet 包装，所以它也算遮罩；点卡片里任何东西都不算。
-       ⚠ #curtain 不在其列 —— 那是传手机关卡，点背景就关会把别人的选择亮给上一个人看。 */
+       ⚠ #curtain 与 #summary 不在其列 —— 前者是传手机关卡（点背景就关会把别人的选择亮给上一个人看），
+       后者是结算流程的一半（见 waitSummary）：点背景就关等于替人按了「确认」，散场与补票被一并跳过。 */
     [['rules', null], ['palette', '.sheet'], ['logbox', null]].forEach(function (pair) {
       const box = $('#' + pair[0]);
       if (!box) return;
@@ -1650,7 +1789,11 @@ const LOBBY_V = 150;                                      /* 候车自由走动�
     $('#btnAgain').onclick = function () {
       sfx('tap');
       clearFx();
-      draft.rows = draft.rows.map(function (r, i) { return { name: r.name, colors: r.colors }; });
+      /* 名单沿用上一局：draft 里就是发车前那份（名字与配色），万一它是空的
+         （老存档 / 没走名单就读档进来的旧路径）就从刚打完的这一局还原，绝不铺空白。 */
+      draft.rows = rosterFrom(draft.rows, S).map(function (r) {
+        return { name: r.name, colors: r.colors };
+      });
       renderRoster();
       only('screen-setup');
     };

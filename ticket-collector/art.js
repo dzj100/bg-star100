@@ -22,9 +22,12 @@
   /* ================= 车票 ================= */
   /* 四重色盲冗余：形状 + 磁条点位数(1/2/3/4) + 票面明度阶梯 + 紫色双层描边，
      第五重是票边的 ×n 数字。色值全部由 .tk-0..3 上的 --tk-ink / --tk-paper 决定。 */
+  /* 四个形状与 game.js 的 G.TC_GLYPH（◆ ■ ▲ ★）逐位对应：二号票是方块，不是圆 ——
+     小票在柜里 / 车里只剩一两像素时，直角比圆弧更认得出来。边长按面积与原来的
+     r=4.4 圆相等取 7.8，整组形状的墨量不变。 */
   const GLYPH = [
     'M0 -4.6 L4.2 0 L0 4.6 L-4.2 0 Z',
-    'M-4.4 0 a4.4 4.4 0 1 0 8.8 0 a4.4 4.4 0 1 0 -8.8 0 Z',
+    'M-3.9 -3.9 h7.8 v7.8 h-7.8 Z',
     'M0 -4.6 L4.5 3.9 L-4.5 3.9 Z',
     'M0 -5 L1.5 -1.6 L5.2 -1.5 L2.4 1.1 L3.3 4.8 L0 2.9 L-3.3 4.8 L-2.4 1.1 L-5.2 -1.5 L-1.5 -1.6 Z',
   ];
@@ -99,6 +102,30 @@
       '<span class="pk-tot">共 ' + tot + ' 张</span>' +
       '</div>' +
       '<div class="pk-chips">' + (chips || '<span class="pk-none">空的</span>') + '</div>';
+  };
+
+  /* 「本轮战报」的一行：左色点（衣服色，与柜门色条 / 榜单圆点同源）+ 名字 +
+     收支说明（可能两条：自己干了什么、被别人干了什么），右侧净票数。
+     行内每条说明可以带票面分布，用与「看一眼」卡片同一套票样 —— 同一张票在哪儿都长一样。 */
+  A.sumRow = function (r) {
+    const chips = function (t) {
+      let s = '';
+      for (let c = 0; c < 4; c++) if (t[c]) s += '<span class="pk-ch">' + A.ticket(c) + '<b>×' + t[c] + '</b></span>';
+      return s;
+    };
+    let body = '';
+    for (let i = 0; i < r.lines.length; i++) {
+      const L = r.lines[i];
+      body += '<div class="sum-line ' + L.cls + '">' +
+        '<span class="sum-txt">' + A.esc(L.txt) + '</span>' +
+        (L.t ? '<span class="sum-chips">' + chips(L.t) + '</span>' : '') +
+        '</div>';
+    }
+    return '<div class="sum-row">' +
+      '<i class="sum-mark" style="--cloth:' + A.esc(r.cloth) + '"></i>' +
+      '<div class="sum-who"><b>' + A.esc(r.name) + '</b>' + body + '</div>' +
+      '<span class="sum-net ' + r.netCls + '">' + A.esc(r.net) + '</span>' +
+      '</div>';
   };
 
   /* ================= 车厢（车顶掀掉，露出地板、座椅与车门） ================= */
@@ -352,14 +379,22 @@
         '<text class="li-n" x="' + n1(B.w / 2) + '" y="' + n1(B.h - 1.6) + '" font-size="7">0</text>';
     }
     const cols = B.w >= 30 ? 2 : 1, rows = Math.ceil(kinds / cols);
-    const cw = (B.w - 4.4) / cols, chh = (B.h - 8) / rows;
+    const cw = (B.w - 4.4) / cols;
     const side = cols === 1;                                   // 窄柜：数字在票右边
     const tw = Math.min(cw * (side ? 0.40 : 0.60), 13.6), th = tw * 0.625;
+    /* 行距贴着「一节」算（票 + 票下那行数字；窄柜数字在右侧，一节就只有票自己）：
+       摊满柜高会把两行拉到柜子的上下两头，中间空出一条和票一样宽的缝，
+       看着像两排不相干的东西 —— 而柜膛本来就只有两行，空着的是柜膛，不是行距。
+       所以 rows 节摞成一整块、在柜里居中；只有行多到摞不下（窄柜四行）才回落到
+       摊满：那时是「放不下」而不是「太松」，挤在一起会顶到底部那行总数。 */
+    const rowH = th + (side ? 4.8 : 11.6);
+    const chh = Math.min((B.h - 8) / rows, rowH);
+    const top0 = 2.2 + ((B.h - 8) - rows * chh) / 2;
     let out = '', k = 0;
     for (let c = 0; c < 4; c++) {
       if (!t[c]) continue;
       const col = k % cols, row = (k / cols) | 0;
-      const x0 = 2.2 + col * cw, y0 = 2.2 + row * chh;
+      const x0 = 2.2 + col * cw, y0 = top0 + row * chh;
       const cy = y0 + chh / 2;
       out += A.ticketMini(c, 'x="' + n1(side ? x0 + 1 : x0 + (cw - tw) / 2) + '" y="' + n1(cy - th / 2) +
         '" width="' + n1(tw) + '" height="' + n1(th) + '"', true);

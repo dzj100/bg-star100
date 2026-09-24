@@ -505,6 +505,12 @@ ok('单张不成对会在明细里说明', (function () {
   const b = G.breakdown([1, 0, 0, 0]);
   return b.total === 0 && b.rows.length === 1 && b.rows[0].pts === 0;
 })());
+ok('散票两行写的是两堆不相交的票（5 枚 → 4 枚配对 + 1 枚单张，不是两行都写 5）', (function () {
+  const b = G.breakdown([0, 0, 5, 0]);
+  return b.rows.length === 2 &&
+    b.rows[0].n === 2 && b.rows[0].expr === '4 枚 ÷ 2 × 2 分' && b.rows[0].pts === 4 &&
+    b.rows[1].expr === '1 枚，单张不成对' && b.rows[1].pts === 0;
+})());
 
 /* 贪心最优性：暴力枚举「取几套」验证 G.score 取到最大值 */
 (function () {
@@ -540,6 +546,23 @@ section('排名');
   eq('总分含储物柜 + 背包', r[1].total, 5);
   eq('名次编号从 1 开始', r.map(x => x.place), [1, 2, 3, 4]);
   ok('无人并列时 tied 全为假', r.every(x => x.tied === false));
+  ok('validate 通过', G.validate(S).ok);
+})();
+
+(function () {
+  /* 背包 + 储物柜合成一池再计分：分开算（柜 3 枚散黄 = 2 分 + 包里 1 枚 = 0 分）会白扔一对，
+     合起来 4 枚 = 两对 = 4 分。成套同理 —— 红黄绿分在两个容器里也算一套。 */
+  const S = mk(2);
+  put(S, S.players[0].locker, [0, 3, 0, 0]);
+  put(S, S.players[0].bag, [0, 1, 0, 0]);      // 合一池：4 枚散黄 = 4 分（分算只有 2 分）
+  put(S, S.players[1].locker, [1, 0, 0, 0]);
+  put(S, S.players[1].bag, [0, 1, 1, 0]);      // 合一池：红黄绿各 1 = 一套 5 分（分算是 0 分）
+  const r = G.rank(S);
+  eq('散票对子跨容器合并（4 枚散黄 = 4 分）', r[1].total, 4);
+  eq('成套跨容器合并（红 / 黄 / 绿 分在两处也算一套）', r[0].total, 5);
+  eq('排名按合并后的总分', r.map(x => x.id), [1, 0]);
+  eq('merged 就是那一池', JSON.stringify(r[1].merged), JSON.stringify([0, 4, 0, 0]));
+  eq('明细用的也是 merged', G.breakdown(r[1].merged).rows.map(x => x.pts).join(), '4');
   ok('validate 通过', G.validate(S).ok);
 })();
 

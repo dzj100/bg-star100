@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>《车票收藏家》台外页面 · 配色提案</title>
+<style>
+  :root{
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 24px 26px;background:#22262c;color:#e9f0f7;font-family:var(--font);}
+  h1{font-size:16px;letter-spacing:.06em;margin:0 0 3px}
+  .sub{font-size:11.5px;color:#98a4b0;margin-bottom:13px}
+  .ref{display:flex;gap:7px;align-items:center;flex-wrap:nowrap;margin-bottom:16px}
+  .ref .lbl{font-size:11px;color:#98a4b0;margin-right:3px;white-space:nowrap}
+  .ref i{font-style:normal;font-size:10px;font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap}
+  .row3{display:flex;gap:14px;align-items:stretch;flex-wrap:nowrap}
+  .panel{width:360px;flex:0 0 360px;border-radius:18px;padding:14px 13px 13px;display:flex;flex-direction:column;gap:10px;
+         background:var(--pg);background-image:var(--pgi,none);border:1px solid rgba(128,140,152,.22)}
+  .phead b{display:block;font-size:13.5px;font-weight:900;letter-spacing:.03em;color:var(--c1)}
+  .phead span{display:block;margin-top:2px;font-size:10.5px;color:var(--c2)}
+
+  .card{background:var(--card);border:1px solid var(--cardbd);border-radius:14px;box-shadow:var(--cardsh);
+        padding:13px 12px 11px;display:flex;flex-direction:column;align-items:center}
+  .kicker{font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.3em;color:var(--kicker)}
+  .logo{margin-top:4px;font-size:28px;font-weight:900;letter-spacing:.05em;
+        background-image:var(--logobi);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .en{margin-top:5px;font-style:normal;font-size:8.5px;font-weight:700;letter-spacing:.28em;color:var(--c2)}
+  .btns{display:flex;flex-direction:column;gap:7px;width:80%;margin-top:12px}
+  button{font-family:var(--font);cursor:default}
+  button.pri{background:var(--pri);color:var(--pric);border:0;border-radius:10px;padding:9px 0;font-weight:800;font-size:13px;box-shadow:var(--prish,none)}
+  button.gh{background:transparent;color:var(--ghc);border:1.5px solid var(--ghbd);border-radius:10px;padding:9px 0;font-weight:800;font-size:13px}
+  .foot{margin-top:10px;font-size:9.5px;letter-spacing:.1em;color:var(--c2)}
+
+  .sec{display:flex;flex-direction:column;gap:6px}
+  .sechead{display:flex;align-items:baseline;gap:8px;padding:0 2px}
+  .sechead b{font-size:12.5px;font-weight:900;color:var(--c1)}
+  .sechead span{font-size:10px;color:var(--c2)}
+  .mrow{display:flex;align-items:center;gap:8px;background:var(--row);border:1.5px solid var(--rowbd);border-radius:11px;
+        padding:7px 10px;color:var(--rowc);box-shadow:var(--rowsh,none)}
+  .mrow.win{background:var(--winbg);border-color:var(--winbd);box-shadow:var(--winsh,none)}
+  .mrow.win .sc{color:var(--winsc)}
+  .mrow.win .no{color:var(--winbd)}
+  .no{font-family:var(--mono);font-size:12px;font-weight:900;color:var(--c2);min-width:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#3f8fd8;flex:0 0 auto}
+  .dot.o{background:#f2f4f7;border:1px solid rgba(0,0,0,.22)}
+  .dot.p{background:#9b5fd0}
+  .nm{font-size:12px;font-weight:800;flex:1 1 auto}
+  .sc{font-family:var(--mono);font-size:12.5px;font-weight:900}
+  .av{width:20px;height:32px;border-radius:7px;background:#3f8fd8;flex:0 0 auto}
+  .sq{width:25px;height:25px;border-radius:8px;border:1.5px solid var(--rowbd);background:transparent;color:var(--rowc);
+      font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .sq.x{color:#d0555f;border-color:rgba(208,85,95,.55)}
+  .rule{height:4px;border-radius:2px;background-image:var(--rulebi,none);opacity:.9}
+
+  .sws{display:flex;gap:5px;margin-top:1px}
+  .swv{flex:1 1 0;min-width:0}
+  .swv i{display:block;height:24px;border-radius:6px;border:1px solid rgba(128,140,152,.35)}
+  .swv u{margin-top:3px;display:block;text-align:center;font:600 7.5px/1.2 var(--mono);font-style:normal;color:#8b95a1;text-decoration:none;
+         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .note{font-size:10.5px;line-height:1.62;color:var(--c1);opacity:.9;border-top:1px dashed var(--cardbd);padding-top:8px}
+  .note b{font-weight:900}
+</style>
+</head>
+<body>
+<h1>《车票收藏家》台外页面（封面 / 名单 / 结算）· 配色提案</h1>
+<div class="sub">同一套页面骨架、同一批元素，只换颜色与材质 —— 与游戏进行页并排对照看气质是否连贯。</div>
+<div class="ref">
+  <span class="lbl">游戏页取色 →</span>
+  <i style="background:#dfe8f2;color:#22303d">瓷砖白 #dfe8f2</i>
+  <i style="background:#f2f6fb;color:#22303d">银白车体 #f2f6fb</i>
+  <i style="background:#22303d;color:#e9f0f7">站牌深蓝 #22303d</i>
+  <i style="background:#e8a53a;color:#22303d">琥珀顶光 #e8a53a</i>
+  <i style="background:#ffd98a;color:#22303d">LED 金 #ffd98a</i>
+  <i style="background:#e8c65a;color:#22303d">盲道黄 #e8c65a</i>
+  <i style="background:#d94f5c;color:#fff">车头红 #d94f5c</i>
+  <i style="background:#0b1220;color:#e9f0f7">夜空 #0b1220</i>
+</div>
+<div class="row3" id="panels"></div>
+<script>
+const SCHEMES = [
+{ name:'现状（对照）', tag:'深板岩 + 琥珀 · 取色自站牌与顶光',
+  v:{ pg:'#0f1721', pgi:'none', c1:'#e9f0f7', c2:'#71818f',
+      card:'linear-gradient(180deg,#1d2b3f,#101a26)', cardbd:'rgba(255,255,255,.20)', cardsh:'0 16px 34px rgba(4,10,18,.55)',
+      kicker:'#e8a53a', logobi:'linear-gradient(180deg,#ffe6ad 6%,#e8a53a 62%,#c9822a 100%)',
+      pri:'#e8a53a', pric:'#22303d', prish:'0 6px 16px rgba(232,165,58,.30)', ghbd:'rgba(255,255,255,.20)', ghc:'#e9f0f7',
+      row:'linear-gradient(180deg,#1c2b3c,#16222f)', rowbd:'rgba(255,255,255,.10)', rowc:'#e9f0f7',
+      winbg:'linear-gradient(180deg,rgba(232,165,58,.18),rgba(232,165,58,.05))', winbd:'#e8a53a', winsc:'#ffd98a',
+      winsh:'0 0 0 1px rgba(232,165,58,.34), 0 8px 22px rgba(120,78,12,.28)', rulebi:'none' },
+  sw:['#0f1721','#16222f','#1d2b3a','#e8a53a','#e9f0f7','#d94f5c'],
+  note:'<b>色相是对的</b>（站牌 / 顶光 / 夜空都在里面），问题是明度策略：三个页面 85% 是大片空深色，读起来像「深色工具 App」，与游戏页明亮的站台气质断层。' },
+
+{ name:'A · 站台日光', tag:'浅色 · 把游戏页的材料直接搬上台外',
+  v:{ pg:'#e8eef4', pgi:'repeating-linear-gradient(0deg,rgba(34,48,61,.05) 0 1px,transparent 1px 25px),repeating-linear-gradient(90deg,rgba(34,48,61,.05) 0 1px,transparent 1px 25px)',
+      c1:'#22303d', c2:'#6b7a8b',
+      card:'#ffffff', cardbd:'#d8e2ec', cardsh:'0 14px 30px rgba(30,50,70,.13)',
+      kicker:'#c9822a', logobi:'linear-gradient(180deg,#22303d,#22303d)',
+      pri:'#e8a53a', pric:'#22303d', prish:'0 8px 18px rgba(232,165,58,.35)', ghbd:'rgba(34,48,61,.22)', ghc:'#22303d',
+      row:'#ffffff', rowbd:'#e0e8f0', rowc:'#22303d', rowsh:'0 4px 12px rgba(30,50,70,.08)',
+      winbg:'#fff6e3', winbd:'#e8a53a', winsc:'#b3761f', winsh:'0 8px 20px rgba(232,165,58,.22)',
+      rulebi:'repeating-linear-gradient(90deg,#e8c65a 0 10px,transparent 10px 17px)' },
+  sw:['#e8eef4','#ffffff','#e8a53a','#e8c65a','#22303d','#3fae6b'],
+  note:'瓷砖白底 + 白卡 + 琥珀主按钮 + 盲道黄分隔（A 是游戏页的原地取色）。<b>与游戏页 100% 同源</b>；风险是白底容易「工具感」，靠地砖纹与黄条把它按回车站。' },
+
+{ name:'B · 硬券纸', tag:'浅色 · 暖纸卡 + 印章红，扣「收藏家」',
+  v:{ pg:'#ece2cf', pgi:'linear-gradient(180deg,#efe6d3,#e9dfc9)', c1:'#2f3d4d', c2:'#8a7a63',
+      card:'#fffaf0', cardbd:'#dccfb2', cardsh:'0 14px 28px rgba(96,74,42,.20)',
+      kicker:'#b8402f', logobi:'linear-gradient(180deg,#33404e,#33404e)',
+      pri:'#b8402f', pric:'#fff6e9', prish:'0 8px 18px rgba(184,64,47,.30)', ghbd:'rgba(47,61,77,.30)', ghc:'#2f3d4d',
+      row:'#f8efdd', rowbd:'#e3d6b8', rowc:'#2f3d4d', rowsh:'0 3px 9px rgba(96,74,42,.10)',
+      winbg:'#fdf3d9', winbd:'#c9822a', winsc:'#a4631c', winsh:'0 8px 20px rgba(201,130,42,.22)',
+      rulebi:'repeating-linear-gradient(90deg,#cbb98f 0 3px,transparent 3px 10px)' },
+  sw:['#ece2cf','#fffaf0','#b8402f','#e8a53a','#2f3d4d','#c9822a'],
+  note:'暖纸 + 印刷墨 + 印章红主按钮，票根齿孔做分隔，身份感来自「票」本身。<b>风险</b>：偏复古档案味，与聚会游戏的轻快感有一点点拉扯。' },
+
+{ name:'C · 深夜站台 2.0', tag:'深色 · 骨架不动，只做深化',
+  v:{ pg:'#0b131d', pgi:'radial-gradient(120% 62% at 50% 0%,rgba(232,165,58,.10),transparent 62%)',
+      c1:'#e9f0f7', c2:'#6f8194',
+      card:'linear-gradient(180deg,#15222f,#0f1926)', cardbd:'rgba(255,255,255,.14)', cardsh:'0 16px 34px rgba(2,8,16,.6), inset 0 1px 0 rgba(255,255,255,.06)',
+      kicker:'#ffd98a', logobi:'linear-gradient(180deg,#ffe6ad 6%,#e8a53a 62%,#c9822a 100%)',
+      pri:'#e8a53a', pric:'#22303d', prish:'0 6px 16px rgba(232,165,58,.30)', ghbd:'rgba(255,255,255,.22)', ghc:'#e9f0f7',
+      row:'linear-gradient(180deg,#16232f,#111c28)', rowbd:'rgba(255,255,255,.10)', rowc:'#e9f0f7',
+      winbg:'linear-gradient(180deg,rgba(232,165,58,.20),rgba(232,165,58,.06))', winbd:'#e8a53a', winsc:'#ffd98a',
+      winsh:'0 0 0 1px rgba(232,165,58,.34), 0 8px 22px rgba(120,78,12,.28)',
+      rulebi:'repeating-linear-gradient(90deg,rgba(255,217,138,.8) 0 10px,transparent 10px 17px)' },
+  sw:['#0b131d','#15222f','#e8a53a','#ffd98a','#e8c65a','#e9f0f7'],
+  note:'骨架一行不改：深色往场景夜景靠、页面顶部加琥珀顶光光晕、卡片加顶部高光。<b>风险最小</b>，但不解决「与游戏页气质断层」的根本问题，只是更好看的现状。' },
+
+{ name:'D · 夜色票纸', tag:'深框 + 浅票纸 · 身份最强',
+  v:{ pg:'#0c141f', pgi:'radial-gradient(120% 62% at 50% 0%,rgba(232,165,58,.12),transparent 62%)',
+      c1:'#e9f0f7', c2:'#8a99a8',
+      card:'#fdf8ec', cardbd:'rgba(255,255,255,.10)', cardsh:'0 18px 38px rgba(2,8,16,.65), 0 0 0 1px rgba(255,255,255,.06)',
+      kicker:'#b3761f', logobi:'linear-gradient(180deg,#22303d,#22303d)',
+      pri:'#e8a53a', pric:'#22303d', prish:'0 8px 18px rgba(232,165,58,.30)', ghbd:'rgba(34,48,61,.28)', ghc:'#22303d',
+      row:'#fdf8ec', rowbd:'#e3d7bd', rowc:'#22303d', rowsh:'0 10px 22px rgba(2,8,16,.5)',
+      winbg:'#fbeed2', winbd:'#d9a441', winsc:'#a4631c', winsh:'0 10px 24px rgba(2,8,16,.5)',
+      rulebi:'repeating-linear-gradient(90deg,#ddc9a0 0 3px,transparent 3px 10px)' },
+  sw:['#0c141f','#fdf8ec','#f4ecdc','#e8a53a','#22303d','#e8c65a'],
+  note:'画框仍是夜空深色（演出时与亮舞台同屏不打架），但所有卡片换成夜光票纸 —— 深海上飘着发光的票。<b>风险</b>：深浅混搭要控制卡片面积，铺太多会显碎。' },
+];
+
+const panelHTML = s => {
+  const v = Object.entries(s.v).filter(([,val])=>val).map(([k,val])=>'--'+k+': '+val).join('; ');
+  const sws = s.sw.map(c=>'<div class="swv"><i style="background:'+c+'"></i><u>'+c+'</u></div>').join('');
+  return '<div class="panel" style="'+v+'">'+
+    '<div class="phead"><b>'+s.name+'</b><span>'+s.tag+'</span></div>'+
+    '<div class="card">'+
+      '<i class="kicker">BOARD GAME ASSISTANT</i>'+
+      '<b class="logo">车票收藏家</b>'+
+      '<i class="en">TICKET COLLECTOR</i>'+
+      '<div class="btns"><button class="pri">开始游戏</button><button class="gh">游戏规则</button></div>'+
+      '<span class="foot">3 ～ 6 人 · 欢乐聚会博弈竞争</span>'+
+    '</div>'+
+    '<div class="sec">'+
+      '<div class="sechead"><b>乘客名单</b><span>3 ～ 6 人 · 点角色换配色</span></div>'+
+      '<div class="mrow"><span class="av"></span><b class="nm">乘客 2</b><button class="sq">骰</button><button class="sq x">×</button></div>'+
+    '</div>'+
+    '<div class="sec">'+
+      '<div class="sechead"><b>收藏结算</b><span>点任意一行看计分公式</span></div>'+
+      '<div class="mrow win"><span class="no">1</span><span class="dot"></span><b class="nm">乘客 2</b><b class="sc">64</b></div>'+
+      '<div class="mrow"><span class="no">2</span><span class="dot o"></span><b class="nm">乘客 1</b><b class="sc">0</b></div>'+
+    '</div>'+
+    '<div class="rule"></div>'+
+    '<div class="sws">'+sws+'</div>'+
+    '<div class="note">'+s.note+'</div>'+
+  '</div>';
+};
+document.getElementById('panels').innerHTML = SCHEMES.map(panelHTML).join('');
+</script>
+</body>
+</html>
