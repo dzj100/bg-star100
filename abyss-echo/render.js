@@ -17,6 +17,9 @@ function setHandFocus(pi) { _combatHandFocus = pi; render(); }
 
 /* ---------- 工具 ---------- */
 
+let IMG_ROOT = 'assets/pixel';   // 立绘根目录：'assets/pixel' = 16-bit 像素风；'' = 旧风（回退时改回空串）
+function pxImg(p) { return IMG_ROOT ? p.replace(/^assets\//, IMG_ROOT + '/') : p; }
+
 function getState() {
   try {
     if (typeof state !== 'undefined' && state) return state;
@@ -430,7 +433,7 @@ function renderMenu() {
     const checked = sel.includes(id);
     h += `
       <div class="class-card${checked ? ' sel' : ''}" style="--cc:${c.color}">
-        ${c.img ? `<img class="class-img" src="${c.img}" alt="${c.name}" loading="lazy">` : ''}
+        ${c.img ? `<img class="class-img" src="${pxImg(c.img)}" alt="${c.name}" loading="lazy">` : ''}
         <label class="class-check">
           <input type="checkbox"${checked ? ' checked' : ''} onchange="toggleMenuClass('${id}', this.checked)">
           <span class="class-name">${c.name}</span>
@@ -735,7 +738,7 @@ function renderCombat() {
     const eTip = `<div class="tip-title">${e.name}${e.isBoss ? '（首领）' : e.elite ? '（精英）' : ''}</div><div class="tip-body">${def.desc || ''}</div>`;
     const eHit = hitAttrs('e' + e.id);
     h += `<div class="enemy-card${e.isBoss ? ' boss' : ''}${e.elite ? ' elite' : ''}${alive ? '' : ' dead'}${combat.killedId === e.id ? ' just-killed' : ''}${acted.indexOf('e' + e.id) >= 0 ? ' attacking' : ''}${combat.tideSplash === e.id ? ' tide-splash' : ''}${combat.hitPulse === e.id ? ' pulse-hit' : ''}${targetable ? ' targetable' : ''}${hitClass(eHit)}" data-eid="${e.id}"${hitAttrsHtml(eHit)}${targetable ? ` onclick="act('play-card',${pending.playerIdx},${pending.handIdx},${i})"` : ''}${tipAttrs(eTip)}>`;
-    if (def.img) h += `<img class="enemy-img" src="${def.img}" alt="${def.name || ''}" loading="lazy">`;
+    if (def.img) h += `<img class="enemy-img" src="${pxImg(def.img)}" alt="${def.name || ''}" loading="lazy">`;
     if (combat.tideSplash === e.id) h += '<span class="tide-ring" aria-hidden="true"></span>';
     h += `<div class="enemy-name">${def.name || e.name || e.defId}</div>`;
     const floorScale = FLOOR_SCALE[run.floor - 1] || 1;
@@ -759,7 +762,7 @@ function renderCombat() {
     const pHit = hitAttrs('p' + i);
     h += `<div class="party-card${alive ? '' : ' dead'}${combat.playerActed === i ? ' attacking' : ''}${targetable ? ' targetable' : ''}${hitClass(pHit)}"${hitAttrsHtml(pHit)}${targetable ? ` onclick="act('play-card',${pending.playerIdx},${pending.handIdx},${i})"` : ''}>`;
     const cls = clsCard(p.classId);
-    if (cls && cls.img) h += `<img class="party-img" src="${cls.img}" alt="${cls.name || ''}" loading="lazy">`;
+    if (cls && cls.img) h += `<img class="party-img" src="${pxImg(cls.img)}" alt="${cls.name || ''}" loading="lazy">`;
     h += `<div class="party-name">${p.name}</div>`;
     if (cls && cls.mechanic) {
       const mTip = `<div class="tip-title">${cls.mechanic}</div><div class="tip-body">${cls.mechanicDesc || ''}</div>`;

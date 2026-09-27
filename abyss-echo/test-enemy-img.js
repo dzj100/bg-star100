@@ -19,6 +19,10 @@ const path = require('path');
   await page.waitForSelector('.enemy-card', { timeout: 8000 });
 
   // 检查敌人图片是否已渲染
+  await page.waitForFunction(() => {
+    const imgs = Array.from(document.querySelectorAll('.enemy-img'));
+    return imgs.length > 0 && imgs.every(i => i.complete && i.naturalWidth > 0);
+  }, { timeout: 8000 }).catch(() => {});
   const imgCount = await page.evaluate(() => document.querySelectorAll('.enemy-img').length);
   console.log('敌人图片数量:', imgCount);
   const imgSrcs = await page.evaluate(() => {
