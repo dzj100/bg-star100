@@ -660,7 +660,7 @@ function getMoveTargets(pathPos) {
 /**
  * 计算当前位置所有可达格及AP成本（移动V2）
  * 每步1AP：走1格并跳过占用格/机器人/加速标记（发明家可停在任意加速标记上），
- * 月球车每1AP走2格；后退越过第0格时基地可达。
+ * 月球车每1AP可走2格或1格（1格落点也为合法目标）；后退越过第0格时基地可达。
  * @param {number} pathPos - 玩家当前路径位置（-1=基地）
  * @returns {{ targets: Array<{pathPos: number, cost: number}>, base: number|null }}
  */
@@ -696,6 +696,8 @@ function getMoveReach(pathPos) {
           while (cur >= 0 && cur <= maxPos && occupied(cur)) cur += dir;
         }
         if (cur < 0 || cur > maxPos) { stepOk = false; break; }
+        // 月球车1AP可选走1格或2格：第1个子步的落点也是合法目标
+        if (isRover && i === 0) targets.push({ pathPos: cur, cost: cost + 1 });
       }
       if (!stepOk) {
         // 后退越过第0格 → 返回基地可达
