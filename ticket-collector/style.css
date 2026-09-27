@@ -1,7 +1,10 @@
 /* ============================================================
    《车票收藏家》Ticket Collector · 样式表
    白天都会地铁：白瓷砖站台 + 暖琥珀顶光 + 银白列车 + 蓝灰软阴影。
-   深板岩色的顶栏 / HUD 只是画框，明亮的舞台才是主角。
+   两层配色（SPEC 2.8）：**台上画框**（顶栏 / HUD / 传手机遮罩 / 特效）是深板岩，
+   只管当画框，明亮的舞台才是主角；**台外**（封面 / 名单 / 结算，加上浮在台上方的
+   卡片层：规则 / 日志 / 战报 / 配色抽屉）是硬券纸 —— 暖纸底 + 印刷墨 + 印章红，
+   扣「票」与「收藏」的身份。纸面上控件的换皮集中在 10b 节。
 
    三条铁律（改动前先读 SPEC 7.6）：
    1. 游戏层所有长度 = calc(N * var(--wu))，N 是世界单位；JS 往
@@ -43,11 +46,28 @@
   --ink2: #5c6b7c;
   --stage-bg: #dfe8f2;
 
-  /* —— 强调色 —— */
+  /* —— 强调色（台上）—— */
   --amber: #e8a53a;              /* 主按钮 / 顶光 */
   --amber-d: #c9822a;
   --danger: #d94f5c;             /* 无人光顾 / 最后一轮 */
   --ok: #3fae6b;                 /* 得手 */
+
+  /* —— 台外纸色（SPEC 2.8）：封面 / 名单 / 结算 / 卡片层 ——
+     硬券式暖纸 + 印刷墨 + 印章红。纸面上控件的换皮见 10b 节，
+     容器换纸见 11 ~ 15c 各节。 */
+  --paper-page: #e9dfc9;         /* 纸底（页面）*/
+  --paper-page-hi: #f2e9d6;      /* 纸底受光的一头 */
+  --paper: #fffaf0;              /* 卡面：比页面亮一档的硬券纸 */
+  --paper2: #f8efdd;             /* 行条：名单行 / 榜单行 */
+  --paper-hi: #fdf3d9;           /* 高亮行：冠军 */
+  --paper-line: #dccfb2;         /* 卡缘 */
+  --paper-line2: #e3d6b8;        /* 行缘 */
+  --paper-ink: #2f3d4d;          /* 印刷墨 */
+  --paper-dim: #8a7a63;          /* 纸上的次要字：暖灰棕 */
+  --paper-punch: #cbb98f;        /* 票根齿孔（分隔线用的点阵色）*/
+  --paper-btn: linear-gradient(180deg, #fffdf6, #f3e8d2);
+  --paper-sh: 0 14px 28px rgba(96, 74, 42, .22);
+  --stamp: #b8402f;              /* 印章红：纸面主按钮 / 强调 */
 
   /* —— 粒子用的明亮一档（落在浅舞台上仍读得清）—— */
   --fx-red: #e0503f;
@@ -97,7 +117,12 @@ b, strong { font-weight: 800; }
 .dim { color: var(--dim); }
 
 /* 细滚动条（只给可滚动的浮层） */
-.rules-card, .sheet-card, #roster, .roster, .ranking, #overList, #hudListIn, .rank-detail {
+/* 滚动条：纸面上的拇指走暖棕（白拇指在纸上看不见）；HUD 里的选择气泡仍是深色皮 */
+.rules-card, .sheet-card, #roster, .roster, .ranking, #overList, .rank-detail {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(96, 74, 42, .30) transparent;
+}
+#hudListIn {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, .22) transparent;
 }
@@ -109,7 +134,11 @@ b, strong { font-weight: 800; }
 #hudListIn::-webkit-scrollbar-track, .rank-detail::-webkit-scrollbar-track { background: transparent; }
 .rules-card::-webkit-scrollbar-thumb, .sheet-card::-webkit-scrollbar-thumb, #roster::-webkit-scrollbar-thumb,
 .roster::-webkit-scrollbar-thumb, .ranking::-webkit-scrollbar-thumb, #overList::-webkit-scrollbar-thumb,
-#hudListIn::-webkit-scrollbar-thumb, .rank-detail::-webkit-scrollbar-thumb {
+.rank-detail::-webkit-scrollbar-thumb {
+  background: rgba(96, 74, 42, .26);
+  border-radius: 3px;
+}
+#hudListIn::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, .18);
   border-radius: 3px;
 }
@@ -121,16 +150,16 @@ b, strong { font-weight: 800; }
 #screen-menu.on, #screen-setup.on, #screen-game.on, #screen-over.on,
 #curtain.on, #rules.on, #palette.on, #logbox.on, #summary.on { display: flex; }
 
-/* z 1 —— 封面 */
+/* z 1 —— 封面（台外纸面：暖纸 + 顶部一层站台顶光的光晕） */
 #screen-menu {
   position: fixed; inset: 0; z-index: 1;
   flex-direction: column; align-items: center; justify-content: center;
   padding: max(22px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
   overflow: hidden;
+  color: var(--paper-ink);
   background:
-    radial-gradient(120% 58% at 50% -12%, rgba(232, 165, 58, .18), transparent 64%),
-    radial-gradient(90% 46% at 50% 112%, rgba(63, 174, 107, .10), transparent 70%),
-    linear-gradient(180deg, #13202f 0%, #0d1621 58%, #0a121a 100%);
+    radial-gradient(120% 58% at 50% -12%, rgba(232, 165, 58, .26), transparent 64%),
+    linear-gradient(180deg, var(--paper-page-hi) 0%, #ece2cd 58%, #e3d7bd 100%);
 }
 
 /* z 2 —— 对局！position:relative + z-index 是舞台各层的解析基准 */
@@ -141,20 +170,22 @@ b, strong { font-weight: 800; }
   background: var(--chrome);
 }
 
-/* z 10 —— 名单 */
+/* z 10 —— 名单（台外纸面） */
 #screen-setup {
   position: fixed; inset: 0; z-index: 10;
   flex-direction: column;
   padding-top: max(6px, env(safe-area-inset-top));
-  background: linear-gradient(180deg, #13202f, #0c151f);
+  color: var(--paper-ink);
+  background: linear-gradient(180deg, var(--paper-page-hi), #e6dbc3);
 }
 
-/* z 20 —— 结算 */
+/* z 20 —— 结算（台外纸面：顶部受光的一张大纸） */
 #screen-over {
   position: fixed; inset: 0; z-index: 20;
   flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; padding: 16px;
-  background: radial-gradient(120% 76% at 50% 0%, #17273a 0%, #0a1219 66%);
+  color: var(--paper-ink);
+  background: radial-gradient(120% 76% at 50% 0%, #f6eed9 0%, #e4d8bf 66%);
 }
 
 /* z 30 —— 传手机遮罩（不透明到看不见下层，且绝不用 backdrop-filter） */
@@ -166,19 +197,19 @@ b, strong { font-weight: 800; }
   animation: riseIn .2s ease-out;
 }
 
-/* z 50 —— 规则 */
+/* z 50 —— 规则（压幕走暖调：桌上摊的是纸，不是黑房间） */
 #rules {
   position: fixed; inset: 0; z-index: 50;
   align-items: center; justify-content: center;
   padding: 14px;
-  background: rgba(5, 11, 18, .74);
+  background: rgba(28, 20, 10, .62);
 }
 
 /* z 51 —— 配色抽屉 */
 #palette {
   position: fixed; inset: 0; z-index: 51;
   align-items: flex-end; justify-content: center;
-  background: rgba(5, 11, 18, .52);
+  background: rgba(28, 20, 10, .44);
 }
 
 /* z 52 —— 运行日志（比配色抽屉高一层：日志可以在任何界面喊出来） */
@@ -186,7 +217,7 @@ b, strong { font-weight: 800; }
   position: fixed; inset: 0; z-index: 52;
   align-items: center; justify-content: center;
   padding: 14px;
-  background: rgba(5, 11, 18, .74);
+  background: rgba(28, 20, 10, .62);
 }
 
 /* z 40 —— 本轮战报：结算演完到下一轮之间那一格。压住舞台与 HUD（选择都在它之下），
@@ -196,7 +227,7 @@ b, strong { font-weight: 800; }
   position: fixed; inset: 0; z-index: 40;
   align-items: center; justify-content: center;
   padding: 14px;
-  background: rgba(5, 11, 18, .74);
+  background: rgba(28, 20, 10, .62);
 }
 
 /* z 60 —— 特效层：视口坐标，永不接事件 */
@@ -343,11 +374,14 @@ b, strong { font-weight: 800; }
 .lo-bumper { fill: #9fabb9; }
 
 /* —— 车厢号 / 车顶总数：常驻字号，不随纵深缩小（可读性优先）——
-   两颗药丸骑在车厢近端的那道横梁上：左边是「第 N 节」，右边是「共 N 张」。
-   10 世界单位是用户的指定值：这两颗药丸是全局最要紧的数字（哪节车、几张票）。 */
+   两颗药丸落在车厢 80% 高度的那条空档里：左边是「第 N 节」，右边是「共 N 张」。
+   空档上不糊人脸（登车的脚在 78%、头在 43%）、下不骑近端横梁（梁带在最后
+   9 世界单位）、远不碰筹码（筹码带在远 30%）；从前贴地骑在近端横梁上，
+   会垂到车缝与车头上 —— 80% 是用户的指定值，整颗都在自己车厢里。
+   10 世界单位也是用户的指定值：这两颗药丸是全局最要紧的数字（哪节车、几张票）。 */
 .car-no, .roof-total {
   position: absolute; z-index: 1;
-  top: calc(100% - 4.6 * var(--wu));
+  top: calc(80% - 4.6 * var(--wu));
   display: flex; align-items: center; gap: calc(1.4 * var(--wu));
   padding: calc(1.1 * var(--wu)) calc(2.4 * var(--wu));
   border-radius: 2em;
@@ -940,6 +974,46 @@ b, strong { font-weight: 800; }
 }
 
 /* ============================================================
+   10b. 台外纸面：共用控件的换纸皮（SPEC 2.8）
+   ------------------------------------------------------------------
+   台外的范围：封面 / 名单 / 结算三张页面，加上浮在台上方的卡片层
+   （规则 / 日志 / 战报 / 配色抽屉）。这些范围里的 .btn / .tb-btn 与深色画框
+   里的同名控件共用一套骨架，所以换皮集中在这里写一次。
+
+   变量块是这层纸的地基：--line / --line2 / --text / --dim / --dim2 /
+   --sh-inset / --sh-card 全部换成纸面值，容器里的边框、正文色、按下阴影
+   自动跟着走（自定义属性直接落在元素上，一定压得过 :root 的继承值）。
+   控件皮只补那些写死了颜色的部分：深色底与彩色影。
+   传手机遮罩 #curtainOk 与 HUD 不在此列 —— 它们是台上的画框。
+   ============================================================ */
+:is(#screen-menu, #screen-setup, #screen-over, .sheet-card, .rules-card, .log-card, .sum-card) {
+  --line: rgba(96, 74, 42, .20);
+  --line2: rgba(47, 61, 77, .30);
+  --text: var(--paper-ink);
+  --dim: var(--paper-dim);
+  --dim2: #9c8d75;
+  --sh-inset: 0 1px 2px rgba(96, 74, 42, .12);
+  --sh-card: var(--paper-sh);
+}
+:is(#screen-menu, #screen-setup, #screen-over, .sheet-card, .rules-card, .log-card, .sum-card) .btn {
+  background: var(--paper-btn);
+}
+/* 顺序要紧：.btn 的纸底会压过 .btn-ghost 的透明底，所以幽灵皮要跟在后面重新写回 */
+:is(#screen-menu, #screen-setup, #screen-over, .sheet-card, .rules-card, .log-card, .sum-card) .btn-ghost {
+  background: transparent;
+  box-shadow: none;
+}
+:is(#screen-menu, #screen-setup, #screen-over, .sheet-card, .rules-card, .log-card, .sum-card) .btn-primary {
+  background: linear-gradient(180deg, #c4452f, var(--stamp));
+  border-color: #cf5a41;
+  color: #fff6e9;
+  box-shadow: 0 8px 18px rgba(184, 64, 47, .28);
+}
+:is(#screen-menu, #screen-setup, #screen-over, .sheet-card, .rules-card, .log-card, .sum-card) .tb-btn {
+  background: rgba(255, 250, 240, .72);
+}
+
+/* ============================================================
    11. 封面 #screen-menu
    ============================================================ */
 .menu-card, .menu-inner {
@@ -948,25 +1022,24 @@ b, strong { font-weight: 800; }
   display: flex; flex-direction: column; align-items: center;
   padding: 26px 20px 22px;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(29, 45, 63, .94), rgba(16, 26, 38, .95));
-  border: 1px solid var(--line2);
-  box-shadow: 0 22px 48px rgba(4, 10, 18, .58);
+  background: var(--paper);
+  border: 1.5px solid var(--paper-line);
+  box-shadow: var(--paper-sh);
   animation: riseIn .34s ease-out;
 }
 
 .logo-kicker {
   display: inline-block;
   font-size: 12px; font-weight: 700; letter-spacing: .34em; text-transform: uppercase;
-  color: var(--amber); opacity: .88;
+  color: var(--stamp); opacity: .92;
 }
+/* 大标题 = 印在券纸上的墨字：压凹一档的浮雕感（上白下一丁点暖影） */
 .logo-zh {
   margin-top: 6px;
   font-size: clamp(38px, 13vw, 56px);
   font-weight: 900; letter-spacing: .06em; line-height: 1.06;
-  color: #f6c76b;
-  background: linear-gradient(180deg, #ffe6ad 6%, #e8a53a 62%, #c9822a 100%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #33404e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .6);
 }
 .logo-en {
   margin-top: 7px;
@@ -981,21 +1054,27 @@ b, strong { font-weight: 800; }
   margin-top: 24px;
 }
 .menu-actions .btn { width: 100%; }
+/* 页脚上方一道票根齿孔（分隔「拿着票去坐车」这一句与按钮区） */
 .menu-foot {
-  margin-top: 18px;
+  width: 100%;
+  margin-top: 16px; padding-top: 13px;
   font-size: 12px; letter-spacing: .12em; color: var(--dim2); text-align: center;
+  background-image: repeating-linear-gradient(90deg, var(--paper-punch) 0 3px, transparent 3px 10px);
+  background-repeat: no-repeat;
+  background-size: 100% 3px;
+  background-position: 50% 0;
 }
 
-/* 打孔纸屑装饰：圆环 + 亮心，两个呼吸一个闪 */
+/* 纸面装饰：邮戳环（印章红的同心圆），两个呼吸一个闪 */
 .menu-deco, #screen-menu .deco {
   position: absolute; z-index: 1;
   border-radius: 50%;
   pointer-events: none;
-  border: 1.5px solid rgba(232, 165, 58, .22);
-  background: radial-gradient(closest-side, rgba(232, 165, 58, .12), transparent 74%);
+  border: 1.5px solid rgba(184, 64, 47, .20);
+  background: radial-gradient(closest-side, rgba(184, 64, 47, .07), transparent 74%);
 }
-.menu-deco::before { content: ""; position: absolute; inset: 26%; border-radius: 50%; background: rgba(232, 165, 58, .16); }
-.menu-deco::after  { content: ""; position: absolute; inset: 43%; border-radius: 50%; background: rgba(255, 246, 225, .5); }
+.menu-deco::before { content: ""; position: absolute; inset: 26%; border-radius: 50%; background: rgba(184, 64, 47, .13); }
+.menu-deco::after  { content: ""; position: absolute; inset: 43%; border-radius: 50%; background: rgba(184, 64, 47, .26); }
 .menu-deco.d1, #screen-menu .deco.d1 { width: 122px; height: 122px; top: -28px; left: -36px; opacity: .9; animation: floatY 5.6s ease-in-out infinite; }
 .menu-deco.d2, #screen-menu .deco.d2 { width: 64px; height: 64px; top: 22%; right: -16px; opacity: .7; animation: sparkle 3.4s ease-in-out infinite; }
 .menu-deco.d3, #screen-menu .deco.d3 { width: 38px; height: 38px; left: 9%; bottom: 15%; opacity: .5; animation: sparkle 4.2s ease-in-out infinite .7s; }
@@ -1018,9 +1097,9 @@ b, strong { font-weight: 800; }
   display: flex; align-items: center; gap: 9px;
   padding: 7px 9px;
   border-radius: 15px;
-  border: 1.5px solid var(--line);
-  background: linear-gradient(180deg, #1c2b3c, #16222f);
-  box-shadow: var(--sh-inset);
+  border: 1.5px solid var(--paper-line2);
+  background: var(--paper2);
+  box-shadow: 0 3px 9px rgba(96, 74, 42, .10);
 }
 .pl-row.invalid { border-color: var(--danger); animation: shakeX .42s ease-out; }
 
@@ -1028,7 +1107,9 @@ b, strong { font-weight: 800; }
   flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
   min-width: 24px;
-  background: radial-gradient(circle at 50% 82%, rgba(255, 255, 255, .10), transparent 64%);
+  padding: 3px 5px;              /* 命中区比小人本身大一圈 */
+  border: 0;                     /* <button> 的 UA 边框在深色行里看不见，到了纸上就是一只黑方块 */
+  background: radial-gradient(circle at 50% 82%, rgba(96, 74, 42, .10), transparent 64%);
   border-radius: 12px;
 }
 /* 预览用：把 .fig 从「绝对定位的世界实体」降级成普通盒子。
@@ -1048,11 +1129,11 @@ b, strong { font-weight: 800; }
   padding: 8px 11px;
   border-radius: 11px;
   border: 1.5px solid var(--line2);
-  background: #0d1620; color: var(--text);
+  background: var(--paper); color: var(--text);
   font-size: 15px; font-weight: 700; letter-spacing: .02em;
 }
 .pl-name::placeholder { color: var(--dim2); }
-.pl-name:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px rgba(232, 165, 58, .3); }
+.pl-name:focus { outline: none; border-color: var(--stamp); box-shadow: 0 0 0 2px rgba(184, 64, 47, .22); }
 
 .pl-rand, .pl-del {
   flex: 0 0 auto;
@@ -1060,19 +1141,19 @@ b, strong { font-weight: 800; }
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 11px;
   border: 1.5px solid var(--line2);
-  background: #131e2a; color: var(--text);
+  background: var(--paper-btn); color: var(--text);
   font-size: 16px; font-weight: 800;
   transition: transform .1s ease-out;
 }
 .pl-rand:active, .pl-del:active { transform: translateY(1px); }
-.pl-del { color: #ffb3a8; border-color: rgba(217, 79, 92, .5); }
+.pl-del { color: var(--stamp); border-color: rgba(184, 64, 47, .45); }
 .pl-rand:disabled, .pl-del:disabled { opacity: .34; pointer-events: none; }
 
 .setup-foot {
   display: flex; gap: 8px;
   padding: 9px 12px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: rgba(16, 26, 38, .6);
+  background: rgba(255, 250, 240, .62);
 }
 .setup-foot .btn { flex: 1 1 auto; }
 
@@ -1082,17 +1163,23 @@ b, strong { font-weight: 800; }
 .sheet {
   position: fixed; inset: 0;
   display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(5, 11, 18, .3);
+  background: rgba(28, 20, 10, .26);
 }
+/* 抽屉 = 从桌下抽上来的一张券纸：顶上一道齿孔，撕下来就能用 */
 .sheet-card {
   width: 100%; max-width: 470px;
   max-height: 78dvh;
   overflow-y: auto; overscroll-behavior: contain;
-  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  padding: 20px 16px calc(18px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0;
-  border-top: 2px solid var(--line2);
-  background: var(--chrome2);
-  box-shadow: 0 -14px 34px rgba(4, 10, 18, .55);
+  border-top: 1.5px solid var(--paper-line);
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(90deg, var(--paper-punch) 0 3px, transparent 3px 10px);
+  background-repeat: no-repeat;
+  background-size: 100% 3px;
+  background-position: 50% 8px;
+  color: var(--paper-ink);
+  box-shadow: 0 -14px 34px rgba(96, 74, 42, .26);
   animation: riseIn .22s ease-out;
 }
 .sheet-head {
@@ -1125,7 +1212,7 @@ b, strong { font-weight: 800; }
   transition: transform .1s ease-out;
 }
 .sw:active { transform: scale(.94); }
-.sw.on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--c, #888); }
+.sw.on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--c, #888); }
 
 /* ============================================================
    14. 结算 #screen-over
@@ -1144,19 +1231,21 @@ b, strong { font-weight: 800; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
   padding: 9px 11px;
   border-radius: 14px;
-  border: 1.5px solid var(--line);
-  background: linear-gradient(180deg, #1c2b3c, #16222f);
+  border: 1.5px solid var(--paper-line2);
+  background: var(--paper2);
+  box-shadow: 0 3px 9px rgba(96, 74, 42, .10);
 }
+/* 冠军行 = 一张烫金奖券：纸色高一档、缘是琥珀、分数用印油金棕 */
 .rank-row.win {
-  border-color: var(--amber);
-  background: linear-gradient(180deg, rgba(232, 165, 58, .18), rgba(232, 165, 58, .05));
-  box-shadow: 0 0 0 1px rgba(232, 165, 58, .34), 0 8px 22px rgba(120, 78, 12, .28);
+  border-color: var(--amber-d);
+  background: var(--paper-hi);
+  box-shadow: 0 8px 20px rgba(201, 130, 42, .22);
 }
 .rank-no { min-width: 26px; font-family: var(--mono); font-size: 16px; font-weight: 900; color: var(--dim); }
-.rank-row.win .rank-no { color: var(--amber); }
+.rank-row.win .rank-no { color: var(--amber-d); }
 .rank-name { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rank-score { font-family: var(--mono); font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
-.rank-row.win .rank-score { color: #ffd98a; }
+.rank-row.win .rank-score { color: #a4631c; }
 
 .rank-detail { display: none; width: 100%; margin-top: 2px; padding-top: 7px; border-top: 1px dashed var(--line2); }
 .rank-row.open .rank-detail { display: block; }
@@ -1164,7 +1253,7 @@ b, strong { font-weight: 800; }
   display: flex; align-items: baseline; gap: 8px;
   padding: 3px 0;
   font-size: 12.5px; color: var(--dim);
-  border-bottom: 1px dashed rgba(255, 255, 255, .07);
+  border-bottom: 1px dashed rgba(96, 74, 42, .16);
 }
 .score-row > :last-child { margin-left: auto; font-family: var(--mono); font-weight: 800; color: var(--text); }
 .score-total {
@@ -1173,7 +1262,7 @@ b, strong { font-weight: 800; }
   border-top: 1px solid var(--line2);
   font-size: 14px; font-weight: 900;
 }
-.score-total > :last-child { margin-left: auto; color: #ffd98a; font-family: var(--mono); }
+.score-total > :last-child { margin-left: auto; color: #a4631c; font-family: var(--mono); }
 
 .over-foot { display: flex; gap: 8px; padding-top: 4px; }
 .over-foot .btn { flex: 1 1 auto; }
@@ -1187,22 +1276,23 @@ b, strong { font-weight: 800; }
   overflow-y: auto; overscroll-behavior: contain;
   padding: 16px 18px calc(18px + env(safe-area-inset-bottom));
   border-radius: 18px;
-  border: 1.5px solid var(--line2);
-  background: linear-gradient(180deg, #17232f, #121b25);
+  border: 1.5px solid var(--paper-line);
+  background: var(--paper);
+  color: var(--paper-ink);
   box-shadow: var(--sh-card);
   animation: riseIn .24s ease-out;
 }
 .rules-card h3 { font-size: 17px; font-weight: 900; letter-spacing: .05em; margin-bottom: 8px; }
-.rules-card h4 { margin: 14px 0 6px; font-size: 13.5px; font-weight: 900; letter-spacing: .04em; color: var(--amber); }
+.rules-card h4 { margin: 14px 0 6px; font-size: 13.5px; font-weight: 900; letter-spacing: .04em; color: var(--stamp); }
 .rules-card h4:first-child, .rules-card h3 + h4 { margin-top: 6px; }
-.rules-card p, .rules-card li { font-size: 13px; line-height: 1.72; color: rgba(233, 240, 247, .84); }
+.rules-card p, .rules-card li { font-size: 13px; line-height: 1.72; color: rgba(47, 61, 77, .84); }
 .rules-card p { margin: 6px 0; }
 .rules-card ul, .rules-card ol { margin: 6px 0; padding-left: 19px; }
 .rules-card li { margin: 2px 0; }
-.rules-card b { color: #fff; }
+.rules-card b { color: #22303d; }
 .rules-card table { width: 100%; margin: 8px 0; border-collapse: collapse; font-size: 12.5px; }
 .rules-card th, .rules-card td { padding: 6px 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; line-height: 1.6; }
-.rules-card th { background: rgba(255, 255, 255, .05); color: var(--dim); font-size: 12px; font-weight: 800; letter-spacing: .06em; }
+.rules-card th { background: rgba(96, 74, 42, .06); color: var(--dim); font-size: 12px; font-weight: 800; letter-spacing: .06em; }
 .rules-card td:first-child { font-weight: 800; }
 .rules-card .btn { width: 100%; margin-top: 14px; }
 
@@ -1216,7 +1306,7 @@ b, strong { font-weight: 800; }
   line-height: 1.6;
 }
 .rules-kv dt, .rules-kv > :nth-child(odd) { color: var(--dim); font-weight: 800; }
-.rules-kv dd, .rules-kv > :nth-child(even) { margin: 0; color: rgba(233, 240, 247, .86); }
+.rules-kv dd, .rules-kv > :nth-child(even) { margin: 0; color: rgba(47, 61, 77, .86); }
 
 #rulesBody > :first-child { margin-top: 0; }
 
@@ -1229,9 +1319,10 @@ b, strong { font-weight: 800; }
   display: flex; flex-direction: column;
   padding: 13px 14px calc(13px + env(safe-area-inset-bottom));
   border-radius: 18px;
-  border: 1px solid var(--line2);
-  background: var(--chrome2);
-  box-shadow: 0 18px 44px rgba(3, 8, 15, .6);
+  border: 1.5px solid var(--paper-line);
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 18px 44px rgba(96, 74, 42, .30);
   animation: riseIn .18s ease-out;
 }
 .log-head {
@@ -1253,17 +1344,18 @@ b, strong { font-weight: 800; }
   display: flex; gap: 7px; align-items: baseline;
   padding: 3px 7px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, .035);
+  background: rgba(96, 74, 42, .05);
   border-left: 2.5px solid var(--line2);
 }
 .log-row i { flex: 0 0 auto; color: var(--dim); font-style: normal; font-size: 12px; }
 .log-row b { flex: 0 0 auto; color: var(--dim); font-size: 12px; font-weight: 800; }
-.log-row span { flex: 1 1 auto; word-break: break-word; color: rgba(233, 240, 247, .9); }
-.log-row.act  { border-left-color: #4f9be0; }
-.log-row.good { border-left-color: #46b877; }
-.log-row.warn { border-left-color: var(--amber); }
-.log-row.err  { border-left-color: #e05b5b; background: rgba(224, 91, 91, .12); }
-.log-row.err span { color: #ffc9c9; }
+.log-row span { flex: 1 1 auto; word-break: break-word; color: rgba(47, 61, 77, .92); }
+/* 四种状态的边条色在纸上各压深一档，保证浅底上仍读得清 */
+.log-row.act  { border-left-color: #2f6fb0; }
+.log-row.good { border-left-color: #2e8a52; }
+.log-row.warn { border-left-color: var(--amber-d); }
+.log-row.err  { border-left-color: var(--stamp); background: rgba(184, 64, 47, .10); }
+.log-row.err span { color: #8f2f22; }
 .log-empty { padding: 22px 0; text-align: center; color: var(--dim); font-size: 12.5px; }
 
 .log-foot {
@@ -1283,9 +1375,10 @@ b, strong { font-weight: 800; }
   display: flex; flex-direction: column;
   padding: 15px 15px calc(15px + env(safe-area-inset-bottom));
   border-radius: 18px;
-  border: 1px solid var(--line2);
-  background: var(--chrome2);
-  box-shadow: 0 18px 44px rgba(3, 8, 15, .6);
+  border: 1.5px solid var(--paper-line);
+  background: var(--paper);
+  color: var(--paper-ink);
+  box-shadow: 0 18px 44px rgba(96, 74, 42, .30);
   animation: riseIn .18s ease-out;
 }
 .sum-card h3 { font-size: 16px; font-weight: 900; letter-spacing: .05em; margin-bottom: 9px; }
@@ -1304,32 +1397,32 @@ b, strong { font-weight: 800; }
   flex: none; width: 9px; height: 9px; margin-top: 5px;
   border-radius: 50%;
   background: var(--cloth, #7c8899);
-  outline: 1.5px solid rgba(255, 255, 255, .22);
+  outline: 1.5px solid rgba(96, 74, 42, .28);
 }
 .sum-who { flex: 1 1 auto; min-width: 0; }
-.sum-who > b { display: block; font-size: 13.5px; font-weight: 800; color: #fff; }
+.sum-who > b { display: block; font-size: 13.5px; font-weight: 800; color: #22303d; }
 .sum-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
-.sum-line .sum-txt { font-size: 12px; line-height: 1.4; color: rgba(233, 240, 247, .72); }
-.sum-line.good .sum-txt { color: #6fd39a; }
-.sum-line.bad .sum-txt { color: #e88a92; }
-.sum-line.store .sum-txt { color: var(--amber); }
+.sum-line .sum-txt { font-size: 12px; line-height: 1.4; color: rgba(47, 61, 77, .74); }
+.sum-line.good .sum-txt { color: #2e8a52; }
+.sum-line.bad .sum-txt { color: var(--stamp); }
+.sum-line.store .sum-txt { color: var(--amber-d); }
 .sum-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 /* 票样比「看一眼」卡片小一号：这里一行里要塞下几条说明，26px 的票会把人名挤到换行 */
 #summary .pk-ch {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 7px;
   border: 1px solid var(--line2); border-radius: 8px;
-  background: #0d1620;
+  background: #fffdf6;
 }
 #summary .pk-ch .tk { width: 17px; height: auto; }
-#summary .pk-ch b { font-size: 11.5px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+#summary .pk-ch b { font-size: 11.5px; font-weight: 800; color: #22303d; font-variant-numeric: tabular-nums; }
 .sum-net {
   flex: none; min-width: 34px; margin-top: 1px; text-align: right;
   font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums;
 }
-.sum-net.good { color: #6fd39a; }
-.sum-net.bad { color: #e88a92; }
-.sum-net.store { font-size: 12.5px; color: var(--amber); }
+.sum-net.good { color: #2e8a52; }
+.sum-net.bad { color: var(--stamp); }
+.sum-net.store { font-size: 12.5px; color: var(--amber-d); }
 .sum-net.dim { color: var(--dim); }
 .sum-hint { margin-bottom: 10px; font-size: 12px; line-height: 1.6; color: var(--dim); }
 .sum-card .btn { width: 100%; }
@@ -1459,7 +1552,7 @@ b, strong { font-weight: 800; }
   flex: 0 0 auto;
   width: 12px; height: 12px; border-radius: 50%;
   background: var(--cloth, #71818f);
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .22);
+  box-shadow: 0 0 0 1.5px rgba(96, 74, 42, .30);
 }
 /* 明细里的「储物柜 / 背包」小节标题 */
 .score-sub { margin-top: 7px; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--dim2); }

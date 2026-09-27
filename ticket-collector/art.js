@@ -250,25 +250,31 @@
   };
 
   /* ================= 列车头 =================
-     近端被画面切掉之前，露出来的那一截：车顶 + 朝向观众的车头脸。 */
+     近端被画面切掉之前，露出来的那一截：车顶 + 朝向观众的车头脸。
+     红色腰带贴着站台那一侧的边缘走 —— 浮在顶面中间、两边留白，会被读成一扇门；
+     检修口与通风口排在右边那块白顶上。 */
   A.loco = function (B) {
     const q = B.quad, iT = q[0][0], oT = q[1][0], iB = q[3][0], oB = q[2][0];
     const y0 = B.y0, y1 = B.y1, s = B.s;
     const hF = 30 * s;                                     // 车头脸的高度
     const fx = iB + 2, fw = oB - iB - 4;
+    const bwT = (oT - iT) * 0.26, bwB = (oB - iB) * 0.26;  // 腰带宽度：跟着车体一起收
+    /* 腰带收到车头脸上沿之前 2 单位就停 —— 让它整个被脸盖住，不然脸下会漏出一道红边 */
+    const yB = y1 - 2, tB = (yB - y0) / (y1 - y0);
+    const bL = iT + (iB - iT) * tB, bR = bL + bwT + (bwB - bwT) * tB;
     return '<svg class="lo-svg" viewBox="' + n1(B.box.x) + ' ' + n1(B.box.y) + ' ' +
       n1(B.box.w) + ' ' + n1(B.box.h) + '">' +
       '<path class="lo-shadow" d="M' + n1(iT) + ' ' + n1(y0) + ' L' + n1(iT - 4.5) + ' ' + n1(y0) +
       ' L' + n1(iB - 4.5) + ' ' + n1(y1) + ' L' + n1(iB) + ' ' + n1(y1) + ' Z"/>' +
       '<path class="lo-body" d="M' + n1(iT) + ' ' + n1(y0) + ' L' + n1(oT) + ' ' + n1(y0) +
       ' L' + n1(oB) + ' ' + n1(y1) + ' L' + n1(iB) + ' ' + n1(y1) + ' Z"/>' +
-      '<path class="lo-stripe" d="M' + n1(iT + 6) + ' ' + n1(y0) + ' L' + n1(oT - 46) + ' ' + n1(y0) +
-      ' L' + n1(oB - 46) + ' ' + n1(y1) + ' L' + n1(iB + 6) + ' ' + n1(y1) + ' Z"/>' +
-      '<rect class="lo-hatch" x="' + n1(iT + 26) + '" y="' + n1(y0 + 12) + '" width="' + n1(30 * s) +
+      '<path class="lo-stripe" d="M' + n1(iT + 1) + ' ' + n1(y0) + ' L' + n1(iT + 1 + bwT) + ' ' + n1(y0) +
+      ' L' + n1(bR) + ' ' + n1(yB) + ' L' + n1(bL) + ' ' + n1(yB) + ' Z"/>' +
+      '<rect class="lo-hatch" x="' + n1(iT + 46) + '" y="' + n1(y0 + 12) + '" width="' + n1(30 * s) +
       '" height="' + n1(20 * s) + '" rx="' + n1(3 * s) + '"/>' +
-      '<rect class="lo-vent" x="' + n1(iT + 62) + '" y="' + n1(y0 + 14) + '" width="' + n1(22 * s) +
+      '<rect class="lo-vent" x="' + n1(iT + 84) + '" y="' + n1(y0 + 14) + '" width="' + n1(22 * s) +
       '" height="' + n1(8 * s) + '" rx="' + n1(3 * s) + '"/>' +
-      '<rect class="lo-vent" x="' + n1(iT + 62) + '" y="' + n1(y0 + 28) + '" width="' + n1(22 * s) +
+      '<rect class="lo-vent" x="' + n1(iT + 84) + '" y="' + n1(y0 + 28) + '" width="' + n1(22 * s) +
       '" height="' + n1(8 * s) + '" rx="' + n1(3 * s) + '"/>' +
       /* 车头脸：整块压在车顶近端上（它比车顶更靠近观众） */
       '<path class="lo-face" d="M' + n1(fx) + ' ' + n1(y1 - hF) + ' L' + n1(fx + fw) + ' ' + n1(y1 - hF) +
