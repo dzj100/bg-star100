@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>桌游助手合集</title>
+<meta name="theme-color" content="#6d4a2b">
 <meta name="description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家 — 多人聚会桌游在线助手">
 <meta property="og:title" content="桌游助手合集">
 <meta property="og:description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家 — 多人聚会桌游在线助手">
@@ -12,240 +13,445 @@
 <link rel="icon" href="og-icon.png">
 <style>
 :root {
-  --bg: #d6e8f0;
-  --surface: #faf5eb;
-  --card-bg: #fff8ee;
-  --accent: #d94f5c;
-  --gold: #e8a832;
-  --text: #3d3228;
-  --text-dim: #8a7e72;
+  --bg: #6d4a2b;
+  --surface: #f8f1e0;
+  --card-bg: #fdf9ee;
+  --accent: #c93b2f;
+  --gold: #b0741a;
+  --gold-l: #e8b64c;
+  --text: #2b2620;
+  --text-dim: #8a7c66;
   --radius: 14px;
-  --blue: #5ba4d9;
-  --orange: #e8943a;
-  --green: #5aad5e;
-  --purple: #b55dae;
+  --line: rgba(43,38,32,.12);
+  --tb: calc(88px + env(safe-area-inset-top));
+  --rail-w: 56px;
+  --shell-w: calc(var(--rail-w) + 520px);
+  --shell-half: calc(var(--rail-w) / 2 + 260px);
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; overflow-x:hidden; }
+html { scroll-behavior:smooth; }
+/* 背景 = 深胡桃木桌：底色 + 顶光 + 宽色斑 + 细木纹（SVG 噪声，无缝平铺） */
+body { font-family:-apple-system,system-ui,sans-serif; color:var(--text); min-height:100dvh; overflow-x:hidden;
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 50% -120px, rgba(255,226,178,.18), rgba(255,226,178,0) 72%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='0.005 0.055' numOctaves='5' seed='13' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.62 0 0 0 0 0.44 0 0 0 0 0.26 0.55 0 0 0 -0.20'/></filter><rect width='640' height='640' filter='url(%23g)'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='960' height='960'><filter id='p' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='0.0026 0.010' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.55 0 0 0 0 0.37 0 0 0 0 0.19 0.85 0 0 0 -0.42'/></filter><rect width='960' height='960' filter='url(%23p)'/></svg>");
+  background-repeat:no-repeat, repeat, repeat; }
+body.modal-open { overflow:hidden; }
+a { text-decoration:none; color:inherit; }
+button { font-family:inherit; }
 
-#portal { display:flex; flex-direction:column; align-items:center; padding:32px 16px; padding-top:max(32px, env(safe-area-inset-top)); min-height:100dvh; }
-.portal-header { text-align:center; margin-bottom:40px; }
-.portal-header h1 { font-size:1.8rem; color:var(--gold); margin-bottom:6px; }
-.portal-header p { color:var(--text-dim); font-size:.9rem; }
+/* ---------------- 顶栏 + 搜索 ---------------- */
+.shell { max-width:var(--shell-w); margin:0 auto; }
+.topbar { position:sticky; top:0; z-index:40; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; background:rgba(84,58,34,.90); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid rgba(0,0,0,.35); }
+.topbar h1 { font-size:1rem; font-weight:800; color:#d9a94b; letter-spacing:.08em; margin:0 2px 8px; text-shadow:0 1px 2px rgba(0,0,0,.45); }
+.search-btn { display:flex; align-items:center; gap:8px; width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:999px; background:var(--card-bg); box-shadow:0 2px 8px rgba(0,0,0,.30); color:var(--text-dim); font-size:.88rem; cursor:pointer; text-align:left; transition:border-color .15s, box-shadow .15s; }
+.search-btn:hover { border-color:rgba(176,116,26,.55); box-shadow:0 3px 12px rgba(0,0,0,.40); }
+.search-btn svg { flex:none; color:var(--gold); }
 
-.game-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; width:100%; max-width:400px; }
-.game-card { background:var(--surface); border-radius:var(--radius); padding:20px 16px; text-align:center; cursor:pointer; transition:transform .15s, box-shadow .15s; box-shadow:0 2px 8px rgba(60,50,40,.08); display:flex; flex-direction:column; align-items:center; gap:10px; }
+/* ---------------- 左侧导航（固定定位：不随滚动重算，手机贴屏左侧，PC 随容器居中） ---------------- */
+.rail { position:fixed; left:max(0px, calc(50% - var(--shell-half))); top:calc(var(--tb) - 8px); bottom:-160px; z-index:30; width:var(--rail-w); display:flex; flex-direction:column; background:rgba(76,50,27,.95); border-right:1px solid rgba(0,0,0,.30); box-shadow:2px 0 12px rgba(0,0,0,.25); padding-bottom:env(safe-area-inset-bottom); }
+.rail-nav { display:flex; flex-direction:column; width:100%; padding-top:8px; }
+.tab { position:relative; display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; padding:15px 0 13px; border:none; background:transparent; color:rgba(244,233,215,.72); font-size:.72rem; font-weight:800; letter-spacing:.08em; cursor:pointer; transition:background .18s, color .18s; }
+.tab-ico { font-size:18px; line-height:1; }
+.tab:hover { color:rgba(250,241,226,.96); background:rgba(255,240,214,.07); }
+.tab.active { color:var(--gold-l); background:rgba(255,240,214,.10); }
+.tab.active::after { content:''; position:absolute; right:0; top:0; bottom:0; width:3px; background:var(--gold-l); }
+
+/* ---------------- 内容 ---------------- */
+#portal { margin-left:var(--rail-w); min-width:0; max-width:520px; padding:16px 16px 28px; min-height:calc(100dvh - var(--tb)); display:flex; flex-direction:column; }
+.content { flex:1; min-width:0; display:flex; flex-direction:column; gap:26px; }
+.section { scroll-margin-top:calc(var(--tb) + 10px); }
+.section-head { display:flex; align-items:center; gap:8px; margin:0 2px 12px; }
+.section-head h2 { font-size:.92rem; letter-spacing:.14em; color:#f3e7d0; text-shadow:0 1px 2px rgba(0,0,0,.40); }
+.section-count { font-size:.66rem; font-weight:700; color:var(--text-dim); background:rgba(253,249,238,.95); border:1px solid var(--line); border-radius:999px; padding:2px 8px; box-shadow:0 1px 3px rgba(0,0,0,.20); }
+
+.game-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+.game-card { display:flex; flex-direction:column; align-items:center; gap:7px; padding:14px 8px 12px; background:var(--card-bg); border:1px solid rgba(43,38,32,.09); border-radius:var(--radius); box-shadow:0 3px 10px rgba(0,0,0,.35); text-align:center; min-width:0; transition:transform .15s, box-shadow .15s; }
+@media (hover:hover) { .game-card:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(0,0,0,.45); } }
 .game-card:active { transform:scale(.96); }
-.game-card .card-icon { font-size:40px; line-height:1; }
-.game-card .card-title { font-size:.95rem; font-weight:bold; color:var(--text); }
-.game-card .card-desc { font-size:.75rem; color:var(--text-dim); line-height:1.3; }
+.card-icon { height:40px; display:flex; align-items:center; justify-content:center; font-size:33px; line-height:1; }
+.card-icon .ico-svg { height:36px; width:auto; }
+.card-icon .ico-img { width:38px; height:38px; object-fit:contain; }
+.card-title { font-size:.84rem; font-weight:700; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card-meta { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px 6px; max-width:100%; }
+.tag { font-size:.63rem; font-weight:800; line-height:1; padding:3px 7px; border-radius:999px; background:rgba(176,116,26,.15); color:#8a5a14; white-space:nowrap; }
+.card-type { font-size:.66rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 
-.game-card:nth-child(1) .card-icon { color:var(--purple); }
-.game-card:nth-child(2) .card-icon { color:var(--orange); }
-.game-card:nth-child(3) .card-icon { color:var(--gold); }
-.game-card:nth-child(4) .card-icon { color:var(--green); }
-.game-card:nth-child(5) .card-icon { color:var(--blue); }
-.game-card:nth-child(6) .card-icon { color:var(--accent); }
-.game-card:nth-child(7) .card-icon { color:var(--blue); }
-.game-card:nth-child(8) .card-icon { color:#45bab2; }
-.game-card:nth-child(9) .card-icon { color:#8e6bb5; }
-.game-card:nth-child(10) .card-icon { color:#8a93a8; }
-.game-card:nth-child(11) .card-icon { color:#1a6d8f; }
-.game-card:nth-child(13) .card-icon { color:#e8a53a; }
-.game-card:nth-child(14) .card-icon { color:#2f7d9e; }
+.portal-footer { margin-top:34px; text-align:center; font-size:.72rem; color:rgba(240,225,200,.68); text-shadow:0 1px 2px rgba(0,0,0,.35); }
 
-.online-section { width:100%; max-width:400px; margin-top:32px; }
-.section-title { font-size:.85rem; color:var(--text-dim); margin:0 0 14px; text-align:center; letter-spacing:.2em; }
-.online-list { display:flex; flex-direction:column; gap:10px; }
-.online-item { background:var(--surface); border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; box-shadow:0 2px 8px rgba(60,50,40,.08); transition:transform .15s, box-shadow .15s; }
-.online-item:active { transform:scale(.97); }
-.online-icon { font-size:24px; line-height:1; }
-.online-name { font-size:.95rem; font-weight:bold; color:var(--text); }
-.online-desc { margin-left:auto; font-size:.75rem; color:var(--text-dim); }
+/* ---------------- 搜索弹窗 ---------------- */
+.modal-mask { position:fixed; inset:0; z-index:100; background:rgba(26,16,8,.55); display:flex; align-items:center; justify-content:center; padding:20px; }
+.modal-mask.hidden { display:none; }
+.modal { width:min(440px,100%); max-height:min(84dvh,660px); background:var(--surface); border-radius:18px; box-shadow:0 24px 60px rgba(0,0,0,.45); display:flex; flex-direction:column; overflow:hidden; animation:pop .18s ease; }
+@keyframes pop { from { transform:translateY(14px) scale(.98); opacity:.5; } to { transform:none; opacity:1; } }
+.modal-head { display:flex; align-items:center; justify-content:space-between; padding:15px 16px 11px; }
+.modal-head h3 { font-size:.98rem; }
+.modal-close { position:relative; width:28px; height:28px; border:none; border-radius:50%; background:rgba(43,38,32,.10); color:var(--text-dim); font-size:.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.modal-close::after { content:''; position:absolute; inset:-8px; }
+.modal-body { flex:1; min-height:0; padding:0 16px 16px; display:flex; flex-direction:column; gap:13px; }
+.field-label { display:block; font-size:.72rem; font-weight:800; color:var(--text-dim); letter-spacing:.06em; margin-bottom:7px; }
+.search-input { width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px; background:var(--card-bg); font-size:.9rem; font-family:inherit; color:var(--text); outline:none; transition:border-color .15s, box-shadow .15s; -webkit-appearance:none; }
+.search-input:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(176,116,26,.20); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { padding:6px 11px; border:1px solid var(--line); border-radius:999px; background:var(--card-bg); color:var(--text-dim); font-size:.74rem; font-weight:700; cursor:pointer; transition:background .12s, color .12s, border-color .12s; }
+.chip.active { background:var(--gold); border-color:var(--gold); color:#fff; }
+.result-head { display:flex; align-items:center; justify-content:space-between; font-size:.72rem; font-weight:700; color:var(--text-dim); }
+#resetBtn { border:none; background:none; color:var(--accent); font-size:.72rem; font-weight:800; cursor:pointer; padding:2px 0; }
+.results { flex:1; min-height:96px; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:8px; margin:0 -2px; padding:2px; }
+.result-item { display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--line); border-radius:12px; background:var(--card-bg); transition:transform .12s, border-color .12s; }
+.result-item:hover { border-color:rgba(176,116,26,.5); }
+.result-item:active { transform:scale(.98); }
+.result-icon { flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:21px; line-height:1; }
+.result-icon .ico-svg { height:24px; width:auto; }
+.result-icon .ico-img { width:24px; height:24px; object-fit:contain; }
+.result-main { flex:1; min-width:0; }
+.result-name { display:block; font-size:.85rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.result-sub { display:block; font-size:.67rem; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.result-mode { flex:none; font-size:.63rem; font-weight:800; padding:3px 8px; border-radius:999px; }
+.mode-solo { background:rgba(76,150,94,.18); color:#35743f; }
+.mode-online { background:rgba(201,59,47,.15); color:#ad3226; }
+.empty { padding:26px 0; text-align:center; font-size:.8rem; color:var(--text-dim); }
 
-.portal-footer { margin-top:auto; padding-top:32px; padding-bottom:16px; text-align:center; font-size:.75rem; color:var(--text-dim); }
+@media (max-width:560px) {
+  .modal-mask { align-items:flex-end; padding:0; }
+  .modal { width:100%; max-height:82dvh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+}
+@media (max-width:360px) {
+  :root { --rail-w:50px; }
+  #portal { padding-left:12px; padding-right:12px; }
+  .topbar { padding-left:12px; padding-right:12px; }
+  .game-grid { gap:8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior:auto; }
+  .modal { animation:none; }
+}
 </style>
 </head>
 <body>
 <img src="/og-icon.png" width="300" height="300" style="position:absolute;left:-9999px;top:-9999px;" alt="桌游助手合集">
 
-<div id="portal">
-  <div class="portal-header">
+<div class="shell">
+<header class="topbar">
+  <div class="topbar-inner">
     <h1>桌游助手合集</h1>
-    <p>选择一个游戏开始</p>
+    <button class="search-btn" id="searchBtn" type="button" aria-haspopup="dialog">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      <span>搜索桌游名称 / 人数</span>
+    </button>
   </div>
+</header>
 
-  <!-- <div class="section-title">🃏 线下发牌助手</div> -->
-
-  <div class="game-grid">
-    <div class="game-card" onclick="location.href='https://werewolf-word.pages.dev/'">
-      <div class="card-icon">🐺</div>
-      <div class="card-title">狼人真言</div>
-      <div class="card-desc">4~10人 欢乐聚会猜词</div>
-    </div>
-    <div class="game-card" onclick="location.href='https://dog-joker.pages.dev/'">
-      <div class="card-icon">🐶</div>
-      <div class="card-title">夺狗囧事</div>
-      <div class="card-desc">2~5人 吹牛博弈</div>
-    </div>
-    <div class="game-card" onclick="location.href='https://incan-gold.pages.dev/'">
-      <div class="card-icon">💎</div>
-      <div class="card-title">印加宝藏</div>
-      <div class="card-desc">3~8人 赌狗冒险</div>
-    </div>
-    <div class="game-card" onclick="location.href='https://cat-diary-6v8.pages.dev/'">
-      <div class="card-icon">🐱</div>
-      <div class="card-title">捉虫猫日记</div>
-      <div class="card-desc">2人 策略竞争</div>
-    </div>
-    <div class="game-card" onclick="location.href='mountaineer/index.html'">
-      <div class="card-icon">🏔️</div>
-      <div class="card-title">登山家</div>
-      <div class="card-desc">2人 叠棋策略</div>
-    </div>
-    <div class="game-card" onclick="location.href='uno_single_player/index.html'">
-      <div class="card-icon" style="height: 40px;">
-        <img src="uno_single_player/images/addfour2.png" alt="UNO" style="width:40px;height:40px;object-fit:contain;scale: 1.25;margin-top: 2px;">
-      </div>
-      <div class="card-title">UNO</div>
-      <div class="card-desc">1人 手牌管理</div>
-    </div>
-    <div class="game-card" onclick="location.href='undersea-explorer/index.html'">
-      <div class="card-icon" style="height: 40px;">
-        <svg viewBox="0 0 1054 1024" width="45" height="45">
-          <path d="M59.64 433.76h135.64v288.61H59.64z" fill="#45bab2"/>
-          <path d="M560.02 155.46h36.55v148.99H560.02z" fill="#45bab2"/>
-          <path d="M560.02 155.46h95.58v28.11H560.02z" fill="#45bab2"/>
-          <path d="M411.03 269.78h333.59v112.85H411.03z" fill="#45bab2"/>
-          <path d="M183.33 579.94a397.77 216.46 0 1 0 795.55 0 397.77 216.46 0 1 0-795.55 0Z" fill="#45bab2"/>
-          <path d="M303.27 583.85a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
-          <path d="M523.94 579.94a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
-          <path d="M744.62 583.69a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>
-        </svg>
-      </div>
-      <div class="card-title">海底探险</div>
-      <div class="card-desc">2~6人 骰子聚会冒险</div>
-    </div>
-    <div class="game-card" onclick="location.href='regicide/index.html'">
-      <div class="card-icon">⚔️</div>
-      <div class="card-title">弑君者</div>
-      <div class="card-desc">1~4人 合作扑克闯关</div>
-    </div>
-    <div class="game-card" onclick="location.href='moon-adventure/index.html'">
-      <div class="card-icon">🌕</div>
-      <div class="card-title">月面探险</div>
-      <div class="card-desc">2~5人 合作角色扮演</div>
-    </div>
-    <div class="game-card" onclick="location.href='scoundrel/index.html'">
-      <div class="card-icon">🗡️</div>
-      <div class="card-title">无赖勇者</div>
-      <div class="card-desc">1人 单人扑克闯关</div>
-    </div>
-    <div class="game-card" onclick="location.href='fugitive/index.html'">
-      <div class="card-icon">🕵️</div>
-      <div class="card-title">神探缉凶</div>
-      <div class="card-desc">1人 人机对战推理</div>
-    </div>
-    <div class="game-card" onclick="location.href='that_time_you_killed_me/index.html'">
-      <div class="card-icon">⏳</div>
-      <div class="card-title">煞有其时</div>
-      <div class="card-desc">2人 策略抽象棋</div>
-    </div>
-    <div class="game-card" onclick="location.href='infiltraitors/index.html'">
-      <div class="card-icon" style="height: 40px;">
-        <svg viewBox="0 0 44 30" width="45" height="45">
-          <path d="M3 4.2 L0.8 5.6 V10.4 L3 9 Z" fill="#3c4550"></path>
-          <path d="M35.6 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"></path>
-          <path d="M5.2 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"></path>
-          <path d="M3 3 H40 V12.4 H3 Z" fill="#525d6b"></path>
-          <path d="M3 3 H40 V6 H3 Z" fill="#6b7787"></path>
-          <path d="M14.6 7 h6.4 v1.8 h-6.4 Z" fill="#2c333d"></path>
-          <circle cx="37.4" cy="7.7" r="2.3" fill="#1a1f26"></circle>
-          <circle cx="37.6" cy="7.7" r="1.1" fill="#39424e"></circle>
-          <path d="M9 12.4 H24.6 V15.6 H9 Z" fill="#46505c"></path>
-          <path d="M10 15.6 H24.6 L21 28.6 H7.4 Z" fill="#3c4550"></path>
-          <path d="M10 15.6 H17.4 L14.6 28.6 H7.4 Z" fill="#46505c"></path>
-          <path d="M24.6 15.6 H31.8 V19.2 Q31.8 22.8 28.2 22.8 Q24.6 22.8 24.6 19.2 Z" fill="#313a44"></path>
-          <path d="M28.2 16.2 v4.4" stroke="#d9a94b" stroke-width="1.6" stroke-linecap="round" fill="none"></path>
-        </svg>
-      </div>
-      <div class="card-title">渗透因子</div>
-      <div class="card-desc">1人 人机合作推理</div>
-    </div>
-    <div class="game-card" onclick="location.href='ticket-collector/index.html'">
-      <div class="card-icon" style="height: 40px;">
-        <svg viewBox="0 0 52 30" width="48" height="30">
-          <path d="M7.6 2.4 h36.8 a4.2 4.2 0 0 1 4.2 4.2 v16.8 a4.2 4.2 0 0 1 -4.2 4.2 h-36.8 a4.2 4.2 0 0 1 -4.2 -4.2 v-16.8 a4.2 4.2 0 0 1 4.2 -4.2 Z" fill="#f4f7f9"></path>
-          <path d="M7.6 2.4 h36.8 a4.2 4.2 0 0 1 4.2 4.2 v1.2 h-45.2 v-1.2 a4.2 4.2 0 0 1 4.2 -4.2 Z" fill="#dbe4ea"></path>
-          <path d="M7.6 24.4 h36.8 a4.2 4.2 0 0 0 4.2 -4.2 v-1.2 h-45.2 v1.2 a4.2 4.2 0 0 0 4.2 4.2 Z" fill="#c9d5dd"></path>
-          <path d="M0 20.4 v3.6 l3.6 -3.6 Z" fill="#2f7d9e"></path>
-          <path d="M0 7.2 v3.6 l3.6 -3.6 Z" fill="#2f7d9e"></path>
-          <path d="M6.6 8.6 h20.4 v2.6 h-20.4 Z" fill="#3d4b57"></path>
-          <path d="M6.6 14 h13.8 v2.2 h-13.8 Z" fill="#7c8b98"></path>
-          <path d="M6.6 19 h9.4 v2.2 h-9.4 Z" fill="#7c8b98"></path>
-          <path d="M43.4 9 a6.6 6.6 0 1 0 0 13.2 a6.6 6.6 0 0 0 0 -13.2 Z" fill="#b55dae"></path>
-          <path d="M43.4 12.4 l1.15 2.35 2.6 .38 -1.88 1.83 .44 2.58 -2.31 -1.22 -2.31 1.22 .44 -2.58 -1.88 -1.83 2.6 -.38 Z" fill="#f6e9f8"></path>
-        </svg>
-      </div>
-      <div class="card-title">车票收藏家</div>
-      <div class="card-desc">3~6人 传手机抢票</div>
-    </div>
-    <!-- <div class="game-card" onclick="location.href='abyss-echo/index.html'">
-      <div class="card-icon">🐙</div>
-      <div class="card-title">深渊回响 Abyss Echo</div>
-      <div class="card-desc">深海克苏鲁合作肉鸽卡牌构筑</div>
-    </div> -->
+<nav class="rail" aria-label="游戏分类">
+  <div class="rail-nav">
+    <button class="tab active" type="button" data-target="sec-solo"><span class="tab-ico">📱</span>单机</button>
+    <button class="tab" type="button" data-target="sec-online"><span class="tab-ico">🌐</span>联机</button>
   </div>
+</nav>
 
-  <div class="online-section">
-    <div class="section-title">🎮 联机对战</div>
-    <div class="online-list">
-      <div class="online-item" onclick="location.href='regicide/index_ol.html'">
-        <span class="online-icon">⚔️</span>
-        <span class="online-name">弑君者OL</span>
-        <span class="online-desc">2~4人 合作扑克闯关</span>
-      </div>
-      <div class="online-item" onclick="location.href='moon-adventure/index_ol.html'">
-        <span class="online-icon">🌕</span>
-        <span class="online-name">月面探险OL</span>
-        <span class="online-desc">2~5人 合作角色扮演</span>
-      </div>
-      <div class="online-item" onclick="location.href='take-time/index.html'">
-        <span class="online-icon">🕰️</span>
-        <span class="online-name">时序谜局OL</span>
-        <span class="online-desc">2~4人 合作默契配合</span>
-      </div>
-      <div class="online-item" onclick="location.href='fugitive/index_ol.html'">
-        <span class="online-icon">🕵️</span>
-        <span class="online-name">神探缉凶OL</span>
-        <span class="online-desc">2人 1v1对战策略推理</span>
-      </div>
-      <div class="online-item" onclick="location.href='infiltraitors/index_ol.html'">
-        <span class="online-icon">
-          <svg viewBox="0 0 44 30" width="32" height="21">
-          <path d="M3 4.2 L0.8 5.6 V10.4 L3 9 Z" fill="#3c4550"></path>
-          <path d="M35.6 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"></path>
-          <path d="M5.2 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"></path>
-          <path d="M3 3 H40 V12.4 H3 Z" fill="#525d6b"></path>
-          <path d="M3 3 H40 V6 H3 Z" fill="#6b7787"></path>
-          <path d="M14.6 7 h6.4 v1.8 h-6.4 Z" fill="#2c333d"></path>
-          <circle cx="37.4" cy="7.7" r="2.3" fill="#1a1f26"></circle>
-          <circle cx="37.6" cy="7.7" r="1.1" fill="#39424e"></circle>
-          <path d="M9 12.4 H24.6 V15.6 H9 Z" fill="#46505c"></path>
-          <path d="M10 15.6 H24.6 L21 28.6 H7.4 Z" fill="#3c4550"></path>
-          <path d="M10 15.6 H17.4 L14.6 28.6 H7.4 Z" fill="#46505c"></path>
-          <path d="M24.6 15.6 H31.8 V19.2 Q31.8 22.8 28.2 22.8 Q24.6 22.8 24.6 19.2 Z" fill="#313a44"></path>
-          <path d="M28.2 16.2 v4.4" stroke="#d9a94b" stroke-width="1.6" stroke-linecap="round" fill="none"></path>
-        </svg>
-        </span>
-        <span class="online-name">渗透因子OL</span>
-        <span class="online-desc">2~5人 合作推理清剿</span>
-      </div>
-    </div>
-  </div>
-
+<div id="portal">
+  <main class="content">
+    <section class="section" id="sec-solo">
+      <div class="section-head"><h2>单机游戏</h2><span class="section-count" id="count-solo"></span></div>
+      <div class="game-grid" id="grid-solo"></div>
+    </section>
+    <section class="section" id="sec-online">
+      <div class="section-head"><h2>联机对战</h2><span class="section-count" id="count-online"></span></div>
+      <div class="game-grid" id="grid-online"></div>
+    </section>
+  </main>
   <div class="portal-footer">@imStar100</div>
 </div>
+</div><!-- /.shell -->
 
+<div class="modal-mask hidden" id="searchModal" role="dialog" aria-modal="true" aria-label="搜索桌游">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>🔍 搜索桌游</h3>
+      <button class="modal-close" id="modalClose" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <span class="field-label">游戏名称</span>
+        <input class="search-input" id="searchName" type="search" placeholder="输入名称，支持模糊搜索" autocomplete="off">
+      </div>
+      <div class="field">
+        <span class="field-label">玩家人数</span>
+        <div class="chips" id="peopleChips"></div>
+      </div>
+      <div class="result-head">
+        <span id="resultCount"></span>
+        <button id="resetBtn" type="button">重置</button>
+      </div>
+      <div class="results" id="results"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* 页面脚本：GAMES 数据 → 卡片渲染 / 常玩统计(localStorage) / 搜索弹窗 / 左侧 TAB 滚动联动 */
+
+/* ---------------- 图标 ---------------- */
+var ICO_UNO = '<img class="ico-img" src="uno_single_player/images/addfour2.png" alt="">';
+var ICO_UNDERSEA = '<svg class="ico-svg" viewBox="0 0 1054 1024">' +
+  '<path d="M59.64 433.76h135.64v288.61H59.64z" fill="#45bab2"/>' +
+  '<path d="M560.02 155.46h36.55v148.99H560.02z" fill="#45bab2"/>' +
+  '<path d="M560.02 155.46h95.58v28.11H560.02z" fill="#45bab2"/>' +
+  '<path d="M411.03 269.78h333.59v112.85H411.03z" fill="#45bab2"/>' +
+  '<path d="M183.33 579.94a397.77 216.46 0 1 0 795.55 0 397.77 216.46 0 1 0-795.55 0Z" fill="#45bab2"/>' +
+  '<path d="M303.27 583.85a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>' +
+  '<path d="M523.94 579.94a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>' +
+  '<path d="M744.62 583.69a88.55 53.88 90 1 0 107.76 0 88.55 53.88 90 1 0-107.76 0Z" fill="#10325c"/>' +
+'</svg>';
+var ICO_INFIL = '<svg class="ico-svg" viewBox="0 0 44 30">' +
+  '<path d="M3 4.2 L0.8 5.6 V10.4 L3 9 Z" fill="#3c4550"/>' +
+  '<path d="M35.6 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"/>' +
+  '<path d="M5.2 1.4 h2.2 v1.6 h-2.2 Z" fill="#3c4550"/>' +
+  '<path d="M3 3 H40 V12.4 H3 Z" fill="#525d6b"/>' +
+  '<path d="M3 3 H40 V6 H3 Z" fill="#6b7787"/>' +
+  '<path d="M14.6 7 h6.4 v1.8 h-6.4 Z" fill="#2c333d"/>' +
+  '<circle cx="37.4" cy="7.7" r="2.3" fill="#1a1f26"/>' +
+  '<circle cx="37.6" cy="7.7" r="1.1" fill="#39424e"/>' +
+  '<path d="M9 12.4 H24.6 V15.6 H9 Z" fill="#46505c"/>' +
+  '<path d="M10 15.6 H24.6 L21 28.6 H7.4 Z" fill="#3c4550"/>' +
+  '<path d="M10 15.6 H17.4 L14.6 28.6 H7.4 Z" fill="#46505c"/>' +
+  '<path d="M24.6 15.6 H31.8 V19.2 Q31.8 22.8 28.2 22.8 Q24.6 22.8 24.6 19.2 Z" fill="#313a44"/>' +
+  '<path d="M28.2 16.2 v4.4" stroke="#d9a94b" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
+'</svg>';
+var ICO_TICKET = '<svg class="ico-svg" viewBox="0 0 52 30">' +
+  '<path d="M7.6 2.4 h36.8 a4.2 4.2 0 0 1 4.2 4.2 v16.8 a4.2 4.2 0 0 1 -4.2 4.2 h-36.8 a4.2 4.2 0 0 1 -4.2 -4.2 v-16.8 a4.2 4.2 0 0 1 4.2 -4.2 Z" fill="#f4f7f9"/>' +
+  '<path d="M7.6 2.4 h36.8 a4.2 4.2 0 0 1 4.2 4.2 v1.2 h-45.2 v-1.2 a4.2 4.2 0 0 1 4.2 -4.2 Z" fill="#dbe4ea"/>' +
+  '<path d="M7.6 24.4 h36.8 a4.2 4.2 0 0 0 4.2 -4.2 v-1.2 h-45.2 v1.2 a4.2 4.2 0 0 0 4.2 4.2 Z" fill="#c9d5dd"/>' +
+  '<path d="M0 20.4 v3.6 l3.6 -3.6 Z" fill="#2f7d9e"/>' +
+  '<path d="M0 7.2 v3.6 l3.6 -3.6 Z" fill="#2f7d9e"/>' +
+  '<path d="M6.6 8.6 h20.4 v2.6 h-20.4 Z" fill="#3d4b57"/>' +
+  '<path d="M6.6 14 h13.8 v2.2 h-13.8 Z" fill="#7c8b98"/>' +
+  '<path d="M6.6 19 h9.4 v2.2 h-9.4 Z" fill="#7c8b98"/>' +
+  '<path d="M43.4 9 a6.6 6.6 0 1 0 0 13.2 a6.6 6.6 0 0 0 0 -13.2 Z" fill="#b55dae"/>' +
+  '<path d="M43.4 12.4 l1.15 2.35 2.6 .38 -1.88 1.83 .44 2.58 -2.31 -1.22 -2.31 1.22 .44 -2.58 -1.88 -1.83 2.6 -.38 Z" fill="#f6e9f8"/>' +
+'</svg>';
+
+/* ---------------- 数据 ---------------- */
+/* min/max 用于“按人数搜索”，players 为展示标签 */
+var GAMES = [
+  /* —— 单机 —— */
+  { mode:'solo',   name:'狼人真言',   players:'4~10人', min:4, max:10, type:'欢乐聚会猜词', icon:'🐺',    url:'https://werewolf-word.pages.dev/' },
+  { mode:'solo',   name:'夺狗囧事',   players:'2~5人',  min:2, max:5,  type:'吹牛博弈',     icon:'🐶',    url:'https://dog-joker.pages.dev/' },
+  { mode:'solo',   name:'印加宝藏',   players:'3~8人',  min:3, max:8,  type:'赌狗冒险',     icon:'💎',    url:'https://incan-gold.pages.dev/' },
+  { mode:'solo',   name:'捉虫猫日记', players:'2人',    min:2, max:2,  type:'策略竞争',     icon:'🐱',    url:'https://cat-diary-6v8.pages.dev/' },
+  { mode:'solo',   name:'登山家',     players:'2人',    min:2, max:2,  type:'叠棋策略',     icon:'🏔️',    url:'mountaineer/index.html' },
+  { mode:'solo',   name:'UNO',        players:'1人',    min:1, max:1,  type:'手牌管理',     icon:ICO_UNO, url:'uno_single_player/index.html' },
+  { mode:'solo',   name:'海底探险',   players:'2~6人',  min:2, max:6,  type:'骰子聚会冒险', icon:ICO_UNDERSEA, url:'undersea-explorer/index.html' },
+  { mode:'solo',   name:'弑君者',     players:'1~4人',  min:1, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index.html' },
+  { mode:'solo',   name:'月面探险',   players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index.html' },
+  { mode:'solo',   name:'无赖勇者',   players:'1人',    min:1, max:1,  type:'单人扑克闯关', icon:'🗡️',    url:'scoundrel/index.html' },
+  { mode:'solo',   name:'神探缉凶',   players:'1人',    min:1, max:1,  type:'人机对战推理', icon:'🕵️',   url:'fugitive/index.html' },
+  { mode:'solo',   name:'煞有其时',   players:'1~2人',    min:1, max:2,  type:'策略抽象棋',   icon:'⏳',    url:'that_time_you_killed_me/index.html' },
+  { mode:'solo',   name:'渗透因子',   players:'1人',    min:1, max:1,  type:'人机合作推理', icon:ICO_INFIL, url:'infiltraitors/index.html' },
+  { mode:'solo',   name:'车票收藏家', players:'3~6人',  min:3, max:6,  type:'欢乐竞争博弈',   icon:ICO_TICKET, url:'ticket-collector/index.html' },
+  /* —— 联机 —— */
+  { mode:'online', name:'弑君者OL',   players:'2~4人',  min:2, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index_ol.html' },
+  { mode:'online', name:'月面探险OL', players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index_ol.html' },
+  { mode:'online', name:'时序谜局OL', players:'2~4人',  min:2, max:4,  type:'合作默契配合', icon:'🕰️',    url:'take-time/index.html' },
+  { mode:'online', name:'神探缉凶OL', players:'2人',    min:2, max:2,  type:'1v1对战策略推理', icon:'🕵️', url:'fugitive/index_ol.html' },
+  { mode:'online', name:'渗透因子OL', players:'2~5人',  min:2, max:5,  type:'合作推理烧脑', icon:ICO_INFIL, url:'infiltraitors/index_ol.html' }
+];
+
+/* ---------------- 渲染列表 ---------------- */
+/* 按模式拆分数据，一次性渲染两个网格并写入数量徽标 */
+var SOLO = GAMES.filter(function(g){ return g.mode === 'solo'; });
+var ONLINE = GAMES.filter(function(g){ return g.mode === 'online'; });
+
+/* 生成单个游戏卡片的 HTML（列表网格与“常玩”分区共用；data-name 供点击计数） */
+function cardHTML(g){
+  return '<a class="game-card" href="' + g.url + '" data-name="' + g.name + '">' +
+    '<span class="card-icon">' + g.icon + '</span>' +
+    '<span class="card-title">' + g.name + '</span>' +
+    '<span class="card-meta"><span class="tag">' + g.players + '</span><span class="card-type">' + g.type + '</span></span>' +
+  '</a>';
+}
+
+document.getElementById('grid-solo').innerHTML = SOLO.map(cardHTML).join('');
+document.getElementById('grid-online').innerHTML = ONLINE.map(cardHTML).join('');
+document.getElementById('count-solo').textContent = SOLO.length + ' 款';
+document.getElementById('count-online').textContent = ONLINE.length + ' 款';
+
+/* ---------------- 常玩：localStorage 记录打开次数，取前 3 ---------------- */
+var PLAY_KEY = 'bg-star100:plays';
+
+/* 读取打开次数表 { 游戏名: 次数 }；无记录或解析失败返回空对象 */
+function readPlays(){
+  try { return JSON.parse(localStorage.getItem(PLAY_KEY)) || {}; } catch (e) { return {}; }
+}
+
+/* 有历史记录时：nav 顶部插入“🔥常玩”tab，内容区首部插入常玩分区（按次数倒序取前 3，不足 3 个显示全部） */
+(function buildFav(){
+  var plays = readPlays();
+  var favs = GAMES.filter(function(g){ return plays[g.name] > 0; })
+    .sort(function(a, b){ return plays[b.name] - plays[a.name]; })
+    .slice(0, 3);
+  if (!favs.length) return;
+  var railNav = document.querySelector('.rail-nav');
+  var tab = document.createElement('button');
+  tab.type = 'button';
+  tab.className = 'tab';
+  tab.dataset.target = 'sec-fav';
+  tab.innerHTML = '<span class="tab-ico">🔥</span>常玩';
+  railNav.insertBefore(tab, railNav.firstChild);
+
+  var sec = document.createElement('section');
+  sec.className = 'section';
+  sec.id = 'sec-fav';
+  sec.innerHTML = '<div class="section-head"><h2>常玩</h2><span class="section-count">' + favs.length + ' 款</span></div>' +
+    '<div class="game-grid">' + favs.map(cardHTML).join('') + '</div>';
+  var content = document.querySelector('.content');
+  content.insertBefore(sec, content.firstChild);
+})();
+
+/* 打开次数记录：点击任意游戏卡片/搜索结果 +1 并写回 localStorage（写入失败不影响跳转） */
+document.addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('a[data-name]');
+  if (!a) return;
+  var plays = readPlays();
+  plays[a.dataset.name] = (plays[a.dataset.name] || 0) + 1;
+  try { localStorage.setItem(PLAY_KEY, JSON.stringify(plays)); } catch (e) {}
+});
+
+/* ---------------- 搜索弹窗 ---------------- */
+var modal = document.getElementById('searchModal');
+var nameInput = document.getElementById('searchName');
+var chipsWrap = document.getElementById('peopleChips');
+var resultsEl = document.getElementById('results');
+var resultCount = document.getElementById('resultCount');
+var curPlayers = 0;
+
+/* 生成人数 chips：0 → “不限”，1~10 为具体人数 */
+(function buildChips(){
+  var html = '';
+  for (var i = 0; i <= 10; i++) {
+    html += '<button type="button" class="chip' + (i === 0 ? ' active' : '') + '" data-num="' + i + '">' + (i === 0 ? '不限' : i) + '</button>';
+  }
+  chipsWrap.innerHTML = html;
+})();
+
+/* 弹窗筛选：名称模糊匹配（忽略大小写）+ 人数需落在 [min,max] 内 */
+function matchGames(){
+  var q = nameInput.value.trim().toLowerCase();
+  return GAMES.filter(function(g){
+    if (curPlayers && (curPlayers < g.min || curPlayers > g.max)) return false;
+    if (q && g.name.toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+/* 渲染弹窗结果列表与计数文案（无命中时显示空状态） */
+function renderResults(){
+  var list = matchGames();
+  var filtered = !!(nameInput.value.trim() || curPlayers);
+  resultCount.textContent = filtered ? ('找到 ' + list.length + ' 款桌游') : ('共 ' + GAMES.length + ' 款桌游');
+  if (!list.length) {
+    resultsEl.innerHTML = '<div class="empty">没有找到匹配的桌游，换个条件试试～</div>';
+    return;
+  }
+  resultsEl.innerHTML = list.map(function(g){
+    return '<a class="result-item" href="' + g.url + '" data-name="' + g.name + '">' +
+      '<span class="result-icon">' + g.icon + '</span>' +
+      '<span class="result-main">' +
+        '<span class="result-name">' + g.name + '</span>' +
+        '<span class="result-sub">' + g.players + ' · ' + g.type + '</span>' +
+      '</span>' +
+      '<span class="result-mode ' + (g.mode === 'online' ? 'mode-online' : 'mode-solo') + '">' + (g.mode === 'online' ? '联机' : '单机') + '</span>' +
+    '</a>';
+  }).join('');
+}
+
+/* 打开搜索弹窗：显示遮罩 + 锁定页面滚动 + 重算结果，桌面端自动聚焦输入框 */
+function openModal(){
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  renderResults();
+  if (window.matchMedia && matchMedia('(pointer:fine)').matches) nameInput.focus();
+}
+
+/* 关闭搜索弹窗：隐藏并恢复页面滚动 */
+function closeModal(){
+  modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+/* 弹窗事件绑定：开/关按钮、点遮罩关闭、Esc 关闭、输入与 chips 实时筛选、重置 */
+document.getElementById('searchBtn').addEventListener('click', openModal);
+document.getElementById('modalClose').addEventListener('click', closeModal);
+modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+});
+nameInput.addEventListener('input', renderResults);
+chipsWrap.addEventListener('click', function(e){
+  var btn = e.target.closest('.chip');
+  if (!btn) return;
+  var chips = chipsWrap.querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.toggle('active', chips[i] === btn);
+  curPlayers = +btn.dataset.num;
+  renderResults();
+});
+document.getElementById('resetBtn').addEventListener('click', function(){
+  nameInput.value = '';
+  curPlayers = 0;
+  var chips = chipsWrap.querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.toggle('active', chips[i].dataset.num === '0');
+  renderResults();
+});
+
+/* ---------------- 左 TAB：点击跳转 + 滚动联动高亮 ---------------- */
+var tabs = [].slice.call(document.querySelectorAll('.tab'));
+var secs = [].slice.call(document.querySelectorAll('.content .section'));
+var activeTarget = 'sec-solo';
+var spyLock = 0;
+
+/* 切换 TAB 高亮（activeTarget 缓存当前值，避免重复改 DOM） */
+function setActive(target){
+  if (activeTarget === target) return;
+  activeTarget = target;
+  tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === target); });
+}
+
+/* 滚动联动：顶部(≤16px)高亮首个分区；中途取越过 55% 视口线的最后一个分区；触底高亮最后一个分区 */
+function spy(){
+  if (Date.now() < spyLock) return;
+  var active = secs[0].id;
+  if (window.scrollY > 16) { /* 顶部时高亮首个分区（有常玩即常玩） */
+    var probe = window.innerHeight * 0.55;
+    for (var i = 0; i < secs.length; i++) {
+      if (secs[i].getBoundingClientRect().top <= probe) active = secs[i].id;
+    }
+  }
+  var last = secs[secs.length - 1];
+  var bottomReached = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+  if (bottomReached && last.getBoundingClientRect().top < window.innerHeight) active = last.id;
+  setActive(active);
+}
+
+window.addEventListener('scroll', spy, { passive:true });
+window.addEventListener('resize', spy);
+
+/* TAB 点击：滚动到对应分区（尊重 prefers-reduced-motion），700ms 内锁定联动避免抢高亮 */
+tabs.forEach(function(t){
+  t.addEventListener('click', function(){
+    var target = document.getElementById(t.dataset.target);
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (target) target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block:'start' });
+    spyLock = Date.now() + 700;
+    setActive(t.dataset.target);
+  });
+});
+
+spy();
+})();
+</script>
 </body>
 </html>
