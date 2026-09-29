@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>桌游助手合集</title>
 <meta name="theme-color" content="#6d4a2b">
-<meta name="description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家 — 多人聚会桌游在线助手">
+<meta name="description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家、巫师牌 — 多人聚会桌游在线助手">
 <meta property="og:title" content="桌游助手合集">
-<meta property="og:description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家 — 多人聚会桌游在线助手">
+<meta property="og:description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家、巫师牌 — 多人聚会桌游在线助手">
 <meta property="og:image" content="https://bg-star100.pages.dev/og-icon.png">
 <meta property="og:type" content="website">
 <link rel="icon" href="og-icon.png">
@@ -234,6 +234,20 @@ var ICO_TICKET = '<svg class="ico-svg" viewBox="0 0 52 30">' +
   '<path d="M43.4 9 a6.6 6.6 0 1 0 0 13.2 a6.6 6.6 0 0 0 0 -13.2 Z" fill="#b55dae"/>' +
   '<path d="M43.4 12.4 l1.15 2.35 2.6 .38 -1.88 1.83 .44 2.58 -2.31 -1.22 -2.31 1.22 .44 -2.58 -1.88 -1.83 2.6 -.38 Z" fill="#f6e9f8"/>' +
 '</svg>';
+/* 巫师牌：金帽 + 四色符文（◆★▲■ 是游戏里的花色记号，颜色与卡面一致）。
+   四个符文钉在角上占着版面，帽子小了整个图标就“缩”在中间 —— 帽子单独放大 1.5 倍补回来，
+   符文顺带往四角让开一点，免得帽檐顶到 ▲■ 的头顶 */
+var ICO_WIZ = '<svg class="ico-svg" viewBox="0 0 38 32">' +
+  '<g transform="translate(19 15) scale(1.5) translate(-16 -15)">' +
+    '<path d="M16 6.2 20.8 17.6H11.2Z" fill="#d9a441"/>' +
+    '<path d="M7 19.6c0-1.7 4-2.8 9-2.8s9 1.1 9 2.8-4 2.6-9 2.6-9-.9-9-2.6Z" fill="#b8862c"/>' +
+    '<path d="M16 9.4l.9 2 2.2.2-1.7 1.4.5 2.1L16 14.1l-1.9 1 .5-2.1-1.7-1.4 2.2-.2z" fill="#2a1f08"/>' +
+  '</g>' +
+  '<text x="5.6" y="8.9" font-size="14" text-anchor="middle" fill="#e0432f">◆</text>' +
+  '<text x="31.4" y="7.9" font-size="12" text-anchor="middle" fill="#f0b32b">★</text>' +
+  '<text x="3.6" y="30.9" font-size="9" text-anchor="middle" fill="#4aa3dd">▲</text>' +
+  '<text x="33.4" y="30.9" font-size="12" text-anchor="middle" fill="#7cb342">■</text>' +
+'</svg>';
 
 /* ---------------- 数据 ---------------- */
 /* min/max 用于“按人数搜索”，players 为展示标签 */
@@ -253,6 +267,7 @@ var GAMES = [
   { mode:'solo',   name:'煞有其时',   players:'1~2人',    min:1, max:2,  type:'策略抽象棋',   icon:'⏳',    url:'that_time_you_killed_me/index.html' },
   { mode:'solo',   name:'渗透因子',   players:'1人',    min:1, max:1,  type:'人机合作推理', icon:ICO_INFIL, url:'infiltraitors/index.html' },
   { mode:'solo',   name:'车票收藏家', players:'3~6人',  min:3, max:6,  type:'欢乐竞争博弈',   icon:ICO_TICKET, url:'ticket-collector/index.html' },
+  { mode:'solo',   name:'巫师牌',     players:'1人',  min:1, max:1,  type:'人机吃墩博弈',   icon:ICO_WIZ, url:'wizard/index.html' },
   /* —— 联机 —— */
   { mode:'online', name:'弑君者OL',   players:'2~4人',  min:2, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index_ol.html' },
   { mode:'online', name:'月面探险OL', players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index_ol.html' },

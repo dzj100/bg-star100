@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111b31">
+<meta name="description" content="巫师牌 Wizard · 3~6 人吃墩预测博弈">
+<title>巫师牌 · Wizard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 封面 ============ -->
+  <div id="screen-menu">
+    <div class="menu-art" id="menuArt"></div>
+    <div class="menu-hero">
+      <div class="logo-zh">巫师牌</div>
+      <div class="logo-en">Wizard</div>
+      <div class="logo-sub">3 ~ 6 人 · 吃墩预测博弈</div>
+    </div>
+    <div class="menu-actions">
+      <button id="btnStart" class="btn btn-primary" type="button">开始游戏</button>
+      <button id="btnRules" class="btn btn-ghost" type="button">游戏规则</button>
+    </div>
+    <div class="menu-foot" id="menuFoot">说得准，比赢得多更值钱</div>
+    <div class="credit">@imStar100</div>
+  </div>
+
+  <!-- ============ 开局名单 ============ -->
+  <div id="screen-setup">
+    <div class="setup-head">
+      <button id="btnSetupBack" class="tb-btn" type="button">‹ 返回</button>
+      <b>开局名单</b>
+      <small class="dim">1 名真人 + AI 同席</small>
+    </div>
+    <div id="setupBody">
+      <div class="st-row">
+        <span class="st-label">人数</span>
+        <div id="cntSeg" class="seg"></div>
+      </div>
+      <div class="st-row">
+        <span class="st-label">你的名字</span>
+        <input id="inpName" class="inp" type="text" maxlength="6" placeholder="你" autocomplete="off">
+      </div>
+      <div class="st-row">
+        <span class="st-label">巫师帽</span>
+        <div id="avRow" class="swatches"></div>
+      </div>
+      <div id="roster"></div>
+    </div>
+    <div class="setup-foot">
+      <button id="btnBegin" class="btn btn-primary" type="button">开桌</button>
+    </div>
+  </div>
+
+  <!-- ============ 对局 ============ -->
+  <div id="screen-game">
+    <div id="topbar">
+      <b id="tbRound">第 1 轮</b>
+      <span id="tbTrump" class="pill pill-none">无王牌</span>
+      <button id="btnScore" class="tb-btn" type="button">计分榜</button>
+      <button id="btnSpeed" class="tb-btn" type="button">快进</button>
+      <button id="btnHelp" class="tb-btn" type="button">规则</button>
+    </div>
+    <!-- 最新一条日志的常驻横条：只报最后发生的事，想看全部点开日志面板 -->
+    <button id="btnLog" class="tb-log" type="button">
+      <i class="tb-log-t" id="tbLogT">--:--:--</i>
+      <span class="tb-log-s" id="tbLogS">开局后，这里跟着最新一条日志走</span>
+    </button>
+    <div id="stagewrap">
+      <div id="stage">
+        <div id="scenery"></div>
+        <div id="table"></div>
+        <div id="seats"></div>
+        <div id="hand"></div>
+      </div>
+    </div>
+    <div id="hud">
+      <div id="hudPrompt">准备开局…</div>
+      <div id="followHint" class="follow-hint off">必须跟 <b id="fhColor">红 ◆</b></div>
+      <div id="preview" class="off">
+        <div id="pvCard"></div>
+        <div class="pv-actions">
+          <button id="pvCancel" class="btn btn-ghost" type="button">取消</button>
+          <button id="pvPlay" class="btn btn-primary" type="button">出牌</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 终局 ============ -->
+  <div id="screen-over">
+    <div class="over-head">
+      <b>终局排名</b>
+      <small class="dim">预判越准，分数越高</small>
+    </div>
+    <div id="rankList"></div>
+    <div class="over-board-wrap">
+      <div class="board-title">完整计分榜</div>
+      <div id="overBoard" class="board-scroll"></div>
+    </div>
+    <div class="over-foot">
+      <button id="btnAgain" class="btn btn-primary" type="button">再来一局</button>
+      <button id="btnBackHome" class="btn btn-ghost" type="button">返回封面</button>
+      <button class="btn btn-ghost js-log" type="button">日志</button>
+    </div>
+  </div>
+
+  <!-- ============ 预判面板（可收起：桌面上的公开信息要能看，点底部提示条再展开） ============ -->
+  <div id="bidpanel">
+    <div class="bid-card">
+      <div class="bid-head">
+        <b>预判：这一轮你能赢几墩？</b>
+        <small class="dim" id="bidSub">第 1 轮 · 每人 1 张</small>
+      </div>
+      <div id="bidChips" class="bid-chips"></div>
+      <div class="bid-actions">
+        <button id="bidOk" class="btn btn-primary" type="button" disabled>确认预判</button>
+        <button id="bidShrink" class="btn btn-ghost" type="button">先看桌面</button>
+      </div>
+      <p class="bid-hint">所有人都会看到你的预判 · 提交后不可更改 · 可先收起看桌面</p>
+    </div>
+  </div>
+
+  <!-- ============ 选色面板（指示牌是巫师时，先手指定王牌色） ============ -->
+  <div id="trumppanel">
+    <div class="bid-card">
+      <div class="bid-head">
+        <b>指示牌是「巫师」</b>
+        <small class="dim">你是先手 · 看完手牌再指定王牌色</small>
+      </div>
+      <div id="trumpRow" class="trump-row"></div>
+      <p class="bid-hint">指定的颜色将成为本轮王牌 · 提交后不可更改</p>
+    </div>
+  </div>
+
+  <!-- ============ 本轮结算（确认是流程的一半，不吃点背景关闭） ============ -->
+  <div id="summary">
+    <div class="sum-card">
+      <h3 id="sumTitle">第 1 轮 · 本轮计分</h3>
+      <div id="sumRows"></div>
+      <div class="board-title">计分榜</div>
+      <div id="sumBoard"></div>
+      <p class="sum-hint" id="sumHint">确认后进入下一轮 · 重新洗牌发牌</p>
+      <button id="sumOk" class="btn btn-primary" type="button">确认</button>
+    </div>
+  </div>
+
+  <!-- ============ 规则 ============ -->
+  <div id="rules">
+    <div class="rules-card">
+      <h3>巫师牌 · 规则</h3>
+      <div id="rulesBody">
+        <h4>组件</h4>
+        <p>红 ◆ / 黄 ★ / 蓝 ▲ / 绿 ■ 各 1~13（52 张）+ <b>4 张巫师</b> + <b>4 张小丑</b>，共 60 张。</p>
+        <h4>每轮流程</h4>
+        <ol>
+          <li>60 张全部重洗，每人发 <b>轮次号</b> 张（第 5 轮每人 5 张）。</li>
+          <li>翻 1 张<b>指示牌</b>定王牌：彩色 → 该色为王牌；<b>巫师</b> → 先手看完手牌后指定一色；<b>小丑</b> → 本轮无王牌。</li>
+          <li>全员<b>预判</b>本轮会赢几墩（0 ~ 本轮手牌数），所有人可见。</li>
+          <li>从先手起打 <b>轮次号</b> 个回合（墩）。</li>
+        </ol>
+        <h4>出牌</h4>
+        <ul>
+          <li>先手任意出牌；跟牌时<b>手牌有先手色就必须跟</b>，没有才能出别的颜色。</li>
+          <li><b>巫师 / 小丑永远可以出</b>，不受跟色限制；先手打的是巫师或小丑，则所有人任意出。</li>
+        </ul>
+        <h4>得墩判定（依序）</h4>
+        <ol>
+          <li>场上有巫师 → <b>第一个</b>打出巫师的人赢。</li>
+          <li>否则有王牌色 → 王牌中<b>数字最大</b>者赢。</li>
+          <li>否则跟先手同色 → 该色<b>数字最大</b>者赢。</li>
+          <li>先手是小丑 → 其后<b>第一张彩色牌</b>的颜色定跟色，该色最大者赢（全是小丑则先手赢）。</li>
+        </ol>
+        <p class="dim">小丑永不赢（唯一例外：全小丑）。</p>
+        <h4>计分</h4>
+        <table>
+          <tr><th>结果</th><th>分数</th></tr>
+          <tr><td>预判精确命中</td><td>20 + 10 × 赢墩数（预判 0 且赢 0 墩也 +20）</td></tr>
+          <tr><td>未命中</td><td>−10 × |预判 − 实际|（可为负）</td></tr>
+        </table>
+        <h4>先手与轮数</h4>
+        <p>第 1 轮先手随机；此后<b>先手 = 上一墩的赢家</b>。轮数：3 人 20 轮 / 4 人 15 轮 / 5 人 12 轮 / 6 人 10 轮。最后一轮 60 张全部发完，<b>没有王牌</b>。</p>
+      </div>
+      <button id="rulesClose" class="btn btn-primary" type="button">知道了</button>
+    </div>
+  </div>
+
+  <!-- ============ 计分榜 ============ -->
+  <div id="scorebox">
+    <div class="sheet">
+      <div class="sheet-card">
+        <div class="sheet-head">
+          <b>计分榜</b>
+          <small class="dim" id="scoreSub">逐轮得分 · 预判 / 实际</small>
+          <button id="scoreClose" class="tb-btn" type="button">收起</button>
+        </div>
+        <div id="scoreBody" class="board-scroll"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 运行日志 ============ -->
+  <div id="logbox">
+    <div class="log-card">
+      <div class="log-head">
+        <b>运行日志</b>
+        <small class="dim" id="logCount">0 条</small>
+        <button id="logCopy" class="tb-btn" type="button">复制</button>
+        <button id="logClear" class="tb-btn" type="button">清空</button>
+        <button id="logClose" class="tb-btn" type="button">收起</button>
+      </div>
+      <div id="logBody"></div>
+      <div class="log-foot">
+        <small class="dim">存档：<span id="logSaveInfo">无</span></small>
+        <button id="logWipe" class="btn btn-ghost" type="button">清空存档并回到封面</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 特效层：视口坐标，永不接事件。必须在各屏之外 —— 它用高 z 压住所有界面 -->
+  <div id="fx"></div>
+
+</div>
+
+<script src="game.js"></script>
+<script src="ai.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
