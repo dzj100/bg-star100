@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#8fe3f7">
+<title>棕榈岛 · Palm Island</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+<!-- ============ SVG 图标库（全部素材代码绘制，无外部图片） ============ -->
+<svg class="defs" aria-hidden="true">
+  <symbol id="ic-fish" viewBox="0 0 16 16">
+    <path d="M15 8c0 2.3-2.9 4.2-6.3 4.2S2.4 10.3 2.4 8s2.9-4.2 6.3-4.2S15 5.7 15 8z" fill="#2fb9d8"/>
+    <path d="M3.4 8 0.8 5.3v5.4z" fill="#1a93b5"/>
+    <circle cx="12" cy="6.9" r="1.05" fill="#fff"/>
+    <circle cx="12.1" cy="6.9" r=".5" fill="#17384f"/>
+  </symbol>
+  <symbol id="ic-wood" viewBox="0 0 16 16">
+    <rect x="1.4" y="4.5" width="12.4" height="7" rx="3.5" fill="#a9702f"/>
+    <rect x="1.4" y="4.5" width="12.4" height="2.8" rx="1.4" fill="#c08a4a"/>
+    <circle cx="12.6" cy="8" r="3" fill="#e3b877"/>
+    <circle cx="12.6" cy="8" r="1.5" fill="#c08a4a"/>
+    <circle cx="12.6" cy="8" r=".55" fill="#a9702f"/>
+  </symbol>
+  <symbol id="ic-stone" viewBox="0 0 16 16">
+    <path d="M3.1 11.7C1.5 10.5 1.8 7.1 4 5.4 6.2 3.7 9.9 3.8 12 5.6c2.1 1.8 1.9 5.2-.4 6.5-2.3 1.2-6.8 1-8.5-.4z" fill="#8b98a6"/>
+    <path d="M4.7 7.2c1-1.3 2.8-2 4.4-1.9" stroke="#c3ccd6" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+  </symbol>
+  <symbol id="ic-star" viewBox="0 0 16 16">
+    <path d="M8 1.1l2.1 4.2 4.6.7-3.3 3.3.8 4.6L8 11.7l-4.2 2.2.8-4.6L1.3 6l4.6-.7z" fill="#ffc93c" stroke="#e8a20c" stroke-width=".9" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="ic-up" viewBox="0 0 16 16">
+    <path d="M8 1.6 13.2 7.1H10v7.3H6V7.1H2.8z" fill="currentColor"/>
+  </symbol>
+  <symbol id="ic-rot" viewBox="0 0 16 16">
+    <path d="M8 3.1a4.9 4.9 0 1 0 4.9 4.9" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M8 .5v4.3l3.8-2.15z" fill="currentColor"/>
+  </symbol>
+  <symbol id="ic-rot180" viewBox="0 0 16 16">
+    <!-- 🔃 造型：两枚钩形箭头（上：顶弧 + 右竖杆 + 向下箭头；下为它旋转 180°：底弧 + 左竖杆 + 向上箭头） -->
+    <path d="M6.23 4.19A4.2 4.2 0 0 1 12.2 8L12.2 10" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M10 10 14.4 10 12.2 13.2z" fill="currentColor"/>
+    <path d="M9.77 11.81A4.2 4.2 0 0 1 3.8 8L3.8 6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M6 6 1.6 6 3.8 2.8z" fill="currentColor"/>
+  </symbol>
+  <symbol id="ic-flip" viewBox="0 0 16 16">
+    <path d="M2.9 3.3 6.7 8l-3.8 4.7z" fill="currentColor"/>
+    <path d="M13.1 3.3 9.3 8l3.8 4.7z" fill="currentColor" opacity=".45"/>
+    <path d="M8 1.5v13" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.4 2.4"/>
+  </symbol>
+  <symbol id="ic-sound" viewBox="0 0 16 16">
+    <path d="M2.4 6h2.6l3.6-2.9v9.8L5 10H2.4z" fill="currentColor"/>
+    <path d="M10.6 5.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <path d="M12.6 4a6 6 0 0 1 0 8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55"/>
+  </symbol>
+  <symbol id="deco-palm" viewBox="0 0 140 170">
+    <path d="M66 168c3-36 6-64 12-90 3-11 7-19 14-27l7 6c-7 8-11 16-14 27-6 26-9 53-11 84z" fill="#8a5a2b"/>
+    <path d="M89 57C65 34 36 29 14 42c22-6 47 1 69 17z" fill="#177a4e"/>
+    <path d="M90 56C75 32 55 21 35 24c18 2 34 13 49 34z" fill="#2aa06a"/>
+    <path d="M91 55c-6-25-4-45 7-60 2 21 1 41-3 60z" fill="#1e8f5c"/>
+    <path d="M92 55c16-21 38-30 59-26-19 4-35 14-51 32z" fill="#2aa06a"/>
+    <path d="M93 58c23-8 45-6 61 9-19-5-39-1-57 8z" fill="#177a4e"/>
+    <circle cx="88" cy="62" r="5" fill="#7c4d22"/>
+    <circle cx="97" cy="66" r="5" fill="#8a5a2b"/>
+  </symbol>
+  <symbol id="deco-starfish" viewBox="0 0 60 60">
+    <path d="M30 4l6.6 15.2 16.4 1.2-12.4 10.6 3.9 16L30 38.6 15.5 47l3.9-16L7 20.4l16.4-1.2z" fill="#ff9b6f" stroke="#f2583a" stroke-width="2.4" stroke-linejoin="round"/>
+    <circle cx="30" cy="27" r="2.2" fill="#f2583a" opacity=".5"/>
+  </symbol>
+  <symbol id="deco-shell" viewBox="0 0 60 60">
+    <path d="M30 51C13 51 5 36 7.4 23.6 8.4 18.4 12.4 15 17 15c5.4 0 9.3 4 13 12 3.7-8 7.6-12 13-12 4.6 0 8.6 3.4 9.6 8.6C55 36 47 51 30 51z" fill="#ffe0cd" stroke="#f2906a" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M30 50V27M21.5 48 16 29M38.5 48 44 29" stroke="#f2b39a" stroke-width="2" stroke-linecap="round" fill="none"/>
+  </symbol>
+
+  <!-- 卡面底图（场景剪影 · 单色，着色由 .pc-art 类控制） -->
+  <symbol id="art-hut" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="76" cy="24" r="10" opacity=".5"/>
+      <path d="M14 21c3-4 7-4 9 0 3-3 6-2 6 2 0 2-3 3-6 3H16c-3 0-4-3-2-5z" opacity=".32"/>
+      <path d="M0 83h100v3H0z" opacity=".25"/>
+      <path d="M0 91h100v3H0z" opacity=".35"/>
+      <path d="M0 100h100v3H0z" opacity=".45"/>
+      <path d="M30 70h40v8H30z" opacity=".68"/>
+      <path d="M34 78h5v22h-5zM61 78h5v22h-5z" opacity=".55"/>
+      <path d="M28 46h44v24H28z" opacity=".72"/>
+      <path d="M23 48 50 29l27 19z" opacity=".88"/>
+      <path d="M44 55h12v15H44z" opacity=".4"/>
+      <path d="M16 110c2-14 3-24 5-32" stroke="currentColor" stroke-width="3" fill="none" opacity=".65"/>
+      <path d="M21 78c-7-7-14-9-21-6 7-1 14 2 19 8zM21 77c4-9 11-13 18-12-6 1-11 6-16 13zM21 78c1-9-1-16-5-22 2 8 3 15 3 23z" opacity=".65"/>
+    </g>
+  </symbol>
+  <symbol id="art-lumber" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="20" cy="22" r="9" opacity=".5"/>
+      <path d="M78 30 65 58h26z" opacity=".55"/>
+      <path d="M78 44 62 76h32z" opacity=".55"/>
+      <path d="M78 62 59 96h38z" opacity=".55"/>
+      <path d="M75 96h6v14h-6z" opacity=".65"/>
+      <path d="M24 52 15 74h18z" opacity=".45"/>
+      <path d="M24 64 12 88h24z" opacity=".45"/>
+      <path d="M21.5 88h5v10h-5z" opacity=".55"/>
+      <path d="M0 104h100v32H0z" opacity=".16"/>
+      <rect x="52" y="112" width="42" height="10" rx="5" opacity=".38"/>
+      <circle cx="34" cy="122" r="8.5" opacity=".6"/>
+      <circle cx="50" cy="122" r="8.5" opacity=".45"/>
+      <circle cx="42" cy="109" r="8.5" opacity=".72"/>
+    </g>
+  </symbol>
+  <symbol id="art-isle" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="72" cy="30" r="12" opacity=".5"/>
+      <path d="M0 86h100v4H0z" opacity=".25"/>
+      <path d="M0 96h100v4H0z" opacity=".4"/>
+      <path d="M18 110c9-11 25-15 35-13 8 2 17 6 27 13z" opacity=".5"/>
+      <path d="M52 104c3-16 5-26 9-34" stroke="currentColor" stroke-width="3" fill="none" opacity=".6"/>
+      <path d="M61 70c-8-8-16-10-24-6 8-1 15 2 22 8zM61 69c5-10 12-14 20-13-7 1-13 6-18 14zM61 70c1-10-1-18-6-24 2 8 3 16 4 24z" opacity=".6"/>
+    </g>
+  </symbol>
+  <symbol id="art-quarry" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="24" cy="24" r="9" opacity=".5"/>
+      <path d="M0 106h100v30H0z" opacity=".18"/>
+      <path d="M8 106l16-28 10 12 12-20 12 24 12-14 14 26z" opacity=".62"/>
+      <path d="M60 44h4v28h-4z" opacity=".6"/>
+      <path d="M50 44h26v4H50z" opacity=".6"/>
+      <path d="M56 52h4v10h-4z" opacity=".5"/>
+      <path d="M40 96h16l-2 10H42z" opacity=".55"/>
+      <circle cx="34" cy="120" r="6" opacity=".45"/>
+    </g>
+  </symbol>
+  <symbol id="art-market" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="74" cy="26" r="9" opacity=".5"/>
+      <path d="M0 106h100v30H0z" opacity=".16"/>
+      <path d="M12 60l7-20h62l7 20z" opacity=".55"/>
+      <path d="M18 60h64v7H18z" opacity=".72"/>
+      <path d="M20 44q6 6 12 0t12 0 12 0 12 0 8 0" stroke="currentColor" stroke-width="2" fill="none" opacity=".4"/>
+      <path d="M22 67h4v30h-4zM74 67h4v30h-4z" opacity=".55"/>
+      <path d="M30 97h40v8H30z" opacity=".5"/>
+      <circle cx="34" cy="88" r="5" opacity=".55"/>
+      <circle cx="46" cy="88" r="5" opacity=".4"/>
+      <circle cx="58" cy="88" r="5" opacity=".55"/>
+    </g>
+  </symbol>
+  <symbol id="art-storehouse" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="22" cy="24" r="9" opacity=".5"/>
+      <path d="M0 108h100v28H0z" opacity=".16"/>
+      <rect x="20" y="76" width="26" height="26" rx="2" opacity=".6"/>
+      <rect x="46" y="76" width="26" height="26" rx="2" opacity=".5"/>
+      <rect x="33" y="50" width="26" height="26" rx="2" opacity=".68"/>
+      <path d="M20 89h26M46 89h26M33 63h26" stroke="currentColor" stroke-width="1.6" opacity=".3"/>
+      <rect x="64" y="94" width="22" height="16" rx="8" opacity=".45"/>
+    </g>
+  </symbol>
+  <symbol id="art-warehouse" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="76" cy="24" r="9" opacity=".5"/>
+      <path d="M0 104h100v32H0z" opacity=".16"/>
+      <path d="M18 66h64v40H18z" opacity=".7"/>
+      <path d="M12 68 50 40l38 28z" opacity=".85"/>
+      <path d="M42 78h16v28H42z" opacity=".38"/>
+      <path d="M46 80v26M54 80v26" stroke="currentColor" stroke-width="1.8" opacity=".45"/>
+      <path d="M26 74h10v10H26zM64 74h10v10H64z" opacity=".4"/>
+    </g>
+  </symbol>
+  <symbol id="art-house" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="74" cy="26" r="10" opacity=".5"/>
+      <path d="M0 106h100v30H0z" opacity=".16"/>
+      <path d="M26 62h48v44H26z" opacity=".7"/>
+      <path d="M20 64 50 38l30 26z" opacity=".85"/>
+      <path d="M44 78h12v28H44z" opacity=".42"/>
+      <path d="M32 70h10v10H32zM58 70h10v10H58z" opacity=".4"/>
+      <path d="M10 92h14v4H10zM10 100h14v4H10z" opacity=".4"/>
+      <path d="M12 84h3v26h-3zM20 84h3v26h-3z" opacity=".5"/>
+    </g>
+  </symbol>
+  <symbol id="art-temple" viewBox="0 0 100 136">
+    <g fill="currentColor">
+      <circle cx="50" cy="20" r="9" opacity=".5"/>
+      <path d="M0 112h100v24H0z" opacity=".16"/>
+      <path d="M22 44 50 26l28 18z" opacity=".85"/>
+      <path d="M18 44h64v6H18z" opacity=".72"/>
+      <path d="M28 50h5v44h-5zM40 50h5v44h-5zM55 50h5v44h-5zM67 50h5v44h-5z" opacity=".6"/>
+      <path d="M22 94h56v6H22z" opacity=".7"/>
+      <path d="M16 100h68v6H16z" opacity=".6"/>
+      <path d="M10 106h80v6H10z" opacity=".5"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- ============ 封面 ============ -->
+<div id="screen-menu">
+  <div class="sun" aria-hidden="true"></div>
+  <div class="cloud c1" aria-hidden="true"></div>
+  <div class="cloud c2" aria-hidden="true"></div>
+  <div class="cloud c3" aria-hidden="true"></div>
+  <svg class="sea" viewBox="0 0 390 150" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 44 Q 55 22 118 42 T 250 40 T 390 34 V150 H0 Z" fill="#a9ecfa"/>
+    <path d="M0 76 Q 68 50 138 74 T 276 70 T 390 64 V150 H0 Z" fill="#41cdea"/>
+    <path d="M0 108 Q 60 88 132 104 T 262 102 T 390 98 V150 H0 Z" fill="#17a6d6"/>
+    <path d="M0 128 H390 V150 H0 Z" fill="#0f83b8"/>
+  </svg>
+  <svg class="deco palm-l" aria-hidden="true"><use href="#deco-palm"/></svg>
+  <svg class="deco palm-r" aria-hidden="true"><use href="#deco-palm"/></svg>
+  <svg class="deco starfish" aria-hidden="true"><use href="#deco-starfish"/></svg>
+  <svg class="deco shell" aria-hidden="true"><use href="#deco-shell"/></svg>
+  <button class="mute-fab" id="btnMuteMenu" aria-label="音效开关"><svg class="ic"><use href="#ic-sound"/></svg></button>
+
+  <div class="menu-inner">
+    <div class="logo-block">
+      <div class="logo-kicker">孤岛求生 · 卡牌构筑</div>
+      <div class="logo-zh">棕榈岛</div>
+      <div class="logo-en">Palm Island</div>
+      <div class="logo-sub">8 轮循环 · 旋转采资源 · 升级你的岛</div>
+    </div>
+
+    <button class="btn-main primary" id="btnStart">开始新航程<span class="sub">8 轮循环 · 收集资源 · 升级卡牌</span></button>
+    <button class="btn-main hidden" id="btnResume">继续上次航程<span class="sub" id="resumeSub">上次对局未结束</span></button>
+    <div class="menu-meta" id="menuMeta">
+      <!-- 设计样板：render 会按 best 数据重写 -->
+      <span>最佳 <b>18</b> <svg class="ic"><use href="#ic-star"/></svg></span>
+      <span>已完成 <b>12</b> 次航程</span>
+    </div>
+    <button class="btn-link" id="btnRules">规则速览</button>
+  </div>
+  <div class="credit">@imStar100</div>
+</div>
+
+<!-- ============ 对局屏 ============ -->
+<div id="screen-game">
+  <div id="topbar">
+    <button class="tb-btn" id="btnMenu">‹ 菜单</button>
+    <div class="tb-title">棕榈岛<small>PALM ISLAND</small></div>
+    <button class="tb-btn" id="btnMute" aria-label="音效开关"><svg class="ic"><use href="#ic-sound"/></svg></button>
+    <button class="tb-btn" id="btnRulesGame">规则</button>
+    <button class="tb-btn" id="btnReset">重置</button>
+  </div>
+
+  <div id="logbar">
+    <span class="nb-ico">▤</span>
+    <span class="nb-t" id="logText">第 2 轮 · 樵夫 右转收集 1<svg class="ic"><use href="#ic-wood"/></svg></span>
+    <span class="nb-open">日志</span>
+  </div>
+
+  <div id="roundbar">
+    <div id="roundPips">
+      <!-- 设计样板：render 按当前轮次渲染 8 枚底线 -->
+      <span class="pip done"></span><span class="pip done"></span><span class="pip now"></span>
+      <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+    </div>
+    <div id="roundTxt">第 <b>3</b> / 8 轮</div>
+  </div>
+
+  <div id="resbar">
+    <span class="rchip fish" id="resFishChip"><svg class="ic"><use href="#ic-fish"/></svg><b id="resFish">1</b></span>
+    <span class="rchip wood" id="resWoodChip"><svg class="ic"><use href="#ic-wood"/></svg><b id="resWood">2</b></span>
+    <span class="rchip stone zero" id="resStoneChip"><svg class="ic"><use href="#ic-stone"/></svg><b id="resStone">0</b></span>
+    <span id="resHint">资源＝横置的卡 · 上限 4 张</span>
+  </div>
+
+  <div id="focuswrap">
+    <div id="focusTop">
+      <span>牌堆顶 · 可见最上 2 张</span>
+      <span id="deckchip"><span class="deckico"><i></i><i></i><i></i></span>牌堆 <b id="deckN">13</b> 张</span>
+    </div>
+    <div id="focusCardArea">
+      <!-- 设计样板：render 按焦点 2 张渲染（.fslot 包裹 + 点选目标） -->
+    </div>
+    <div id="focusNote">正 0° 行 · 非资源态 · 点卡可换目标</div>
+  </div>
+
+  <div class="stripwrap">
+    <div class="striplabel">横置资源 · 每张标注它在牌堆第几张 <span class="n" id="bankN">0 / 4</span></div>
+    <div class="strip" id="decklist">
+      <!-- render.js 只列横置（资源态）卡：卡面旋转展示 + 标注它在牌堆中的位置；其余牌序不展示 -->
+    </div>
+  </div>
+
+  <div id="actbar">
+    <button class="act collect" id="btnCollect"><b><svg class="ic"><use href="#ic-rot"/></svg>收集</b><span class="cost" id="colSub">免费 · 得 1<svg class="ic"><use href="#ic-wood"/></svg></span></button>
+    <button class="act spin180" id="btnSpin180"><b><svg class="ic"><use href="#ic-rot180"/></svg>转180°</b><span class="cost" id="spinSub">付 1<svg class="ic"><use href="#ic-wood"/></svg>1<svg class="ic"><use href="#ic-fish"/></svg></span></button>
+    <button class="act flip" id="btnFlip"><b><svg class="ic"><use href="#ic-flip"/></svg>翻面</b><span class="cost" id="flipSub">当前行未印出</span></button>
+    <button class="act skip" id="btnSkip"><b>跳过</b><span class="cost">第 1 张 · 回牌堆底</span></button>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="fx"></div>
+</div>
+
+<!-- ============ 规则速览 ============ -->
+<div class="sheet-mask hidden" id="rulesMask">
+  <div class="sheet sheet-wide">
+    <h3>规则速览<small class="sheet-sub">单人 · 8 轮 · 16 张岛卡 + 1 张回合标记卡</small></h3>
+    <p>你是漂流到棕榈岛的旅人。整场航程共 <b>8 轮</b>：每轮把整副牌堆循环一遍，靠 <b>旋转卡牌</b> 采集资源、升级卡牌；牌堆全程保持 16 张岛卡循环使用、没有卡牌离场，最终按全部卡牌的朝向计分。</p>
+
+    <div class="rt-title">组件</div>
+    <table class="rt">
+      <thead><tr><th>组件</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>岛卡 ×16</td><td>方形双向卡：正面（1 级）/ 背面（2 级）；每面 2 条内容行（0° 正读 + 180° 倒印）＝ 每张卡 <b>4 个朝向</b></td></tr>
+        <tr><td>回合标记卡 ×1</td><td>每次露出计数 +1（1→8）；读到 8 时立即结算。不计分</td></tr>
+        <tr><td>资源</td><td>无实体资源池：某张卡<b>横置（右转 90°）</b>即成为资源卡，露出的图标＝该行产出（<svg class="ic"><use href="#ic-fish"/></svg> 鱼 / <svg class="ic"><use href="#ic-wood"/></svg> 木 / <svg class="ic"><use href="#ic-stone"/></svg> 石头），最多同时 4 张</td></tr>
+      </tbody>
+    </table>
+
+    <div class="rt-title">回合流程（读牌堆顶卡）</div>
+    <table class="rt">
+      <thead><tr><th>顶卡</th><th>交互</th><th>花费</th><th>去向</th></tr></thead>
+      <tbody>
+        <tr><td>回合标记卡</td><td>自动：计数 +1</td><td>—</td><td>读 8 → 结算；否则放回牌堆底（仅计数，无卡牌离场）</td></tr>
+        <tr><td>非资源态卡</td><td>可见最上 <b>2 张</b>、任选其一：① 右转收集 ② 转 180° ③ 翻面 ④ 跳过（仅第 1 张）</td><td>① 免费（印有收集费用时按 or 任选其一支付）；② 当前行的 <span class="k-spin">🟡</span> 费用；③ 当前行的 <span class="k-flip">🔵</span> 费用</td><td>按<b>最终样式</b>放到牌堆最下方</td></tr>
+        <tr><td>资源态卡</td><td>自动：左转 90° 复位</td><td>—</td><td>回退为非资源态 → 放回牌堆底</td></tr>
+      </tbody>
+    </table>
+    <p class="rt-note">⚠ 当前行未印出的操作不可用；行态完全为空（如樵夫背 0°）时只能跳过。每张卡把自己的「终态」印在 ⬆ 最大的一行（终态各不相同）。</p>
+
+    <div class="rt-title">资源与上限</div>
+    <ol>
+      <li>资源＝牌堆中所有「横置」的卡，顶部资源栏显示合计；最多同时 <b>4 张</b>。横置卡仍留在牌堆里，下方「横置资源」条会标出每张<b>此刻在牌堆中的位置（第几张）</b>。</li>
+      <li>支付时勾选资源卡：<b>每种所需资源</b>都要有对应卡覆盖（可多选、允许多付）。</li>
+      <li>花掉的卡<b>原位</b>左转 90° 复位，牌堆中其他卡的顺序不变。</li>
+      <li>已满 4 张时仍可收集：先点选 1 张现有资源卡<b>原位重置</b>，再执行收集。</li>
+    </ol>
+
+    <div class="rt-title">升级状态图</div>
+    <table class="rt">
+      <thead><tr><th>操作</th><th>状态变化</th></tr></thead>
+      <tbody>
+        <tr><td class="k-free">🟢 右转 90°（免费）</td><td>露出产出 → 成为资源卡；之后回到牌堆顶时自动复位</td></tr>
+        <tr><td class="k-spin">🟡 旋转 180°</td><td>保持面：正 0° ↔ 正 180°、背 0° ↔ 背 180°</td></tr>
+        <tr><td class="k-flip">🔵 翻面</td><td>保持行：正 0° ↔ 背 0°、正 180° ↔ 背 180°</td></tr>
+      </tbody>
+    </table>
+
+    <div class="rt-title">结算</div>
+    <ul>
+      <li>回合标记卡读到 <b>8</b>：每张卡按 <b>当前朝向</b>、取「<b>上方那条框条</b>」的 <span class="k-star">⭐</span> 累计（横置卡按底层行态取值）。</li>
+      <li>总分对照段位门槛评出本次航程的段位。</li>
+      <li>牌堆里的 16 张卡全程在列、照常计分——在 8 轮里把它们升级到高分行，才是拿到高分的关键。</li>
+    </ul>
+
+    <div class="rt-title">符号</div>
+    <table class="rt">
+      <tbody>
+        <tr><td>🟢 Free</td><td>免费右转 90°（收集）</td></tr>
+        <tr><td>🟢 N</td><td>该行的<b>收集费用</b>（or 列出多种，任选其一支付）</td></tr>
+        <tr><td>🟡 N</td><td>花 N 资源旋转 180°</td></tr>
+        <tr><td>🔵 N</td><td>花 N 资源翻面</td></tr>
+        <tr><td><span class="k-star">N⭐</span></td><td>该行结算分（读向框条左端）</td></tr>
+        <tr><td>N⬆</td><td>升级深度＝距基础态（正 0°）的最少步数（读向框条右端）</td></tr>
+      </tbody>
+    </table>
+    <button class="btn-main" id="btnCloseRules">知道了</button>
+  </div>
+</div>
+
+<!-- ============ 日志 ============ -->
+<div class="sheet-mask hidden" id="logMask">
+  <div class="sheet sheet-wide">
+    <h3>航海日志<small class="sheet-sub">最新在前 · 点顶部日志条随时查看</small></h3>
+    <div id="logList">
+      <!-- 设计样板：render 会按真实日志重写 -->
+      <div class="log-item round"><span class="lg-no">12</span><span>第 3 轮开始</span></div>
+      <div class="log-item good"><span class="lg-no">11</span><span>樵夫 右转收集 1<svg class="ic"><use href="#ic-wood"/></svg></span></div>
+      <div class="log-item flip"><span class="lg-no">10</span><span>樵夫 翻面 → 背 180° 行</span></div>
+      <div class="log-item sys"><span class="lg-no">9</span><span>第 2 轮结束</span></div>
+    </div>
+    <button class="btn-main" id="btnCloseLog">关闭</button>
+  </div>
+</div>
+
+<!-- ============ 重置确认 ============ -->
+<div class="sheet-mask hidden" id="resetMask">
+  <div class="sheet sheet-wide">
+    <h3>重新出发<small class="sheet-sub">放弃当前航程，从第 1 轮重开</small></h3>
+    <p>当前航程进度将<b>被清空</b>，牌堆会重新洗过。确定要重开吗？</p>
+    <button class="btn-main primary" id="btnResetGo">重新开始</button>
+    <button class="btn-main" id="btnResetBack">取消</button>
+  </div>
+</div>
+
+<!-- ============ 资源上限：重置选择 ============ -->
+<div class="sheet-mask hidden" id="resetPickMask">
+  <div class="sheet sheet-wide">
+    <h3>资源卡已满 4 张<small class="sheet-sub">按上限规则：先重置 1 张现有资源卡，再进行本次收集</small></h3>
+    <div id="resetPickRows">
+      <!-- 设计样板：render 按资源态卡渲染 -->
+    </div>
+    <div id="resetPickInfo">点选 1 张要重置的资源卡（原位左转，不改牌堆顺序）</div>
+    <button class="btn-main primary" id="btnResetPickGo" disabled>重置并继续</button>
+    <button class="btn-main" id="btnResetPickCancel">取消</button>
+  </div>
+</div>
+
+<!-- ============ 支付 ============ -->
+<div class="sheet-mask hidden" id="payMask">
+  <div class="sheet sheet-wide">
+    <h3 id="payTitle">支付<small class="sheet-sub">勾选资源卡 · 每种所需资源都要有对应卡覆盖</small></h3>
+    <div class="payopts hidden" id="payOpts"></div>
+    <div class="paybar" id="payBar">
+      需 <span id="payNeed"></span>
+      <span class="pt">已选 <b id="payGot"></b></span>
+    </div>
+    <div id="payRows">
+      <!-- 设计样板：render 按资源态卡渲染 -->
+      <button class="payrow on" data-i="0">
+        <div class="pcard m res" style="--q:1"><div class="pc-in">
+          <span class="pc-prod t on"><svg class="ic"><use href="#ic-fish"/></svg></span>
+          <span class="pc-prod b"><svg class="ic"><use href="#ic-fish"/></svg><svg class="ic"><use href="#ic-fish"/></svg></span>
+          <div class="pc-body">
+            <div class="pc-bar top"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">船屋</span><span class="pc-bd lv none">0<svg class="ic"><use href="#ic-up"/></svg></span></div>
+            <div class="pc-row r0"></div><div class="pc-row r180"></div>
+            <div class="pc-bar bot"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">船屋</span><span class="pc-bd lv">1<svg class="ic"><use href="#ic-up"/></svg></span></div>
+          </div>
+        </div></div>
+        <span class="pinfo"><b>船屋 · 正0°</b><span><i>1<svg class="ic"><use href="#ic-fish"/></svg></i></span></span>
+        <span class="ck">✓</span>
+      </button>
+      <button class="payrow on" data-i="1">
+        <div class="pcard m res" style="--q:3"><div class="pc-in">
+          <span class="pc-prod t"><svg class="ic"><use href="#ic-wood"/></svg></span>
+          <span class="pc-prod b on"><svg class="ic"><use href="#ic-wood"/></svg></span>
+          <div class="pc-body">
+            <div class="pc-bar top"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv none">0<svg class="ic"><use href="#ic-up"/></svg></span></div>
+            <div class="pc-row r0"></div><div class="pc-row r180"></div>
+            <div class="pc-bar bot"><span class="pc-bd star">1<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">1<svg class="ic"><use href="#ic-up"/></svg></span></div>
+          </div>
+        </div></div>
+        <span class="pinfo"><b>樵夫 · 正180°</b><span><i>1<svg class="ic"><use href="#ic-wood"/></svg></i></span></span>
+        <span class="ck">✓</span>
+      </button>
+      <button class="payrow" data-i="2">
+        <div class="pcard m res" style="--q:3"><div class="pc-in">
+          <span class="pc-prod b on"><svg class="ic"><use href="#ic-wood"/></svg><svg class="ic"><use href="#ic-wood"/></svg></span>
+          <div class="pc-body">
+            <div class="pc-bar top"><span class="pc-bd star">5<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">3<svg class="ic"><use href="#ic-up"/></svg></span></div>
+            <div class="pc-row r0"></div><div class="pc-row r180"></div>
+            <div class="pc-bar bot"><span class="pc-bd star">2<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">2<svg class="ic"><use href="#ic-up"/></svg></span></div>
+          </div>
+        </div></div>
+        <span class="pinfo"><b>樵夫 · 背180°</b><span><i>2<svg class="ic"><use href="#ic-wood"/></svg></i></span></span>
+        <span class="ck">✓</span>
+      </button>
+    </div>
+    <button class="btn-main primary" id="btnPayGo" disabled>确认支付</button>
+    <button class="btn-main" id="btnPayCancel">再想想</button>
+  </div>
+</div>
+
+<!-- ============ 查看全貌 ============ -->
+<div class="sheet-mask hidden" id="inspectMask">
+  <div class="sheet sheet-wide">
+    <h3>查看卡牌<small class="sheet-sub">四个朝向 · 产出与升级一览</small></h3>
+    <div id="inspectCardBox">
+      <!-- 设计样板：render 按焦点卡渲染 -->
+    </div>
+    <div id="inspectRows"></div>
+    <button class="btn-main" id="btnCloseInspect">关闭</button>
+  </div>
+</div>
+
+<!-- ============ 结算 ============ -->
+<div id="overlay-win" class="hidden">
+  <!-- 设计样板：render 按结算数据重写 -->
+  <div class="win-card">
+    <div class="win-kicker">航程结束 · 8 轮</div>
+    <div class="win-stamp"><svg class="ic"><use href="#ic-star"/></svg>还过得去</div>
+    <div class="win-total"><b id="winScore">13</b><svg class="ic"><use href="#ic-star"/></svg></div>
+    <div class="win-best" id="winBest">最佳纪录 <b>18</b> ⭐ · 继续努力！</div>
+    <div class="win-list" id="winList">
+      <div class="winrow"><div class="pcard x" style="--q:0"><div class="pc-in"><div class="pc-body"><div class="pc-bar top"><span class="pc-bd star">5<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">3<svg class="ic"><use href="#ic-up"/></svg></span></div><div class="pc-row r0"></div><div class="pc-row r180"></div><div class="pc-bar bot"><span class="pc-bd star">2<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">2<svg class="ic"><use href="#ic-up"/></svg></span></div></div></div></div><span class="grow">樵夫 · 背 0° 行</span><span class="sc">5<svg class="ic"><use href="#ic-star"/></svg></span></div>
+      <div class="winrow"><div class="pcard x" style="--q:0"><div class="pc-in"><div class="pc-body"><div class="pc-bar top"><span class="pc-bd star">5<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">3<svg class="ic"><use href="#ic-up"/></svg></span></div><div class="pc-row r0"></div><div class="pc-row r180"></div><div class="pc-bar bot"><span class="pc-bd star">2<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">2<svg class="ic"><use href="#ic-up"/></svg></span></div></div></div></div><span class="grow">樵夫 · 背 0° 行</span><span class="sc">5<svg class="ic"><use href="#ic-star"/></svg></span></div>
+      <div class="winrow"><div class="pcard x" style="--q:3"><div class="pc-in"><div class="pc-body"><div class="pc-bar top"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">船屋</span><span class="pc-bd lv">1<svg class="ic"><use href="#ic-up"/></svg></span></div><div class="pc-row r0"></div><div class="pc-row r180"></div><div class="pc-bar bot"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">船屋</span><span class="pc-bd lv">2<svg class="ic"><use href="#ic-up"/></svg></span></div></div></div></div><span class="grow">船屋 · 背 180° 行（横置）</span><span class="sc">0<svg class="ic"><use href="#ic-star"/></svg></span></div>
+      <div class="winrow"><div class="pcard x" style="--q:0"><div class="pc-in"><div class="pc-body"><div class="pc-bar top"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv none">0<svg class="ic"><use href="#ic-up"/></svg></span></div><div class="pc-row r0"></div><div class="pc-row r180"></div><div class="pc-bar bot"><span class="pc-bd star">1<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">1<svg class="ic"><use href="#ic-up"/></svg></span></div></div></div></div><span class="grow">樵夫 · 正 0° 行</span><span class="sc">0<svg class="ic"><use href="#ic-star"/></svg></span></div>
+      <div class="winrow"><div class="pcard x" style="--q:2"><div class="pc-in"><div class="pc-body"><div class="pc-bar top"><span class="pc-bd star none">0<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv none">0<svg class="ic"><use href="#ic-up"/></svg></span></div><div class="pc-row r0"></div><div class="pc-row r180"></div><div class="pc-bar bot"><span class="pc-bd star">1<svg class="ic"><use href="#ic-star"/></svg></span><span class="pc-nm">樵夫</span><span class="pc-bd lv">1<svg class="ic"><use href="#ic-up"/></svg></span></div></div></div></div><span class="grow">樵夫 · 正 180° 行</span><span class="sc">1<svg class="ic"><use href="#ic-star"/></svg></span></div>
+    </div>
+    <button class="btn-main primary" id="btnAgain">再来一局</button>
+    <button class="btn-main" id="btnHome">回封面</button>
+  </div>
+</div>
+
+<!-- ============ 新手引导 ============ -->
+<div id="coach" class="hidden">
+  <div class="coach-dim"></div>
+  <div class="coach-hole" id="coachHole" style="left:12px;right:12px;bottom:calc(122px + env(safe-area-inset-bottom));height:72px"></div>
+  <div id="coachTip" style="bottom:calc(212px + env(safe-area-inset-bottom))">
+    <span id="coachStep">1 / 4</span>
+    <b id="coachTitle">牌堆顶可见 2 张</b>
+    <p id="coachText">每次能同时看到最上面 2 张卡。点卡切换「目标」（带 ✓ 标记），行动默认作用于当前目标；再点一次可看卡牌全貌。</p>
+    <div class="coach-btns">
+      <button id="coachSkip">跳过引导</button>
+      <button class="primary" id="coachNext">下一步</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#app -->
+<script src="game.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
