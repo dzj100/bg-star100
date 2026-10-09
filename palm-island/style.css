@@ -42,7 +42,7 @@
   --mkw: calc(var(--fcw) * 1.62);       /* 回合标记卡（焦点位特写）卡面宽 */
   --mcw: clamp(34px, 9.6vw, 40px);      /* 迷你卡宽（牌堆顺序条） */
   --gcw: clamp(150px, 58vw, 230px);     /* 抽屉卡宽（查看全貌 · 大卡给内容留足版面） */
-  --xcw: 30px;                          /* 微型卡宽（结算清单） */
+  --xcw: 38px;                          /* 微型卡宽（结算清单）：需容下框条两端「数字+图标」徽章不裁切（10⭐ 双位数也全） */
 }
 @media (max-height: 700px) {
   :root { --fcw: min(28vw, 116px); --mcw: clamp(30px, 8.6vw, 36px); --gcw: clamp(130px, 48vw, 196px); }
@@ -502,7 +502,10 @@ button.act.off:active { transform: none; }
 .pcard.m .pc-bar { padding: 0; }
 .pcard.m .pc-bar.top { height: 31%; }
 .pcard.x .pc-bar.top { height: 26%; }
-.pcard.x .pc-nm { letter-spacing: .05em; text-indent: .05em; }
+/* 结算微型卡：框条定宽容不下卡名（行文字已印卡名），结构上移除，余量让两枚徽章分靠两端 */
+.pcard.x .pc-nm { display: none; }
+/* 结算微型卡：框条两端「数字+图标」已很挤——收窄两端留白与项距，防徽章挤出卡框被圆角裁切 */
+.pcard.x .pc-bar { padding: 0 2%; gap: .15em; }
 /* 资源态微光（状态本身由旋转表达；此为辅助提示） */
 .pcard.res .pc-body { box-shadow: 0 0 0 2.5px rgba(47, 185, 216, .55), 0 4px 10px rgba(18, 70, 100, .22); }
 /* 选中/置灰 */
