@@ -216,7 +216,7 @@
       <div class="logo-kicker">孤岛求生 · 卡牌构筑</div>
       <div class="logo-zh">棕榈岛</div>
       <div class="logo-en">Palm Island</div>
-      <div class="logo-sub">8 轮循环 · 旋转采资源 · 升级你的岛</div>
+      <!-- <div class="logo-sub">8 轮循环   · 采资源升级 · 建造你的岛</div> -->
     </div>
 
     <button class="btn-main primary" id="btnStart">开始新航程<span class="sub">8 轮循环 · 收集资源 · 升级卡牌</span></button>
@@ -260,7 +260,7 @@
     <span class="rchip fish" id="resFishChip"><svg class="ic"><use href="#ic-fish"/></svg><b id="resFish">1</b></span>
     <span class="rchip wood" id="resWoodChip"><svg class="ic"><use href="#ic-wood"/></svg><b id="resWood">2</b></span>
     <span class="rchip stone zero" id="resStoneChip"><svg class="ic"><use href="#ic-stone"/></svg><b id="resStone">0</b></span>
-    <span id="resHint">资源＝横置的卡 · 上限 4 张</span>
+    <span id="resHint">资源=横置的卡（上限 4 张）</span>
   </div>
 
   <div id="focuswrap">
@@ -275,7 +275,7 @@
   </div>
 
   <div class="stripwrap">
-    <div class="striplabel">横置资源 · 每张标注它在牌堆第几张 <span class="n" id="bankN">0 / 4</span></div>
+    <div class="striplabel">横置资源 <span class="n" id="bankN">0 / 4</span></div>
     <div class="strip" id="decklist">
       <!-- render.js 只列横置（资源态）卡：卡面旋转展示 + 标注它在牌堆中的位置；其余牌序不展示 -->
     </div>
@@ -296,32 +296,32 @@
 <div class="sheet-mask hidden" id="rulesMask">
   <div class="sheet sheet-wide">
     <h3>规则速览<small class="sheet-sub">单人 · 8 轮 · 16 张岛卡 + 1 张回合标记卡</small></h3>
-    <p>你是漂流到棕榈岛的旅人。整场航程共 <b>8 轮</b>：每轮把整副牌堆循环一遍，靠 <b>旋转卡牌</b> 采集资源、升级卡牌；牌堆全程保持 16 张岛卡循环使用、没有卡牌离场，最终按全部卡牌的朝向计分。</p>
+    <p>你是漂流到棕榈岛的旅人。整场航程共 <b>8 轮</b>：每轮把整副牌堆循环一遍，靠 <b>90°旋转卡牌</b> 收集资源，<b>180°旋转/翻面</b>升级卡牌；牌堆全程仅 16 张岛卡循环使用，最终按所有卡牌的对应方向上的星星计分。</p>
 
-    <div class="rt-title">组件</div>
+    <div class="rt-title">卡组</div>
     <table class="rt">
-      <thead><tr><th>组件</th><th>说明</th></tr></thead>
+      <thead><tr><th>卡组</th><th>说明</th></tr></thead>
       <tbody>
-        <tr><td>岛卡 ×16</td><td>方形双向卡：正面（1 级）/ 背面（2 级）；每面 2 条内容行（0° 正读 + 180° 倒印）＝ 每张卡 <b>4 个朝向</b></td></tr>
-        <tr><td>回合标记卡 ×1</td><td>每次露出计数 +1（1→8）；读到 8 时立即结算。不计分</td></tr>
-        <tr><td>资源</td><td>无实体资源池：某张卡<b>横置（右转 90°）</b>即成为资源卡，露出的图标＝该行产出（<svg class="ic"><use href="#ic-fish"/></svg> 鱼 / <svg class="ic"><use href="#ic-wood"/></svg> 木 / <svg class="ic"><use href="#ic-stone"/></svg> 石头），最多同时 4 张</td></tr>
+        <tr><td>岛卡 ×16</td><td>区分正反两面；每面 2 条内容行（0° 正读 + 180° 倒印）＝ 每张卡 <b>4 个朝向</b></td></tr>
+        <tr><td>回合标记卡 ×1</td><td>每次露出计数 +1（至多到8）；读到 8 时立即结算</td></tr>
+        <tr><td>资源</td><td>某张岛卡<b>横置（右转 90°）</b>即成为资源卡，露出的图标＝该行产出（<svg class="ic"><use href="#ic-fish"/></svg> 鱼 / <svg class="ic"><use href="#ic-wood"/></svg> 木 / <svg class="ic"><use href="#ic-stone"/></svg> 石头），最多同时 4 张</td></tr>
       </tbody>
     </table>
 
     <div class="rt-title">回合流程（读牌堆顶卡）</div>
     <table class="rt">
-      <thead><tr><th>顶卡</th><th>交互</th><th>花费</th><th>去向</th></tr></thead>
-      <tbody>
-        <tr><td>回合标记卡</td><td>自动：计数 +1</td><td>—</td><td>读 8 → 结算；否则放回牌堆底（仅计数，无卡牌离场）</td></tr>
-        <tr><td>非资源态卡</td><td>可见最上 <b>2 张</b>、任选其一：① 右转收集 ② 转 180° ③ 翻面 ④ 跳过（仅第 1 张）</td><td>① 免费（印有收集费用时按 or 任选其一支付）；② 当前行的 <span class="k-spin">🟡</span> 费用；③ 当前行的 <span class="k-flip">🔵</span> 费用</td><td>按<b>最终样式</b>放到牌堆最下方</td></tr>
-        <tr><td>资源态卡</td><td>自动：左转 90° 复位</td><td>—</td><td>回退为非资源态 → 放回牌堆底</td></tr>
+      <thead><tr><th>顶卡</th><th>操作</th><th>花费</th></tr></thead>
+      <tbody></tbody>
+        <tr><td>非资源态卡</td><td>可见最上 <b>2 张</b>、任选其一：<br>① 右转 90° 收集 <br>② 转 180° <br>③ 翻面 <br>④ 跳过第1张</td><td>Free = 免费； 其余按图示自选资源支付</td></tr>
+        <tr><td>资源态卡</td><td>复位：自动左转 90° </td><td>—</td></tr>
+        <tr><td>回合标记卡</td><td>计数：自动 +1</td><td>—</td></tr>
       </tbody>
     </table>
-    <p class="rt-note">⚠ 当前行未印出的操作不可用；行态完全为空（如樵夫背 0°）时只能跳过。每张卡把自己的「终态」印在 ⬆ 最大的一行（终态各不相同）。</p>
+    <p class="rt-note">⚠ ⬆ 数字越大代表当前卡的级别越高，⭐ 数字用于结尾计分。</p>
 
     <div class="rt-title">资源与上限</div>
     <ol>
-      <li>资源＝牌堆中所有「横置」的卡，顶部资源栏显示合计；最多同时 <b>4 张</b>。横置卡仍留在牌堆里，下方「横置资源」条会标出每张<b>此刻在牌堆中的位置（第几张）</b>。</li>
+      <li>资源＝牌堆中所有「横置」的卡，顶部资源栏显示合计；最多同时 <b>4 张</b>，下方「横置资源」条会标出每张<b>此刻在牌堆中的位置（第几张）</b>。</li>
       <li>支付时勾选资源卡：<b>每种所需资源</b>都要有对应卡覆盖（可多选、允许多付）。</li>
       <li>花掉的卡<b>原位</b>左转 90° 复位，牌堆中其他卡的顺序不变。</li>
       <li>已满 4 张时仍可收集：先点选 1 张现有资源卡<b>原位重置</b>，再执行收集。</li>
@@ -331,7 +331,7 @@
     <table class="rt">
       <thead><tr><th>操作</th><th>状态变化</th></tr></thead>
       <tbody>
-        <tr><td class="k-free">🟢 右转 90°（免费）</td><td>露出产出 → 成为资源卡；之后回到牌堆顶时自动复位</td></tr>
+        <tr><td class="k-free">🟢 右转 90°</td><td>成为资源卡；获得卡牌顶部标记的资源</td></tr>
         <tr><td class="k-spin">🟡 旋转 180°</td><td>保持面：正 0° ↔ 正 180°、背 0° ↔ 背 180°</td></tr>
         <tr><td class="k-flip">🔵 翻面</td><td>保持行：正 0° ↔ 背 0°、正 180° ↔ 背 180°</td></tr>
       </tbody>
@@ -339,9 +339,8 @@
 
     <div class="rt-title">结算</div>
     <ul>
-      <li>回合标记卡读到 <b>8</b>：每张卡按 <b>当前朝向</b>、取「<b>上方那条框条</b>」的 <span class="k-star">⭐</span> 累计（横置卡按底层行态取值）。</li>
+      <li>回合标记卡读到 <b>8</b>：每张卡按 <b>当前朝向</b>、取「<b>上方那条框条</b>」的 <span class="k-star">⭐</span> 累计（横置卡按对应行态取值）。</li>
       <li>总分对照段位门槛评出本次航程的段位。</li>
-      <li>牌堆里的 16 张卡全程在列、照常计分——在 8 轮里把它们升级到高分行，才是拿到高分的关键。</li>
     </ul>
 
     <div class="rt-title">符号</div>
@@ -351,8 +350,8 @@
         <tr><td>🟢 N</td><td>该行的<b>收集费用</b>（or 列出多种，任选其一支付）</td></tr>
         <tr><td>🟡 N</td><td>花 N 资源旋转 180°</td></tr>
         <tr><td>🔵 N</td><td>花 N 资源翻面</td></tr>
-        <tr><td><span class="k-star">N⭐</span></td><td>该行结算分（读向框条左端）</td></tr>
-        <tr><td>N⬆</td><td>升级深度＝距基础态（正 0°）的最少步数（读向框条右端）</td></tr>
+        <tr><td><span class="k-star">N⭐</span></td><td>结算计分</td></tr>
+        <tr><td>N⬆</td><td>升级深度</td></tr>
       </tbody>
     </table>
     <button class="btn-main" id="btnCloseRules">知道了</button>

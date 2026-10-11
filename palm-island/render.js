@@ -77,10 +77,10 @@
   var winFx = false;            // 结算落章演出只放一次
 
   var COACH_STEPS = [
-    { sel: '#focusCardArea', title: '牌堆顶可见 2 张', text: '每次能同时看到最上面 2 张卡。点卡切换「目标」（带 ✓ 标记），行动默认作用于当前目标；再点一次可看卡牌全貌。' },
-    { sel: '#actbar', title: '四种行动', text: '收集＝右转 90° 产资源（部分卡要付费）；转 180°／翻面＝花资源升级；跳过＝第 1 张原样回牌堆底。置灰的按键当前不可用。' },
-    { sel: '.stripwrap', title: '横置资源与牌堆位置', text: '收集过的卡会横置着列在这里：每张都标出它此刻在牌堆里的位置（第几张），什么时候轮回来心里有数。横置资源最多 4 张，收集第 5 张前要先重置 1 张。' },
-    { sel: '#logbar', title: '航海日志', text: '每步操作都会记在这里，点开可看完整日志。祝航行顺利！' },
+    { sel: '#focusCardArea', title: '牌堆顶可见 2 张', text: '每次能同时看到最上面 2 张卡。点卡切换「目标」（带 ✓ 标记），行动默认作用于当前目标。' },
+    { sel: '#actbar', title: '四种行动', text: '收集＝右转 90° 产资源（部分卡要付费）；转 180°／翻面＝花资源升级；跳过＝第 1 张原样回牌堆底。' },
+    { sel: '.stripwrap', title: '横置资源与牌堆位置', text: '收集过的卡会横置着列在这里：每张都标出它此刻在牌堆里的位置（第几张）。横置资源最多 4 张，收集第 5 张前要先重置 1 张。' },
+    { sel: '#logbar', title: '航海日志', text: '每步操作都会记在这里，点开可看完整日志，祝航行顺利！' },
   ];
 
   /* ---------- 小工具 ---------- */
@@ -486,7 +486,7 @@
       if (pendingPopUid === c.uid) { pop(el); pendingPopUid = null; }
     });
     if (!deckList.children.length) {
-      deckList.innerHTML = '<span class="empty">暂无资源卡 · 收集（右转 90°）后横置到这里，并标注它在牌堆的位置</span>';
+      deckList.innerHTML = '<span class="empty">暂无资源卡</span>';
     }
     deckList.scrollLeft = sl;
   }
@@ -515,12 +515,12 @@
     var slot = v.slots[targetSel];
     if (!slot || slot.kind !== 'card') { offAll('—'); return; }
     var rs = slot.rowState, ops = slot.ops;
-    colSub.innerHTML = !rs.spin ? '当前行未印出'
+    colSub.innerHTML = !rs.spin ? '无'
       : !ops.collect.ok ? ('资源不足 · 需 ' + feeOptsHtml(rs.fee))
         : rs.fee ? ('付 ' + feeOptsHtml(rs.fee) + ' · 得 ' + makeHtml(rs.make))
           : ('免费 · 得 ' + makeHtml(rs.make));
-    spinSub.innerHTML = rs.to180 ? ('付 ' + costHtml(rs.to180) + (ops.to180.ok ? '' : ' · 资源不足')) : '当前行未印出';
-    flipSub.innerHTML = rs.flip ? ('付 ' + costHtml(rs.flip) + (ops.flip.ok ? '' : ' · 资源不足')) : '当前行未印出';
+    spinSub.innerHTML = rs.to180 ? ('付 ' + costHtml(rs.to180) + (ops.to180.ok ? '' : ' · 资源不足')) : '无';
+    flipSub.innerHTML = rs.flip ? ('付 ' + costHtml(rs.flip) + (ops.flip.ok ? '' : ' · 资源不足')) : '无';
     btnCollect.classList.toggle('off', !ops.collect.ok);
     btnSpin180.classList.toggle('off', !ops.to180.ok);
     btnFlip.classList.toggle('off', !ops.flip.ok);

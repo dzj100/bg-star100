@@ -219,11 +219,11 @@
     var rs = rowStateOf(c);
     var got = resTotals(S, payIdxs(S, ti));
     var collect;
-    if (!rs.spin) collect = { ok: false, reason: '当前行未印出' };
+    if (!rs.spin) collect = { ok: false, reason: '无' };
     else if (rs.fee && !anyFeeCovered(got, rs.fee)) collect = { ok: false, reason: '资源不足', fee: rs.fee };
     else collect = { ok: true, fee: rs.fee || null };
     function rk(cost) {
-      if (!cost) return { ok: false, reason: '当前行未印出' };
+      if (!cost) return { ok: false, reason: '无' };
       if (!covers(got, cost)) return { ok: false, cost: cost, reason: '资源不足' };
       return { ok: true, cost: cost };
     }
@@ -384,7 +384,7 @@
 
   function doTo180(S, d, ti, payload) {
     var slot = d.slots[ti];
-    if (!slot.ops.to180.ok) return { ok: false, err: slot.ops.to180.reason || '当前行未印出' };
+    if (!slot.ops.to180.ok) return { ok: false, err: slot.ops.to180.reason || '无' };
     var cost = slot.ops.to180.cost;
     var chk = checkPay(S, cost, payload, ti);
     if (chk.err) return { ok: false, err: chk.err };
@@ -401,7 +401,7 @@
 
   function doFlip(S, d, ti, payload) {
     var slot = d.slots[ti];
-    if (!slot.ops.flip.ok) return { ok: false, err: slot.ops.flip.reason || '当前行未印出' };
+    if (!slot.ops.flip.ok) return { ok: false, err: slot.ops.flip.reason || '无' };
     var cost = slot.ops.flip.cost;
     var chk = checkPay(S, cost, payload, ti);
     if (chk.err) return { ok: false, err: chk.err };
