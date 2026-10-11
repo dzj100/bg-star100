@@ -602,8 +602,13 @@
     later(kind === 'reset' ? 480 : 300, function () { busy = false; renderAll(); });
   }
 
-  /* ---------- 旋转（同节点更新 --q 触发 CSS 过渡） ---------- */
-  function setQ(el, q, animate) {
+  /* ---------- 旋转 / 翻面演出 ---------- */
+  /* 180°／翻面按基准 1.7× 放慢：578ms 旋转 · 255+289ms 翻面 · 整段推进 1054ms */
+  var ROT180_MS = 578, FLIP_IN_MS = 255, FLIP_OUT_MS = 289, SWAP_SLOW_MS = 1054;
+  /* 跳过级联：210ms 淡出 · 60+280ms 左移就位 · 360ms 切口重绘 · 200ms 新卡淡入（整段 ~580ms） */
+  var SKIP_FADE_MS = 210, SKIP_SLIDE_DELAY = 60, SKIP_SLIDE_MS = 280, SKIP_CUT_MS = 360, SKIP_IN_MS = 200;
+
+  function setQ(el, q, animate, durMs) {
     var pcIn = el.querySelector('.pc-in');
     if (!pcIn) return;
     if (!animate || reduceMotion()) {
@@ -612,8 +617,35 @@
       void pcIn.offsetWidth;
       pcIn.style.transition = '';
     } else {
+      if (durMs) pcIn.style.transitionDuration = durMs + 'ms';
       el.style.setProperty('--q', q);
     }
+  }
+
+  /* 翻面演出：旧面绕竖轴转出 → 接缝处换面 → 新面转入（255/289ms，正交一瞬不可见） */
+  function flipSwap(el, ne, q) {
+    var pcIn = el.querySelector('.pc-in');
+    if (!pcIn || reduceMotion()) { el.replaceWith(ne); pop(ne); return; }
+    var base = 'perspective(' + Math.round(el.offsetWidth * 4) + 'px) translate(-50%,-50%) rotate(' + (q * 90) + 'deg) ';
+    var a1;
+    try {
+      a1 = pcIn.animate([
+        { transform: base + 'rotateY(0deg)' },
+        { transform: base + 'rotateY(88deg)' },
+      ], { duration: FLIP_IN_MS, easing: 'ease-in', fill: 'forwards' });
+    } catch (e) { el.replaceWith(ne); pop(ne); return; }
+    a1.onfinish = function () {
+      el.replaceWith(ne);
+      pop(ne);
+      var npc = ne.querySelector('.pc-in');
+      if (!npc) return;
+      try {
+        npc.animate([
+          { transform: base + 'rotateY(-88deg)' },
+          { transform: base + 'rotateY(0deg)' },
+        ], { duration: FLIP_OUT_MS, easing: 'ease-out' });
+      } catch (e) {}
+    };
   }
 
   /* ---------- 玩家动作 ---------- */
@@ -685,27 +717,71 @@
       });
       swapMs = 620;
     } else if (action === 'to180') {
-      if (el) setQ(el, PALM.qOf(c0), true);
+      if (el) setQ(el, PALM.qOf(c0), true, ROT180_MS);
       SFX.spin();
-      swapMs = 620;
+      swapMs = SWAP_SLOW_MS;
     } else if (action === 'flip') {
       if (el) {
         var ne = cardEl(c0, 'f');
         ne.dataset.slot = ti;
         ne.addEventListener('click', function () { openInspect(c0); });
-        el.replaceWith(ne);
-        pop(ne);
+        flipSwap(el, ne, PALM.qOf(c0));
       }
       SFX.flip();
-      swapMs = 620;
+      swapMs = SWAP_SLOW_MS;
     } else if (action === 'skip') {
+      /* 级联左移：第 1 张淡出 → 第 2 张滑到第 1 张位并转正 → 切口重绘 → 新第 2 张淡入 */
       SFX.tap();
       if (el && !reduceMotion()) {
-        try { el.animate([{ opacity: 1 }, { opacity: .2 }], { duration: 220 }); } catch (e) {}
+        try { el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SKIP_FADE_MS, easing: 'ease-out', fill: 'forwards' }); } catch (e) {}
+        var el1 = focusArea.querySelector('.pcard[data-slot="1"]');
+        if (el1) {
+          var v1 = PALM.draw(S);
+          var v1s0 = (v1.slots && v1.slots[0]) || null;
+          var nv = !(v1s0 && v1s0.kind === 'card');   /* 新第 1 张为资源态/标记：落点保持灰调 */
+          var r0 = el.getBoundingClientRect(), r1 = el1.getBoundingClientRect();
+          var cs1 = getComputedStyle(el1);
+          var pre1 = (cs1.transform && cs1.transform !== 'none') ? cs1.transform + ' ' : '';
+          var oldLift = el.parentNode.classList.contains('sel') ? -6 : 0;   /* .fslot.sel 上抬 6px */
+          var newLift = (v1s0 && v1s0.kind === 'card' && targetSel === 0) ? -6 : 0;
+          var dx1, dy1;
+          if (v1.kind === 'res') {
+            /* 资源态视图为单卡居中槽，落点瞄准居中位 */
+            var faR = focusArea.getBoundingClientRect();
+            dx1 = Math.round((faR.left + (faR.width - r1.width) / 2 - r1.left) * 100) / 100;
+            dy1 = Math.round((el.parentNode.getBoundingClientRect().top - r1.top) * 100) / 100;
+          } else {
+            dx1 = Math.round((r0.left - r1.left) * 100) / 100;
+            dy1 = Math.round((r0.top - oldLift + newLift - r1.top) * 100) / 100;
+          }
+          try {
+            el1.animate([
+              { transform: pre1 + 'translate(0px, 0px)', opacity: cs1.opacity, filter: cs1.filter },
+              { transform: pre1 + 'translate(' + dx1 + 'px, ' + dy1 + 'px)', opacity: nv ? cs1.opacity : 1, filter: nv ? cs1.filter : 'saturate(1)' },
+            ], { duration: SKIP_SLIDE_MS, delay: SKIP_SLIDE_DELAY, easing: 'cubic-bezier(.3, 1.12, .4, 1)', fill: 'forwards' });
+          } catch (e) {}
+        }
       }
-      swapMs = 320;
+      swapMs = SKIP_CUT_MS;
     }
     later(swapMs, function () {
+      if (action === 'skip' && !reduceMotion()) {
+        renderAll();
+        var neC = focusArea.querySelector('.pcard[data-slot="1"]');
+        if (neC) {
+          var csC = getComputedStyle(neC);
+          try {
+            neC.animate([
+              { opacity: 0, transform: 'translateX(20px)' },
+              { opacity: csC.opacity, transform: csC.transform },
+            ], { duration: SKIP_IN_MS, easing: 'ease-out' });
+          } catch (e) {}
+          later(SKIP_IN_MS + 20, function () { busy = false; });
+          return;
+        }
+        busy = false;
+        return;
+      }
       busy = false;
       renderAll();
       if (action === 'collect') scrollDeckEnd();
