@@ -419,10 +419,17 @@ function renderPlaySheet() {
     ? `<label class="eye-opt" onclick="toggleEye()"><span class="eye-box">${pendingPlay.useEye ? '☑' : '☐'}</span> 明置此牌（消耗1眼标记，剩${left}）</label>`
     : `<div class="eye-opt off">👁 眼标记已用完，此牌将暗置打出</div>`;
 
+  // 第7章「摸1张」：目标区域放置后放牌玩家会摸1张备用牌
+  const segCondNow = pendingPlay.seg >= 0 && S.segCond ? S.segCond[pendingPlay.seg] : null;
+  const drawHint = segCondNow && segCondNow.key === 'draw1'
+    ? `<div class="wait-text">该区域「摸1张」：放置后从未加入游戏的备用牌堆摸 1 张到手牌</div>`
+    : '';
+
   content.innerHTML = `
     <h3>${title}</h3>
     ${segGrid}
     ${eyeChip}
+    ${drawHint}
     <button class="btn-full btn-primary" onclick="placeCard()" ${pendingPlay.seg === -1 ? 'disabled' : ''}>确认放置</button>
     <button class="btn-full btn-secondary" onclick="closePlaySheet()">取消</button>`;
   sheet.classList.add('show');

@@ -8,10 +8,8 @@ const vm = require('vm');
 
 // ── mock DOM ──
 function makeEl(id) {
-  return {
+  const el = {
     id,
-    innerHTML: '',
-    textContent: '',
     style: {},
     classList: { add() {}, remove() {}, contains() { return false; } },
     appendChild() {}, remove() {}, querySelector() { return null; },
@@ -20,6 +18,20 @@ function makeEl(id) {
     removeChild() {},
     children: [],
   };
+  let _text = '', _html = '';
+  // 模拟浏览器语义：textContent 赋值同步转义到 innerHTML（online.js 的 _esc 依赖该行为）
+  Object.defineProperty(el, 'textContent', {
+    get: () => _text,
+    set: (v) => {
+      _text = String(v);
+      _html = _text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    },
+  });
+  Object.defineProperty(el, 'innerHTML', {
+    get: () => _html,
+    set: (v) => { _html = String(v); },
+  });
+  return el;
 }
 const elements = {
   app: makeEl('app'),
@@ -1030,5 +1042,435 @@ g.settle();
 lastMsg = g.S.log[g.S.log.length - 1].msg;
 assert(/挑战用时 45秒/.test(lastMsg), '不足 1 分钟显示秒数（实测: ' + lastMsg + '）');
 
-console.log(`\n结果: ${passCount} 通过 / ${failCount} 失败`);
-process.exit(failCount ? 1 : 0);
+// ── 12. 第七章「入侵/引泉/同辉/三汲」：转盘选条件 + 摸1张机制 ──
+console.log('\n[第七章·摸1张]');
+
+// 关卡库：条件集 / rotate / 文案
+const ch7Keys = id => g.CHALLENGE_LIB[id].conds.map(c => c.key).join(',');
+assert(ch7Keys(25) === 'draw1,free,no789,no789,free,free', '第25关条件集', ch7Keys(25));
+assert(ch7Keys(26) === 'draw1,free,free,draw1,last,free', '第26关条件集', ch7Keys(26));
+assert(ch7Keys(27) === 'free,free,free,maxMoonMinSun,draw1,sunMoon2', '第27关条件集', ch7Keys(27));
+assert(ch7Keys(28) === 'free,draw1,free,draw1,free,draw1', '第28关条件集', ch7Keys(28));
+assert([25, 26, 27, 28].every(id => g.CHALLENGE_LIB[id].rotate === true), '第7章4关均为转盘关（房主选1号位条件）');
+assert(g.CHALLENGE_LIB[25].conds[0].label === '摸1张' && g.CHALLENGE_LIB[25].conds[0].short === '摸1张', '摸1张条件文案');
+
+// 发牌：备用牌堆12张，与手牌合计24张不重复
+g._olSeatIndex = () => 0;
+g.dealGame(['A', 'B'], { chapter: 7, test: 1, id: 25 });
+assert(g.S.phase === 'discuss' && g.S.segCond === null, '第25关初始 discuss、segCond 未定');
+assert(Array.isArray(g.S.reserve) && g.S.reserve.length === 12, '备用牌堆12张', g.S.reserve && g.S.reserve.length);
+const all24 = [...g.S.reserve, ...g.S.players.flatMap(p => p.hand)];
+assert(all24.length === 24, '备用牌堆+手牌共24张');
+assert(new Set(all24.map(c => c.color + c.v)).size === 24, '24张牌无重复');
+
+// 转盘预览：摸1张到1号位；重新预览 → 摸1张循环顺延到2号位（no789 随之到 4/5 号位）
+g.chooseFirstCond(0);
+assert(g.S.segCond.map(c => c.key).join(',') === 'draw1,free,no789,no789,free,free', '预览：摸1张在1号位', g.S.segCond.map(c => c.key));
+g.chooseFirstCond(5);
+assert(g.S.segCond[1].key === 'draw1' && g.S.segCond[3].key === 'no789' && g.S.segCond[5].key === 'free', '循环顺延：摸1张到2号位、no789到4/5号位', g.S.segCond.map(c => c.key));
+g.chooseFirstCond(0);
+
+// 2人局锁定期第一次行动放牌即触发摸1张；摸到的牌插在锁定牌之前、立即可见
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 0;
+assert(g.S.players[0].hand.length === 6 && g.handLockedIndexes().size === 2, '2人局：6张手牌、后2张锁定');
+const reserveTopBefore = g.S.reserve[g.S.reserve.length - 1];
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false }; // 1号位（摸1张）
+g.placeCard();
+assert(g.S.reserve.length === 11, '摸1张后备用牌堆剩11张', g.S.reserve.length);
+assert(g.S.players[0].hand.length === 6, '放牌-1、摸牌+1 → 手牌仍6张', g.S.players[0].hand.length);
+assert(g.S.players[0].hand[3] === reserveTopBefore, '摸到的牌插在锁定牌之前（索引3）');
+assert(!g.handLockedIndexes().has(3), '摸到的牌不受2人局锁定影响，立即可见');
+const drawLog = g.S.log[g.S.log.length - 1].msg;
+assert(drawLog.includes('摸取1张牌'), '日志记录摸牌', drawLog);
+assert(!/[☀☾]/.test(drawLog), '日志不暴露颜色/数字', drawLog);
+
+// 摸到的牌放到无限制区域：不摸牌
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 3, seg: 4, useEye: false };
+g.placeCard();
+assert(g.S.reserve.length === 11, '无限制区域放牌不摸牌', g.S.reserve.length);
+assert(g.S.players[0].hand.length === 5, '无限制区域放牌后手牌5张', g.S.players[0].hand.length);
+
+// 连锁：再次放入摸1张区域，继续摸牌；回合照常轮转
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false };
+g.placeCard();
+assert(g.S.reserve.length === 10, '再次放入摸1张区域连锁摸牌', g.S.reserve.length);
+assert(g.S.players[0].hand.length === 5, '连锁摸牌后手牌数不变（-1+1）', g.S.players[0].hand.length);
+assert(g.S.currentSeat === 1, '放牌后轮转到下家');
+
+// 备用牌堆耗尽：不再摸牌
+g.S.reserve = [];
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false };
+g.placeCard();
+assert(g.S.players[0].hand.length === 4, '备用牌堆为空时不摸牌', g.S.players[0].hand.length);
+
+// 结算判定：入侵（no789）
+g.S.challenge = { chapter: 7, test: 1, id: 25 };
+g.S.segCond = g.CHALLENGE_LIB[25].conds.slice();
+const c25PassSegs = [
+  mkSeg([cd(2, 'sun')]),                         // 2
+  mkSeg([cd(3, 'moon')]),                        // 3
+  mkSeg([cd(5, 'sun'), cd(6, 'moon')]),          // 11，无7/8/9 ✓
+  mkSeg([cd(1, 'sun'), cd(10, 'moon')]),         // 11，无7/8/9 ✓
+  mkSeg([cd(11, 'moon')]),                       // 11
+  mkSeg([cd(9, 'sun'), cd(12, 'moon')]),         // 21
+];
+const c25PassSums = c25PassSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c25Pass = g.challengeCheck({ id: 25 }, c25PassSums, c25PassSegs);
+assert(c25Pass.pass === true, '第25关：3、4号位无7/8/9 → 通过', c25Pass);
+assert(c25Pass.items.some(it => it.label.includes('不含7、8、9数字牌') && it.ok === true), '结算项含不含7、8、9');
+const c25FailSegs = [
+  mkSeg([cd(2, 'sun')]),
+  mkSeg([cd(3, 'moon')]),
+  mkSeg([cd(5, 'sun'), cd(7, 'moon')]),          // 12，含7 → 失败
+  mkSeg([cd(1, 'sun'), cd(11, 'moon')]),         // 12
+  mkSeg([cd(12, 'sun')]),                        // 12
+  mkSeg([cd(9, 'sun'), cd(10, 'moon')]),         // 19
+];
+const c25FailSums = c25FailSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c25Fail = g.challengeCheck({ id: 25 }, c25FailSums, c25FailSegs);
+assert(c25Fail.pass === false && c25Fail.segBad[2] === true, '第25关：3号位含7 → 失败');
+assert(c25Fail.items.some(it => it.label.includes('（含7）') && it.ok === false), '结算项标注违规数字');
+
+// 结算判定：引泉（last 最后一张牌）
+g.S.segCond = g.CHALLENGE_LIB[26].conds.slice();
+const c26PassSegs = [
+  mkSeg([cd(2, 'sun', 1)]),
+  mkSeg([cd(3, 'moon', 2)]),
+  mkSeg([cd(5, 'sun', 3)]),
+  mkSeg([cd(6, 'moon', 4)]),
+  mkSeg([cd(11, 'sun', 12)]),                    // 最后一张（第12张）→ 5号位 ✓
+  mkSeg([cd(9, 'moon', 5), cd(12, 'sun', 6)]),   // 21
+];
+const c26PassSums = c26PassSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c26Pass = g.challengeCheck({ id: 26 }, c26PassSums, c26PassSegs);
+assert(c26Pass.pass === true, '第26关：最后一张在5号位 → 通过', c26Pass);
+assert(c26Pass.items.some(it => it.label.includes('最后一张牌（第12张）') && it.ok === true), '结算项含最后一张牌');
+const c26FailSegs = [
+  mkSeg([cd(2, 'sun', 1)]),
+  mkSeg([cd(3, 'moon', 2)]),
+  mkSeg([cd(5, 'sun', 3)]),
+  mkSeg([cd(6, 'moon', 4)]),
+  mkSeg([cd(11, 'sun', 5)]),
+  mkSeg([cd(9, 'moon', 6), cd(12, 'sun', 12)]),  // 最后一张在6号位 → 5号位失败
+];
+const c26FailSums = c26FailSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c26Fail = g.challengeCheck({ id: 26 }, c26FailSums, c26FailSegs);
+assert(c26Fail.pass === false && c26Fail.segBad[4] === true, '第26关：最后一张不在5号位 → 失败');
+
+// 结算判定：同辉（最大月亮+最小太阳同区；6号位恰好2太阳+2月亮）
+g.S.segCond = g.CHALLENGE_LIB[27].conds.slice();
+const c27PassSegs = [
+  mkSeg([cd(2, 'moon')]),                        // 2
+  mkSeg([cd(3, 'sun')]),                         // 3
+  mkSeg([cd(4, 'moon')]),                        // 4
+  mkSeg([cd(1, 'sun'), cd(12, 'moon')]),         // 13：最小太阳1 + 最大月亮12 ✓
+  mkSeg([cd(5, 'sun'), cd(9, 'moon')]),          // 14
+  mkSeg([cd(2, 'sun'), cd(6, 'sun'), cd(1, 'moon'), cd(5, 'moon')]), // 14：2太阳2月亮 ✓
+];
+const c27PassSums = c27PassSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c27Pass = g.challengeCheck({ id: 27 }, c27PassSums, c27PassSegs);
+assert(c27Pass.pass === true, '第27关：最大月亮+最小太阳同区、6号位2+2 → 通过', c27Pass);
+assert(c27Pass.items.some(it => it.label.includes('最大月亮牌（12）与最小太阳牌（1）') && it.ok === true), '结算项含双锚文案');
+assert(c27Pass.items.some(it => it.label.includes('太阳月亮各2张（日2/月2）') && it.ok === true), '结算项含各2张计数');
+const c27Fail1Segs = [
+  mkSeg([cd(2, 'moon')]),
+  mkSeg([cd(3, 'sun')]),
+  mkSeg([cd(4, 'moon')]),
+  mkSeg([cd(1, 'sun'), cd(11, 'moon')]),         // 12：最大月亮12跑到6号位 → 锚点区失败
+  mkSeg([cd(5, 'sun'), cd(9, 'moon')]),          // 14
+  mkSeg([cd(2, 'sun'), cd(6, 'sun'), cd(1, 'moon'), cd(12, 'moon')]), // 21
+];
+const c27Fail1Sums = c27Fail1Segs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c27Fail1 = g.challengeCheck({ id: 27 }, c27Fail1Sums, c27Fail1Segs);
+assert(c27Fail1.pass === false && c27Fail1.segBad[3] === true, '第27关：最大月亮不在锚点区 → 失败');
+const c27Fail2Segs = [
+  mkSeg([cd(2, 'moon')]),
+  mkSeg([cd(3, 'sun')]),
+  mkSeg([cd(4, 'moon')]),
+  mkSeg([cd(1, 'sun'), cd(12, 'moon')]),         // 13
+  mkSeg([cd(5, 'sun'), cd(9, 'moon')]),          // 14
+  mkSeg([cd(2, 'sun'), cd(6, 'sun'), cd(7, 'moon')]), // 15：3张 → 各2张失败
+];
+const c27Fail2Sums = c27Fail2Segs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c27Fail2 = g.challengeCheck({ id: 27 }, c27Fail2Sums, c27Fail2Segs);
+assert(c27Fail2.pass === false && c27Fail2.segBad[5] === true, '第27关：6号位非恰好2+2 → 失败');
+
+// 结算判定：三汲（仅基础三项，draw1 无约束项）
+g.S.segCond = g.CHALLENGE_LIB[28].conds.slice();
+const c28Segs = [
+  mkSeg([cd(1, 'sun')]), mkSeg([cd(2, 'moon')]), mkSeg([cd(3, 'sun')]),
+  mkSeg([cd(4, 'moon')]), mkSeg([cd(5, 'sun')]), mkSeg([cd(6, 'moon')]),
+];
+const c28Sums = c28Segs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c28 = g.challengeCheck({ id: 28 }, c28Sums, c28Segs);
+assert(c28.pass === true, '第28关：仅基础三项 → 通过', c28);
+assert(c28.items.length === 3, '第28关：结算项仅基础三条（draw1 无约束项）', c28.items.length);
+
+// 第28关玩法：选 conds[0]（无限制）→ 摸1张在 2/4/6 号位
+g.dealGame(['A', 'B'], { chapter: 7, test: 4, id: 28 });
+g.chooseFirstCond(0);
+assert(g.S.segCond.map(c => c.key).join(',') === 'free,draw1,free,draw1,free,draw1', '第28关预览分配（三个摸1张）', g.S.segCond.map(c => c.key));
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 1, useEye: false }; // 2号位（摸1张）
+g.placeCard();
+assert(g.S.reserve.length === 11, '第28关：2号位放牌触发摸牌');
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false }; // 1号位（无限制）
+g.placeCard();
+assert(g.S.reserve.length === 11, '第28关：1号位放牌不摸牌');
+assert(g.S.currentSeat === 1, '第28关：回合照常轮转');
+
+// ── 13. 联机健壮性（过期快照过滤 / 重同步 / 未确认推送补发 / 断线恢复） ──
+(async () => {
+  console.log('\n[联机健壮性]');
+
+  // 沙箱加载 online.js（stub net 层与 window 事件）
+  const flush = () => new Promise(r => setImmediate(r));
+  ctx.NET_CONFIG = { MAX_PLAYERS: 4 };
+  let onChange = null, onStatus = null, subscribeCalls = 0;
+  ctx.netSubscribeRoom = (id, cb, st) => {
+    subscribeCalls++;
+    onChange = cb; onStatus = st;
+    const u = () => {};
+    u.getStatus = () => 'joined';
+    return u;
+  };
+  ctx.netLeaveRoom = async () => {};
+  ctx._pushCount = 0;
+  ctx._pushResults = [];
+  ctx.netUpdateGameState = async () => {
+    ctx._pushCount++;
+    return ctx._pushResults.length ? ctx._pushResults.shift() : true;
+  };
+  ctx._roomRow = null;
+  ctx.netGetRoom = async () => ctx._roomRow;
+  ctx._winListeners = {};
+  ctx.addEventListener = (ev, fn) => { (ctx._winListeners[ev] = ctx._winListeners[ev] || []).push(fn); };
+  // 定时轮询桩：捕获 setInterval 回调与清理调用
+  let pollTickFn = null, pollDelay = 0, pollIntervalsStarted = 0;
+  const pollIntervalsCleared = [];
+  ctx.setInterval = (fn, ms) => { pollIntervalsStarted++; pollTickFn = fn; pollDelay = ms; return 4242; };
+  ctx.clearInterval = (id) => { pollIntervalsCleared.push(id); };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'online.js'), 'utf8'), ctx, { filename: 'online.js' });
+
+  const applied = [];
+  ctx.initOnline({
+    dealGame: () => {}, render: () => {},
+    renderLanding: () => '', clearState: () => {},
+    getOnlineState: () => { if (g.S && typeof g.S.currentSeat === 'number') g.S.currentPlayer = g.S.currentSeat; return g.S; },
+    applyOnlineState: (s) => { applied.push(s); g.S = s; },
+    getPlayers: () => (g.S && g.S.players) || [],
+    getCurrentPlayer: () => (g.S ? g.S.currentSeat : undefined),
+    getPlayerColors: () => ['#111', '#222'],
+    showLanding: () => {}, waitingExtras: () => '',
+  });
+
+  // 建立联机会话上下文：座位1、非房主、对局中
+  vm.runInContext('_onlineRoomId = "TAKETIME-0001"; _mySeatIndex = 1; _myPlayerName = "B"; _isHost = false; _gameStarted = true; _knownSeatCount = 2; _channelStatus = "SUBSCRIBED";', ctx);
+  vm.runInContext('_subscribeToRoom(_onlineRoomId);', ctx); // 触发订阅（捕获 onChange/onStatus）
+
+  const mkState = (cur, ts, pushId, turnNo) => ({ currentSeat: cur, currentPlayer: cur, turnNo, _ts: ts, _pushId: pushId });
+  const t0 = Date.now();
+
+  // A. 过期快照（乱序投递）被拒绝，新快照正常应用
+  g.S = { currentSeat: 0, currentPlayer: 0, turnNo: 1 };
+  g._handleRemoteState({ state: mkState(0, t0, 'h-2', 2) });
+  assert(applied.length === 1 && g.S.turnNo === 2, '新状态正常应用');
+  g._handleRemoteState({ state: mkState(3, t0 - 5000, 'h-1', 1) });
+  assert(applied.length === 1, '过期快照被拒绝（防状态倒退）');
+
+  // B. 同一状态重复投递去重
+  g._handleRemoteState({ state: mkState(0, t0, 'h-2', 2) });
+  assert(applied.length === 1, '同一条状态重复投递去重');
+
+  // C. force 重同步：权威来源跳过新鲜度过滤
+  g._handleRemoteState({ state: mkState(4, t0 - 5000, 'h-0', 0) }, true);
+  assert(applied.length === 2 && g.S.currentSeat === 4, '重同步 force 应用权威状态');
+
+  // D. 未确认推送补发：房间落后 → 补发成功、标记已确认、不应用旧快照
+  ctx._pushResults = [false]; // 第1次推送失败（模拟 iOS 丢包）
+  ctx._pushCount = 0;
+  vm.runInContext('_pendingPushSeat = 1; _lastPushVerified = false; _lastResyncAt = 0;', ctx);
+  g.S = { currentSeat: 1, currentPlayer: 1, turnNo: 7 };
+  g.onlinePushState();
+  await flush();
+  assert(ctx._pushCount === 1 && vm.runInContext('_lastPushVerified', ctx) === false, '推送失败未确认');
+  ctx._roomRow = { status: 'playing', seats: [], state: mkState(0, t0 - 1000, 'x-1', 6) }; // 房间落后（6 < 7）
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  await g._resyncRoom();
+  assert(ctx._pushCount === 2, '房间落后 → 补发未确认推送');
+  assert(vm.runInContext('_lastPushVerified', ctx) === true, '补发成功标记已确认');
+  assert(g.S.turnNo === 7, '补发后不应用旧快照（本地保持最新）');
+
+  // E. 房间已被更新状态取代 → 不补发，应用房间最新状态
+  ctx._pushResults = [false];
+  ctx._pushCount = 0;
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  g.S = { currentSeat: 1, currentPlayer: 1, turnNo: 7 };
+  g.onlinePushState();
+  await flush();
+  assert(ctx._pushCount === 1, 'E: 推送发出但未确认');
+  ctx._roomRow = { status: 'playing', seats: [], state: mkState(0, t0, 'x-9', 8) }; // 房间前进（8 > 7）
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  const appliedBeforeE = applied.length;
+  await g._resyncRoom();
+  assert(ctx._pushCount === 1, '房间已前进 → 不补发');
+  assert(vm.runInContext('_lastPushVerified', ctx) === true, '被更新的状态取代视为已解决');
+  assert(applied.length === appliedBeforeE + 1 && g.S.turnNo === 8, '重同步应用房间最新状态');
+
+  // F. 订阅成功（首次/重连）自动补拉最新状态
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  ctx._roomRow = { status: 'playing', seats: [], state: mkState(2, t0 + 10000, 'x-10', 9) };
+  onStatus('SUBSCRIBED');
+  await flush();
+  assert(g.S.turnNo === 9, '订阅成功触发重同步拉取最新状态');
+
+  // G. 频道错误 → 延迟重订阅
+  const savedTimeout = ctx.setTimeout;
+  ctx.setTimeout = (fn) => { ctx._resubFn = fn; return 1; };
+  const subsBeforeG = subscribeCalls;
+  onStatus('CHANNEL_ERROR');
+  assert(typeof ctx._resubFn === 'function', '频道错误被捕获并安排重订阅');
+  ctx._resubFn();
+  assert(subscribeCalls === subsBeforeG + 1, '重订阅重建频道');
+  ctx.setTimeout = savedTimeout;
+
+  // H. 回前台（visibilitychange）→ 重建频道 + 重同步
+  document.visibilityState = 'visible';
+  const visHandler = (listeners['visibilitychange'] || [])[0];
+  assert(typeof visHandler === 'function', '注册了 visibilitychange 恢复处理');
+  assert(typeof (ctx._winListeners['online'] || [])[0] === 'function' && typeof (ctx._winListeners['pageshow'] || [])[0] === 'function', '注册了 online/pageshow 恢复处理');
+  vm.runInContext('_lastRecoverAt = 0; _lastResyncAt = 0;', ctx);
+  ctx._roomRow = { status: 'playing', seats: [], state: mkState(0, t0 + 20000, 'x-11', 10) };
+  const subsBeforeH = subscribeCalls;
+  visHandler();
+  assert(subscribeCalls === subsBeforeH + 1, '回前台重建频道');
+  await flush();
+  assert(g.S.turnNo === 10, '回前台重同步应用最新状态');
+
+  // I. 3s 时钟余量内的"略旧"状态正常应用（跨设备时钟偏差容忍）
+  const appliedBeforeI = applied.length;
+  const lastTs = vm.runInContext('_lastAppliedTs', ctx);
+  g._handleRemoteState({ state: mkState(3, lastTs - 1000, 'x-12', 11) });
+  assert(applied.length === appliedBeforeI + 1 && g.S.turnNo === 11, '时钟偏差余量内的状态正常应用');
+
+  // J. 定时轮询兜底：僵尸连接（收不到任何事件）也能拉到新状态 / 自动补发 / 跳过重复 / 退出停止
+  assert(typeof pollTickFn === 'function' && pollIntervalsStarted === 1, '订阅后启动定时轮询（幂等：重订阅/恢复不重复启动）');
+  assert(pollDelay === vm.runInContext('ONLINE_CONFIG.POLL_GAME_MS', ctx), '对局中轮询间隔取对局节奏（POLL_GAME_MS）');
+
+  // J0. 轮询不依赖 visibility（对齐神探缉凶/fugitive 的无条件轮询）：
+  // 即便 visibilityState 滞留 'hidden'，轮询照常拉取并应用——真后台时系统本就会挂起定时器，
+  // 而一旦按 hidden 跳过，visibility 滞留会让唯一兜底通道永久停摆
+  document.visibilityState = 'hidden';
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  ctx._roomRow = { status: 'playing', seats: [], state: mkState(2, t0 + 40000, 'x-30', 30) };
+  const appliedBeforeJ0 = applied.length;
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(applied.length === appliedBeforeJ0 + 1 && g.S.turnNo === 30, 'hidden 状态不阻止轮询（拉取并应用前进的房间状态）');
+  document.visibilityState = 'visible';
+
+  // J2. 房间无变化（同 pushId）→ 不重复应用（避免打断拖拽/动画）
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  const appliedBeforeJ2 = applied.length;
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(applied.length === appliedBeforeJ2, '轮询在房间无变化时不重复应用');
+
+  // J3. 未确认推送 + 房间落后 → 轮询自动补发（无需等生命周期事件）
+  ctx._pushResults = [false];
+  const pushBeforeJ3 = ctx._pushCount;
+  vm.runInContext('_pendingPushSeat = 1; _lastPushVerified = false; _lastResyncAt = 0;', ctx);
+  g.S = { currentSeat: 1, currentPlayer: 1, turnNo: 31 };
+  g.onlinePushState();
+  await flush();
+  assert(ctx._pushCount === pushBeforeJ3 + 1, 'J3: 推送发出（模拟 iOS 丢包）');
+  vm.runInContext('_lastResyncAt = 0;', ctx);
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(ctx._pushCount === pushBeforeJ3 + 2, '轮询发现未确认推送并自动补发');
+  assert(vm.runInContext('_lastPushVerified', ctx) === true && g.S.turnNo === 31, '补发成功且本地状态未被旧快照覆盖');
+
+  // J4. 等候室（未开局）：轮询按内容签名刷新、不重应用对局状态
+  vm.runInContext('_gameStarted = false; _knownSeatCount = 1; _departedHandled = false; _lastWaitingSig = "";', ctx);
+  ctx._roomRow = { status: 'waiting', seats: [{ seatIndex: 0, name: 'A' }], state: null };
+  const appliedBeforeJ4 = applied.length;
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(applied.length === appliedBeforeJ4, '等候室轮询不重应用对局状态');
+  assert(vm.runInContext('_lastWaitingSig', ctx) === '0:A|', '等候室轮询按签名刷新等候室');
+
+  // J4a. 等候室轮询兜住漏收的成员离开（实时行丢失时）→ 提示 + 计数同步
+  const savedAlertJ = ctx.alert;
+  let alertMsgJ = '';
+  ctx.alert = (m) => { alertMsgJ = String(m); };
+  g.S = { currentSeat: 0, players: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] };
+  vm.runInContext('_knownSeatCount = 3; _departedHandled = false;', ctx);
+  ctx._roomRow = { status: 'waiting', seats: [{ seatIndex: 0, name: 'A' }, { seatIndex: 1, name: 'B' }], state: null };
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(vm.runInContext('_departedHandled', ctx) === true && vm.runInContext('_knownSeatCount', ctx) === 2,
+    '轮询兜住漏收的成员离开并同步席位数');
+  assert(alertMsgJ.includes('C'), '非房主收到离开提示（含离开者名字）');
+  assert(vm.runInContext('_lastWaitingSig', ctx) === '0:A,1:B|', '成员离开后等候室按签名重绘');
+  ctx.alert = savedAlertJ;
+
+  // J4b. 等候室中房间已开局（漏收开局推送）→ 轮询补同步并把间隔切换到对局节奏
+  vm.runInContext('_lastResyncAt = 0; _pollIntervalMs = ONLINE_CONFIG.POLL_WAIT_MS;', ctx);
+  const pollsBeforeJ4b = pollIntervalsStarted;
+  ctx._roomRow = { status: 'playing', seats: [{ seatIndex: 0, name: 'A' }, { seatIndex: 1, name: 'B' }], state: mkState(0, t0 + 50000, 'x-40', 40) };
+  pollTickFn();
+  await flush();
+  await flush();
+  assert(g.S.turnNo === 40 && vm.runInContext('_gameStarted', ctx) === true, '等候室中房间开局 → 轮询补同步进入对局');
+  assert(pollIntervalsStarted === pollsBeforeJ4b + 1 && pollDelay === vm.runInContext('ONLINE_CONFIG.POLL_GAME_MS', ctx),
+    '进入对局后轮询按对局节奏重启');
+
+  // J5. 推送串行化（对齐神探缉凶）：在途期间的并发推送请求合并，完成后以最新本地状态补发；
+  //     排队补发必须携带粘性状态（开局 'playing' 推送常被 dealGame 的 saveState 推送挡在队列外）
+  let pushGate = null;
+  const sentStates = [];
+  const savedPushJ = ctx.netUpdateGameState;
+  ctx.netUpdateGameState = async (roomId, st, status) => {
+    ctx._pushCount++;
+    sentStates.push({ turnNo: st.turnNo, status: status || '' });
+    if (sentStates.length === 1) await new Promise(r => { pushGate = r; }); // 第1发挂起在途
+    return true;
+  };
+  vm.runInContext('_pendingPushSeat = 1;', ctx);
+  g.S = { currentSeat: 1, currentPlayer: 1, turnNo: 50 };
+  g.onlinePushState(); // 第1发：挂起
+  await flush();
+  g.S = { currentSeat: 1, currentPlayer: 1, turnNo: 51 };
+  g.onlinePushState(); // 在途期间 → 只记标记、不并发发送
+  await flush();
+  assert(sentStates.length === 1, '串行化：推送在途期间不并发发送');
+  vm.runInContext('_markPushAndSend(window._getOnlineState(), "playing");', ctx); // 开局状态推送被排队
+  pushGate(); // 放行第1发
+  await flush();
+  await flush();
+  assert(sentStates.length === 2 && sentStates[1].turnNo === 51, '在途完成后补发最新状态（最后一次操作不丢）');
+  assert(sentStates[1].status === 'playing', '排队补发携带粘性状态（开局 playing 不因串行化丢失）');
+  ctx.netUpdateGameState = savedPushJ;
+
+  // J6. 退出房间 → 停止轮询并复位推送/签名状态
+  vm.runInContext('_cleanupOnline();', ctx);
+  assert(pollIntervalsCleared.includes(4242), '退出房间后停止轮询');
+  assert(vm.runInContext('_pushInFlight === false && _pushQueued === false && _lastWaitingSig === ""', ctx),
+    '退出清理推送串行化与等候室签名状态');
+
+  console.log(`\n结果: ${passCount} 通过 / ${failCount} 失败`);
+  process.exit(failCount ? 1 : 0);
+})().catch(e => { console.error('测试异常:', e); process.exit(1); });

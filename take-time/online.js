@@ -9,7 +9,7 @@
  *  2. 在 HTML 中按顺序加载：
  *     <script src="game.js"></script>
  *     <script src="render.js"></script>
- *     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ *     <script src="supabase.min.js"></script>
  *     <script src="net.js"></script>
  *     <script src="online.js"></script>
  *  3. 实现下方「HOOK: 游戏定制」中的所有函数
@@ -25,6 +25,13 @@
 const ONLINE_CONFIG = {
   SESSION_KEY: 'taketime-online',   // localStorage 键名，不同游戏用不同值
   GAME_TITLE: '时序谜局',           // 游戏名称
+  // 定时轮询节奏（毫秒）：兜住实时推送漏收（断线窗口/丢包/僵尸连接），
+  // 对齐神探缉凶/fugitive 的在产方案——等候室 2.5s，对局中 5s 防各端僵等
+  POLL_WAIT_MS: 2500,
+  POLL_GAME_MS: 5000,
+  // 状态新鲜度排序值（同一房间内单调不减）：用于判断"房间状态是否落后于我的最后一次推送"。
+  // 时序谜局用 S.turnNo（每次放牌 +1，全局单调）；无 turnNo 的状态（等候室选关等）退化为推送时间戳。
+  getOrderValue: (s) => (s && typeof s.turnNo === 'number') ? s.turnNo : ((s && s._ts) || 0),
 };
 
 /** 游戏定制：等候室额外内容（选关），由 initOnline 注册 */
@@ -122,6 +129,23 @@ let _lastPushedCurrentSeat = null;
 let _gameStarted    = false;
 let _rescueSheetShown = false; // 视游戏需求保留
 
+// ── 移动端健壮性（iOS 切前后台会挂死 WebSocket、丢事件、丢请求） ──
+let _channelStatus  = null;       // 最近一次频道订阅状态（SUBSCRIBED/CHANNEL_ERROR/...）
+let _resubTimer     = null;       // 频道故障后的重订阅定时器
+let _lastAppliedTs  = 0;          // 已应用的远端状态最大时间戳（拒绝乱序/重放的过期快照）
+let _lastAppliedPushId = null;    // 已应用的远端状态 pushId（同一条状态重复投递去重）
+let _lastPushPayload = null;      // 最近一次推送 { pushId, stateObj, status }（未确认时供补发）
+let _lastPushVerified = false;    // 最近一次推送是否已确认到达服务端
+let _resyncing      = false;      // 重同步进行中
+let _lastResyncAt   = 0;          // 重同步限频
+let _lastRecoverAt  = 0;          // 前台恢复重建频道限频
+let _pollTimer      = null;       // 定时轮询定时器（僵尸连接兜底）
+let _pollIntervalMs = 0;          // 当前轮询间隔（等候室/对局两种节奏）
+let _pushInFlight   = false;      // 推送在途（串行化：防并发 UPDATE 竞速、旧快照后到覆盖）
+let _pushQueued     = false;      // 在途期间又有推送请求：完成后以最新本地状态补发
+let _pushStatus     = '';         // 粘性状态标记：开局等一次性 status 随排队补发送达，不因串行化丢失
+let _lastWaitingSig = '';         // 等候室渲染签名（座位/选关未变则跳过重绘）
+
 function _saveSession() {
   if (_onlineRoomId) {
     try {
@@ -172,6 +196,8 @@ async function onlineBackToLanding() {
 
 function _cleanupOnline() {
   if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
+  if (_resubTimer) { clearTimeout(_resubTimer); _resubTimer = null; }
+  _stopPolling();
   _onlineRoomId = null;
   _mySeatIndex  = null;
   _myPlayerName = null;
@@ -183,6 +209,18 @@ function _cleanupOnline() {
   _pendingPushSeat = null;
   _lastPushedCurrentSeat = null;
   _gameStarted = false;
+  _channelStatus = null;
+  _lastAppliedTs = 0;
+  _lastAppliedPushId = null;
+  _lastPushPayload = null;
+  _lastPushVerified = false;
+  _resyncing = false;
+  _lastResyncAt = 0;
+  _lastRecoverAt = 0;
+  _pushInFlight = false;
+  _pushQueued = false;
+  _pushStatus = '';
+  _lastWaitingSig = '';
   _clearSession();
 }
 
@@ -302,6 +340,7 @@ async function onJoinRoom() {
       // 加入时游戏已开始 → 直接进入
       _applyRemoteState(room.state);
       _gameStarted = true;
+      _startPolling(ONLINE_CONFIG.POLL_GAME_MS);
       document.getElementById('online').style.display = 'none';
       document.getElementById('app').style.display = 'block';
       if (typeof HOOK_render === 'function') HOOK_render();
@@ -364,30 +403,16 @@ function renderWaitingRoom(room) {
    ============================================================ */
 
 function _subscribeToRoom(roomId) {
-  if (_unsubscribe) _unsubscribe();
+  if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
+  _channelStatus = 'CONNECTING';
 
   _unsubscribe = netSubscribeRoom(roomId, (row) => {
-    // 检测成员离开
-    if (Array.isArray(row.seats) && row.seats.length < _knownSeatCount && _knownSeatCount > 0 && !_departedHandled) {
-      _departedHandled = true;
-      const players = typeof HOOK_getPlayers === 'function' ? HOOK_getPlayers() : [];
-      const departedSeat = players.length > 0
-        ? players.findIndex((_, i) =>
-            i < _knownSeatCount && !row.seats.some(s => s.seatIndex === i))
-        : -1;
-      const departedName = departedSeat >= 0 && players[departedSeat]
-        ? players[departedSeat].name : '未知玩家';
-      if (_isHost) {
-        _showPlayerLeftDialog(departedName, departedSeat);
-      } else {
-        alert(_esc(departedName) + ' 退出了房间，等待房主处理...');
-      }
-      _knownSeatCount = row.seats.length;
-    }
+    // 成员离开（seats 减少）→ 接管/提示；与轮询共用同一套检测，漏收的实时行也能兜住
+    _syncSeatTracking(row);
 
-    // 等候室阶段
+    // 等候室阶段（内容未变不重绘，避免重置选关等交互）
     if (row.status === 'waiting' && row.seats) {
-      renderWaitingRoom(row);
+      _renderWaitingIfChanged(row);
       return;
     }
 
@@ -401,11 +426,26 @@ function _subscribeToRoom(roomId) {
     if (row.status === 'playing' && row.state) {
       _handleRemoteState(row);
     }
+  }, (status) => {
+    _channelStatus = status;
+    if (status === 'SUBSCRIBED') {
+      // 首次订阅与断线重连都会到这里：断线期间的事件不会重放，
+      // 因此每次订阅成功都补拉一次房间状态（幂等，由新鲜度守卫去重）
+      _resyncRoom();
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      _scheduleResubscribe();
+    }
   });
+
+  // 定时轮询兜底（幂等；所有进入房间的路径都经过本函数）
+  _startPolling(_gameStarted ? ONLINE_CONFIG.POLL_GAME_MS : ONLINE_CONFIG.POLL_WAIT_MS);
 }
 
-/** 处理远程游戏状态更新 */
-function _handleRemoteState(row) {
+/** 处理远程游戏状态更新
+ *  @param {object} row - rooms 表行
+ *  @param {boolean} [force] - 权威重同步（房间是数据源真相，跳过新鲜度过滤）
+ */
+function _handleRemoteState(row, force) {
   const curPlayer = row.state.currentPlayer;
   const departed = row.state.departedPlayers || [];
   const iTakeover = _isHost && departed.includes(curPlayer)
@@ -416,9 +456,20 @@ function _handleRemoteState(row) {
 
   const remotePushId = row.state._pushId;
   if (remotePushId && _myPushedIds.has(remotePushId)) return;
+  if (!force) {
+    // 同一条状态重复投递（重订阅/重同步重复拉取）：跳过
+    if (remotePushId && remotePushId === _lastAppliedPushId) return;
+    // 过期快照防倒灌：Realtime 乱序投递/重连重放可能送来比本地旧的快照（留 3s 时钟偏差余量）
+    const remoteTs = row.state._ts || 0;
+    if (remoteTs && remoteTs < _lastAppliedTs - 3000) {
+      console.log('[online] ignore stale state ts', remoteTs, '<', _lastAppliedTs - 3000);
+      return;
+    }
+  }
 
   _isReceiving = true;
   _gameStarted = true;
+  _startPolling(ONLINE_CONFIG.POLL_GAME_MS); // 进入对局：轮询切到游戏节奏（防各端僵等）
   // 只有当前不是"等待自己出牌"时才更新 pendingPushSeat，
   // 防止 Supabase Realtime 乱序投递旧状态覆盖正确值导致 isOutgoingActor 判定失败
   if (_pendingPushSeat !== _mySeatIndex) {
@@ -436,10 +487,17 @@ function _handleRemoteState(row) {
   _isReceiving = false;
 }
 
-/** 处理远程游戏结束 */
-function _handleRemoteFinished(row) {
+/** 处理远程游戏结束
+ *  @param {boolean} [force] - 权威重同步时跳过过期/重复过滤
+ */
+function _handleRemoteFinished(row, force) {
   const remotePushId = row.state && row.state._pushId;
   if (remotePushId && _myPushedIds.has(remotePushId)) return;
+  if (!force && row.state) {
+    if (remotePushId && remotePushId === _lastAppliedPushId) return;
+    const remoteTs = row.state._ts || 0;
+    if (remoteTs && remoteTs < _lastAppliedTs - 3000) return;
+  }
 
   _isReceiving = true;
   if (row.state) {
@@ -470,11 +528,173 @@ function _handleRemoteFinished(row) {
 
 /** 应用远程状态到本地 S */
 function _applyRemoteState(state) {
+  // 记录新鲜度标记：后续拒绝比它更旧的快照
+  if (state) {
+    if (state._pushId) _lastAppliedPushId = state._pushId;
+    if (state._ts) _lastAppliedTs = Math.max(_lastAppliedTs, state._ts);
+  }
   // 游戏应暴露全局 S 用于状态覆盖
   // 各游戏根据自身状态结构实现
   if (typeof window._applyOnlineState === 'function') {
     window._applyOnlineState(state);
   }
+}
+
+/* ============================================================
+   断线恢复 / 重同步 / 丢失推送补发
+   iOS 上切后台会挂起 WebSocket 与在途请求：事件断线期间不会重放、
+   推送请求可能静默失败。恢复策略：
+   1) 频道故障 → 自动重订阅；2) 订阅成功/回前台 → 主动补拉房间状态；
+   3) 本地最后一次推送未确认时，按状态新鲜度判断是否补发。
+   ============================================================ */
+
+function _orderValue(state) {
+  try {
+    if (typeof ONLINE_CONFIG.getOrderValue === 'function') {
+      return ONLINE_CONFIG.getOrderValue(state) || 0;
+    }
+  } catch (e) {}
+  return (state && state._ts) || 0;
+}
+
+/** 拉取房间最新状态并应用；若本地有未确认推送且房间落后则先补发 */
+async function _resyncRoom() {
+  if (!_onlineRoomId || _resyncing) return;
+  const now = Date.now();
+  if (now - _lastResyncAt < 800) return; // 限频：多次触发只拉一次
+  _resyncing = true;
+  _lastResyncAt = now;
+  try {
+    const room = await netGetRoom(_onlineRoomId);
+    if (!_onlineRoomId) return; // 拉取期间已退出房间
+    _syncSeatTracking(room); // 漏收的成员离开也能兜住（房主仍会弹接管/提示）
+
+    // 本地最后一次推送未被确认：判断是否需要补发
+    if (_lastPushPayload && !_lastPushVerified && _gameStarted) {
+      const my = _lastPushPayload;
+      const roomState = room.state;
+      const roomPushId = roomState && roomState._pushId;
+      const startLost = my.status === 'playing' && room.status === 'waiting'; // 开局推送丢失
+      if (roomPushId === my.pushId) {
+        _lastPushVerified = true; // 其实已到达（响应丢失）
+      } else if (startLost || _orderValue(roomState) < _orderValue(my.stateObj)) {
+        // 房间落后于我的最后推送 → 补发（走串行化推送通道，避免与在途推送竞速）；
+        // 补发后本地即最新，不能再应用刚拉到的旧快照（否则状态回卷）
+        console.log('[online] resend unverified push', my.pushId);
+        await _markPushAndSend(my.stateObj, my.status);
+        return;
+      } else {
+        _lastPushVerified = true; // 已被更新的状态取代，视为已解决
+      }
+    }
+
+    // 应用房间最新状态（权威来源，force 跳过新鲜度过滤）。
+    // 与本地已应用状态相同则跳过：轮询周期性触发时不得重复渲染（会打断进行中的拖拽/动画）
+    const roomPushId = room.state && room.state._pushId;
+    if (roomPushId && roomPushId === _lastAppliedPushId) {
+      // 无变化
+    } else if (room.status === 'finished') {
+      _handleRemoteFinished(room, true);
+    } else if (room.status === 'playing' && room.state) {
+      _handleRemoteState(room, true);
+    } else if (room.status === 'waiting' && room.seats && !_gameStarted) {
+      _renderWaitingIfChanged(room);
+    }
+  } catch (e) {
+    console.warn('[online] resync failed:', e);
+  } finally {
+    _resyncing = false;
+  }
+}
+
+/** 频道进入错误/关闭状态：延迟重订阅（若已自行恢复则跳过） */
+function _scheduleResubscribe() {
+  if (_resubTimer || !_onlineRoomId) return;
+  _resubTimer = setTimeout(() => {
+    _resubTimer = null;
+    if (!_onlineRoomId || _channelStatus === 'SUBSCRIBED') return;
+    console.warn('[online] channel unhealthy, resubscribe');
+    _subscribeToRoom(_onlineRoomId);
+  }, 2000);
+}
+
+/** 回到前台/网络恢复：重建频道（iOS 后台会挂死 WebSocket，客户端自认 SUBSCRIBED 也不可靠）+ 重同步 */
+function _recoverConnection() {
+  if (!_onlineRoomId) return;
+  const now = Date.now();
+  if (now - _lastRecoverAt < 1500) return; // 限频：visibilitychange 可能连续触发
+  _lastRecoverAt = now;
+  _subscribeToRoom(_onlineRoomId);
+  _resyncRoom();
+}
+
+/** 启动定时轮询（幂等，间隔变化时切换节奏）：WebSocket 可能静默死亡且自报 SUBSCRIBED、
+ *  不触发任何事件，仅靠事件驱动的恢复会漏掉这种"僵尸连接"，轮询拉取房间状态作为最终兜底。 */
+function _startPolling(ms) {
+  if (_pollTimer && _pollIntervalMs === ms) return;
+  _stopPolling();
+  _pollIntervalMs = ms;
+  _pollTimer = setInterval(_pollTick, ms);
+}
+
+function _stopPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  _pollIntervalMs = 0;
+}
+
+async function _pollTick() {
+  if (!_onlineRoomId || _resyncing) return;
+  // 不按 visibility 跳过（对齐神探缉凶/fugitive 的无条件轮询）：
+  // 真后台时 iOS/Android 本就挂起页面定时器，浏览器天然节流；
+  // 而 visibilityState 一旦滞留 hidden（WebKit 偶发）会让轮询永久停摆，
+  // 只剩可见性变化事件能救——恰恰把唯一兜底通道也堵死了。
+  if (!_gameStarted) {
+    // 等候室：按内容签名重绘（未变化零副作用，不重置房主选关交互），同步席位并补漏收的离开/开局
+    try {
+      const room = await netGetRoom(_onlineRoomId);
+      if (!_onlineRoomId || !room) return;
+      if (room.status !== 'waiting') { _resyncRoom(); return; } // 开局/解散漏收 → 走统一重同步
+      _syncSeatTracking(room);
+      _renderWaitingIfChanged(room);
+    } catch (e) { /* 网络抖动忽略，下个周期再试 */ }
+    return;
+  }
+  _resyncRoom(); // 内部限频；状态无变化不会重复应用（见 _resyncRoom 的 _lastAppliedPushId 守卫），含未确认推送补发
+}
+
+/** 席位跟踪（实时与轮询共用）：成员离开弹接管/提示；成员数增减都同步计数（否则后续离开检测失真） */
+function _syncSeatTracking(row) {
+  if (!Array.isArray(row.seats)) return;
+  if (row.seats.length < _knownSeatCount && _knownSeatCount > 0 && !_departedHandled) {
+    _departedHandled = true;
+    const players = typeof HOOK_getPlayers === 'function' ? HOOK_getPlayers() : [];
+    const departedSeat = players.length > 0
+      ? players.findIndex((_, i) =>
+          i < _knownSeatCount && !row.seats.some(s => s.seatIndex === i))
+      : -1;
+    const departedName = departedSeat >= 0 && players[departedSeat]
+      ? players[departedSeat].name : '未知玩家';
+    if (_isHost) {
+      _showPlayerLeftDialog(departedName, departedSeat);
+    } else {
+      alert(_esc(departedName) + ' 退出了房间，等待房主处理...');
+    }
+  }
+  _knownSeatCount = row.seats.length;
+}
+
+/** 等候室内容签名：座位 + 选关；未变则跳过重绘（实时行与轮询共用） */
+function _waitingSig(room) {
+  const seats = (room.seats || []).map(s => s.seatIndex + ':' + s.name).join(',');
+  const ch = room.state && room.state.pendingChallenge ? JSON.stringify(room.state.pendingChallenge) : '';
+  return seats + '|' + ch;
+}
+
+function _renderWaitingIfChanged(room) {
+  const sig = _waitingSig(room);
+  if (sig === _lastWaitingSig) return;
+  _lastWaitingSig = sig;
+  renderWaitingRoom(room);
 }
 
 /* ============================================================
@@ -490,6 +710,7 @@ async function startOnlineGame() {
     _knownSeatCount = seats.length;
     _departedHandled = false;
     _gameStarted = true;
+    _startPolling(ONLINE_CONFIG.POLL_GAME_MS);
     const names = seats.map(s => s.name);
     if (typeof HOOK_dealGame === 'function') {
       HOOK_dealGame(names);
@@ -551,14 +772,44 @@ function onlinePushState() {
 }
 
 async function _markPushAndSend(stateObj, status) {
-  _myPushSeq++;
-  const pushId = _mySeatIndex + '-' + _myPushSeq;
-  stateObj._pushId = pushId;
-  stateObj._src = _mySeatIndex;
-  _myPushedIds.add(pushId);
-  _lastPushedCurrentSeat = typeof stateObj.currentPlayer === 'number'
-    ? stateObj.currentPlayer : null;
-  netUpdateGameState(_onlineRoomId, stateObj, status);
+  // 串行化（对齐神探缉凶）：并发 UPDATE 会竞速，旧快照后到会覆盖对方刚应用的新进度；
+  // 在途时只记标记，完成后用最新本地状态补发
+  if (status) _pushStatus = status; // 粘性：开局推送常被 dealGame 的 saveState 推送挡在队列外，status 必须随补发一起送达
+  if (_pushInFlight) { _pushQueued = true; return true; }
+  _pushInFlight = true;
+  try {
+    _myPushSeq++;
+    const ts = Date.now();
+    // 含时间戳：刷新重连后 _myPushSeq 会重置，仅靠 座位-序号 会与刷新前的推送 ID 撞车
+    const pushId = _mySeatIndex + '-' + ts.toString(36) + '-' + _myPushSeq;
+    // 深拷贝快照：重试/补发期间本地状态可能继续变化，不能污染在途请求
+    const snapshot = JSON.parse(JSON.stringify(stateObj));
+    snapshot._pushId = pushId;
+    snapshot._src = _mySeatIndex;
+    snapshot._ts = ts;
+    _myPushedIds.add(pushId);
+    _lastAppliedTs = Math.max(_lastAppliedTs, ts);
+    _lastPushedCurrentSeat = typeof snapshot.currentPlayer === 'number'
+      ? snapshot.currentPlayer : null;
+    // 记录本次推送，供"回前台重同步"时检测未到达并补发
+    _lastPushPayload = { pushId, stateObj: snapshot, status: _pushStatus };
+    _lastPushVerified = false;
+    const ok = await netUpdateGameState(_onlineRoomId, snapshot, _pushStatus);
+    if (ok && _lastPushPayload && _lastPushPayload.pushId === pushId) {
+      _lastPushVerified = true;
+    }
+    return ok;
+  } finally {
+    _pushInFlight = false;
+    if (_pushQueued) {
+      _pushQueued = false;
+      if (_onlineRoomId) {
+        // 补发在途期间产生的最新本地状态；直接复用推送通道（不经过行动者判定），携带粘性状态
+        const latest = (typeof window._getOnlineState === 'function' && window._getOnlineState()) || stateObj;
+        _markPushAndSend(latest, _pushStatus);
+      }
+    }
+  }
 }
 
 /**
@@ -851,11 +1102,23 @@ async function _tryReconnect() {
     _myPushedIds = new Set();
     _pendingPushSeat = null;
     _lastPushedCurrentSeat = null;
+    _lastAppliedTs = 0;
+    _lastAppliedPushId = null;
+    _lastPushPayload = null;
+    _lastPushVerified = false;
+    _pushInFlight = false;
+    _pushQueued = false;
+    _lastWaitingSig = '';
+    if (_resubTimer) { clearTimeout(_resubTimer); _resubTimer = null; }
+    _resyncing = false;
+    _lastResyncAt = 0;
+    _lastRecoverAt = 0;
     _subscribeToRoom(saved.roomId);
 
     if (room.status === 'playing' && room.state) {
       // 游戏进行中：直接恢复对局
       _gameStarted = true;
+      _startPolling(ONLINE_CONFIG.POLL_GAME_MS);
       // 恢复「上一手推送上下文」：否则刷新后轮到自己出牌时 canPush 全 false，推送被吞
       _lastPushedCurrentSeat = (typeof room.state.currentPlayer === 'number')
         ? room.state.currentPlayer : null;
@@ -944,6 +1207,15 @@ function initOnline(hooks) {
       return before + btn + after;
     };
   }
+
+  // 移动端生命周期恢复：iOS 切后台会挂起 WebSocket，且断线期间的事件不会重放，
+  // 回前台 / 网络恢复 / bfcache 恢复时统一重建频道并重拉状态
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') return;
+    _recoverConnection();
+  });
+  window.addEventListener('online', () => _recoverConnection());
+  window.addEventListener('pageshow', (e) => { if (e.persisted) _recoverConnection(); });
 
   // 启动重连检测
   document.addEventListener('DOMContentLoaded', async () => {

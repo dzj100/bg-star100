@@ -30,6 +30,57 @@ function cardsPerPlayer(n) {
 // 基础规则（无自定义 check 时）：每区域≥1张、每区域≤24、区域1→6递增
 // ========================================
 
+/**
+ * 第7章通用判定：基础三项（≥1张 / ≤24 / 区域1→6递增）+ 按 S.segCond 实际分配的区域条件逐项检查。
+ * 支持条件：draw1（放置时摸牌，无结算约束）、no789、last、maxMoonMinSun、sunMoon2。
+ */
+function ch7Check(sums, segs) {
+  const segOK = segs.map(seg => seg.cards.length >= 1);
+  const sumOK = sums.map(s => s <= 24);
+  const ascOK = sums.every((s, i) => i === 0 || s >= sums[i - 1]);
+  const items = [
+    { label: '每区域至少1张', ok: segOK.every(Boolean) },
+    { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+    { label: '区域1→6总和递增', ok: ascOK },
+  ];
+  const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+  const conds = S.segCond || [];
+  const allCards = segs.flatMap(s => s.cards);
+  const suns = allCards.filter(c => c.color === 'sun');
+  const moons = allCards.filter(c => c.color === 'moon');
+  const minSunV = suns.length ? Math.min(...suns.map(c => c.v)) : Infinity;
+  const maxMoonV = moons.length ? Math.max(...moons.map(c => c.v)) : -Infinity;
+  let condOK = true;
+  conds.forEach((cond, i) => {
+    if (cond.key === 'no789') {
+      const ok = segs[i].cards.every(c => c.v < 7 || c.v > 9);
+      const banned = segs[i].cards.filter(c => c.v >= 7 && c.v <= 9).map(c => c.v);
+      items.push({ label: `${i + 1}号位：不含7、8、9数字牌${banned.length ? '（含' + banned.join('、') + '）' : ''}`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    } else if (cond.key === 'last') {
+      const lastOrder = allCards.length ? Math.max(...allCards.map(c => c.order || 0)) : 0;
+      const ok = segs[i].cards.some(c => c.order === lastOrder);
+      items.push({ label: `${i + 1}号位：最后一张牌（第${lastOrder}张）放这里`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    } else if (cond.key === 'maxMoonMinSun') {
+      const ok = segs[i].cards.some(c => c.color === 'moon' && c.v === maxMoonV)
+        && segs[i].cards.some(c => c.color === 'sun' && c.v === minSunV);
+      items.push({ label: `${i + 1}号位：含最大月亮牌（${isFinite(maxMoonV) ? maxMoonV : '无'}）与最小太阳牌（${isFinite(minSunV) ? minSunV : '无'}）`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    } else if (cond.key === 'sunMoon2') {
+      const sunN = segs[i].cards.filter(c => c.color === 'sun').length;
+      const moonN = segs[i].cards.filter(c => c.color === 'moon').length;
+      const ok = segs[i].cards.length === 4 && sunN === 2 && moonN === 2;
+      items.push({ label: `${i + 1}号位：太阳月亮各2张（日${sunN}/月${moonN}）`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    }
+  });
+  return {
+    segOK, sumOK, ascOK, items, segBad,
+    pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+  };
+}
+
 const CHALLENGE_LIB = {
   // ── 第1章 ──
   1: {
@@ -980,6 +1031,76 @@ const CHALLENGE_LIB = {
       };
     },
   },
+  // ── 第7章（转盘选条件 + 「摸1张」：向该区域放牌后，放牌玩家从未加入游戏的备用牌堆摸 1 张进手牌） ──
+  /**
+   * 入侵（第7章第1关）：区域条件“摸1张->无限制->不含7、8、9数字牌->…”；
+   * 与定首类关卡相同：看牌前房主先选 1 号位条件（其余循环顺延）。
+   */
+  25: {
+    name: '入侵', chapter: 7, test: 1,
+    rotate: true,
+    conds: [
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'no789', label: '不含7、8、9数字牌', short: '不含7、8、9' },
+      { key: 'no789', label: '不含7、8、9数字牌', short: '不含7、8、9' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“摸1张->无限制->不含7、8、9数字牌->不含7、8、9数字牌->无限制->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check: ch7Check,
+  },
+  /**
+   * 引泉（第7章第2关）：区域条件“摸1张->…->最后1张牌放这里->…”，双摸牌 + 最后一张锚点。
+   */
+  26: {
+    name: '引泉', chapter: 7, test: 2,
+    rotate: true,
+    conds: [
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'last', label: '最后1张牌放这里', short: '最后1张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“摸1张->无限制->无限制->摸1张->最后1张牌放这里->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check: ch7Check,
+  },
+  /**
+   * 同辉（第7章第3关）：区域条件“…->含1张最大月亮牌和1张最小太阳牌->摸1张->太阳月亮各2张（恰好2+2共4张）”。
+   */
+  27: {
+    name: '同辉', chapter: 7, test: 3,
+    rotate: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'maxMoonMinSun', label: '含1张数字最大的月亮牌和1张数字最小的太阳牌', short: '最大月亮+最小太阳' },
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'sunMoon2', label: '太阳月亮各2张', short: '2太阳+2月亮' },
+    ],
+    desc: '区域规则为“无限制->无限制->无限制->含1张数字最大的月亮牌和1张数字最小的太阳牌->摸1张->太阳月亮各2张”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check: ch7Check,
+  },
+  /**
+   * 三汲（第7章第4关）：区域条件“无限制->摸1张->无限制->摸1张->无限制->摸1张”，三处摸牌。
+   */
+  28: {
+    name: '三汲', chapter: 7, test: 4,
+    rotate: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'draw1', label: '摸1张', short: '摸1张' },
+    ],
+    desc: '区域规则为“无限制->摸1张->无限制->摸1张->无限制->摸1张”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
+    check: ch7Check,
+  },
 };
 
 /** 通过 window 暴露（测试扩展用） */
@@ -1205,6 +1326,8 @@ function dealGame(names, challenge) {
     name,
     hand: deck.slice(i * per, (i + 1) * per),
   }));
+  // 第7章「摸1张」：未加入游戏的 12 张牌作为备用牌堆（随状态同步，UI 不展示内容）
+  const reserve = deck.slice(n * per).map(c => ({ ...c }));
   // 2人局：后2张标记锁定（随出牌 splice 移动，解锁前始终指向原后2张）
   if (n === 2 && per === 6) {
     players.forEach(p => p.hand.forEach((c, i) => { if (i >= 4) c.lock = true; }));
@@ -1215,6 +1338,7 @@ function dealGame(names, challenge) {
     phase: 'discuss',
     challenge: ch,
     segments: Array.from({ length: SEG_COUNT }, () => ({ cards: [] })),
+    reserve,
     firstSeat: null,
     currentSeat: 0,
     turnNo: 0,
@@ -1426,24 +1550,37 @@ function placeCard() {
 
   const me = actionSeat();
   if (me === null) return;
+  const segIdx = pendingPlay.seg;
   const card = S.players[me].hand.splice(pendingPlay.cardIndex, 1)[0];
   if (!card) return;
   card.revealed = pendingPlay.useEye;
   card.by = me;
   card.fresh = true; // 新放置的牌：区域渲染时播放入场动效
   card.order = S.turnNo + 1; // 全局放置序号（第3关「第1张/第2张」规则用）
-  S.segments[pendingPlay.seg].cards.push(card);
+  S.segments[segIdx].cards.push(card);
   if (pendingPlay.useEye) S.eyeUsed++;
 
   addLog(
     pendingPlay.useEye
-      ? `${S.players[me].name} 明置 ☀${card.v} 到区域${pendingPlay.seg + 1}（用1眼标记）`
-      : `${S.players[me].name} 暗置1张牌到区域${pendingPlay.seg + 1}`
+      ? `${S.players[me].name} 明置 ☀${card.v} 到区域${segIdx + 1}（用1眼标记）`
+      : `${S.players[me].name} 暗置1张牌到区域${segIdx + 1}`
   );
-  console.log('[taketime] place:', card.v, '-> seg', pendingPlay.seg, 'revealed', pendingPlay.useEye);
+  console.log('[taketime] place:', card.v, '-> seg', segIdx, 'revealed', pendingPlay.useEye);
 
   pendingPlay = null;
   S.turnNo++;
+
+  // 第7章「摸1张」：向该区域放牌后，放牌玩家从未加入游戏的备用牌堆摸1张进手牌。
+  // 日志不写颜色/数字（颜色由玩家条 ☀/☾ 计数+1 自然暴露）；再次放入摸1张区域会连锁摸牌。
+  const segCond = S.segCond && S.segCond[segIdx];
+  if (segCond && segCond.key === 'draw1' && S.reserve && S.reserve.length) {
+    const drawn = S.reserve.pop();
+    const hand = S.players[me].hand;
+    const at = hand.findIndex(c => c.lock); // 2人局：插在锁定牌之前，摸牌者立即可见
+    if (at >= 0) hand.splice(at, 0, drawn); else hand.push(drawn);
+    addLog(`${S.players[me].name} 从备用牌堆摸取1张牌`);
+    showToast(`摸到 ${drawn.color === 'sun' ? '☀' : '☾'}${drawn.v}`);
+  }
 
   if (S.players.every(p => p.hand.length === 0)) {
     S.allPlaced = true;

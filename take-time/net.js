@@ -3,8 +3,8 @@
  * 负责房间 CRUD + Realtime 订阅
  *
  * 用法：
- *   1. 在 HTML 中引入 supabase CDN：
- *      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ *   1. 在 HTML 中引入本地 supabase 库：
+ *      <script src="supabase.min.js"></script>
  *   2. 修改下方 CONFIG 中的项目凭证
  *   3. 按需调整 ROOM_PREFIX 和 MAX_PLAYERS
  */
@@ -22,7 +22,13 @@ const NET_CONFIG = {
 
 // ════════════════════════════════════════════════════════════════
 
-const _supabase = supabase.createClient(NET_CONFIG.SUPABASE_URL, NET_CONFIG.SUPABASE_ANON);
+// 统一禁用 HTTP 缓存（no-store）：iOS WebKit 可能复用 GET 响应导致"读到旧数据"，
+// 断线重连/轮询拉取必须是网络最新值
+const _supabase = supabase.createClient(NET_CONFIG.SUPABASE_URL, NET_CONFIG.SUPABASE_ANON, {
+  global: {
+    fetch: (input, init) => fetch(input, Object.assign({}, init, { cache: 'no-store' })),
+  },
+});
 
 /** 将用户输入的短房间号转为完整数据库 ID */
 function _fullId(shortId) {
@@ -98,16 +104,25 @@ async function netJoinRoom(shortId, playerName) {
 
 /**
  * 房主：更新游戏状态（触发 Realtime 推送给所有订阅者）
+ * 移动端网络抖动（iOS 切前后台 / Wi-Fi↔蜂窝切换）会让单次请求静默失败，
+ * 因此失败后指数退避重试；返回是否最终成功，调用方可用于补发判断。
  * @param {string} shortId - 用户可见的 4 位房间号
  * @param {object|null} gameState - 游戏状态快照，null 表示解散
  * @param {'waiting'|'playing'|'finished'} [status] - 房间状态
+ * @returns {Promise<boolean>} 是否推送成功
  */
 async function netUpdateGameState(shortId, gameState, status) {
   const roomId = _fullId(shortId);
   const update = { state: gameState };
   if (status) update.status = status;
-  const { error } = await _supabase.from('rooms').update(update).eq('id', roomId);
-  if (error) console.error('[net] updateGameState error:', error);
+  const ATTEMPTS = 3;
+  for (let i = 0; i < ATTEMPTS; i++) {
+    const { error } = await _supabase.from('rooms').update(update).eq('id', roomId);
+    if (!error) return true;
+    console.error(`[net] updateGameState error (attempt ${i + 1}/${ATTEMPTS}):`, error);
+    if (i < ATTEMPTS - 1) await new Promise(r => setTimeout(r, 400 * Math.pow(2, i)));
+  }
+  return false;
 }
 
 /**
@@ -149,9 +164,11 @@ async function netGetRoom(shortId) {
  * 订阅房间变化（Realtime WebSocket）
  * @param {string} shortId - 用户可见的 4 位房间号
  * @param {function} onChange - (row) => void，row 为更新后的完整行
- * @returns {function} unsubscribe
+ * @param {function} [onStatus] - (status, err) => void，透传频道状态
+ *   SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED，供上层做重订阅与重同步
+ * @returns {function} unsubscribe（附带 getStatus() 返回 channel.state）
  */
-function netSubscribeRoom(shortId, onChange) {
+function netSubscribeRoom(shortId, onChange, onStatus) {
   const roomId = _fullId(shortId);
   const channel = _supabase
     .channel('room-' + roomId)
@@ -163,9 +180,12 @@ function netSubscribeRoom(shortId, onChange) {
     }, (payload) => {
       onChange(payload.new);
     })
-    .subscribe((status) => {
-      console.log('[net] Realtime:', status);
+    .subscribe((status, err) => {
+      console.log('[net] Realtime:', status, err ? String(err.message || err) : '');
+      if (typeof onStatus === 'function') onStatus(status, err);
     });
 
-  return () => _supabase.removeChannel(channel);
+  const unsubscribe = () => _supabase.removeChannel(channel);
+  unsubscribe.getStatus = () => channel.state;
+  return unsubscribe;
 }
