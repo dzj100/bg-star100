@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>炸弹克星 · Bomb Busters</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app"></div>
+
+<!-- 猜测对话气泡层（独立于 #app，渲染重建不丢失） -->
+<div id="bubble-layer"></div>
+
+<!-- 联机大厅容器（online.js 使用） -->
+<div id="online" style="display:none"></div>
+
+<!-- 通用弹窗（online.js 退出确认/玩家离开处理） -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal('modalOverlay')">
+  <div class="modal-box" id="modalContent"></div>
+</div>
+
+<!-- 结算弹窗（render.js 渲染；终局操作在 own-area 下方按钮区） -->
+<div class="modal-overlay" id="endModal" onclick="if(event.target===this)closeModal('endModal')">
+  <div class="modal-box" id="endModalContent"></div>
+</div>
+
+<!-- 底部弹层（选牌/猜测/道具交互，render.js 使用） -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet" id="sheetContent"></div>
+</div>
+
+<div id="init-loading-overlay">⏳ 加载中…</div>
+
+<script src="game.js?v=2026101609"></script>
+<script src="render.js?v=2026101609"></script>
+<script src="supabase.min.js?v=2026101609"></script>
+<script src="net.js?v=2026101609"></script>
+<script src="online.js?v=2026101609"></script>
+<script>
+initOnline({
+  dealGame: (names) => { dealGame(names); },
+  render: () => render(),
+  renderLanding: () => renderLandingHTML(),
+  clearState: () => clearState(),
+  getOnlineState: () => getOnlineState(),
+  applyOnlineState: (state) => applyOnlineState(state),
+  addLog: (msg, cls) => addLog(msg, cls),
+  showEndModal: () => showEndModal(),
+  getPlayers: () => S.players,
+  getCurrentPlayer: () => (S && typeof S.currentSeat === 'number' ? S.currentSeat : 0),
+  getPlayerColors: () => PLAYER_COLORS,
+  showLanding: () => { clearState(); render(); },
+  waitingExtras: () => waitingExtrasHTML(),
+  updateDiceAreaUI: () => {},
+});
+</script>
+</body>
+</html>
