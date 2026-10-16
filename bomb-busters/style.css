@@ -275,6 +275,10 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .rules-scroll h3 { font-size: .88rem; margin: 10px 0 4px; color: #b3781a; }
 .rules-scroll p { margin: 4px 0; }
+.rules-scroll table { width: 100%; border-collapse: collapse; margin: 5px 0 8px; font-size: .76rem; line-height: 1.5; }
+.rules-scroll th, .rules-scroll td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+.rules-scroll th { background: var(--surface2); white-space: nowrap; }
+.rules-scroll td:first-child { white-space: nowrap; font-weight: 600; }
 
 .sheet-overlay {
   position: fixed;
@@ -645,8 +649,46 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .marker { font-size: .5rem; padding: 1px 3px; border-radius: 5px; line-height: 1.25; white-space: nowrap; font-weight: 800; border: 1px solid rgba(37, 50, 78, .2); }
 .marker-info { background: #d9f0f3; color: #0d4a52; border-color: #4f959d; }
-.marker-fail { background: #ffe0da; color: #a52a18; border-color: #d93a26; }
+.marker-fail { background: #d9f0f3; color: #a52a18; border-color: #4f959d; }
 .marker-neq { background: #6d28d9; color: #f3e8ff; border-color: #4c1d95; }
+.marker-eqp { background: #0f766e; color: #ccfbf1; border-color: #115e59; }
+
+/* 配对卡上的徽章让位给 ≠/＝ 横条，落到牌面顶部 */
+.card.neq-l > .markers,
+.card.neq-r > .markers,
+.card.eqp-l > .markers,
+.card.eqp-r > .markers { top: 7px; }
+
+/* ≠/＝ 配对标签：一条横标横跨相邻两张牌（仅由左侧牌渲染一次） */
+.neq-span,
+.eqp-span {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - var(--cw, 24px) * .2);
+  width: calc(var(--cw, 24px) * 2 + var(--cgap, 3px));
+  height: max(18px, calc(var(--cw, 24px) * .5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: max(4px, calc(var(--cw, 24px) * .22));
+  font-size: max(8px, calc(var(--cw, 24px) * .36));
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 1;
+}
+.neq-span {
+  background: var(--gold);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(140, 90, 0, .45);
+  box-shadow: 0 1.5px 0 #d99e17;
+}
+.eqp-span {
+  background: #5da3ae;
+  color: #ccfbf1;
+  text-shadow: 0 1px 1px rgba(6, 54, 48, .55);
+  box-shadow: 0 1.5px 0 #115e59;
+}
 
 /* 交互态 */
 .card.selectable { animation: selPulse 1.3s ease-in-out infinite; cursor: pointer; }
@@ -686,9 +728,10 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   margin-bottom: 8px;
 }
 .equip-label { flex: 0 0 auto; color: var(--text-dim); font-size: .74rem; font-weight: 800; }
-.equip-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.equip-btns { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .equip-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -699,6 +742,25 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   font-size: .74rem;
   font-weight: 700;
   padding: 6px 9px;
+}
+.equip-no {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: #fff;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1;
 }
 .equip-btn.ready { border-color: var(--gold); background: #fff8e3; box-shadow: 0 2px 0 #d99e17; }
 .equip-btn.ready:active { transform: translateY(1px); box-shadow: none; }
@@ -769,6 +831,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   text-align: left;
 }
 .pick-card.selected { border-color: var(--gold); background: #fff5d8; }
+.pick-card.dim { opacity: .45; }
 .pc-num { font-weight: 800; }
 .pc-pos { font-size: .7rem; color: var(--text-dim); }
 
@@ -784,7 +847,45 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   font-weight: 800;
 }
 .guess-btn.selected { border-color: var(--gold); background: #fff5d8; color: #96680a; }
+.guess-btn.dim { opacity: .4; }
 .guess-btn.yellow { grid-column: span 2; border-color: var(--wire-yellow); color: #8a6a06; background: #fdf3d0; }
+
+/* 稳定状态提示（回合行动条内） */
+.stabilize-hint {
+  color: #0d5a52;
+  background: #d8f3ec;
+  border: 1.5px dashed #34a48e;
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   通用雷达结果面板
+   ============================================================ */
+
+.radar-panel {
+  background: var(--surface);
+  border: 2.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  animation: dealIn .3s ease both;
+}
+.radar-head { font-size: .78rem; font-weight: 800; color: #0d4a52; margin-bottom: 6px; }
+.radar-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+.radar-row.mine .radar-name { color: #96680a; }
+.radar-name { flex: 0 0 auto; font-size: .78rem; font-weight: 800; color: var(--ink); min-width: 64px; }
+.radar-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.radar-chip {
+  font-size: .68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(37, 50, 78, .2);
+}
+.radar-chip.yes { background: #d9f0f3; color: #0d4a52; border-color: #4f959d; }
+.radar-chip.no { background: #ece9df; color: #8b8574; }
 
 /* ============================================================
    日志（位于数轴板上方）

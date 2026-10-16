@@ -16,8 +16,8 @@
 <!-- 联机大厅容器（online.js 使用） -->
 <div id="online" style="display:none"></div>
 
-<!-- 通用弹窗（online.js 退出确认/玩家离开处理） -->
-<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal('modalOverlay')">
+<!-- 通用弹窗（online.js 退出确认/玩家离开处理；_olDialogLock 时锁背景不可点关） -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this && !window._olDialogLock)closeModal('modalOverlay')">
   <div class="modal-box" id="modalContent"></div>
 </div>
 

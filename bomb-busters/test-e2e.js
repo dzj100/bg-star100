@@ -3,8 +3,8 @@
  * 覆盖：着陆页+规则 → 建房/加入 → 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
- *       → 再来一局（远端弹窗自动关闭）→ 成员退出 + 房主接管代操作
- *       → 返回房间（等候室）→ 新玩家加入 → 房主重开
+ *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
+ *       → 成员退出 + 房主解散房间（无接管选项，强制解散）
  * 前置：node bomb-busters/serve.js（端口 8124）
  * 运行：node bomb-busters/test-e2e.js
  */
@@ -52,8 +52,28 @@ await p1.screenshot({ path: SHOTS + '/e2e-1-landing.png' });
 
 await p1.click('button:has-text("规则")');
 await p1.waitForSelector('#modalOverlay.show', { timeout: 5000 });
-const rulesText = await p1.evaluate(() => document.getElementById('modalContent').textContent);
-if (!rulesText.includes('胜利条件') || !rulesText.includes('双重探测器')) throw new Error('规则弹层内容缺失');
+const rules = await p1.evaluate(() => {
+  const el = document.getElementById('modalContent');
+  const tables = [...el.querySelectorAll('.rules-scroll table')];
+  return {
+    text: el.textContent,
+    tableCount: tables.length,
+    rows: tables.map(t => t.querySelectorAll('tbody tr').length),
+    heads: tables.map(t => t.querySelector('thead tr').textContent.replace(/\s/g, '')),
+  };
+});
+if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
+if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
+if (rules.rows.join(',') !== '4,3,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
+if (rules.heads.join('|') !== '人数手牌分配黄线|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
+for (const kw of ['≠标签', '对讲机', '三重探测器', 'X/Y射线', '咖啡瓶', '＝标签']) {
+  if (!rules.text.includes(kw)) throw new Error('道具表缺少: ' + kw);
+}
+console.log('规则弹层 OK（表格：开局分配 4 行 / 回合操作 3 行 / 道具介绍 12 行）');
+await p1.screenshot({ path: SHOTS + '/e2e-1b-rules-tables.png' });
+await p1.evaluate(() => { const sc = document.querySelector('.rules-scroll'); sc.scrollTop = sc.scrollHeight; });
+await p1.waitForTimeout(200);
+await p1.screenshot({ path: SHOTS + '/e2e-1c-rules-equipment.png' });
 await p1.click('button:has-text("知道了")');
 await p1.waitForTimeout(300);
 
@@ -333,6 +353,240 @@ const spotProbe = await devA.evaluate(() => {
 });
 if (!spotProbe) throw new Error('fx-miss 聚光类切换异常');
 console.log('道具取消 OK（再次点击 / 取消按钮 / 弹层取消 三条路径，未消耗道具；聚光 miss 色路径 OK）');
+
+console.log('== 道具 4~12 入口契约 ==');
+const eqBefore2 = await devA.evaluate(() => JSON.stringify(window.S.equipment));
+
+// 道具区展示契约：🔧 标签；按钮 = 左上角编号角标 + 纯名称（无 ✓/🔒/emoji）
+await devA.evaluate(() => {
+  window.S.equipment = [
+    { no: 6, unlocked: true, used: true },      // 已使用
+    { no: 2, unlocked: false, used: false },    // 未解锁
+    { no: 9, unlocked: true, used: false },     // 可用
+  ];
+  window.saveStateDirect();
+  window.render();
+});
+await devA.waitForTimeout(400);
+await devA.screenshot({ path: SHOTS + '/e2e-12h-eq-display.png' });
+const eqDisplay = await devA.evaluate(() => {
+  const grab = (n) => {
+    const b = document.querySelector(`[data-testid="equip-${n}"]`);
+    return {
+      badge: (b.querySelector('.equip-no') || {}).textContent,
+      name: (b.querySelector('.equip-name') || {}).textContent,
+      raw: b.innerText.replace(/\s/g, ''),
+      cls: b.className,
+      iconDom: !!b.querySelector('.equip-icon'),
+    };
+  };
+  return { used: grab(6), locked: grab(2), ready: grab(9), label: document.querySelector('.equip-label').textContent };
+});
+if (!eqDisplay.label.includes('🔧') || eqDisplay.label.includes('🎁')) throw new Error('道具行标签应为「🔧 道具」: ' + eqDisplay.label);
+for (const [st, no, name] of [['used', '6', '抑制器'], ['locked', '2', '对讲机'], ['ready', '9', '稳定剂']]) {
+  const d = eqDisplay[st];
+  if (d.badge !== no || d.name !== name || d.raw !== no + name || d.iconDom) {
+    throw new Error(`道具按钮展示应为「角标${no}+${name}」且无 ✓/🔒/emoji: ` + JSON.stringify(d));
+  }
+  if (!d.cls.includes(st)) throw new Error(`道具按钮状态类缺失 ${st}: ` + d.cls);
+}
+console.log('道具区展示契约 OK（🔧 道具 / 编号角标 / 纯名称，无 ✓·🔒·emoji 前缀）');
+
+await devA.evaluate(() => {
+  window.S.equipment = [4, 5, 7, 8, 10, 11, 12].map(no => ({ no, unlocked: true, used: false }));
+  window.saveStateDirect();
+  window.render();
+});
+await devA.waitForTimeout(300);
+
+// 点选式道具（4 便利贴 / 5 超级探测器 / 10 X/Y射线 / 12 ＝标签）：进入选择态 → 再次点击取消
+for (const [no, txt] of [[4, '无信息标记的蓝色导线'], [5, '将扫描该整份手牌'], [10, '两个选项之一'], [12, '相邻的 2 张同色牌']]) {
+  await devA.click(`[data-testid="equip-${no}"]`);
+  await waitEval(devA, t => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes(t)); }, `道具${no}进入选择态`, txt);
+  if (!(await devA.evaluate(n => document.querySelector(`[data-testid="equip-${n}"]`).classList.contains('active'), no))) {
+    throw new Error(`道具${no}使用中应呈激活态`);
+  }
+  await devA.click(`[data-testid="equip-${no}"]`);
+  await waitEval(devA, n => !document.querySelector('.mode-hint') && !document.querySelector(`[data-testid="equip-${n}"]`).classList.contains('active'), `再次点击道具${no}取消`, no);
+}
+await devA.screenshot({ path: SHOTS + '/e2e-12f-eq4-12-hints.png' });
+
+// 7 备用电池：临时标记行动者已用技能 → 弹层可选、确认键启用 → 取消（恢复 skillUsed）
+await devA.evaluate(() => { window.S.players[window.S.currentSeat].skillUsed = true; window.saveStateDirect(); window.render(); });
+await devA.click('[data-testid="equip-7"]');
+await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await devA.waitForSelector('[data-testid="battery-confirm"]', { timeout: 3000 });
+if (!(await devA.evaluate(() => document.querySelector('[data-testid="battery-confirm"]').disabled))) {
+  throw new Error('未选择玩家时备用电池确认键应禁用');
+}
+await devA.click(`[data-testid="battery-p${seatA}"]`);
+if (await devA.evaluate(() => document.querySelector('[data-testid="battery-confirm"]').disabled)) {
+  throw new Error('选中已用技能玩家后确认键应启用');
+}
+await devA.click('#sheetContent .btn-secondary');
+await devA.waitForTimeout(300);
+if (await devA.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) throw new Error('备用电池弹层取消后未关闭');
+await devA.evaluate(() => { window.S.players[window.S.currentSeat].skillUsed = false; window.saveStateDirect(); window.render(); });
+
+// 11 咖啡瓶：弹层列出其他玩家 → 取消
+await devA.click('[data-testid="equip-11"]');
+await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+const coffeeN = await devA.evaluate(() => document.querySelectorAll('[data-testid="coffee-to"]').length);
+if (coffeeN < 1) throw new Error('咖啡瓶应列出其他玩家');
+await devA.click('#sheetContent .btn-secondary');
+await devA.waitForTimeout(300);
+if (await devA.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) throw new Error('咖啡瓶弹层取消后未关闭');
+
+// 以上纯取消路径不应产生任何残留
+const eqAfter2 = await devA.evaluate(() => ({
+  used: window.S.equipment.map(e => e.used),
+  cur: window.S.currentSeat,
+  pending: window.S.pending,
+}));
+if (eqAfter2.used.some(Boolean) || eqAfter2.cur !== seatA || eqAfter2.pending !== null) {
+  throw new Error('道具 4~12 取消路径不应有残留: ' + JSON.stringify(eqAfter2));
+}
+
+// 8 通用雷达：走完整 UI 路径公布数字 3 → 面板出现（行数=人数）→ 清理
+await devA.click('[data-testid="equip-8"]');
+await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+const radarBtns = await devA.evaluate(() => document.querySelectorAll('#sheetContent .guess-grid .guess-btn').length);
+if (radarBtns !== 12) throw new Error('雷达数字格应为 12，得到 ' + radarBtns);
+await devA.click('#sheetContent [data-guess="radar-3"]');
+await waitEval(devA, () => !document.getElementById('sheetOverlay').classList.contains('show') && !!document.querySelector('.radar-panel'), '雷达公布后面板出现');
+const radarInfo = await devA.evaluate(() => ({
+  rows: document.querySelectorAll('.radar-panel .radar-row').length,
+  chips: document.querySelectorAll('.radar-panel .radar-chip').length,
+  p: window.S.pCount,
+  num: window.S.radar && window.S.radar.num,
+}));
+if (radarInfo.rows !== radarInfo.p || radarInfo.num !== 3 || radarInfo.chips < radarInfo.p) {
+  throw new Error('雷达面板呈现异常: ' + JSON.stringify(radarInfo));
+}
+await devA.waitForTimeout(400);   // 等待面板入场动画（dealIn 0.3s）完成后再截图
+await devA.screenshot({ path: SHOTS + '/e2e-12g-radar-panel.png' });
+await devA.evaluate(() => { window.S.radar = null; window.saveStateDirect(); window.render(); });
+await devA.evaluate((orig) => { window.S.equipment = JSON.parse(orig); window.saveStateDirect(); window.render(); }, eqBefore2);
+await devA.waitForTimeout(300);
+console.log('道具 4~12 入口契约 OK（4/5/10/12 点选态+取消；7 选人启用；8 面板公布；11 列表；无残留）');
+
+console.log('== ≠/＝ 配对标签契约（横条横跨两张牌，两处手牌区各渲染 1 个）==');
+const neqBefore = await devA.evaluate(() => JSON.stringify(window.S.players));
+const pairSetup = await devA.evaluate(() => {
+  const own = document.querySelector('.own-hand');
+  const myS = parseInt(own.dataset.seat, 10);
+  const ownSh = window.S.players[myS].shares[0];
+  if (!ownSh || ownSh.length < 4) return null;
+  ownSh[0].neq = 'e2e-neq-own';
+  ownSh[1].neq = 'e2e-neq-own';
+  ownSh[2].eqp = 'e2e-eqp-own';
+  ownSh[3].eqp = 'e2e-eqp-own';
+  let other = null;
+  for (let k = 0; k < window.S.pCount; k++) {
+    if (k === myS) continue;
+    const sh = window.S.players[k].shares[0];
+    if (sh && sh.length >= 4) {
+      sh[0].neq = 'e2e-neq-enemy';
+      sh[1].neq = 'e2e-neq-enemy';
+      sh[2].eqp = 'e2e-eqp-enemy';
+      sh[3].eqp = 'e2e-eqp-enemy';
+      other = k;
+      break;
+    }
+  }
+  window.saveStateDirect();
+  window.render();
+  const r = window.S.players[myS].shares[0];
+  const e = other != null ? window.S.players[other].shares[0] : null;
+  return {
+    myS, other,
+    ownNeq: [r[0].id, r[1].id],
+    ownEqp: [r[2].id, r[3].id],
+    enemyNeq: e ? [e[0].id, e[1].id] : null,
+    enemyEqp: e ? [e[2].id, e[3].id] : null,
+  };
+});
+if (!pairSetup) throw new Error('构造不出配对（手牌不足 4 张）');
+await devA.waitForTimeout(350);   // 等 dealIn 入场动画完成
+
+const spanProbe = ([ids, sel, spanCls, badgeCls]) => {
+  const scope = document.querySelector(sel);
+  if (!scope) return { err: 'missing ' + sel };
+  const spans = scope.querySelectorAll(spanCls);
+  const badges = scope.querySelectorAll(badgeCls);
+  const span = spans[0];
+  if (!span) return { n: 0, badges: badges.length };
+  const cardA = scope.querySelector(`[data-cardid="${ids[0]}"]`);
+  const cardB = scope.querySelector(`[data-cardid="${ids[1]}"]`);
+  if (!cardA || !cardB) return { err: 'cards not found' };
+  const rs = span.getBoundingClientRect(), ra = cardA.getBoundingClientRect(), rb = cardB.getBoundingClientRect();
+  return {
+    n: spans.length,
+    badges: badges.length,
+    onLeft: span.parentElement === cardA,
+    text: span.textContent.trim(),
+    leftOff: Math.round(Math.abs(rs.left - ra.left)),
+    rightOff: Math.round(Math.abs(rb.right - rs.right)),
+    widthGot: Math.round(rs.width),
+    widthNeed: Math.round(rb.right - ra.left),
+    aboveTop: rs.top < ra.top - 2,
+    overlap: Math.round(rs.bottom - ra.top),
+  };
+};
+const checkSpan = (p, where, glyph) => {
+  if (p.err) throw new Error(where + ' 探测失败: ' + p.err);
+  if (p.n !== 1) throw new Error(`${where} 应只渲染 1 个 ${glyph} 横条，得到 ${p.n}`);
+  if (p.badges !== 0) throw new Error(`${where} 不应再渲染单牌 ${glyph} 徽章，得到 ${p.badges}`);
+  if (!p.onLeft) throw new Error(`${where} ${glyph} 横条应挂在左侧牌上`);
+  if (p.text !== glyph) throw new Error(`${where} ${glyph} 横条文本异常: ` + p.text);
+  if (p.leftOff > 4 || p.rightOff > 4 || Math.abs(p.widthGot - p.widthNeed) > 4) {
+    throw new Error(`${where} ${glyph} 横条未横跨两张牌: ${JSON.stringify(p)}`);
+  }
+  if (!p.aboveTop || p.overlap <= 0) throw new Error(`${where} ${glyph} 横条应跨在两张牌顶部: ${JSON.stringify(p)}`);
+};
+const ownSel = `.own-hand[data-seat="${pairSetup.myS}"]`;
+const enemySel = pairSetup.other != null ? `.player-row[data-seat="${pairSetup.other}"]` : null;
+const probePairs = [
+  [pairSetup.ownNeq, ownSel, '.neq-span', '.marker-neq', '≠', '本设备手牌'],
+  [pairSetup.ownEqp, ownSel, '.eqp-span', '.marker-eqp', '＝', '本设备手牌'],
+];
+if (enemySel) {
+  probePairs.push(
+    [pairSetup.enemyNeq, enemySel, '.neq-span', '.marker-neq', '≠', '他人手牌'],
+    [pairSetup.enemyEqp, enemySel, '.eqp-span', '.marker-eqp', '＝', '他人手牌'],
+  );
+}
+for (const [ids, sel, spanCls, badgeCls, glyph, where] of probePairs) {
+  checkSpan(await devA.evaluate(spanProbe, [ids, sel, spanCls, badgeCls]), where, glyph);
+}
+await devA.waitForTimeout(300);
+await devA.screenshot({ path: SHOTS + '/e2e-13a-pair-spans.png' });
+
+// 孤立配对（伙伴缺失）回退为单牌徽章
+const orphanProbe = await devA.evaluate(() => {
+  const own = document.querySelector('.own-hand');
+  const seat = parseInt(own.dataset.seat, 10);
+  const share = window.S.players[seat].shares[0];
+  share[0].neq = 'e2e-orphan';
+  share[1].neq = null;
+  share[2].eqp = 'e2e-orphan';
+  share[3].eqp = null;
+  window.saveStateDirect();
+  window.render();
+  const sc = document.querySelector(`.own-hand[data-seat="${seat}"]`);
+  return {
+    neqSpans: sc.querySelectorAll('.neq-span').length,
+    neqBadges: sc.querySelectorAll('.marker-neq').length,
+    eqpSpans: sc.querySelectorAll('.eqp-span').length,
+    eqpBadges: sc.querySelectorAll('.marker-eqp').length,
+  };
+});
+if (orphanProbe.neqSpans !== 0 || orphanProbe.neqBadges !== 1 || orphanProbe.eqpSpans !== 0 || orphanProbe.eqpBadges !== 1) {
+  throw new Error('孤立配对应回退为单牌徽章: ' + JSON.stringify(orphanProbe));
+}
+await devA.evaluate((orig) => { window.S.players = JSON.parse(orig); window.saveStateDirect(); window.render(); }, neqBefore);
+await devA.waitForTimeout(300);
+console.log('≠/＝ 配对标签契约 OK（各 1 个横条横跨两牌 / 挂在左牌 / 无单牌徽章 / 孤立回退徽章）');
 
 await devA.click('.log-bar');
 await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
@@ -696,38 +950,8 @@ if (!(await p1.evaluate(() => window.S.ready.every(x => x === false)))) throw ne
 console.log('再来一局 OK（远端弹窗自动关闭、按钮区消失）');
 await p1.screenshot({ path: SHOTS + '/e2e-19-restart-host.png' });
 
-console.log('== 成员退出 + 房主接管 ==');
-await p2.click('#exitRoomBtn');
-await p2.waitForTimeout(500);
-await p2.click('button:has-text("确认退出")');
-await p1.waitForSelector('#modalOverlay.show', { timeout: 15000 });
-const departText = await p1.evaluate(() => document.getElementById('modalContent').textContent);
-if (!departText.includes('玩家离开')) throw new Error('房主未收到玩家离开弹窗');
-await p1.screenshot({ path: SHOTS + '/e2e-20-depart-dialog.png' });
-await p1.click('button:has-text("接管操作")');
-await p1.waitForTimeout(1000);
-const dep = await p1.evaluate(() => ({
-  d: window.S.departedPlayers || [],
-  ownHands: document.querySelectorAll('.own-hand').length,
-}));
-if (dep.d.indexOf(1) < 0) throw new Error('接管后 departedPlayers 应含座位1: ' + JSON.stringify(dep.d));
-if (dep.ownHands !== 2) throw new Error('接管后房主应可见两名玩家的手牌，得到 ' + dep.ownHands);
-
-await p1.waitForSelector('.own-hand[data-seat="0"] .card-own.kind-blue.selectable', { timeout: 5000 });
-await p1.click('.own-hand[data-seat="0"] .card-own.kind-blue.selectable');
-await p1.waitForTimeout(400);
-await p1.click('.own-hand[data-seat="1"] .card-own.kind-blue.selectable');
-await p1.waitForTimeout(600);
-await waitEval(p1, () => window.S.phase === 'play', '接管代操作完成双人标记进入对局');
-console.log('接管代操作 OK（房主完成自己与离席玩家标记）');
-await p1.screenshot({ path: SHOTS + '/e2e-21-takeover-mark.png' });
-
-await waitEval(p2, () => !!document.querySelector('.landing'), '成员回到着陆页');
-await p2.screenshot({ path: SHOTS + '/e2e-22-p2-back-landing.png' });
-
 console.log('== 返回房间 → 新玩家加入 → 房主重开 ==');
-// 此时房间仅剩房主 1 座（成员已退出）。注入终局态后点「返回房间」：
-// 房间回到 waiting（支持新玩家加入），新玩家入座后由房主重开
+// 注入终局态后点「返回房间」：房间回到 waiting（支持新玩家加入），新玩家入座后由房主重开
 await p1.evaluate(() => {
   window.S.phase = 'over';
   window.S.result = { win: false, reason: 'boom-red' };
@@ -746,27 +970,57 @@ const backTitle = await waitEval(p1, (c) => {
 if (await p1.evaluate(() => document.getElementById('endModal').classList.contains('show'))) {
   throw new Error('返回房间后结算弹窗应关闭');
 }
-await waitEval(p1, () => document.querySelectorAll('#online .setup-chip').length === 1, '返回房间后保留房主 1 座');
-await p1.screenshot({ path: SHOTS + '/e2e-23-back-waiting-host.png' });
+await waitEval(p1, () => document.querySelectorAll('#online .setup-chip').length === 2, '返回房间后保留房主与成员 2 座');
+await waitEval(p2, () => document.getElementById('online').style.display === 'flex'
+  && document.getElementById('app').style.display === 'none', '成员端同步切回等候室');
+await p1.waitForTimeout(400); // 等待"正在返回房间"加载遮罩淡出
+await p1.screenshot({ path: SHOTS + '/e2e-20-back-waiting-host.png' });
 
 const p3 = await mkPage('P3', '小刚');
 await p3.click('text=联机模式');
 await p3.fill('#joinRoomInput', code);
 await p3.fill('#joinNameInput', '小刚');
 await p3.click('text=加入房间');
-await waitEval(p1, () => document.querySelectorAll('#online .setup-chip').length === 2, '房主看到新成员加入');
+await waitEval(p1, () => document.querySelectorAll('#online .setup-chip').length === 3, '房主看到新成员加入');
 await p3.waitForTimeout(2000);
-await p1.screenshot({ path: SHOTS + '/e2e-24-p3-joined-host.png' });
-await p3.screenshot({ path: SHOTS + '/e2e-25-p3-waiting.png' });
+await p1.screenshot({ path: SHOTS + '/e2e-21-p3-joined-host.png' });
+await p3.screenshot({ path: SHOTS + '/e2e-22-p3-waiting.png' });
 
 await p1.click('text=开始游戏');
-await waitEval(p1, () => window.S && window.S.phase === 'mark' && window.S.pCount === 2, '房主重开进入标记阶段');
+await waitEval(p1, () => window.S && window.S.phase === 'mark' && window.S.pCount === 3, '房主重开进入标记阶段');
+await waitEval(p2, () => window.S && window.S.phase === 'mark', '成员进入新局');
 await waitEval(p3, () => window.S && window.S.phase === 'mark', '新玩家进入新局');
 const p3Names = await p3.evaluate(() => window.S.players.map(p => p.name).join(','));
 if (!p3Names.includes('小刚')) throw new Error('新玩家应入座新局: ' + p3Names);
 console.log('返回房间 + 新玩家加入 + 房主重开 OK:', backTitle.trim(), '→', p3Names);
-await p1.screenshot({ path: SHOTS + '/e2e-26-reopen-host.png' });
-await p3.screenshot({ path: SHOTS + '/e2e-27-reopen-p3.png' });
+await p3.waitForTimeout(400);
+await p1.screenshot({ path: SHOTS + '/e2e-23-reopen-host.png' });
+await p3.screenshot({ path: SHOTS + '/e2e-24-reopen-p3.png' });
+
+console.log('== 成员退出 + 房主解散房间 ==');
+await p3.click('#exitRoomBtn');
+await p3.waitForTimeout(500);
+await p3.click('button:has-text("确认退出")');
+await waitEval(p3, () => !!document.querySelector('.landing'), '退出成员回到着陆页');
+await p1.waitForSelector('#modalOverlay.show', { timeout: 15000 });
+const departText = await p1.evaluate(() => document.getElementById('modalContent').textContent);
+if (!departText.includes('玩家离开')) throw new Error('房主未收到玩家离开弹窗');
+if (departText.includes('接管')) throw new Error('成员离开弹窗不应再提供接管选项');
+if (!departText.includes('解散房间')) throw new Error('成员离开弹窗应提供解散房间按钮');
+// 强制解散：背景点击不应关闭弹窗
+await p1.mouse.click(10, 10);
+await p1.waitForTimeout(300);
+if (!(await p1.evaluate(() => document.getElementById('modalOverlay').classList.contains('show')))) {
+  throw new Error('玩家离开弹窗不应被背景点击关闭');
+}
+await p1.screenshot({ path: SHOTS + '/e2e-25-depart-dialog.png' });
+await p1.click('button:has-text("解散房间")');
+await waitEval(p1, () => !!document.querySelector('.landing'), '房主解散后回到着陆页');
+await waitEval(p2, () => !!document.querySelector('.landing'), '其余成员收到解散通知回到着陆页');
+console.log('解散房间 OK（无接管选项，全员回到首页）');
+await p1.waitForTimeout(300);
+await p1.screenshot({ path: SHOTS + '/e2e-26-dissolved-host.png' });
+await p2.screenshot({ path: SHOTS + '/e2e-27-dissolved-member.png' });
 
 console.log('E2E 完成');
 await browser.close();

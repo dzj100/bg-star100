@@ -1,7 +1,7 @@
 /**
  * online.js — 联机模式通用模板
  *
- * 职责：房间管理、状态同步、观战/接管、重连
+ * 职责：房间管理、状态同步、重连
  * 依赖：net.js（Supabase 通信层）、game.js（本局游戏逻辑）
  *
  * ── 接入步骤 ──────────────────────────────────────────
@@ -220,6 +220,7 @@ function _cleanupOnline() {
   _pushQueued = false;
   _pushStatus = '';
   _lastWaitingSig = '';
+  window._olDialogLock = false;
   _clearSession();
 }
 
@@ -406,7 +407,7 @@ function _subscribeToRoom(roomId) {
   _channelStatus = 'CONNECTING';
 
   _unsubscribe = netSubscribeRoom(roomId, (row) => {
-    // 成员离开（seats 减少）→ 接管/提示；与轮询共用同一套检测，漏收的实时行也能兜住
+    // 成员离开（seats 减少）→ 解散弹窗/提示；与轮询共用同一套检测，漏收的实时行也能兜住
     _syncSeatTracking(row);
 
     // 等候室阶段（内容未变不重绘，避免重置选关等交互）
@@ -446,12 +447,9 @@ function _subscribeToRoom(roomId) {
  */
 function _handleRemoteState(row, force) {
   const curPlayer = row.state.currentPlayer;
-  const departed = row.state.departedPlayers || [];
-  const iTakeover = _isHost && departed.includes(curPlayer)
-    && (row.state._src === _mySeatIndex);
   const localCur = typeof HOOK_getCurrentPlayer === 'function' ? HOOK_getCurrentPlayer() : undefined;
   const iAmAlreadyOperator = curPlayer === _mySeatIndex && localCur === _mySeatIndex;
-  if (iAmAlreadyOperator || iTakeover) return;
+  if (iAmAlreadyOperator) return;
 
   const remotePushId = row.state._pushId;
   if (remotePushId && _myPushedIds.has(remotePushId)) return;
@@ -513,12 +511,12 @@ function _handleRemoteFinished(row, force) {
       if (typeof HOOK_showEndModal === 'function') HOOK_showEndModal();
     }
   } else {
-    // 房主解散房间
+    // 房间已解散（房主解散 / 房主自己退出）
     _cleanupOnline();
     if (typeof HOOK_clearState === 'function') HOOK_clearState();
     document.getElementById('online').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    alert('房主已离开，房间已解散');
+    alert('房间已解散');
     if (typeof HOOK_showLanding === 'function') HOOK_showLanding();
   }
   _isReceiving = false;
@@ -565,7 +563,7 @@ async function _resyncRoom() {
   try {
     const room = await netGetRoom(_onlineRoomId);
     if (!_onlineRoomId) return; // 拉取期间已退出房间
-    _syncSeatTracking(room); // 漏收的成员离开也能兜住（房主仍会弹接管/提示）
+    _syncSeatTracking(room); // 漏收的成员离开也能兜住（房主仍会弹解散弹窗/提示）
 
     // 本地最后一次推送未被确认：判断是否需要补发
     if (_lastPushPayload && !_lastPushVerified && _gameStarted) {
@@ -661,7 +659,7 @@ async function _pollTick() {
   _resyncRoom(); // 内部限频；状态无变化不会重复应用（见 _resyncRoom 的 _lastAppliedPushId 守卫），含未确认推送补发
 }
 
-/** 席位跟踪（实时与轮询共用）：成员离开弹接管/提示；成员数增减都同步计数（否则后续离开检测失真） */
+/** 席位跟踪（实时与轮询共用）：成员离开给房主弹解散弹窗、给成员提示；成员数增减都同步计数（否则后续离开检测失真） */
 function _syncSeatTracking(row) {
   if (!Array.isArray(row.seats)) return;
   if (row.seats.length < _knownSeatCount && _knownSeatCount > 0 && !_departedHandled) {
@@ -674,9 +672,9 @@ function _syncSeatTracking(row) {
     const departedName = departedSeat >= 0 && players[departedSeat]
       ? players[departedSeat].name : '未知玩家';
     if (_isHost) {
-      _showPlayerLeftDialog(departedName, departedSeat);
+      _showPlayerLeftDialog(departedName);
     } else {
-      alert(_esc(departedName) + ' 退出了房间，等待房主处理...');
+      alert(departedName + ' 退出了房间，等待房主解散房间...');
     }
   }
   _knownSeatCount = row.seats.length;
@@ -779,14 +777,13 @@ function onlinePushState() {
   if (state && state.gameOver) return;
 
   // 操作者判定
-  const hasDeparted = _isHost && state && state.departedPlayers && state.departedPlayers.length > 0;
   const isCurrentActor = state && state.currentPlayer === _mySeatIndex;
   const isOutgoingActor = _pendingPushSeat === _mySeatIndex;
   const turnJustHandedOff =
     _lastPushedCurrentSeat !== null
     && _lastPushedCurrentSeat !== state.currentPlayer
     && _lastPushedCurrentSeat === _mySeatIndex;
-  const canPush = isCurrentActor || isOutgoingActor || turnJustHandedOff || hasDeparted;
+  const canPush = isCurrentActor || isOutgoingActor || turnJustHandedOff;
   if (!canPush) {
     if (state && typeof state.currentPlayer === 'number') {
       _pendingPushSeat = state.currentPlayer;
@@ -847,16 +844,13 @@ async function _markPushAndSend(stateObj, status) {
 
 /**
  * 联机模式下判断当前客户端是否为"有效行动者"：
- * 当前回合玩家本人，或接管离席玩家的房主。
+ * 仅当前回合玩家本人可操作（成员离开后房主只能解散房间，不代操作）。
  * 游戏方在关键操作守卫中调用此函数（单机时不存在该函数，守卫自动跳过）。
  */
 window._olIsActor = function() {
   if (!_onlineRoomId) return true;
   const state = window._getOnlineState();
-  if (!state || typeof state.currentPlayer !== 'number') return false;
-  if (state.currentPlayer === _mySeatIndex) return true;
-  const departed = state.departedPlayers || [];
-  return _isHost && departed.includes(state.currentPlayer);
+  return !!state && state.currentPlayer === _mySeatIndex;
 };
 
 /** 当前客户端座位号（未加入房间时返回 null） */
@@ -1035,23 +1029,19 @@ async function confirmExitRoom() {
    成员离开处理
    ============================================================ */
 
-let _pendingDepartedSeat = null;
-
-function _showPlayerLeftDialog(name, seatIndex) {
-  _pendingDepartedSeat = seatIndex;
+function _showPlayerLeftDialog(name) {
+  // 本弹窗只能「解散房间」：锁定背景点击，防止被误关后对局无人可操作
+  window._olDialogLock = true;
   const content = `
     <h2>⚠️ 玩家离开</h2>
     <p style="text-align:center;color:var(--text-dim);margin:12px 0;">
       <strong style="color:var(--danger)">${_esc(name)}</strong> 退出了房间
     </p>
     <p style="text-align:center;font-size:.85rem;color:var(--text-dim);margin-bottom:16px;">
-      选择如何处理：
+      本局无法继续，只能解散房间
     </p>
-    <button class="btn-full btn-primary" style="margin-bottom:8px;" onclick="_onTakeoverPlayer()">
-      接管操作<br><span style="font-size:.75rem;opacity:.7">后续该玩家的回合由你代操作</span>
-    </button>
-    <button class="btn-full btn-danger" onclick="_onResetAfterDeparture()">
-      重置游戏<br><span style="font-size:.75rem;opacity:.7">关闭房间，所有人回到首页</span>
+    <button class="btn-full btn-danger" onclick="_onDissolveAfterDeparture()">
+      解散房间<br><span style="font-size:.75rem;opacity:.7">关闭房间，所有人回到首页</span>
     </button>`;
   const modal = document.getElementById('modalOverlay');
   const contentDiv = document.getElementById('modalContent');
@@ -1059,34 +1049,9 @@ function _showPlayerLeftDialog(name, seatIndex) {
   modal.classList.add('show');
 }
 
-function _onTakeoverPlayer() {
+function _onDissolveAfterDeparture() {
   const modal = document.getElementById('modalOverlay');
   if (modal) modal.classList.remove('show');
-  const seat = _pendingDepartedSeat;
-  _pendingDepartedSeat = null;
-  if (seat === null) return;
-
-  const state = window._getOnlineState();
-  if (!state) return;
-
-  state.departedPlayers = state.departedPlayers || [];
-  if (!state.departedPlayers.includes(seat)) {
-    state.departedPlayers.push(seat);
-  }
-  if (typeof HOOK_addLog === 'function') {
-    const players = typeof HOOK_getPlayers === 'function' ? HOOK_getPlayers() : [];
-    HOOK_addLog((players[seat] ? players[seat].name : '') + ' 离开了房间，房主接管操作');
-  }
-
-  _isReceiving = false;
-  _markPushAndSend(state);
-  if (typeof HOOK_render === 'function') HOOK_render();
-}
-
-function _onResetAfterDeparture() {
-  const modal = document.getElementById('modalOverlay');
-  if (modal) modal.classList.remove('show');
-  _pendingDepartedSeat = null;
   _isReceiving = false;
   netUpdateGameState(_onlineRoomId, null, 'finished');
   _cleanupOnline();

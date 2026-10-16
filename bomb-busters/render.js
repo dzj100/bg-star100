@@ -19,14 +19,21 @@ function _esc(str) {
    ============================================================ */
 
 let _ui = {
-  mode: null,          // null | pair-target | pair-guess | pair-own | solo | scan | scan-guess | scan-own | neq | walkie-card | walkie-target | log
+  mode: null,          // null | pair-target | pair-guess | pair-own | solo | scan | scan-guess | scan-own
+                       // | neq | walkie-card | walkie-target | log | sticky | eqtag
+                       // | super | super-guess | super-own | ray-target | ray-guess | ray-own
+                       // | battery | radar | coffee
   targetSeat: null,
   targetCardId: null,
   guess: null,         // {kind:'blue',num} | {kind:'yellow'}
   ownCard: null,       // 自选公开牌 id
-  scanSrc: null,       // 'skill' | 'eq3'
-  scanSel: [],         // 扫描/≠ 选择集 [{seat, si, idx, id}]
+  scanSrc: null,       // 'skill' | 'eq3' | 'eq5'
+  scanSel: [],         // 扫描/≠/＝ 选择集 [{seat, si, idx, id}]
   fromCardId: null,    // 对讲机：我挑出的牌
+  superShare: null,    // 超级探测器：目标份下标
+  rayOpts: [],         // X/Y射线：两个猜测选项 [{kind,num}]
+  rayOwn: { a: null, b: null }, // X/Y射线：两选项对应自选牌 id
+  batterySel: [],      // 备用电池：已选玩家座位
 };
 
 let _prevAnim = { first: true, dealStamp: null, failures: 0, revealed: new Set(), defused: null };
@@ -51,6 +58,10 @@ function closeSheet() {
   _ui.scanSrc = null;
   _ui.scanSel = [];
   _ui.fromCardId = null;
+  _ui.superShare = null;
+  _ui.rayOpts = [];
+  _ui.rayOwn = { a: null, b: null };
+  _ui.batterySel = [];
   render();
 }
 
@@ -65,9 +76,14 @@ function _refreshSheet() {
   if (!content) return;
   let html = null;
   if (_ui.mode === 'solo') html = _soloSheetHTML();
-  else if (_ui.mode === 'pair-guess' || _ui.mode === 'scan-guess') html = _guessSheetHTML();
-  else if (_ui.mode === 'pair-own' || _ui.mode === 'scan-own') html = _ownPickSheetHTML();
+  else if (_ui.mode === 'pair-guess' || _ui.mode === 'scan-guess' || _ui.mode === 'super-guess') html = _guessSheetHTML();
+  else if (_ui.mode === 'pair-own' || _ui.mode === 'scan-own' || _ui.mode === 'super-own') html = _ownPickSheetHTML();
   else if (_ui.mode === 'walkie-target') html = _walkieTargetSheetHTML();
+  else if (_ui.mode === 'ray-guess') html = _rayGuessSheetHTML();
+  else if (_ui.mode === 'ray-own') html = _rayOwnSheetHTML();
+  else if (_ui.mode === 'battery') html = _batterySheetHTML();
+  else if (_ui.mode === 'radar') html = _radarSheetHTML();
+  else if (_ui.mode === 'coffee') html = _coffeeSheetHTML();
   else if (_ui.mode === 'log') html = _logListHTML();
   if (html !== null) content.innerHTML = html;
 }
@@ -82,7 +98,7 @@ function _actorSeat() {
   return S.currentSeat;
 }
 
-/** 是否轮到本设备行动（含房主接管离席者） */
+/** 是否轮到本设备行动 */
 function _myTurn() {
   if (!S || S.phase !== 'play' || S.pending || S.result || S.fx) return false;
   const a = _actorSeat();
@@ -243,16 +259,48 @@ function showRules() {
     <div class="rules-scroll">
       <h3>🎯 胜利条件</h3>
       <p>全队合作：场上所有导线（48 蓝 + 全部黄 + 红）<b>全部公开</b> = 拆弹成功。</p>
-      <h3>🧩 配件</h3>
-      <p>蓝线 1~12 各 4 张；红线 1.5~11.5 随机 1 张；黄线 1.1~11.1 随机 2 张（2 人局 4 张）。开局即把红/黄数字标记到数轴上（全场公开）。</p>
-      <h3>🃏 开局与标记</h3>
-      <p>随机产生队长；全部导线洗混后尽量均分（2 人各 2 份；3 人队长 2 份；4/5 人各 1 份），每份从小到大排列。发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线（数字全场公开）。</p>
-      <h3>🔁 回合 = 1 次行动 + 免费道具</h3>
-      <p><b>✂️ 双人剪线</b>：指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」。命中 → 该牌与你的同数字（或黄色）牌各公开 1 张；失误 → 该牌真实身份被标记公开（牌面仍隐藏）并累计 1 次失误。<b>若指认到红色导线 → 立即爆炸！</b></p>
-      <p><b>✂️ 单人剪线</b>：① 某数字已公开 2 张且剩余 2 张都在你手上 → 公开这 2 张；② 你持有某数字全部 4 张 → 全部公开；③ 全部未公开黄线都在你手上 → 清收。</p>
-      <p><b>🚨 公开红线</b>：持红者在自己其余牌全部公开后，可在回合中公开红线。</p>
-      <p><b>🎁 道具</b>：某蓝数字 4/4 拆除时解锁对应编号道具（不占行动）：<b>≠标签</b>（同一份内相邻 2 张编号不同）、<b>对讲机</b>（双方各选 1 张未公开导线交换）、<b>三重探测器</b>（相邻 3 张版探测器）。</p>
+      <h3>🧩 开局导线分配</h3>
+      <table>
+        <thead><tr><th>人数</th><th>手牌分配</th><th>黄线</th></tr></thead>
+        <tbody>
+          <tr><td>2 人</td><td>每人 2 份</td><td>4 张</td></tr>
+          <tr><td>3 人</td><td>队长 2 份，其余各 1 份</td><td>2 张</td></tr>
+          <tr><td>4 人</td><td>每人 1 份</td><td>2 张</td></tr>
+          <tr><td>5 人</td><td>每人 1 份</td><td>2 张</td></tr>
+        </tbody>
+      </table>
+      <p>导线构成：蓝线 1~12 <b>各 4 张</b>（共 48）；红线 1.5~11.5 随机 1 张；黄线 1.1~11.1 随机。<br>随机产生队长；全部导线洗混均分，每份从小到大排列。发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线（数字全场公开）；红/黄数字开局即标记到数轴（全场公开）。</p>
+      <h3>🔁 回合内操作</h3>
+      <p>回合 = <b>1 次行动 + 免费道具</b>。</p>
+      <table>
+        <thead><tr><th>行动</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」。命中 → 该牌与你的同数字（或黄色）牌各公开 1 张；失误 → 该牌真实身份被标记公开（牌面仍隐藏）并累计 1 次失误。<b>若指认到红色导线 → 立即爆炸！</b></td></tr>
+          <tr><td>✂️ 单人剪线</td><td>① 某数字已公开 2 张且剩余 2 张都在你手上 → 公开这 2 张；② 你持有某数字全部 4 张 → 全部公开；③ 全部未公开黄线都在你手上 → 清收。</td></tr>
+          <tr><td>🚨 公开红线</td><td>持红者在自己其余牌全部公开后，可在回合中公开红线。</td></tr>
+        </tbody>
+      </table>
       <p>⏭️ 手牌已全部公开的玩家没有可执行的行动，轮到其回合时将<b>自动跳过</b>。</p>
+      <h3>🎁 道具介绍</h3>
+      <p>开局随机抽「人数」张上桌（锁定）；某蓝数字 4/4 拆除时解锁对应编号道具，每张每局限用 1 次。</p>
+      <table>
+        <thead><tr><th>道具</th><th>效果</th></tr></thead>
+        <tbody>
+          <tr><td>① ≠标签</td><td>选自己同一份相邻 2 张（编号不同、至少 1 张蓝、可含已公开）标【≠】，宣告两张编号不同</td></tr>
+          <tr><td>② 📻 对讲机</td><td>与另一名玩家各选 1 张未公开导线交换；被交换牌的标记自动废弃，双方立即重排</td></tr>
+          <tr><td>③ 🔍 三重探测器</td><td>立即剪线：选他人同一份相邻 3 张，猜「其中至少 1 张为蓝色 N」</td></tr>
+          <tr><td>④ 📝 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
+          <tr><td>⑤ 🛰️ 超级探测器</td><td>立即剪线：选他人一整份手牌，猜「其中有蓝色 N」，命中者自选 1 张公开</td></tr>
+          <tr><td>⑥ 🧯 抑制器</td><td>失误 −1（失误为 0 时不可用）</td></tr>
+          <tr><td>⑦ 🔋 备用电池</td><td>恢复 1~2 名本局已用过「双重探测器」者的使用次数</td></tr>
+          <tr><td>⑧ 📡 通用雷达</td><td>选一个数字：自动公布各人各份是否还有该数字蓝线</td></tr>
+          <tr><td>⑨ 🧪 稳定剂</td><td>本回合剪线失误不计、红线不引爆；可取消，剪线结算时消耗</td></tr>
+          <tr><td>⑩ 🩻 X/Y射线</td><td>立即剪线：指定他人 1 张牌，猜「蓝 A 或蓝 B / 蓝 A 或黄」两个选项之一</td></tr>
+          <tr><td>⑪ ☕ 咖啡瓶</td><td>跳过自己回合，指定 1 名仍有未公开手牌的玩家接续</td></tr>
+          <tr><td>⑫ ＝标签</td><td>选自己同一份相邻 2 张（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标【＝】，宣告两张编号相同</td></tr>
+        </tbody>
+      </table>
+      <p>⚡ <b>③/⑤/⑩ 使用后立即进入剪线环节</b>，结算后结束回合；其余道具不占行动。</p>
       <h3>💥 失误</h3>
       <p>允许 人数−1 次失误；第 N 次失误（N = 人数）立即爆炸失败。</p>
       <h3>🔎 双重探测器（每人每局 1 次）</h3>
@@ -353,7 +401,7 @@ function _logBarHTML() {
 }
 
 /* ============================================================
-   本设备可见的座位（本人 / 房主接管的离席者）
+   本设备可见的座位（本人）
    ============================================================ */
 
 function _ownSeats() {
@@ -403,9 +451,29 @@ function _gameViewHTML() {
   ${_logBarHTML()}
   ${_equipRowHTML()}
   ${_boardHTML()}
+  ${_radarPanelHTML()}
   <div class="players">${rows.join('')}</div>
   <div class="own-area">${ownSeats.map(s => _ownHandHTML(s)).join('')}</div>
   ${S.phase === 'over' ? _endActionHTML() : _actionBarHTML()}`;
+}
+
+/** 【通用雷达】瞬态结果面板（回合结束时清空；各端同步显示） */
+function _radarPanelHTML() {
+  const r = S && S.radar;
+  if (!r || !r.rows) return '';
+  const rows = r.rows.map(row => {
+    const chips = (row.per || []).map((has, i) =>
+      `<span class="radar-chip ${has ? 'yes' : 'no'}">第 ${i + 1} 份 ${has ? '有' : '无'}</span>`).join('');
+    const mine = mySeat() !== null && row.seat === mySeat();
+    return `<div class="radar-row${mine ? ' mine' : ''}">
+      <span class="radar-name">${_esc(_playerName(row.seat))}</span>
+      <span class="radar-chips">${chips}</span>
+    </div>`;
+  }).join('');
+  return `<div class="radar-panel" data-testid="radar-panel">
+    <div class="radar-head">📡 通用雷达：蓝色 ${r.num} 的未公开残留</div>
+    ${rows}
+  </div>`;
 }
 
 /* ============================================================
@@ -506,31 +574,51 @@ function _isSelected(cardId) {
     || _ui.fromCardId === cardId;
 }
 
-function _cardMarkersHTML(card) {
+/** 处于 ≠/＝ 配对中的牌：*-l = 左侧（渲染横条）/ *-r = 右侧（徽章让位） */
+function _pairSpanCls(card, share, idx) {
+  if (!share) return '';
+  let out = '';
+  for (const [field, tag] of [['neq', 'neq'], ['eqp', 'eqp']]) {
+    const pid = card[field];
+    if (!pid) continue;
+    if (share[idx + 1] && share[idx + 1][field] === pid) out += ' ' + tag + '-l';
+    else if (idx > 0 && share[idx - 1][field] === pid) out += ' ' + tag + '-r';
+  }
+  return out;
+}
+
+function _cardMarkersHTML(card, share, idx) {
+  let span = '';
   let out = '';
   if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${_fmtNum(card.info.num)}</span>`;
   if (card.fail) out += `<span class="marker marker-fail" title="身份标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
-  if (card.neq) out += `<span class="marker marker-neq" title="编号不同">≠</span>`;
-  return out ? `<span class="markers">${out}</span>` : '';
+  const pairCls = _pairSpanCls(card, share, idx);
+  if (pairCls.includes('neq-l')) span += `<span class="neq-span" title="编号不同">≠</span>`;
+  else if (card.neq && !pairCls.includes('neq-r')) out += `<span class="marker marker-neq" title="编号不同">≠</span>`;
+  if (pairCls.includes('eqp-l')) span += `<span class="eqp-span" title="编号相同">＝</span>`;
+  else if (card.eqp && !pairCls.includes('eqp-r')) out += `<span class="marker marker-eqp" title="编号相同">＝</span>`;
+  return span + (out ? `<span class="markers">${out}</span>` : '');
 }
 
 /** 他人牌：未公开 = 牌背；已公开 = 亮面 */
-function _enemyCardHTML(card) {
+function _enemyCardHTML(card, share, idx) {
   const sel = _ui.scanSel.some(x => x.id === card.id) || _ui.targetCardId === card.id;
   const picked = S.pending && S.pending.type === 'walkie' && S.pending.fromCardId === card.id;
-  const hit = S.pending && S.pending.type === 'scanPick' && S.pending.cards.indexOf(card.id) >= 0;
-  const markers = _cardMarkersHTML(card);
+  const hit = S.pending && (S.pending.type === 'scanPick' || S.pending.type === 'superPick')
+    && S.pending.cards.indexOf(card.id) >= 0;
+  const markers = _cardMarkersHTML(card, share, idx);
   const byMePicker = S.pending ? canActAs(S.pending.toSeat) : false;
 
   let selectable = false;
   if (!card.revealed && !S.result && !byMePicker && !S.pending) {
-    if (_ui.mode === 'pair-target' && _myTurn()) selectable = true;
-    if (_ui.mode === 'scan') selectable = true;
+    if ((_ui.mode === 'pair-target' || _ui.mode === 'ray-target') && _myTurn()) selectable = true;
+    if (_ui.mode === 'scan' || _ui.mode === 'super') selectable = true;
   }
 
   const cls = ['card'];
   const fxSpot = !!(S.fx && S.fx.ids && S.fx.ids.indexOf(card.id) >= 0);
   if (fxSpot) cls.push('fx-target');
+  _pairSpanCls(card, share, idx).trim().split(' ').forEach(c => c && cls.push(c));
   let body;
   let attrs = ` data-cardid="${card.id}"`;
   if (card.revealed) {
@@ -551,12 +639,13 @@ function _enemyCardHTML(card) {
 }
 
 /** 本设备可见的手牌：始终亮面 */
-function _ownCardHTML(seat, si, card) {
+function _ownCardHTML(seat, si, card, share, idx) {
   const sel = _isSelected(card.id);
   const selectable = _ownCardSelectable(seat, card);
   const cls = ['card', 'card-own', 'kind-' + card.kind];
   const fxSpot = !!(S.fx && S.fx.ids && S.fx.ids.indexOf(card.id) >= 0);
   if (fxSpot) cls.push('fx-target');
+  _pairSpanCls(card, share, idx).trim().split(' ').forEach(c => c && cls.push(c));
   if (card.revealed) cls.push('revealed');
   if (sel) cls.push('selected');
   if (selectable) cls.push('selectable');
@@ -564,11 +653,11 @@ function _ownCardHTML(seat, si, card) {
   return `<div class="${cls.join(' ')}" data-cardid="${card.id}" data-kind="${card.kind}" data-num="${_fmtNum(card.num)}"${onclick}>
     <span class="card-num">${_fmtNum(card.num)}</span>
     <span class="card-kind">${_kindLabel(card.kind)}</span>
-    ${_cardMarkersHTML(card)}
+    ${_cardMarkersHTML(card, share, idx)}
   </div>`;
 }
 
-/** 本设备手牌可点选的场合（标记 / 对讲机 / ≠ / 对讲机挑选） */
+/** 本设备手牌可点选的场合（标记 / 对讲机 / ≠/＝ / 便利贴） */
 function _ownCardSelectable(seat, card) {
   if (!S || S.result) return false;
   if (S.phase === 'mark') {
@@ -581,6 +670,8 @@ function _ownCardSelectable(seat, card) {
   if (seat !== S.currentSeat) return false;
   if (_ui.mode === 'neq') return true;                    // ≠ 标签可含已公开牌
   if (_ui.mode === 'walkie-card') return !card.revealed;
+  if (_ui.mode === 'sticky') return card.kind === 'blue' && !card.revealed && !card.info;
+  if (_ui.mode === 'eqtag') return true;                  // ＝ 标签可含已公开牌
   return false;
 }
 
@@ -592,16 +683,15 @@ function _playerRowHTML(seat) {
   const p = S.players && S.players[seat];
   if (!p) return '';
   const isCur = S.phase === 'play' && S.currentSeat === seat && !S.result;
-  const isDeparted = (S.departedPlayers || []).includes(seat);
   const color = PLAYER_COLORS[seat % PLAYER_COLORS.length];
   const shares = (p.shares || []).map((share, si) =>
-    `<div class="cards" data-share="${si}">${share.map(c => _enemyCardHTML(c)).join('')}</div>`).join('');
+    `<div class="cards" data-share="${si}">${share.map((c, i) => _enemyCardHTML(c, share, i)).join('')}</div>`).join('');
   const markBadge = S.phase === 'mark'
     ? (S.ready[seat] ? '<span class="mark-badge ok">✅ 已标记</span>' : '<span class="mark-badge wait">⏳ 标记中</span>')
     : '';
   return `<div class="player-row${isCur ? ' current' : ''}" data-seat="${seat}">
     <div class="pr-head">
-      <span class="p-chip${isCur ? ' active' : ''}" style="--pc:${color}">${_esc(p.name)}${seat === S.captainSeat ? ' 🎖' : ''}${isDeparted ? ' · 托管中' : ''}</span>
+      <span class="p-chip${isCur ? ' active' : ''}" style="--pc:${color}">${_esc(p.name)}${seat === S.captainSeat ? ' 🎖' : ''}</span>
       ${markBadge}
       <span class="pr-meta">未公开 ${hiddenCards(seat).length}</span>
     </div>
@@ -616,7 +706,7 @@ function _ownHandHTML(seat) {
   const isCur = S.phase === 'play' && S.currentSeat === seat && !S.result;
   const color = PLAYER_COLORS[seat % PLAYER_COLORS.length];
   const shares = (p.shares || []).map((share, si) =>
-    `<div class="cards" data-share="${si}">${share.map(c => _ownCardHTML(seat, si, c)).join('')}</div>`).join('');
+    `<div class="cards" data-share="${si}">${share.map((c, i) => _ownCardHTML(seat, si, c, share, i)).join('')}</div>`).join('');
   let status = '';
   if (S.phase === 'mark') {
     status = S.ready[seat]
@@ -627,7 +717,7 @@ function _ownHandHTML(seat) {
   }
   return `<div class="own-hand${isCur ? ' current' : ''}" data-seat="${seat}" style="--pc:${color}">
     <div class="oh-head">
-      <span class="p-chip${isCur ? ' active' : ''}">${mine ? '🙋 你' : '🫡 接管 ' + _esc(p.name)}</span>
+      <span class="p-chip${isCur ? ' active' : ''}">${mine ? '🙋 你' : _esc(p.name)}</span>
       ${status}
     </div>
     <div class="own-shares">${shares}</div>
@@ -668,15 +758,20 @@ window.addEventListener('resize', () => {
 
 function _equipRowHTML() {
   if (!S.equipment || !S.equipment.length) return '';
+  const stabActive = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
   const btns = S.equipment.map(e => {
     const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[e.no]) || null;
-    const icon = lib ? lib.icon : '❔';
     const name = lib ? lib.name : '道具 ' + e.no;
     // 该道具已进入选择流程（尚未使用）：按钮呈激活态，再点可取消
     const active = !e.used && e.unlocked && (
       (e.no === 1 && _ui.mode === 'neq') ||
       (e.no === 2 && _ui.mode === 'walkie-card') ||
-      (e.no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3'));
+      (e.no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3') ||
+      (e.no === 4 && _ui.mode === 'sticky') ||
+      (e.no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own')) ||
+      (e.no === 9 && stabActive) ||
+      (e.no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own')) ||
+      (e.no === 12 && _ui.mode === 'eqtag'));
     let cls = 'equip-btn';
     let onclk = '';
     let disabled = '';
@@ -688,11 +783,11 @@ function _equipRowHTML() {
     } else { cls += ' locked'; disabled = ' disabled'; }
     const tip = lib && lib.desc ? `<span class="equip-tip">${_esc(lib.desc)}</span>` : '';
     return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${onclk}${disabled}>
-      <span class="equip-icon">${e.used ? '✓' : (e.unlocked ? icon : '🔒')}</span><span class="equip-name">${e.no} ${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
+      <span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
     </button>`;
   }).join('');
   return `<div class="equip-row" data-testid="equipment">
-    <span class="equip-label">🎁 道具</span>
+    <span class="equip-label">🔧 道具</span>
     <div class="equip-btns">${btns}</div>
   </div>`;
 }
@@ -717,8 +812,20 @@ function _modeHintBar() {
   if (_ui.mode === 'neq') {
     return `<div class="action-bar"><div class="mode-hint">≠ 点选自己同一份内相邻的 2 张牌（已选 ${_ui.scanSel.length}/2）</div>${_cancelBtn()}</div>`;
   }
+  if (_ui.mode === 'eqtag') {
+    return `<div class="action-bar"><div class="mode-hint">＝ 点选自己同一份内相邻的 2 张同色牌（已选 ${_ui.scanSel.length}/2）</div>${_cancelBtn()}</div>`;
+  }
   if (_ui.mode === 'walkie-card') {
     return `<div class="action-bar"><div class="mode-hint">📻 点选自己的 1 张未公开导线</div>${_cancelBtn()}</div>`;
+  }
+  if (_ui.mode === 'sticky') {
+    return `<div class="action-bar"><div class="mode-hint">📝 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
+  }
+  if (_ui.mode === 'super') {
+    return `<div class="action-bar"><div class="mode-hint">🛰️ 点击其他玩家某一份中的一张未公开牌（将扫描该整份手牌）</div>${_cancelBtn()}</div>`;
+  }
+  if (_ui.mode === 'ray-target') {
+    return `<div class="action-bar"><div class="mode-hint">🩻 点击其他玩家的一张未公开导线（将猜「两个选项之一」）</div>${_cancelBtn()}</div>`;
   }
   return null;
 }
@@ -748,8 +855,12 @@ function _actionBarHTML() {
   const modeBar = _modeHintBar();
   if (modeBar) return modeBar;
 
+  const stabSeat = (S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined)
+    ? S.cutMods.stabilize : null;
+
   if (!_myTurn()) {
-    return _waitHTML(`⏳ 等待 ${_esc(_playerName(S.currentSeat))} 行动…`);
+    const stab = stabSeat !== null ? `（🧪 ${_esc(_playerName(stabSeat))} 已使用稳定剂）` : '';
+    return _waitHTML(`⏳ 等待 ${_esc(_playerName(S.currentSeat))} 行动…${stab}`);
   }
 
   const actor = S.currentSeat;
@@ -758,6 +869,7 @@ function _actionBarHTML() {
   const skillOK = !S.players[actor].skillUsed;
   return `<div class="action-bar">
     <div class="bar-title">🎯 你的回合：选择 1 次行动（道具免费）</div>
+    ${stabSeat !== null ? '<div class="mode-hint stabilize-hint">🧪 稳定状态生效中：本回合剪线失误不计、红线不爆（点道具 9 可取消）</div>' : ''}
     <div class="bar-btns">
       <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线</button>
       <button class="action-btn" data-action="solo" data-testid="btn-solo"${soloOK ? '' : ' disabled'} onclick="startSoloCut()">🎯 单人剪线</button>
@@ -776,9 +888,10 @@ function _pendingHTML() {
   if (!pd) return '';
   const iAmPicker = canActAs(pd.toSeat);
 
-  if (pd.type === 'scanPick') {
+  if (pd.type === 'scanPick' || pd.type === 'superPick') {
     if (iAmPicker) {
       const num = pd.guessNum;
+      const icon = pd.type === 'superPick' ? '🛰️' : '🔎';
       const btns = pd.cards.map(id => {
         const loc = _locateCard(pd.toSeat, id);
         return `<button class="pick-card" data-cardid="${id}" onclick="onScanPickChoose('${id}')">
@@ -787,14 +900,14 @@ function _pendingHTML() {
         </button>`;
       }).join('');
       return `<div class="action-bar pending">
-        <div class="pending-title">🔎 命中！请选择公开哪一张蓝色 ${num}</div>
+        <div class="pending-title">${icon} 命中！请选择公开哪一张蓝色 ${num}</div>
         <div class="pick-row">${btns}</div>
       </div>`;
     }
     return _waitHTML(`🔎 等待 ${_esc(_playerName(pd.toSeat))} 选择公开的导线…`);
   }
 
-  if (pd.type === 'scanMark') {
+  if (pd.type === 'scanMark' || pd.type === 'superMark') {
     if (iAmPicker) {
       const btns = pd.cards.map(id => {
         const loc = _locateCard(pd.toSeat, id);
@@ -803,8 +916,11 @@ function _pendingHTML() {
           <span class="pc-pos">第 ${loc ? loc.si + 1 : '?'} 份 · 第 ${loc ? loc.idx + 1 : '?'} 张</span>
         </button>`;
       }).join('');
+      const title = pd.type === 'superMark'
+        ? '🔖 未命中！请从该份未公开蓝线中选 1 张放置身份标记'
+        : '🔖 未命中！请从下面选 1 张非红色导线放置身份标记';
       return `<div class="action-bar pending">
-        <div class="pending-title">🔖 未命中！请从下面选 1 张非红色导线放置身份标记</div>
+        <div class="pending-title">${title}</div>
         <div class="pick-row">${btns}</div>
       </div>`;
     }
@@ -853,7 +969,8 @@ function _ownGuessCandidates(seat, guess, isScan) {
 
 function _guessSheetHTML() {
   const actor = _actorSeat();
-  const isScan = _ui.mode === 'scan-guess';
+  const isSuper = _ui.mode === 'super-guess';
+  const isScan = _ui.mode === 'scan-guess' || isSuper;
   const tSeat = _flowTargetSeat();
   const tName = tSeat === null ? '' : _esc(_playerName(tSeat));
 
@@ -871,10 +988,14 @@ function _guessSheetHTML() {
     : '';
   const empty = (opts.nums.length === 0 && (isScan || !opts.yellow))
     ? '<div class="sheet-empty">你没有可猜的类型</div>' : '';
+  const head = isSuper ? `🛰️ 猜${tName}的整份手牌里有——` : `🔎 猜${tName}的这张牌是——`;
+  const sub = isSuper ? '猜「该份中至少 1 张是蓝色 N」'
+    : isScan ? '猜「其中至少 1 张是蓝色 N」'
+    : '仅可猜你手上持有的未公开类型';
 
-  return `${_sheetHead(`🔎 猜${tName}的这张牌是——`)}
+  return `${_sheetHead(head)}
   <div class="sheet-body">
-    <div class="sheet-sub">${isScan ? '猜「其中至少 1 张是蓝色 N」' : '仅可猜你手上持有的未公开类型'}（数字 ×4 张）</div>
+    <div class="sheet-sub">${sub}（数字 ×4 张）</div>
     <div class="guess-grid">${btns}${yellowBtn}</div>
     ${empty}
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
@@ -883,7 +1004,7 @@ function _guessSheetHTML() {
 
 function _ownPickSheetHTML() {
   const actor = _actorSeat();
-  const isScan = _ui.mode === 'scan-own';
+  const isScan = _ui.mode === 'scan-own' || _ui.mode === 'super-own';
   if (actor === null) {
     return `${_sheetHead('✂️ 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
   }
@@ -931,16 +1052,139 @@ function _walkieTargetSheetHTML() {
   const btns = [];
   for (let s = 0; s < S.pCount; s++) {
     if (s === actor) continue;
-    const isDeparted = (S.departedPlayers || []).includes(s);
     btns.push(`<button class="pick-card" data-testid="walkie-to" data-seat="${s}" onclick="onWalkieTarget(${s})">
       <span class="pc-num">📻 ${_esc(_playerName(s))}</span>
-      <span class="pc-pos">未公开 ${hiddenCards(s).length} 张${isDeparted ? ' · 托管中' : ''}</span>
+      <span class="pc-pos">未公开 ${hiddenCards(s).length} 张</span>
     </button>`);
   }
   return `${_sheetHead('📻 对讲机：选择交换对象')}
   <div class="sheet-body">
     <div class="sheet-sub">你已挑出 1 张未公开导线，请选择与谁交换（对方再选 1 张）</div>
     <div class="pick-row">${btns.join('')}</div>
+    <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+/* ── 道具 10【X/Y射线】/ 7【备用电池】/ 8【通用雷达】/ 11【咖啡瓶】 ── */
+
+/** 某选项对应的自选公开候选（蓝 N 未公开牌 / 未公开黄线） */
+function _ownCandsFor(seat, opt) {
+  if (!opt || seat === null) return [];
+  const p = S.players[seat];
+  const cards = ((p && p.shares) || []).flat().filter(c => !c.revealed);
+  if (opt.kind === 'blue') return cards.filter(c => c.kind === 'blue' && c.num === opt.num);
+  return cards.filter(c => c.kind === 'yellow');
+}
+
+function _rayOptKey(o) { return o.kind === 'yellow' ? 'yellow' : 'blue-' + o.num; }
+function _rayOptLabel(o) { return o.kind === 'blue' ? '蓝色 ' + o.num : '黄色'; }
+
+function _rayGuessSheetHTML() {
+  const actor = _actorSeat();
+  const tSeat = _ui.targetSeat;
+  const tName = (tSeat === null || tSeat === undefined) ? '' : _esc(_playerName(tSeat));
+  if (actor === null) {
+    return `${_sheetHead('🩻 X/Y射线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+  }
+  const opts = legalGuessOptions(actor);
+  const picked = _ui.rayOpts.map(_rayOptKey);
+  const btns = opts.nums.map(n => {
+    const k = 'blue-' + n;
+    const sel = picked.indexOf(k) >= 0;
+    const dim = !sel && picked.length >= 2;
+    return `<button class="guess-btn${sel ? ' selected' : ''}${dim ? ' dim' : ''}" data-guess="${k}" onclick="onRayOptTg('${k}')">蓝 ${n}</button>`;
+  }).join('');
+  const ySel = picked.indexOf('yellow') >= 0;
+  const yDim = !ySel && (picked.length >= 2 || !opts.yellow);
+  const yellowBtn = (opts.yellow || ySel)
+    ? `<button class="guess-btn yellow${ySel ? ' selected' : ''}${yDim ? ' dim' : ''}" data-guess="yellow" onclick="onRayOptTg('yellow')">黄色</button>`
+    : '';
+  return `${_sheetHead(`🩻 声明${tName}的这张牌是——`)}
+  <div class="sheet-body">
+    <div class="sheet-sub">一次声明 2 个选项：「蓝A 或 蓝B」/「蓝A 或 黄」；两个选项都须持有对应未公开导线</div>
+    <div class="guess-grid">${btns}${yellowBtn}</div>
+    <button class="btn-full btn-primary" data-testid="ray-confirm"${_ui.rayOpts.length === 2 ? '' : ' disabled'} onclick="onRayConfirm()">确认选项（${_ui.rayOpts.length}/2）</button>
+    <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+function _rayOwnSheetHTML() {
+  const actor = _actorSeat();
+  if (actor === null) {
+    return `${_sheetHead('🩻 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+  }
+  const rowFor = (opt, which, pickedId) => {
+    const cands = _ownCandsFor(actor, opt);
+    const btns = cands.map(c =>
+      `<button class="pick-card${pickedId === c.id ? ' selected' : ''}" data-cardid="${c.id}" onclick="onRayOwnPick('${which}','${c.id}')">
+        <span class="pc-num">${_kindLabel(c.kind)} ${_fmtNum(c.num)}</span>
+        <span class="pc-pos">${_cardPosLabel(actor, c.id)}</span>
+      </button>`).join('');
+    return `<div class="sheet-sub">选项 ${which.toUpperCase()}「${_rayOptLabel(opt)}」命中时，你公开 1 张：</div>
+      <div class="pick-row">${btns || '<div class="sheet-empty">没有对应的未公开导线</div>'}</div>`;
+  };
+  const ok = _ui.rayOpts.length === 2 && _ui.rayOwn.a && _ui.rayOwn.b;
+  return `${_sheetHead('🩻 命中时公开你的导线')}
+  <div class="sheet-body">
+    <div class="sheet-sub">两个选项各自预先选定 1 张（保证结算原子，命中哪项就公开哪张）</div>
+    ${_ui.rayOpts.length === 2 ? rowFor(_ui.rayOpts[0], 'a', _ui.rayOwn.a) : ''}
+    ${_ui.rayOpts.length === 2 ? rowFor(_ui.rayOpts[1], 'b', _ui.rayOwn.b) : ''}
+    <button class="btn-full btn-primary" data-testid="ray-settle"${ok ? '' : ' disabled'} onclick="onConfirmRay()">确认射线</button>
+    <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+function _batterySheetHTML() {
+  const actor = _actorSeat();
+  const btns = [];
+  for (let s = 0; s < S.pCount; s++) {
+    const p = S.players[s];
+    if (!p) continue;
+    const sel = _ui.batterySel.indexOf(s) >= 0;
+    const dis = !p.skillUsed;
+    btns.push(`<button class="pick-card${sel ? ' selected' : ''}${dis ? ' dim' : ''}" data-testid="battery-p${s}" data-seat="${s}"${dis ? ' disabled' : ''} onclick="onBatteryToggle(${s})">
+      <span class="pc-num">🔋 ${_esc(p.name)}${s === actor ? '（你）' : ''}</span>
+      <span class="pc-pos">${p.skillUsed ? '双重探测器已使用，可恢复' : '未使用过双重探测器'}</span>
+    </button>`);
+  }
+  const okCount = _ui.batterySel.length >= 1 && _ui.batterySel.length <= 2;
+  return `${_sheetHead('🔋 备用电池：恢复双重探测器')}
+  <div class="sheet-body">
+    <div class="sheet-sub">选择 1~2 名本局已使用过双重探测器的玩家（可含自己）</div>
+    <div class="pick-row">${btns.join('')}</div>
+    <button class="btn-full btn-primary" data-testid="battery-confirm"${okCount ? '' : ' disabled'} onclick="onBatteryConfirm()">确认（${_ui.batterySel.length}/2）</button>
+    <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+function _radarSheetHTML() {
+  const btns = [];
+  for (let n = 1; n <= 12; n++) {
+    btns.push(`<button class="guess-btn" data-guess="radar-${n}" onclick="onRadarPick(${n})">${n}</button>`);
+  }
+  return `${_sheetHead('📡 通用雷达：选择探测数字')}
+  <div class="sheet-body">
+    <div class="sheet-sub">系统将自动公布每名玩家每份手牌「是否还有未公开的该数字蓝线」（含你自己）</div>
+    <div class="guess-grid">${btns.join('')}</div>
+    <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+function _coffeeSheetHTML() {
+  const actor = _actorSeat();
+  const btns = [];
+  for (let s = 0; s < S.pCount; s++) {
+    if (s === actor || !S.players[s]) continue;
+    const hidden = hiddenCards(s).length;
+    btns.push(`<button class="pick-card${hidden === 0 ? ' dim' : ''}" data-testid="coffee-to" data-seat="${s}"${hidden === 0 ? ' disabled' : ''} onclick="onCoffeePick(${s})">
+      <span class="pc-num">☕ ${_esc(_playerName(s))}</span>
+      <span class="pc-pos">未公开 ${hidden} 张</span>
+    </button>`);
+  }
+  return `${_sheetHead('☕ 咖啡瓶：跳过回合，交给谁？')}
+  <div class="sheet-body">
+    <div class="sheet-sub">你本回合不行动；从所选玩家开始继续后续回合（该玩家须仍有未公开手牌）</div>
+    <div class="pick-row">${btns.join('') || '<div class="sheet-empty">没有符合条件的其他玩家</div>'}</div>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
   </div>`;
 }
@@ -1009,11 +1253,21 @@ function onEquipClick(no) {
   }
   const eq = (S.equipment || []).find(e => e.no === no);
   if (!eq) return;
+  const stabArmed = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
   // 该道具已进入选择流程但尚未真正使用：再次点击 = 取消
   const active = (no === 1 && _ui.mode === 'neq')
     || (no === 2 && _ui.mode === 'walkie-card')
-    || (no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3');
+    || (no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3')
+    || (no === 4 && _ui.mode === 'sticky')
+    || (no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own'))
+    || (no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own'))
+    || (no === 12 && _ui.mode === 'eqtag');
   if (active) { cancelFlow(); showToast('已取消使用道具'); return; }
+  if (no === 9 && stabArmed) {          // 稳定剂：取消 = 撤销稳定状态（未消耗）
+    const rc = cancelStabilizer();
+    if (rc && !rc.ok) showToast(rc.msg || '无法取消');
+    return;
+  }
   if (eq.used) { showToast('该道具已使用过'); return; }
   if (!eq.unlocked) { showToast('该道具尚未解锁（蓝 4/4 拆除后解锁）'); return; }
   if (S.scanMode) { showToast('已启动探测器，本回合只能扫描'); return; }
@@ -1026,6 +1280,35 @@ function onEquipClick(no) {
   } else if (no === 3) {
     _ui.mode = 'scan'; _ui.scanSrc = 'eq3';
     _ui.scanSel = []; _ui.guess = null; _ui.ownCard = null;
+  } else if (no === 4) {
+    _ui.mode = 'sticky';
+  } else if (no === 5) {
+    _ui.mode = 'super';
+    _ui.targetSeat = null; _ui.targetCardId = null; _ui.superShare = null;
+    _ui.guess = null; _ui.ownCard = null;
+  } else if (no === 6) {
+    const r = useSuppressor();
+    if (r && !r.ok) showToast(r.msg || '无法使用');
+    return;
+  } else if (no === 7) {
+    _ui.mode = 'battery'; _ui.batterySel = [];
+    _openSheet();
+  } else if (no === 8) {
+    _ui.mode = 'radar';
+    _openSheet();
+  } else if (no === 9) {
+    const r = useStabilizer();
+    if (r && !r.ok) showToast(r.msg || '无法使用');
+    return;
+  } else if (no === 10) {
+    _ui.mode = 'ray-target';
+    _ui.targetSeat = null; _ui.targetCardId = null;
+    _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
+  } else if (no === 11) {
+    _ui.mode = 'coffee';
+    _openSheet();
+  } else if (no === 12) {
+    _ui.mode = 'eqtag'; _ui.scanSel = [];
   }
   render();
 }
@@ -1038,6 +1321,9 @@ function cancelFlow() {
   _ui.guess = null; _ui.ownCard = null;
   _ui.scanSrc = null; _ui.scanSel = [];
   _ui.fromCardId = null;
+  _ui.superShare = null;
+  _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
+  _ui.batterySel = [];
   render();
 }
 
@@ -1055,6 +1341,35 @@ function onEnemyCardClick(cardId) {
     _ui.targetCardId = cardId;
     _ui.guess = null; _ui.ownCard = null;
     _ui.mode = 'pair-guess';
+    _openSheet();
+    _refreshSheet();
+    render();
+    return;
+  }
+  if (_ui.mode === 'super') {
+    const loc = _locateCardAnywhere(cardId);
+    const card = _findCardById(cardId);
+    if (!loc || loc.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+    if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
+    _ui.targetSeat = loc.seat;
+    _ui.targetCardId = cardId;      // 高亮所选份中的这张（代表整份）
+    _ui.superShare = loc.si;
+    _ui.guess = null; _ui.ownCard = null;
+    _ui.mode = 'super-guess';
+    _openSheet();
+    _refreshSheet();
+    render();
+    return;
+  }
+  if (_ui.mode === 'ray-target') {
+    const loc = _locateCardAnywhere(cardId);
+    const card = _findCardById(cardId);
+    if (!loc || loc.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+    if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
+    _ui.targetSeat = loc.seat;
+    _ui.targetCardId = cardId;
+    _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
+    _ui.mode = 'ray-guess';
     _openSheet();
     _refreshSheet();
     render();
@@ -1090,6 +1405,16 @@ function onOwnCardClick(seat, si, cardId) {
 
   if (_ui.mode === 'neq') {
     _neqSelect(seat, cardId);
+    return;
+  }
+  if (_ui.mode === 'eqtag') {
+    _eqtagSelect(seat, cardId);
+    return;
+  }
+  if (_ui.mode === 'sticky') {
+    const r = useStickyNote(cardId);
+    if (r && r.ok) cancelFlow();
+    else showToast((r && r.msg) || '无法使用便利贴');
     return;
   }
   if (_ui.mode === 'walkie-card') {
@@ -1173,6 +1498,37 @@ function _neqSelect(seat, cardId) {
   }
 }
 
+/** ＝ 标签选牌：自己同一份内相邻 2 张（可含已公开牌，须同色），满 2 张立即执行 */
+function _eqtagSelect(seat, cardId) {
+  const found = _locateCardAnywhere(cardId);
+  if (!found || found.seat !== S.currentSeat) return;
+  const i = _ui.scanSel.findIndex(x => x.id === cardId);
+  if (i >= 0) {
+    _ui.scanSel.splice(i, 1);
+    render();
+    return;
+  }
+  const cur = _ui.scanSel;
+  if (cur.length === 0) {
+    cur.push({ id: cardId, seat: found.seat, si: found.si, idx: found.idx });
+    render();
+    return;
+  }
+  const first = cur[0];
+  if (found.si !== first.si || Math.abs(found.idx - first.idx) !== 1) {
+    showToast('须选择同一份内相邻的 2 张牌');
+    return;
+  }
+  const r = useEqTag(first.si, first.id, cardId);
+  if (r && r.ok) {
+    cancelFlow();
+  } else {
+    showToast((r && r.msg) || '无法标记');
+    _ui.scanSel = [];
+    render();
+  }
+}
+
 /* ============================================================
    猜测对话气泡：宣告 → 回应 → 结算（各端同节奏）
    ============================================================ */
@@ -1206,11 +1562,13 @@ function _bubbleText(fx, phase) {
     if (fx.kind === 'pair') return `${by}这张是「${fx.label}」！`;
     if (fx.kind === 'solo') return `${by}我公开我手上的 ${fx.count} 张「${fx.label}」！`;
     if (fx.kind === 'red') return `${by}我公开我手上最后一张红色导线！`;
+    if (fx.superScan) return `${by}超级探测器扫描你整份手牌——我猜有「${fx.label}」！`;
     return `${by}扫描这 ${fx.count} 张——我猜有「${fx.label}」！`;
   }
   const toMine = mySeat() !== null && fx.to === mySeat();
   const to = toMine ? '' : _playerName(fx.to) + '：';
   if (fx.kind === 'pair') return fx.hit ? `${to}被你猜中了！` : `${to}猜错啦～`;
+  if (fx.superScan) return fx.hit ? `${to}命中了！这份里有「${fx.label}」` : `${to}这份里没有「${fx.label}」…`;
   return fx.hit ? `${to}命中了！有「${fx.label}」` : `${to}这里没有「${fx.label}」…`;
 }
 
@@ -1245,7 +1603,7 @@ function _playBubbles(fx) {
 function _startFxSequence(kind, plan) {
   const ids = kind === 'scan' ? plan.targetCards.map(c => c.id)
     : kind === 'solo' ? plan.cards.map(c => c.id)
-    : [plan.card.id];                     // pair / red：单张目标
+    : [plan.card.id];                     // pair / ray / red：单张目标
   const fx = {
     id: 'fx' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     kind,
@@ -1254,6 +1612,7 @@ function _startFxSequence(kind, plan) {
     label: plan.label,
     hit: !!plan.hit,
     count: kind === 'scan' || kind === 'solo' ? plan.count : 0,
+    superScan: kind === 'scan' && plan.src === 'eq5',
     ids,                                  // 被指认的牌：气泡期间聚光高亮
   };
   _fx.seen = fx.id;
@@ -1265,8 +1624,8 @@ function _startFxSequence(kind, plan) {
     if (!S || S.fx !== fx) { _clearBubbles(); return; }
     S.fx = null;
     _clearBubbles();
-    if (kind === 'pair') _applyPairCut(plan);
-    else if (kind === 'scan') _applyScan(plan);
+    if (kind === 'pair') { if (plan.src === 'eq10') _applyRayCut(plan); else _applyPairCut(plan); }
+    else if (kind === 'scan') { if (plan.src === 'eq5') _applySuperScan(plan); else _applyScan(plan); }
     else if (kind === 'solo') _applySoloCut(plan);
     else _applyRevealRed(plan);
   }, 2000);
@@ -1293,10 +1652,11 @@ function onGuessPick(v) {
     _ui.guess = { kind: 'blue', num: parseInt(m[1], 10) };
   }
   const actor = _actorSeat();
-  const isScan = _ui.mode === 'scan-guess';
+  const isSuper = _ui.mode === 'super-guess';
+  const isScan = _ui.mode === 'scan-guess' || isSuper;
   const cands = _ownGuessCandidates(actor, _ui.guess, isScan);
   _ui.ownCard = cands.length === 1 ? cands[0].id : null;
-  _ui.mode = isScan ? 'scan-own' : 'pair-own';
+  _ui.mode = isSuper ? 'super-own' : (isScan ? 'scan-own' : 'pair-own');
   _refreshSheet();
   render();
 }
@@ -1321,7 +1681,85 @@ function onConfirmCut() {
     if (!plan.ok) { showToast(plan.msg || '无法执行'); return; }
     closeSheet();
     _startFxSequence('scan', plan);
+  } else if (_ui.mode === 'super-own') {
+    const plan = _planSuperScan(_ui.targetSeat, _ui.superShare, _ui.guess.num, _ui.ownCard);
+    if (!plan.ok) { showToast(plan.msg || '无法执行'); return; }
+    closeSheet();
+    _startFxSequence('scan', plan);
   }
+}
+
+/* ── 道具 10/7/8/11 的回调 ── */
+
+function onRayOptTg(v) {
+  const m = /^blue-(\d+)$/.exec(v);
+  const opt = m ? { kind: 'blue', num: parseInt(m[1], 10) } : { kind: 'yellow' };
+  const i = _ui.rayOpts.findIndex(o => o.kind === opt.kind && (o.kind !== 'blue' || o.num === opt.num));
+  if (i >= 0) {
+    _ui.rayOpts.splice(i, 1);
+  } else {
+    if (_ui.rayOpts.length >= 2) { showToast('最多选择 2 个猜测选项'); return; }
+    _ui.rayOpts.push(opt);
+  }
+  _refreshSheet();
+  render();
+}
+
+function onRayConfirm() {
+  if (_ui.rayOpts.length !== 2) { showToast('请选择 2 个猜测选项'); return; }
+  _ui.rayOwn = { a: null, b: null };
+  const actor = _actorSeat();
+  _ui.rayOpts.forEach((o, k) => {          // 仅 1 张候选时自动选中
+    const cands = _ownCandsFor(actor, o);
+    if (cands.length === 1) _ui.rayOwn[k === 0 ? 'a' : 'b'] = cands[0].id;
+  });
+  _ui.mode = 'ray-own';
+  _refreshSheet();
+  render();
+}
+
+function onRayOwnPick(which, cardId) {
+  if (which === 'a') _ui.rayOwn.a = cardId; else _ui.rayOwn.b = cardId;
+  _refreshSheet();
+  render();
+}
+
+function onConfirmRay() {
+  if (!_ui.rayOwn.a || !_ui.rayOwn.b) { showToast('请为两个选项各选 1 张自选牌'); return; }
+  if (_ui.rayOpts.length !== 2) { showToast('请先选择 2 个猜测选项'); return; }
+  const plan = _planRayCut(_ui.targetSeat, _ui.targetCardId, _ui.rayOpts[0], _ui.rayOpts[1], _ui.rayOwn.a, _ui.rayOwn.b);
+  if (!plan.ok) { showToast(plan.msg || '无法执行'); return; }
+  closeSheet();
+  _startFxSequence('pair', plan);
+}
+
+function onBatteryToggle(seat) {
+  const i = _ui.batterySel.indexOf(seat);
+  if (i >= 0) _ui.batterySel.splice(i, 1);
+  else {
+    if (_ui.batterySel.length >= 2) { showToast('最多选择 2 名玩家'); return; }
+    _ui.batterySel.push(seat);
+  }
+  _refreshSheet();
+  render();
+}
+
+function onBatteryConfirm() {
+  const r = useBattery(_ui.batterySel);
+  if (r && r.ok) closeSheet();
+  else showToast((r && r.msg) || '无法使用');
+}
+
+function onRadarPick(n) {
+  const r = useRadar(n);
+  if (r && r.ok) closeSheet();
+  else showToast((r && r.msg) || '无法使用');
+}
+
+function onCoffeePick(seat) {
+  const r = useCoffee(seat);
+  if (r && r.ok) closeSheet();
+  else showToast((r && r.msg) || '无法使用');
 }
 
 function onSoloOpt(i) {

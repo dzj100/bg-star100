@@ -167,7 +167,6 @@ function sc(pCount, hands, opts) {
     result: null,
     ready: Array(pCount).fill(false),
     markAt: {},
-    departedPlayers: [],
     log: [],
     gameOver: false,
   };
@@ -552,7 +551,7 @@ await t('探测器相邻校验：非相邻 / 跨玩家 / 已公开 均被拒绝'
   includes(g.doScan([a.id, b.id], 3, own11.id, 'skill').msg, '没有未公开的蓝色 3', '未持有该数字');
 });
 
-await t('三重探测器：3 张相邻扫描；命中生效；道具不占回合（结束后继续行动）', () => {
+await t('三重探测器：3 张相邻扫描；命中生效；本回合行动（结算后结束回合）', () => {
   const g = loadGame();
   const own7 = C('blue', 7);
   const a = C('blue', 7), b = C('blue', 3), c = C('blue', 2);
@@ -564,7 +563,7 @@ await t('三重探测器：3 张相邻扫描；命中生效；道具不占回合
   assert(S.pending && S.pending.type === 'scanPick' && S.pending.src === 'eq3');
   assert(g.resolveScanPick(a.id).ok);
   assert(a.revealed && own7.revealed);
-  eq(S.currentSeat, 0, '道具不占回合：归还行动者继续行动');
+  eq(S.currentSeat, 1, '探测器类道具 = 本回合行动：结算即结束回合');
   eq(S.scanMode, null);
 });
 
@@ -731,6 +730,493 @@ await t('对讲机拒绝：交换已公开牌 / 指定自己', () => {
   includes(g.useWalkie(h.id, 0).msg, '其他玩家');
 });
 
+/* ──────────────────────────── 道具 4~12 ──────────────────────────── */
+
+console.log('── 道具 4~12 ──');
+
+await t('便利贴：标记自己 1 张未公开且无信息标记的蓝线；不占行动', () => {
+  const g = loadGame();
+  const b5 = C('blue', 5), b6 = C('blue', 6);
+  const S = use(g, sc(2, [[[b5, b6]], [[C('blue', 9)]]],
+    { equipment: [{ no: 4, unlocked: true, used: false }] }));
+  const r = g.useStickyNote(b6.id);
+  assert(r.ok);
+  eq(b6.info.num, 6, '信息标记绑定该牌');
+  eq(S.equipment[0].used, true);
+  eq(S.currentSeat, 0, '便利贴不占行动');
+  assert(S.log.some(l => l.msg.includes('便利贴')));
+});
+
+await t('便利贴拒绝：黄线 / 已公开 / 已有信息标记 / 他人牌', () => {
+  const g = loadGame();
+  const info = C('blue', 3, { info: { num: 3 } });
+  const y = C('yellow', 3.1), rev = C('blue', 4, { revealed: true });
+  const o9 = C('blue', 9);
+  use(g, sc(2, [[[info, y, rev]], [[o9]]],
+    { equipment: [{ no: 4, unlocked: true, used: false }] }));
+  includes(g.useStickyNote(y.id).msg, '蓝色');
+  includes(g.useStickyNote(rev.id).msg, '未公开');
+  includes(g.useStickyNote(info.id).msg, '已有信息标记');
+  includes(g.useStickyNote(o9.id).msg, '自己的导线');
+});
+
+await t('超级探测器：命中所选份（整份视角）；待选公开 → 结算即结束回合', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const a7 = C('blue', 7), a2 = C('blue', 2);
+  const S = use(g, sc(2, [
+    [[own7, C('blue', 12)]],
+    [[C('blue', 9), C('blue', 3)], [a7, a2]],
+  ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  const r = g.doSuperScan(1, 1, 7, own7.id);
+  assert(r.ok && r.hit);
+  eq(S.equipment[0].used, true);
+  assert(S.pending && S.pending.type === 'superPick' && S.pending.src === 'eq5');
+  eq(S.pending.cards.length, 1, '仅该份中命中的牌可公开');
+  eq(S.currentSeat, 1, '移交被猜方选择公开牌');
+  assert(g.resolveScanPick(a7.id).ok);
+  assert(a7.revealed && own7.revealed, '双方各公开 1 张');
+  eq(S.currentSeat, 1, '探测器类 = 本回合行动：结算即结束回合（0→1）');
+});
+
+await t('超级探测器：判定以所选「一份」为准（另一份有也属未命中）', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const s0a = C('blue', 9), s0b = C('blue', 2);
+  const S = use(g, sc(2, [
+    [[own7, C('blue', 12)]],
+    [[s0a, s0b], [C('blue', 7), C('blue', 3)]],
+  ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  const r = g.doSuperScan(1, 0, 7, own7.id);
+  assert(r.ok && !r.hit, '第 1 份无蓝 7 → 未命中（即使第 2 份有）');
+  eq(S.failures, 1);
+  assert(S.pending && S.pending.type === 'superMark' && S.pending.src === 'eq5');
+  eq(S.pending.cards.length, 2, '被猜方仅可在该份未公开蓝线中选');
+  eq(S.currentSeat, 1);
+  assert(g.resolveScanMark(s0a.id).ok);
+  assert(s0a.fail && s0a.fail.type === 'blue' && s0a.fail.num === 9, '身份标记真实公开');
+  assert(!s0a.revealed, '牌面保持隐藏');
+  eq(S.currentSeat, 1, '标记落定即结束回合');
+});
+
+await t('超级探测器：该份无未公开蓝线 → 跳过身份标记且不破坏回合流转', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const y1 = C('yellow', 3.1), y2 = C('yellow', 9.1);
+  const S = use(g, sc(2, [
+    [[own7, C('blue', 12)]],
+    [[y1, y2]],
+  ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  const r = g.doSuperScan(1, 0, 7, own7.id);
+  assert(r.ok && !r.hit);
+  eq(S.failures, 1);
+  eq(S.pending, null, '无需等待标记');
+  assert(!y1.fail && !y2.fail, '无蓝线不标记');
+  eq(S.currentSeat, 1, '回合正常流转');
+  assert(S.log.some(l => l.msg.includes('跳过身份标记')));
+});
+
+await t('超级探测器：命中不自动公开——由被猜方选择公开哪张（回归守护）', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const a7 = C('blue', 7);
+  const S = use(g, sc(2, [
+    [[own7, C('blue', 12)]],
+    [[a7, C('blue', 3)]],
+  ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  g.doSuperScan(1, 0, 7, own7.id);
+  assert(!a7.revealed && !own7.revealed, '未结算前不得自动公开');
+  assert(S.pending && S.pending.type === 'superPick');
+  assert(g.resolveScanPick(a7.id).ok);
+  assert(a7.revealed && own7.revealed);
+});
+
+await t('超级探测器拒绝：全部公开的份 / 无效份 / 未持有数字 / 自选牌不符', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const rev = C('blue', 3, { revealed: true });
+  const a7 = C('blue', 7);
+  use(g, sc(2, [
+    [[own7, C('blue', 12)]],
+    [[rev], [a7, C('blue', 9)]],
+  ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  includes(g.doSuperScan(1, 0, 7, own7.id).msg, '已全部公开');
+  includes(g.doSuperScan(1, 9, 7, own7.id).msg, '无效的份');
+  includes(g.doSuperScan(1, 1, 11, own7.id).msg, '没有未公开的蓝色 11');
+  includes(g.doSuperScan(1, 1, 7, C('blue', 11).id).msg, '自选牌');
+});
+
+await t('抑制器：失误 −1；不占行动', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5), C('blue', 6)]], [[C('blue', 9)]]],
+    { failures: 1, equipment: [{ no: 6, unlocked: true, used: false }] }));
+  const r = g.useSuppressor();
+  assert(r.ok);
+  eq(S.failures, 0);
+  eq(S.equipment[0].used, true);
+  eq(S.currentSeat, 0, '抑制器不占行动');
+});
+
+await t('抑制器拒绝：当前无失误 / 未解锁', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { failures: 0, equipment: [{ no: 6, unlocked: true, used: false }] }));
+  includes(g.useSuppressor().msg, '没有失误');
+
+  const g2 = loadGame();
+  use(g2, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { failures: 1, equipment: [{ no: 6, unlocked: false, used: false }] }));
+  includes(g2.useSuppressor().msg, '不可用');
+});
+
+await t('备用电池：恢复 1~2 名已使用双重探测器的玩家（含自己），恢复后可再次使用', () => {
+  const g = loadGame();
+  const S = use(g, sc(3, [[[C('blue', 5)]], [[C('blue', 9)]], [[C('blue', 3)]]],
+    { equipment: [{ no: 7, unlocked: true, used: false }] }));
+  S.players[0].skillUsed = true;
+  S.players[2].skillUsed = true;
+  const r = g.useBattery([0, 2]);
+  assert(r.ok);
+  eq(S.players[0].skillUsed, false);
+  eq(S.players[2].skillUsed, false);
+  eq(S.equipment[0].used, true);
+  assert(g.useSkill().ok, '恢复后可再次使用双重探测器');
+  eq(S.players[0].skillUsed, true);
+});
+
+await t('备用电池拒绝：数量非法 / 无效玩家 / 未使用过者不可被指定', () => {
+  const g = loadGame();
+  const S = use(g, sc(3, [[[C('blue', 5)]], [[C('blue', 9)]], [[C('blue', 3)]]],
+    { equipment: [{ no: 7, unlocked: true, used: false }] }));
+  S.players[1].skillUsed = true;
+  includes(g.useBattery([]).msg, '1~2');
+  includes(g.useBattery([1, 2, 0]).msg, '1~2');
+  includes(g.useBattery([99]).msg, '无效的玩家');
+  includes(g.useBattery([0]).msg, '尚未使用过');
+});
+
+await t('通用雷达：自动公布每人每份是否还有未公开蓝 N（含自己、已公开不计数）', () => {
+  const g = loadGame();
+  const mineRev = C('blue', 7, { revealed: true });
+  const mine2 = C('blue', 2);
+  const t7 = C('blue', 7);
+  const S = use(g, sc(2, [
+    [[mineRev], [mine2]],
+    [[t7, C('yellow', 3.1)]],
+  ], { equipment: [{ no: 8, unlocked: true, used: false }] }));
+  const r = g.useRadar(7);
+  assert(r.ok);
+  eq(S.equipment[0].used, true);
+  assert(S.radar && S.radar.num === 7);
+  eq(S.radar.rows.length, 2);
+  eq(S.radar.rows[0].seat, 0);
+  eq(S.radar.rows[0].per.length, 2, '持 2 份分份公布');
+  eq(S.radar.rows[0].per[0], false, '已公开的蓝 7 不计数');
+  eq(S.radar.rows[0].per[1], false);
+  eq(S.radar.rows[1].per[0], true);
+  assert(S.log.some(l => l.msg.includes('通用雷达')));
+  eq(S.currentSeat, 0, '雷达不占行动');
+  g.endTurn();
+  eq(S.radar, null, '回合结束清空雷达结果');
+});
+
+await t('通用雷达拒绝：无效数字', () => {
+  const g = loadGame();
+  use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { equipment: [{ no: 8, unlocked: true, used: false }] }));
+  includes(g.useRadar(13).msg, '无效的数字');
+});
+
+await t('稳定剂：启动 / 取消（未消耗）可反复；不锁定行动', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(!g.cancelStabilizer().ok, '未启动时无可取消对象');
+  assert(g.useStabilizer().ok);
+  eq(S.cutMods.stabilize, 0, '共享状态标记稳定状态归属');
+  eq(S.equipment[0].used, false, '启动未消耗');
+  includes(g.useStabilizer().msg, '已生效', '重复启动被拒');
+  assert(g.cancelStabilizer().ok);
+  eq(S.cutMods.stabilize, null);
+  assert(g.useStabilizer().ok, '取消后可重新启动');
+});
+
+await t('稳定剂：受保护未命中——失误不计、蓝牌仍放身份标记、结算消耗', () => {
+  const g = loadGame();
+  const ownY = C('yellow', 3.1);
+  const t8 = C('blue', 8);
+  const S = use(g, sc(2, [
+    [[ownY, C('blue', 4)]],
+    [[t8, C('blue', 12)]],
+  ], { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  const r = g.doPairCut(1, t8.id, { kind: 'yellow' }, ownY.id);
+  assert(r.ok && !r.hit);
+  eq(S.failures, 0, '失误不计入');
+  assert(t8.fail && t8.fail.type === 'blue' && t8.fail.num === 8, '蓝牌仍放身份标记');
+  assert(!t8.revealed, '牌面保持隐藏');
+  eq(S.equipment[0].used, true, '剪线结算即消耗');
+  eq(S.cutMods.stabilize, null);
+  eq(S.currentSeat, 1, '回合正常结束');
+  assert(S.log.some(l => l.msg.includes('稳定剂生效')));
+});
+
+await t('稳定剂：受保护时指到红线也不爆炸、无标记', () => {
+  const g = loadGame();
+  const ownY = C('yellow', 3.1);
+  const red = C('red', 6.5);
+  const S = use(g, sc(2, [
+    [[ownY, C('blue', 4)]],
+    [[red, C('blue', 12)]],
+  ], { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  const r = g.doPairCut(1, red.id, { kind: 'yellow' }, ownY.id);
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'play', '受保护：红线不引爆');
+  eq(S.failures, 0);
+  assert(!red.fail && !red.revealed, '红线无标记、保持隐藏');
+  eq(S.equipment[0].used, true, '结算消耗');
+  eq(S.currentSeat, 1);
+});
+
+await t('稳定剂：命中 → 正常结算但随剪线消耗', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const t7 = C('blue', 7);
+  const S = use(g, sc(2, [[[own7]], [[t7, C('blue', 12)]]],
+    { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  const r = g.doPairCut(1, t7.id, { kind: 'blue', num: 7 }, own7.id);
+  assert(r.ok && r.hit);
+  assert(t7.revealed && own7.revealed);
+  eq(S.equipment[0].used, true, '命中时随本次剪线结算消耗');
+  eq(S.cutMods.stabilize, null);
+});
+
+await t('稳定剂：本回合未剪线（单人剪线）→ 回合结束自动退还', () => {
+  const g = loadGame();
+  const cs = [C('blue', 2), C('blue', 2), C('blue', 2), C('blue', 2)];
+  const S = use(g, sc(2, [[cs], [[C('blue', 9)]]],
+    { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  assert(g.doSoloCut({ kind: 'all', num: 2 }).ok);
+  eq(S.equipment[0].used, false, '未发生剪线结算 → 退还未消耗');
+  eq(S.cutMods.stabilize, null);
+  assert(S.log.some(l => l.msg.includes('退还')));
+});
+
+await t('稳定剂 × 双重探测器：先开稳定再启动探测器，扫描未命中受保护', () => {
+  const g = loadGame();
+  const own11 = C('blue', 11);
+  const a = C('blue', 4), b = C('blue', 9);
+  const S = use(g, sc(2, [
+    [[own11, C('blue', 12)]],
+    [[a, b]],
+  ], { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok, '先开稳定状态');
+  assert(g.useSkill().ok, '稳定状态不锁定行动：仍可启动探测器');
+  const r = g.doScan([a.id, b.id], 11, own11.id, 'skill');
+  assert(r.ok && !r.hit);
+  eq(S.failures, 0, '扫描未命中受保护');
+  assert(S.pending && S.pending.type === 'scanMark');
+  assert(g.resolveScanMark(a.id).ok);
+  eq(S.equipment[0].used, true, '扫描结算时消耗');
+});
+
+await t('X/Y射线：命中蓝 A 项 → 被指牌公开 + 对应自选牌公开；结算即结束回合', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownY = C('yellow', 3.1);
+  const t7 = C('blue', 7);
+  const S = use(g, sc(2, [
+    [[own7, ownY]],
+    [[t7, C('blue', 12)]],
+  ], { equipment: [{ no: 10, unlocked: true, used: false }] }));
+  const r = g.doRayCut(1, t7.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, own7.id, ownY.id);
+  assert(r.ok && r.hit);
+  assert(t7.revealed && own7.revealed, '命中蓝 A → 公开 A 项自选牌');
+  assert(!ownY.revealed, '未命中项自选牌不公开');
+  eq(S.equipment[0].used, true);
+  eq(S.currentSeat, 1, '本回合行动：结算即结束回合');
+});
+
+await t('X/Y射线：命中黄项 → 公开被指牌 + 黄自选牌', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownY = C('yellow', 3.1);
+  const ty = C('yellow', 5.1);
+  use(g, sc(2, [
+    [[own7, ownY]],
+    [[ty, C('blue', 12)]],
+  ], { equipment: [{ no: 10, unlocked: true, used: false }] }));
+  const r = g.doRayCut(1, ty.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, own7.id, ownY.id);
+  assert(r.ok && r.hit);
+  assert(ty.revealed && ownY.revealed);
+  assert(!own7.revealed);
+});
+
+await t('X/Y射线：未命中 → 失误 +1、被指牌放身份标记；非红不爆炸', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), own9 = C('blue', 9);
+  const t10 = C('blue', 10);
+  const S = use(g, sc(2, [
+    [[own7, own9]],
+    [[t10, C('blue', 12)]],
+  ], { equipment: [{ no: 10, unlocked: true, used: false }] }));
+  const r = g.doRayCut(1, t10.id, { kind: 'blue', num: 7 }, { kind: 'blue', num: 9 }, own7.id, own9.id);
+  assert(r.ok && !r.hit);
+  eq(S.failures, 1);
+  assert(t10.fail && t10.fail.type === 'blue' && t10.fail.num === 10);
+  eq(S.phase, 'play');
+  eq(S.currentSeat, 1);
+});
+
+await t('X/Y射线：未命中且为红线 → 立即爆炸（boom-red）', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownY = C('yellow', 3.1);
+  const red = C('red', 6.5);
+  const S = use(g, sc(2, [
+    [[own7, ownY]],
+    [[red, C('blue', 12)]],
+  ], { equipment: [{ no: 10, unlocked: true, used: false }] }));
+  const r = g.doRayCut(1, red.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, own7.id, ownY.id);
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-red');
+});
+
+await t('X/Y射线 × 稳定剂：未命中受保护（红线不爆、失误不计）', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownY = C('yellow', 3.1);
+  const red = C('red', 6.5);
+  const S = use(g, sc(2, [
+    [[own7, ownY]],
+    [[red, C('blue', 12)]],
+  ], { equipment: [{ no: 9, unlocked: true, used: false }, { no: 10, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  const r = g.doRayCut(1, red.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, own7.id, ownY.id);
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'play', '受保护不爆');
+  eq(S.failures, 0);
+  eq(S.equipment.find(e => e.no === 9).used, true);
+  eq(S.equipment.find(e => e.no === 10).used, true);
+});
+
+await t('X/Y射线拒绝：双黄 / 同数字 / 未持有选项 / 自选牌不符', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownY = C('yellow', 3.1);
+  const t5 = C('blue', 5);
+  use(g, sc(2, [
+    [[own7, ownY]],
+    [[t5, C('blue', 12)]],
+  ], { equipment: [{ no: 10, unlocked: true, used: false }] }));
+  includes(g.doRayCut(1, t5.id, { kind: 'yellow' }, { kind: 'yellow' }, ownY.id, ownY.id).msg, '不能都是黄色');
+  includes(g.doRayCut(1, t5.id, { kind: 'blue', num: 7 }, { kind: 'blue', num: 7 }, own7.id, own7.id).msg, '不能相同');
+  includes(g.doRayCut(1, t5.id, { kind: 'blue', num: 7 }, { kind: 'blue', num: 9 }, own7.id, own7.id).msg, '都须持有');
+  includes(g.doRayCut(1, t5.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, ownY.id, own7.id).msg, '自选牌 A');
+  includes(g.doRayCut(1, t5.id, { kind: 'blue', num: 7 }, { kind: 'yellow' }, own7.id, own7.id).msg, '自选牌 B');
+});
+
+await t('咖啡瓶：跳过自己回合，从指定玩家继续（仅限仍有未公开手牌者）', () => {
+  const g = loadGame();
+  const S = use(g, sc(3, [
+    [[C('blue', 5)]],
+    [[C('blue', 9)]],
+    [[C('blue', 3)]],
+  ], { equipment: [{ no: 11, unlocked: true, used: false }] }));
+  const r = g.useCoffee(2);
+  assert(r.ok);
+  eq(S.currentSeat, 2, '从指定玩家继续');
+  eq(S.equipment[0].used, true);
+  assert(S.log.some(l => l.msg.includes('咖啡瓶')));
+});
+
+await t('咖啡瓶拒绝：指定自己 / 已无未公开手牌者', () => {
+  const g = loadGame();
+  use(g, sc(3, [
+    [[C('blue', 5)]],
+    [[C('blue', 9, { revealed: true })]],
+    [[C('blue', 3)]],
+  ], { equipment: [{ no: 11, unlocked: true, used: false }] }));
+  includes(g.useCoffee(0).msg, '其他玩家');
+  includes(g.useCoffee(1).msg, '没有未公开手牌');
+});
+
+await t('咖啡瓶：跳过回合时未消费的稳定剂自动退还', () => {
+  const g = loadGame();
+  const S = use(g, sc(3, [
+    [[C('blue', 5)]],
+    [[C('blue', 9)]],
+    [[C('blue', 3)]],
+  ], { equipment: [{ no: 9, unlocked: true, used: false }, { no: 11, unlocked: true, used: false }] }));
+  assert(g.useStabilizer().ok);
+  assert(g.useCoffee(2).ok);
+  eq(S.cutMods.stabilize, null);
+  eq(S.equipment.find(e => e.no === 9).used, false, '稳定剂退还未消耗');
+  eq(S.currentSeat, 2);
+});
+
+await t('＝标签：蓝蓝同数字相邻 → 成对标记（可含已公开）', () => {
+  const g = loadGame();
+  const b1 = C('blue', 5), b2 = C('blue', 5, { revealed: true });
+  const S = use(g, sc(2, [[[b1, b2]], [[C('blue', 9)]]],
+    { equipment: [{ no: 12, unlocked: true, used: false }] }));
+  const r = g.useEqTag(0, b1.id, b2.id);
+  assert(r.ok);
+  assert(b1.eqp && b1.eqp === b2.eqp, '两张牌共享 pairId');
+  eq(S.equipment[0].used, true);
+  assert(S.log.some(l => l.msg.includes('两张均为蓝色 5')));
+});
+
+await t('＝标签：黄黄 / 红红 → 成对标记', () => {
+  const g1 = loadGame();
+  const y1 = C('yellow', 3.1), y2 = C('yellow', 9.1);
+  const S1 = use(g1, sc(2, [[[y1, y2]], [[C('blue', 9)]]],
+    { equipment: [{ no: 12, unlocked: true, used: false }] }));
+  assert(g1.useEqTag(0, y1.id, y2.id).ok);
+  assert(y1.eqp && y1.eqp === y2.eqp);
+  assert(S1.log.some(l => l.msg.includes('均为黄色')));
+
+  const g2 = loadGame();
+  const r1 = C('red', 6.5), r2 = C('red', 6.5);
+  const S2 = use(g2, sc(2, [[[r1, r2]], [[C('blue', 9)]]],
+    { equipment: [{ no: 12, unlocked: true, used: false }] }));
+  assert(g2.useEqTag(0, r1.id, r2.id).ok);
+  assert(S2.log.some(l => l.msg.includes('均为红色')));
+});
+
+await t('＝标签拒绝：蓝不同数字 / 异色 / 非相邻 / 双已公开', () => {
+  const g = loadGame();
+  const b5 = C('blue', 5), b6 = C('blue', 6), y = C('yellow', 3.1);
+  const rev1 = C('blue', 8, { revealed: true }), rev2 = C('blue', 8, { revealed: true });
+  use(g, sc(2, [[[b5, b6, y, rev1, rev2]], [[C('blue', 9)]]],
+    { equipment: [{ no: 12, unlocked: true, used: false }] }));
+  includes(g.useEqTag(0, b5.id, b6.id).msg, '同一数字');
+  includes(g.useEqTag(0, y.id, rev1.id).msg, '同色');
+  includes(g.useEqTag(0, b5.id, rev1.id).msg, '相邻');
+  includes(g.useEqTag(0, rev1.id, rev2.id).msg, '未公开');
+});
+
+await t('＝标签：交换导致相邻关系破坏时自动废弃', () => {
+  const g = loadGame();
+  const c1 = C('blue', 5), c2 = C('blue', 5);
+  const S = use(g, sc(2, [[[c1, c2]], [[C('blue', 9)]]],
+    { equipment: [{ no: 12, unlocked: true, used: false }] }));
+  g.useEqTag(0, c1.id, c2.id);
+  assert(c1.eqp && c2.eqp);
+  S.players[0].shares[0].splice(0, 1);
+  S.players[1].shares[0].push(c1);
+  g._validateNeqPairs();
+  eq(c1.eqp, null, '离开原相邻位的牌应废弃');
+  eq(c2.eqp, null, '配对另一张同步废弃');
+});
+
+await t('道具通用：已启动双重探测器时道具被封锁（须先执行扫描）', () => {
+  const g = loadGame();
+  use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { failures: 1, equipment: [{ no: 6, unlocked: true, used: false }] }));
+  assert(g.useSkill().ok);
+  includes(g.useSuppressor().msg, '须执行扫描');
+});
+
 /* ──────────────────────────── 公开红线 / 胜利 / 联机合并 ──────────────────────────── */
 
 console.log('── 红线与胜负 ──');
@@ -822,20 +1308,20 @@ await t('联机：getOrderValue 以 turnNo 为新鲜度排序（无 turnNo 退�
 
 await t('联机：陈旧快照拒绝 + pushId 去重（乱序/重放防倒灌）', () => {
   const o = loadOnline();
-  o._handleRemoteState({ state: { currentPlayer: 0, _ts: 6000, _pushId: 'p-new', departedPlayers: [] } });
+  o._handleRemoteState({ state: { currentPlayer: 0, _ts: 6000, _pushId: 'p-new' } });
   eq(o.__applied.length, 1, '新状态应被应用');
   eq(ev(o, '_gameStarted'), true, '应用后进入对局态');
 
   // 同一条状态重复投递（重订阅/重同步重复拉取）
-  o._handleRemoteState({ state: { currentPlayer: 0, _ts: 6000, _pushId: 'p-new', departedPlayers: [] } });
+  o._handleRemoteState({ state: { currentPlayer: 0, _ts: 6000, _pushId: 'p-new' } });
   eq(o.__applied.length, 1, '相同 pushId 重复投递应去重');
 
   // 早于已应用水位 3s 以上的过期快照（留时钟偏差余量）
-  o._handleRemoteState({ state: { currentPlayer: 3, _ts: 1000, _pushId: 'p-old', departedPlayers: [] } });
+  o._handleRemoteState({ state: { currentPlayer: 3, _ts: 1000, _pushId: 'p-old' } });
   eq(o.__applied.length, 1, '陈旧快照应被拒绝');
 
   // 更新的快照正常应用
-  o._handleRemoteState({ state: { currentPlayer: 3, _ts: 7000, _pushId: 'p-new2', departedPlayers: [] } });
+  o._handleRemoteState({ state: { currentPlayer: 3, _ts: 7000, _pushId: 'p-new2' } });
   eq(o.__applied.length, 2, '更新的快照应正常应用');
   eq(ev(o, '_lastAppliedTs'), 7000, '新鲜度水位应推进');
 });
