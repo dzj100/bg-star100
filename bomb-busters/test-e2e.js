@@ -348,6 +348,25 @@ await waitEval(devA, () => {
   return !!(h && h.textContent.includes('依次点选'));
 }, '行动端进入扫描选择态');
 
+// 未消耗可反悔：退出选择 → 面板提供【取消】→ 技能恢复未使用 → 重新启动
+await devA.click('[data-testid="btn-cancel"]');
+await waitEval(devA, () => {
+  const h = document.querySelector('.action-bar .mode-hint');
+  const c = document.querySelector('[data-testid="btn-cancel-skill"]');
+  return !!(h && h.textContent.includes('已启动双重探测器') && c);
+}, '退出选择后出现 取消/开始扫描 面板');
+await devA.screenshot({ path: SHOTS + '/e2e-12d-skill-cancel-panel.png' });
+await devA.click('[data-testid="btn-cancel-skill"]');
+await waitEval(devA, () => {
+  const sn = window.S.currentSeat;
+  return !window.S.scanMode && !window.S.players[sn].skillUsed;
+}, '取消探测器：扫描态清除、技能恢复未使用');
+await devA.click('[data-testid="btn-skill"]');
+await waitEval(devA, () => {
+  const h = document.querySelector('.mode-hint');
+  return !!(h && h.textContent.includes('依次点选'));
+}, '取消后可重新启动探测器');
+
 const scanPlan = await devA.evaluate(() => {
   const s = window.S;
   const actor = s.currentSeat;

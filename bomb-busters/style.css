@@ -13,9 +13,9 @@
   --ink: #25324e;                      /* 描边墨色 */
   --gold: #f6b62b;
   --danger: #e8402a;                   /* 牛仔红 */
-  --blue: #2f6fd6;
-  --red: #e8402a;
-  --yellow: #e3961a;
+  --wire-blue: #54989e;                /* 水鸭青（采样自原版蓝导线 #54989E） */
+  --wire-yellow: #eac31e;              /* 金黄（采样自原版黄导线 #EAC31E） */
+  --wire-red: #dc3d36;                 /* 朱红（采样自原版红导线 #DC3D36） */
   --green: #17a06b;
   --line: #e4dac2;                     /* 浅描边（面板分隔） */
   --radius: 14px;
@@ -432,11 +432,10 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   align-items: center;
   gap: 8px;
   background: var(--surface);
-  border: 2.5px solid var(--ink);
+  border: 2.5px solid var(--line);
   border-radius: var(--radius);
   padding: 8px 12px;
-  margin-bottom: 10px;
-  box-shadow: var(--sticker);
+  margin-bottom: 8px;
 }
 .header-title { font-weight: 900; letter-spacing: .06em; font-size: .95rem; }
 .header-btns { display: flex; gap: 6px; }
@@ -447,11 +446,10 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 
 .board {
   background: var(--surface);
-  border: 2.5px solid var(--ink);
+  border: 2.5px solid var(--line);
   border-radius: var(--radius);
   padding: 10px;
-  margin-bottom: 10px;
-  box-shadow: var(--sticker);
+  margin-bottom: 8px;
 }
 .board-head {
   display: flex;
@@ -470,7 +468,6 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   border-radius: 8px;
   padding: 5px 0 8px;
   text-align: center;
-  overflow: hidden;
 }
 .cell-num { display: block; font-weight: 900; font-size: .8rem; line-height: 1.2; }
 .cell-rev { display: block; font-size: .5rem; color: var(--text-dim); font-weight: 700; }
@@ -482,8 +479,9 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 /* 已完成：保留原数字 + 右上角绿勾徽章 */
 .cell-check {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: -4px;
+  right: -4px;
+  z-index: 1;
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -508,12 +506,12 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   gap: 2px;
 }
 .dot { width: 5px; height: 5px; border-radius: 50%; }
-.dot-y { background: var(--yellow); }
-.dot-r { background: var(--red); box-shadow: 0 0 7px rgba(232, 64, 42, .7); }
+.dot-y { background: var(--wire-yellow); }
+.dot-r { background: var(--wire-red); box-shadow: 0 0 7px rgba(220, 61, 54, .7); }
 
 .board-legend { display: flex; gap: 14px; margin-top: 8px; font-size: .74rem; font-weight: 700; }
-.legend-r { color: #cf3a1f; }
-.legend-y { color: #a56f05; }
+.legend-r { color: #c22c25; }
+.legend-y { color: #8a6a06; }
 
 /* ============================================================
    玩家行 / 手牌
@@ -579,33 +577,58 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 
 .card .card-num { font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
-.card .card-kind { font-size: calc(var(--cw, 24px) * .3); opacity: .8; line-height: 1; margin-top: 3px; font-weight: 700; }
+.card .card-kind { display: none; }
 
 .card-own { width: var(--cw, 26px); height: calc(var(--cw, 26px) * 3); }
-.card-own:not(.revealed) { border-style: dashed !important; }
 
-.card.kind-blue { background: linear-gradient(#eef5ff, #d9e8ff); border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #2f6fd6; color: #1d4f9e; }
-.card.kind-yellow { background: linear-gradient(#fff6d8, #ffe7a3); border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #e3961a; color: #8a5c05; }
-.card.kind-red { background: linear-gradient(#ffe7e2, #ffcfc6); border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #d93a26; color: #a52a18; }
+/* 原版深底：藏青面板 + 参考色导线段 + 白数字（底色参考牌背 #2a3852，导线色采样自原版实体牌）；
+   导线只从上下两端穿过，中部留给数字；牌面=已知，深藏青牌背=未知。
+   底色用 background-color（随圆角裁切），SVG 仅画导线并拉伸铺满，避免缩放留白边 */
+.card.kind-blue {
+  background-color: #30405e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 72' preserveAspectRatio='none'%3E%3Cpath d='M12 0 C8.6 8 15.4 17 12 26' stroke='%236eb5bd' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M12 46 C15.4 55 8.6 64 12 72' stroke='%234f959d' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #1f2b45;
+  color: #f5f2ea;
+}
+.card.kind-yellow {
+  background-color: #30405e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 72' preserveAspectRatio='none'%3E%3Cpath d='M12 0 C8.6 8 15.4 17 12 26' stroke='%23eac31e' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M12 46 C15.4 55 8.6 64 12 72' stroke='%23c9a20e' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #1f2b45;
+  color: #f5f2ea;
+}
+.card.kind-red {
+  background-color: #30405e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 72' preserveAspectRatio='none'%3E%3Cpath d='M12 0 C8.6 8 15.4 17 12 26' stroke='%23dc3d36' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M12 46 C15.4 55 8.6 64 12 72' stroke='%23b32a24' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border: clamp(1px, calc(var(--cw, 24px) * .08), 2px) solid #1f2b45;
+  color: #f5f2ea;
+}
 
 .card.revealed { border-style: solid !important; }
-.card.kind-blue.revealed { box-shadow: 0 0 7px rgba(47, 111, 214, .35); }
-.card.kind-yellow.revealed { box-shadow: 0 0 7px rgba(227, 150, 26, .4); }
-.card.kind-red.revealed { box-shadow: 0 0 7px rgba(217, 58, 38, .4); }
+.card.kind-blue.revealed { box-shadow: 0 0 8px rgba(110, 181, 189, .5); }
+.card.kind-yellow.revealed { box-shadow: 0 0 8px rgba(234, 195, 30, .55); }
+.card.kind-red.revealed { box-shadow: 0 0 8px rgba(220, 61, 54, .55); }
 
-/* 自己的已公开牌：置灰（属于公共信息，不再高亮） */
-.card-own.revealed {
-  background: #eae7dd !important;
-  border: 2px solid #b9b3a2 !important;
-  color: #8a8577 !important;
-  box-shadow: none !important;
-  opacity: .8;
+/* 自己的已公开牌：保留原牌面，只罩一层暗纱（属于公共信息，不再高亮） */
+.card.card-own.revealed { border-color: #1c2740; box-shadow: none; }
+.card-own.revealed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: clamp(3px, calc(var(--cw, 24px) * .28), 6px);
+  background: rgb(220 243 230 / 60%);
+  pointer-events: none;
 }
-.card-own.revealed .card-kind { color: #a09a8a; }
 
 /* 牌背：深色面板 + SVG 导线（上 1 根 + 下 1 根，经中央接头板） */
 .card-back {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 72'%3E%3Crect width='24' height='72' rx='6' fill='%232a3852'/%3E%3Cpath d='M12 0 C8.6 8 15.4 17 12 26' stroke='%236fb3a8' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M12 46 C15.4 55 8.6 64 12 72' stroke='%23487f77' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Crect x='6' y='27' width='12' height='18' rx='3' fill='%233b4c6e'/%3E%3Crect x='10.5' y='31' width='3' height='10' rx='1.2' fill='%23162031'/%3E%3C/svg%3E");
+  background-color: #1d2639;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 72' preserveAspectRatio='none'%3E%3Cpath d='M12 0 C8.6 8 15.4 17 12 26' stroke='%236fb3a8' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M12 46 C15.4 55 8.6 64 12 72' stroke='%23487f77' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3Crect x='6' y='27' width='12' height='18' rx='3' fill='%233b4c6e'/%3E%3Crect x='10.5' y='31' width='3' height='10' rx='1.2' fill='%23162031'/%3E%3C/svg%3E");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   color: var(--text-dim);
@@ -621,14 +644,14 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   z-index: 2;
 }
 .marker { font-size: .5rem; padding: 1px 3px; border-radius: 5px; line-height: 1.25; white-space: nowrap; font-weight: 800; border: 1px solid rgba(37, 50, 78, .2); }
-.marker-info { background: var(--gold); color: #4a3403; }
+.marker-info { background: #d9f0f3; color: #0d4a52; border-color: #4f959d; }
 .marker-fail { background: #ffe0da; color: #a52a18; border-color: #d93a26; }
 .marker-neq { background: #6d28d9; color: #f3e8ff; border-color: #4c1d95; }
 
 /* 交互态 */
 .card.selectable { animation: selPulse 1.3s ease-in-out infinite; cursor: pointer; }
 .card.selected { outline: 3px solid var(--gold); outline-offset: 1px; transform: translateY(-4px); }
-.card.picked { border: 2.5px dashed var(--gold) !important; }
+.card.picked { border: 2.5px solid var(--gold) !important; }
 .card.hit { border-color: var(--gold) !important; box-shadow: 0 0 10px var(--gold); }
 
 /* ============================================================
@@ -660,8 +683,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   border: 2.5px solid var(--line);
   border-radius: var(--radius);
   padding: 8px 10px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 0 rgba(37, 50, 78, .1);
+  margin-bottom: 8px;
 }
 .equip-label { flex: 0 0 auto; color: var(--text-dim); font-size: .74rem; font-weight: 800; }
 .equip-btns { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -707,6 +729,11 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .pending-title { font-size: .92rem; font-weight: 900; color: #96680a; }
 
 .bar-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* 单确认条：左小取消 + 右侧主操作（如探测器「取消 / 开始扫描」） */
+.arm-row { display: flex; gap: 8px; }
+.arm-row .action-btn.cancel { flex: 0 0 auto; padding-left: 18px; padding-right: 18px; }
+.arm-row .action-btn.primary { flex: 1; }
 
 .action-btn {
   padding: 11px 8px;
@@ -757,7 +784,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   font-weight: 800;
 }
 .guess-btn.selected { border-color: var(--gold); background: #fff5d8; color: #96680a; }
-.guess-btn.yellow { grid-column: span 2; border-color: var(--yellow); color: #8a5c05; background: #fff8e3; }
+.guess-btn.yellow { grid-column: span 2; border-color: var(--wire-yellow); color: #8a6a06; background: #fdf3d0; }
 
 /* ============================================================
    日志（位于数轴板上方）
@@ -769,12 +796,12 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   align-items: center;
   gap: 8px;
   background: var(--surface);
-  border: 2px solid var(--line);
+  border: 2.5px solid var(--line);
   border-radius: 12px;
   padding: 8px 12px;
   font-size: .77rem;
   color: var(--text-dim);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .log-msg { flex: 1; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .log-msg.good, .log-item.good { color: #0f7a4d; }

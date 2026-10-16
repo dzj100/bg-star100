@@ -583,6 +583,80 @@ await t('三重探测器：2 张不足 / 已启动技能时被拒绝', () => {
   includes(r2.msg, '技能扫描');
 });
 
+await t('双重探测器可取消：未扫描前恢复技能；执行/结算后不可取消', () => {
+  const g = loadGame();
+  const own4 = C('blue', 4);
+  const a = C('blue', 4), b = C('blue', 9);
+  const S = use(g, sc(2, [[[own4, C('blue', 12)]], [[a, b]]]));
+
+  const r0 = g.cancelSkill();
+  assert(!r0.ok, '未启动时无可取消对象');
+  includes(r0.msg, '未启动');
+
+  assert(g.useSkill().ok);
+  assert(g.cancelSkill().ok, '启动后可取消');
+  eq(S.scanMode, null);
+  eq(S.players[0].skillUsed, false, '技能恢复未使用（未消耗）');
+  assert(S.log.some(l => l.msg.includes('取消使用双重探测器')), '取消写入日志');
+
+  assert(g.useSkill().ok, '取消后可重新启动');
+  const r = g.doScan([a.id, b.id], 4, own4.id, 'skill');
+  assert(r.ok && r.hit);
+  assert(!g.cancelSkill().ok, '扫描执行中（待选公开）不可取消');
+  assert(g.resolveScanPick(a.id).ok);
+  eq(S.scanMode, null);
+  eq(S.players[0].skillUsed, true, '扫描结算后技能保持已消耗');
+  assert(!g.cancelSkill().ok, '结算后不可取消');
+});
+
+await t('手牌全公开的玩家自动跳过回合（3 人局 0→2）', () => {
+  const g = loadGame();
+  const own5 = C('blue', 5);
+  const t5 = C('blue', 5), z9 = C('blue', 9, { revealed: true });
+  const p2a = C('blue', 2), p2b = C('blue', 3);
+  const S = use(g, sc(3, [
+    [[own5, C('blue', 12)]],
+    [[t5, z9]],
+    [[p2a, p2b]],
+  ]));
+  const r = g.doPairCut(1, t5.id, { kind: 'blue', num: 5 }, own5.id);
+  assert(r.ok && r.hit, '双人剪线命中');
+  assert(t5.revealed && z9.revealed, 'P1 手牌应全部公开');
+  eq(S.currentSeat, 2, '全公开的 P1 被跳过，轮到 P2');
+  assert(S.log.some(l => l.msg.includes('自动跳过')), '记录自动跳过日志');
+});
+
+await t('2 人局：对手全公开时回合绕回自己（不卡死）', () => {
+  const g = loadGame();
+  const own5 = C('blue', 5);
+  const t5 = C('blue', 5), yz = C('yellow', 3.1, { revealed: true });
+  const S = use(g, sc(2, [
+    [[own5, C('blue', 12)]],
+    [[t5, yz]],
+  ]));
+  const r = g.doPairCut(1, t5.id, { kind: 'blue', num: 5 }, own5.id);
+  assert(r.ok && r.hit);
+  eq(S.currentSeat, 0, 'P1 全公开 → 绕回 P0 继续行动');
+});
+
+await t('三重探测器：发起者扫描后全公开则结束回合（道具不占回合也不例外）', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const a = C('blue', 7), b = C('blue', 3), c = C('blue', 2);
+  const S = use(g, sc(2, [
+    [[own7]],
+    [[a, b, c]],
+  ], { equipment: [{ no: 3, unlocked: true, used: false }] }));
+  const r = g.doScan([a.id, b.id, c.id], 7, own7.id, 'eq3');
+  assert(r.ok && r.hit);
+  eq(S.equipment[0].used, true);
+  assert(S.pending && S.pending.type === 'scanPick');
+  assert(g.resolveScanPick(a.id).ok);
+  assert(own7.revealed, '发起者自选牌公开');
+  eq(S.players[0].shares.flat().filter(c => !c.revealed).length, 0, '发起者已全公开');
+  eq(S.currentSeat, 1, '发起者全公开 → 回合结束轮到 P1');
+});
+
 /* ──────────────────────────── 道具：≠ 标签 / 对讲机 ──────────────────────────── */
 
 console.log('── 道具 ──');

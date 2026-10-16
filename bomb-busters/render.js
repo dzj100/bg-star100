@@ -115,9 +115,9 @@ function _landingDecoHTML() {
       <path d="M14,88 C34,30 60,24 80,62 C94,90 114,94 140,58" stroke="#25324e" stroke-width="13"/>
       <path d="M8,46 C44,64 54,98 86,90 C114,84 120,44 146,42" stroke="#25324e" stroke-width="13"/>
       <path d="M18,66 C58,86 68,42 98,54 C122,64 126,86 142,76" stroke="#25324e" stroke-width="13"/>
-      <path d="M14,88 C34,30 60,24 80,62 C94,90 114,94 140,58" stroke="#e8402a" stroke-width="7.5"/>
-      <path d="M8,46 C44,64 54,98 86,90 C114,84 120,44 146,42" stroke="#f6b62b" stroke-width="7.5"/>
-      <path d="M18,66 C58,86 68,42 98,54 C122,64 126,86 142,76" stroke="#2f6fd6" stroke-width="7.5"/>
+      <path d="M14,88 C34,30 60,24 80,62 C94,90 114,94 140,58" stroke="#dc3d36" stroke-width="7.5"/>
+      <path d="M8,46 C44,64 54,98 86,90 C114,84 120,44 146,42" stroke="#eac31e" stroke-width="7.5"/>
+      <path d="M18,66 C58,86 68,42 98,54 C122,64 126,86 142,76" stroke="#54989e" stroke-width="7.5"/>
     </g>
     <g transform="translate(146,54) rotate(-30)">
       <rect x="-10" y="-8" width="28" height="16" rx="5" fill="#cfd8e8" stroke="#25324e" stroke-width="3.5"/>
@@ -252,6 +252,7 @@ function showRules() {
       <p><b>✂️ 单人剪线</b>：① 某数字已公开 2 张且剩余 2 张都在你手上 → 公开这 2 张；② 你持有某数字全部 4 张 → 全部公开；③ 全部未公开黄线都在你手上 → 清收。</p>
       <p><b>🚨 公开红线</b>：持红者在自己其余牌全部公开后，可在回合中公开红线。</p>
       <p><b>🎁 道具</b>：某蓝数字 4/4 拆除时解锁对应编号道具（不占行动）：<b>≠标签</b>（同一份内相邻 2 张编号不同）、<b>对讲机</b>（双方各选 1 张未公开导线交换）、<b>三重探测器</b>（相邻 3 张版探测器）。</p>
+      <p>⏭️ 手牌已全部公开的玩家没有可执行的行动，轮到其回合时将<b>自动跳过</b>。</p>
       <h3>💥 失误</h3>
       <p>允许 人数−1 次失误；第 N 次失误（N = 人数）立即爆炸失败。</p>
       <h3>🔎 双重探测器（每人每局 1 次）</h3>
@@ -378,6 +379,7 @@ function _markViewHTML() {
 
   return `
   ${_logBarHTML()}
+  ${_equipRowHTML()}
   ${_boardHTML()}
   <div class="players">${rows.join('')}</div>
   <div class="own-area">${ownSeats.map(s => _ownHandHTML(s)).join('')}</div>
@@ -507,7 +509,7 @@ function _isSelected(cardId) {
 function _cardMarkersHTML(card) {
   let out = '';
   if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${_fmtNum(card.info.num)}</span>`;
-  if (card.fail) out += `<span class="marker marker-fail" title="身份标记">${card.fail.type === 'blue' ? '🔖 蓝 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
+  if (card.fail) out += `<span class="marker marker-fail" title="身份标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
   if (card.neq) out += `<span class="marker marker-neq" title="编号不同">≠</span>`;
   return out ? `<span class="markers">${out}</span>` : '';
 }
@@ -726,13 +728,16 @@ function _actionBarHTML() {
   if (S.fx) return _waitHTML(S.fx.kind === 'solo' || S.fx.kind === 'red' ? '💬 公开结算中…' : '💬 猜测结算中…');
   if (S.pending) return _pendingHTML();
 
-  // 技能探测器已启动：本回合只允许扫描
+  // 技能探测器已启动：本回合只允许扫描（未执行前可取消）
   if (S.scanMode && S.scanMode.src === 'skill') {
     if (_myTurn()) {
       if (_ui.mode !== 'scan') {
         return `<div class="action-bar">
           <div class="mode-hint">🔎 已启动双重探测器：本回合须扫描相邻 ${S.scanMode.count} 张手牌</div>
-          <button class="action-btn primary" data-testid="btn-scan" onclick="startScanFlow('skill')">开始扫描</button>
+          <div class="arm-row">
+            <button class="action-btn cancel" data-testid="btn-cancel-skill" onclick="cancelSkillFlow()">取消</button>
+            <button class="action-btn primary" data-testid="btn-scan" onclick="startScanFlow('skill')">开始扫描</button>
+          </div>
         </div>`;
       }
     } else if (!S.pending) {
@@ -982,6 +987,17 @@ function startScanFlow(src) {
   _ui.mode = 'scan';
   _ui.scanSrc = src || (S.scanMode && S.scanMode.src) || 'eq3';
   _ui.scanSel = [];
+  _ui.guess = null; _ui.ownCard = null;
+  render();
+}
+
+/** 取消已启动的双重探测器（返回普通行动栏） */
+function cancelSkillFlow() {
+  if (!_myTurn()) return;
+  const r = cancelSkill();
+  if (r && !r.ok) { showToast(r.msg || '无法取消'); return; }
+  _ui.mode = null;
+  _ui.scanSrc = null; _ui.scanSel = [];
   _ui.guess = null; _ui.ownCard = null;
   render();
 }

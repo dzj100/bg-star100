@@ -592,6 +592,19 @@ function useSkill() {
   return { ok: true };
 }
 
+/** 取消已启动的双重探测器（尚未执行扫描 = 未消耗，可反悔） */
+function cancelSkill() {
+  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
+  const p = S.players[S.currentSeat];
+  if (!S.scanMode || S.scanMode.src !== 'skill') return { ok: false, msg: '未启动双重探测器' };
+  p.skillUsed = false;
+  S.scanMode = null;
+  addLog(`↩️ ${p.name} 取消使用双重探测器`, 'warn');
+  saveState();
+  _render();
+  return { ok: true };
+}
+
 /**
  * 执行扫描（技能 2 张 / 三重探测器 3 张）。
  * @param {string[]} cardIds 同一名其他玩家同一份内相邻的未公开牌（2/3 张）
@@ -705,7 +718,8 @@ function resolveScanPick(cardId) {
   S.currentSeat = pd.fromSeat;          // 回合归还发起者
   _updateDefused(card.num);
   if (_checkVictory()) return { ok: true };
-  if (pd.src === 'skill') { endTurn(); return { ok: true }; }
+  // 技能扫描占回合；道具（三重探测器）不占回合，但发起者若因此全公开则无牌可动，直接结束
+  if (pd.src === 'skill' || hiddenCards(pd.fromSeat).length === 0) { endTurn(); return { ok: true }; }
   saveStateDirect();
   _render();
   return { ok: true };
@@ -914,12 +928,18 @@ function _finish(win, reason) {
   _render();
 }
 
-/** 行动结算完成 → 回合立即结束 */
+/** 行动结算完成 → 回合立即结束（手牌已全部公开的玩家无牌可动，自动跳过） */
 function endTurn() {
   if (S.phase !== 'play') return;
   S.pending = null;
   S.scanMode = null;
-  S.currentSeat = (S.currentSeat + 1) % S.pCount;
+  let next = S.currentSeat;
+  for (let i = 0; i < S.pCount; i++) {
+    next = (next + 1) % S.pCount;
+    if (hiddenCards(next).length > 0) break;
+    addLog(`⏭️ ${S.players[next].name} 的手牌已全部公开，自动跳过其回合`, 'warn');
+  }
+  S.currentSeat = next;
   saveState();
   _render();
 }
