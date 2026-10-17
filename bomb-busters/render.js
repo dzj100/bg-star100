@@ -123,6 +123,40 @@ function _locateCard(seat, cardId) {
    着陆页
    ============================================================ */
 
+/** 炸药捆+定时器（着陆页装饰与对局头部共用） */
+function _bombSVG(className) {
+  return `
+  <svg class="${className}" viewBox="0 0 170 152" aria-hidden="true">
+    <g stroke="#25324e" stroke-width="3.5">
+      <rect x="14" y="16" width="34" height="106" rx="17" fill="#e8402a"/>
+      <rect x="68" y="10" width="34" height="112" rx="17" fill="#e8402a"/>
+      <rect x="122" y="18" width="34" height="104" rx="17" fill="#e8402a"/>
+    </g>
+    <g stroke="#25324e" stroke-width="3">
+      <ellipse cx="31" cy="26" rx="13.5" ry="7.5" fill="#ff9b76"/>
+      <ellipse cx="85" cy="20" rx="13.5" ry="7.5" fill="#ff9b76"/>
+      <ellipse cx="139" cy="28" rx="13.5" ry="7.5" fill="#ff9b76"/>
+    </g>
+    <ellipse cx="31" cy="26" rx="6" ry="3" fill="#d33222"/>
+    <ellipse cx="85" cy="20" rx="6" ry="3" fill="#d33222"/>
+    <ellipse cx="139" cy="28" rx="6" ry="3" fill="#d33222"/>
+    <rect x="27" y="46" width="6" height="54" rx="3" fill="#ff7a5c" opacity=".75"/>
+    <rect x="81" y="42" width="6" height="58" rx="3" fill="#ff7a5c" opacity=".75"/>
+    <rect x="135" y="48" width="6" height="52" rx="3" fill="#ff7a5c" opacity=".75"/>
+    <rect x="4" y="62" width="162" height="20" rx="9" fill="#25324e"/>
+    <rect x="76" y="64" width="18" height="16" rx="4" fill="#f6b62b"/>
+    <rect x="36" y="70" width="98" height="74" rx="11" fill="#1d2a44" stroke="#25324e" stroke-width="3.5"/>
+    <rect x="46" y="79" width="78" height="30" rx="5" fill="#0e1a33" stroke="#3d5378" stroke-width="2.5"/>
+    <text x="85" y="101" text-anchor="middle" fill="#7fd7ff" font-size="21" font-weight="800" letter-spacing="3" font-family="ui-monospace, Consolas, Menlo, monospace">00:02</text>
+    <circle cx="57" cy="124" r="9.5" fill="#e8402a" stroke="#25324e" stroke-width="3"/>
+    <circle cx="54" cy="121" r="3" fill="#fff" opacity=".65"/>
+    <g fill="#3a4d75">
+      <rect x="76" y="108" width="13" height="10" rx="3"/><rect x="92" y="108" width="13" height="10" rx="3"/><rect x="108" y="108" width="13" height="10" rx="3"/>
+      <rect x="76" y="121" width="13" height="10" rx="3"/><rect x="92" y="121" width="13" height="10" rx="3"/><rect x="108" y="121" width="13" height="10" rx="3"/>
+    </g>
+  </svg>`;
+}
+
 /** 着陆页散落装饰（纯 SVG，无图片）：炸药捆+定时器 / 导线 / 剪刀 / 兔子 / 猫 / 小狗 / 闪光 */
 function _landingDecoHTML() {
   return `
@@ -192,35 +226,7 @@ function _landingDecoHTML() {
     <path d="M50,66 v5 M50,71 q-6,5 -10,1 M50,71 q6,5 10,1" fill="none" stroke="#25324e" stroke-width="3" stroke-linecap="round"/>
     <path d="M43,73 q7,13 14,0 z" fill="#ff8fa8" stroke="#25324e" stroke-width="3" stroke-linejoin="round"/>
   </svg>
-  <svg class="deco deco-bomb" viewBox="0 0 170 152" aria-hidden="true">
-    <g stroke="#25324e" stroke-width="3.5">
-      <rect x="14" y="16" width="34" height="106" rx="17" fill="#e8402a"/>
-      <rect x="68" y="10" width="34" height="112" rx="17" fill="#e8402a"/>
-      <rect x="122" y="18" width="34" height="104" rx="17" fill="#e8402a"/>
-    </g>
-    <g stroke="#25324e" stroke-width="3">
-      <ellipse cx="31" cy="26" rx="13.5" ry="7.5" fill="#ff9b76"/>
-      <ellipse cx="85" cy="20" rx="13.5" ry="7.5" fill="#ff9b76"/>
-      <ellipse cx="139" cy="28" rx="13.5" ry="7.5" fill="#ff9b76"/>
-    </g>
-    <ellipse cx="31" cy="26" rx="6" ry="3" fill="#d33222"/>
-    <ellipse cx="85" cy="20" rx="6" ry="3" fill="#d33222"/>
-    <ellipse cx="139" cy="28" rx="6" ry="3" fill="#d33222"/>
-    <rect x="27" y="46" width="6" height="54" rx="3" fill="#ff7a5c" opacity=".75"/>
-    <rect x="81" y="42" width="6" height="58" rx="3" fill="#ff7a5c" opacity=".75"/>
-    <rect x="135" y="48" width="6" height="52" rx="3" fill="#ff7a5c" opacity=".75"/>
-    <rect x="4" y="62" width="162" height="20" rx="9" fill="#25324e"/>
-    <rect x="76" y="64" width="18" height="16" rx="4" fill="#f6b62b"/>
-    <rect x="36" y="70" width="98" height="74" rx="11" fill="#1d2a44" stroke="#25324e" stroke-width="3.5"/>
-    <rect x="46" y="79" width="78" height="30" rx="5" fill="#0e1a33" stroke="#3d5378" stroke-width="2.5"/>
-    <text x="85" y="101" text-anchor="middle" fill="#7fd7ff" font-size="21" font-weight="800" letter-spacing="3" font-family="ui-monospace, Consolas, Menlo, monospace">00:02</text>
-    <circle cx="57" cy="124" r="9.5" fill="#e8402a" stroke="#25324e" stroke-width="3"/>
-    <circle cx="54" cy="121" r="3" fill="#fff" opacity=".65"/>
-    <g fill="#3a4d75">
-      <rect x="76" y="108" width="13" height="10" rx="3"/><rect x="92" y="108" width="13" height="10" rx="3"/><rect x="108" y="108" width="13" height="10" rx="3"/>
-      <rect x="76" y="121" width="13" height="10" rx="3"/><rect x="92" y="121" width="13" height="10" rx="3"/><rect x="108" y="121" width="13" height="10" rx="3"/>
-    </g>
-  </svg>
+  ${_bombSVG('deco deco-bomb')}
   <svg class="deco deco-star1" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,1.5 L14.6,9.4 L22.5,12 L14.6,14.6 L12,22.5 L9.4,14.6 L1.5,12 L9.4,9.4 Z" fill="#f6b62b" stroke="#25324e" stroke-width="2.2" stroke-linejoin="round"/></svg>
   <svg class="deco deco-star2" viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff" stroke="#25324e" stroke-width="2"><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="17" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="17" width="6" height="6" rx="1.5"/></g></svg>
   <svg class="deco deco-star3" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,1.5 L14.6,9.4 L22.5,12 L14.6,14.6 L12,22.5 L9.4,14.6 L1.5,12 L9.4,9.4 Z" fill="#f6b62b" stroke="#25324e" stroke-width="2.2" stroke-linejoin="round"/></svg>
@@ -389,7 +395,7 @@ function render() {
 function _gameShellHTML(core) {
   return `
   <div class="game-header">
-    <span class="header-title">💣 炸弹克星</span>
+    <span class="header-title">${_bombSVG('header-bomb')}<span>炸弹克星</span></span>
     <span class="header-btns">
       <button class="icon-btn" onclick="showRules()">📜规则</button>
       <button class="icon-btn" onclick="resetGame()">🚪退出</button>

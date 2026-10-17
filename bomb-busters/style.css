@@ -174,17 +174,16 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .btn-danger { background: var(--danger); color: #fff; }
 
 .icon-btn {
-  background: #fff;
-  border: 2px solid var(--ink);
+  background: transparent;
+  border: 1px solid rgba(37, 50, 78, .25);
   color: var(--ink);
   padding: 6px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: .78rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 2px 0 rgba(37, 50, 78, .18);
 }
-.icon-btn:active { transform: translateY(1px); box-shadow: none; }
+.icon-btn:active { background: rgba(37, 50, 78, .07); }
 
 /* ============================================================
    联机大厅 / 等候室（online.js 注入）
@@ -441,7 +440,15 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   padding: 8px 12px;
   margin-bottom: 8px;
 }
-.header-title { font-weight: 900; letter-spacing: .06em; font-size: .95rem; }
+.header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  font-size: .95rem;
+}
+.header-bomb { height: 26px; width: auto; flex: none; }
 .header-btns { display: flex; gap: 6px; }
 
 /* ============================================================
