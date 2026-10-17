@@ -267,7 +267,7 @@ function showRules() {
       <p>全队合作：场上所有导线（48 个蓝导线 + X 个黄导线 + X 个红导线）<b>全部公开</b> = 拆弹成功</p>
       <h3>🧩 开局导线分配</h3>
       <p>① 导线构成<u>（红/黄线开局将自动标记到数轴）</u><br>
-      · 蓝线 1~12 <b>各 4 张</b>（共 48）<br>
+      · 蓝线 1~12 <b>各 4 张</b>（共 48 张）<br>
       · 红线 1.5~11.5 随机 X 张<br>
       · 黄线 1.1~11.1 随机 X 张<br>
       ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线</p>
@@ -285,8 +285,11 @@ function showRules() {
       <table>
         <thead><tr><th>行动</th><th>说明</th></tr></thead>
         <tbody>
-          <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」。命中 → 该牌与你的同数字（或黄色）牌各公开 1 张；失误 → 该牌真实信息将被标记，并累计 1 次失误。<br><b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
-          <tr><td>✂️ 单人剪线</td><td>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → <br>可全部公开（清收）。</td></tr>
+          <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」<br>
+          ✔ 命中 → 该牌与你的同数字（或黄色）牌各公开 1 张<br>
+          × 失误 → 该牌真实信息将被标记，并累计 1 次失误<br>
+          <b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
+          <tr><td>✂️ 单人剪线</td><td>仅以下场景可以进行：<br>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → 可全部公开（清收）；</td></tr>
           <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开红色导线。</td></tr>
         </tbody>
       </table>
@@ -299,13 +302,13 @@ function showRules() {
           <tr><td>① ≠标签</td><td>选自己同一份相邻 2 张（编号不同、至少 1 张蓝、可含已公开）标【≠】，宣告两张编号不同</td></tr>
           <tr><td>② 📻 对讲机</td><td>与另一名玩家各选 1 张未公开导线交换；双方拿到新导线后<b>自动按照顺序</b>加入手牌</td></tr>
           <tr><td>③ 🔍 三重探测器</td><td>立即剪线：选其他玩家同一份相邻 3 张手牌，猜「其中至少 1 张为蓝色 N」</td></tr>
-          <tr><td>④ � 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
+          <tr><td>④ 📃 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
           <tr><td>⑤ 🛰️ 超级探测器</td><td>立即剪线：选其他玩家一整份手牌，猜「其中有蓝色 N」，命中者自选 1 张公开</td></tr>
           <tr><td>⑥ 🧯 抑制器</td><td>失误 −1（失误为 0 时不可用）</td></tr>
           <tr><td>⑦ 🔋 备用电池</td><td>恢复 1~2 名本局已用过「双重探测器」者的使用次数</td></tr>
           <tr><td>⑧ 📡 通用雷达</td><td>选一个数字：自动公布每人各手牌是否还有该数字蓝线未公开</td></tr>
           <tr><td>⑨ 🧪 稳定剂</td><td>本回合剪线失误不计、红线不引爆</td></tr>
-          <tr><td>⑩ ⛓ X/Y射线</td><td>立即剪线：指定其他玩家 1 张牌，进行 2 个选项猜测「蓝 A 或蓝 B / 蓝 A 或黄」</td></tr>
+          <tr><td>⑩ ➿ X/Y射线</td><td>立即剪线：指定其他玩家 1 张牌，进行 2 个选项猜测「（蓝A/蓝B）或（蓝A/黄）」</td></tr>
           <tr><td>⑪ ☕ 咖啡瓶</td><td>跳过自己回合，指定 1 名仍有未公开手牌的玩家接续</td></tr>
           <tr><td>⑫ ＝标签</td><td>选自己同一份相邻 2 张（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标【＝】，宣告两张编号相同</td></tr>
         </tbody>
@@ -397,8 +400,8 @@ function _gameShellHTML(core) {
   <div class="game-header">
     <span class="header-title">${_bombSVG('header-bomb')}<span>炸弹克星</span></span>
     <span class="header-btns">
-      <button class="icon-btn" onclick="showRules()">📜规则</button>
-      <button class="icon-btn" onclick="resetGame()">🚪退出</button>
+      <button class="icon-btn" onclick="showRules()">📜 规则</button>
+      <button class="icon-btn" onclick="resetGame()">🚪 退出</button>
     </span>
   </div>
   ${core}`;
@@ -862,13 +865,13 @@ function _modeHintBar() {
     return `<div class="action-bar"><div class="mode-hint">📻 点选自己的 1 张未公开导线</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'sticky') {
-    return `<div class="action-bar"><div class="mode-hint">� 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
+    return `<div class="action-bar"><div class="mode-hint">📃 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'super') {
     return `<div class="action-bar"><div class="mode-hint">🛰️ 点击其他玩家某一份中的一张未公开牌（将扫描该整份手牌）</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'ray-target') {
-    return `<div class="action-bar"><div class="mode-hint">⛓ 点击其他玩家的一张未公开导线（将猜「两个选项之一」）</div>${_cancelBtn()}</div>`;
+    return `<div class="action-bar"><div class="mode-hint">➿ 点击其他玩家的一张未公开导线（将猜「两个选项之一」）</div>${_cancelBtn()}</div>`;
   }
   return null;
 }
@@ -1127,7 +1130,7 @@ function _rayGuessSheetHTML() {
   const tSeat = _ui.targetSeat;
   const tName = (tSeat === null || tSeat === undefined) ? '' : _esc(_playerName(tSeat));
   if (actor === null) {
-    return `${_sheetHead('⛓ X/Y射线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+    return `${_sheetHead('➿ X/Y射线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
   }
   const opts = legalGuessOptions(actor);
   const picked = _ui.rayOpts.map(_rayOptKey);
@@ -1142,7 +1145,7 @@ function _rayGuessSheetHTML() {
   const yellowBtn = (opts.yellow || ySel)
     ? `<button class="guess-btn yellow${ySel ? ' selected' : ''}${yDim ? ' dim' : ''}" data-guess="yellow" onclick="onRayOptTg('yellow')">黄色</button>`
     : '';
-  return `${_sheetHead(`⛓ 声明${tName}的这张牌是——`)}
+  return `${_sheetHead(`➿ 声明${tName}的这张牌是——`)}
   <div class="sheet-body">
     <div class="sheet-sub">一次声明 2 个选项：「蓝A 或 蓝B」/「蓝A 或 黄」；两个选项都须持有对应未公开导线</div>
     <div class="guess-grid">${btns}${yellowBtn}</div>
@@ -1154,7 +1157,7 @@ function _rayGuessSheetHTML() {
 function _rayOwnSheetHTML() {
   const actor = _actorSeat();
   if (actor === null) {
-    return `${_sheetHead('⛓ 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+    return `${_sheetHead('➿ 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
   }
   const rowFor = (opt, which, pickedId) => {
     const cands = _ownCandsFor(actor, opt);
@@ -1167,7 +1170,7 @@ function _rayOwnSheetHTML() {
       <div class="pick-row">${btns || '<div class="sheet-empty">没有对应的未公开导线</div>'}</div>`;
   };
   const ok = _ui.rayOpts.length === 2 && _ui.rayOwn.a && _ui.rayOwn.b;
-  return `${_sheetHead('⛓ 命中时公开你的导线')}
+  return `${_sheetHead('➿ 命中时公开你的导线')}
   <div class="sheet-body">
     <div class="sheet-sub">两个选项各自预先选定 1 张（命中哪项就公开哪张）</div>
     ${_ui.rayOpts.length === 2 ? rowFor(_ui.rayOpts[0], 'a', _ui.rayOwn.a) : ''}
