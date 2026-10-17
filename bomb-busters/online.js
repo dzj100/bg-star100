@@ -407,7 +407,7 @@ function _subscribeToRoom(roomId) {
   _channelStatus = 'CONNECTING';
 
   _unsubscribe = netSubscribeRoom(roomId, (row) => {
-    // 成员离开（seats 减少）→ 解散弹窗/提示；与轮询共用同一套检测，漏收的实时行也能兜住
+    // 对局中成员离开 → 解散弹窗/提示；等候室离开只更新席位（与轮询共用同一套检测，漏收的实时行也能兜住）
     _syncSeatTracking(row);
 
     // 等候室阶段（内容未变不重绘，避免重置选关等交互）
@@ -563,7 +563,7 @@ async function _resyncRoom() {
   try {
     const room = await netGetRoom(_onlineRoomId);
     if (!_onlineRoomId) return; // 拉取期间已退出房间
-    _syncSeatTracking(room); // 漏收的成员离开也能兜住（房主仍会弹解散弹窗/提示）
+    _syncSeatTracking(room); // 漏收的成员离开也能兜住（仅对局中触发解散弹窗/提示）
 
     // 本地最后一次推送未被确认：判断是否需要补发
     if (_lastPushPayload && !_lastPushVerified && _gameStarted) {
@@ -659,10 +659,12 @@ async function _pollTick() {
   _resyncRoom(); // 内部限频；状态无变化不会重复应用（见 _resyncRoom 的 _lastAppliedPushId 守卫），含未确认推送补发
 }
 
-/** 席位跟踪（实时与轮询共用）：成员离开给房主弹解散弹窗、给成员提示；成员数增减都同步计数（否则后续离开检测失真） */
+/** 席位跟踪（实时与轮询共用）：仅对局中成员离开才弹解散弹窗/提示；
+ *  等候室离开只更新席位计数（列表随签名变化重绘），不触发解散流程。 */
 function _syncSeatTracking(row) {
   if (!Array.isArray(row.seats)) return;
-  if (row.seats.length < _knownSeatCount && _knownSeatCount > 0 && !_departedHandled) {
+  if (_gameStarted && row.status === 'playing'
+      && row.seats.length < _knownSeatCount && _knownSeatCount > 0 && !_departedHandled) {
     _departedHandled = true;
     const players = typeof HOOK_getPlayers === 'function' ? HOOK_getPlayers() : [];
     const departedSeat = players.length > 0

@@ -1326,6 +1326,48 @@ await t('联机：陈旧快照拒绝 + pushId 去重（乱序/重放防倒灌）
   eq(ev(o, '_lastAppliedTs'), 7000, '新鲜度水位应推进');
 });
 
+await t('联机：成员离开——等候室不触发解散，对局中才提示/弹窗', () => {
+  const make = () => {
+    const o = loadOnline();
+    o.__alerts = [];
+    o.__dialogs = [];
+    o.alert = m => o.__alerts.push(m);
+    o._showPlayerLeftDialog = n => o.__dialogs.push(n);
+    o.HOOK_getPlayers = () => [{ name: 'A' }, { name: 'B' }];
+    return o;
+  };
+
+  // 等候室：成员离开只收缩席位与重绘，不提示
+  const w = make();
+  vm.runInContext('_gameStarted = false; _knownSeatCount = 2; _departedHandled = false;', w);
+  w._syncSeatTracking({ status: 'waiting', seats: [{ seatIndex: 0 }] });
+  eq(w.__alerts.length, 0, '等候室成员离开不应提示等待房主解散');
+  eq(w.__dialogs.length, 0, '等候室成员离开不应弹解散弹窗');
+  eq(ev(w, '_knownSeatCount'), 1, '席位计数应更新');
+  eq(ev(w, '_departedHandled'), false, '等候室不应标记已处理离开');
+
+  // 等候室：房主同样不弹解散
+  const hw = make();
+  vm.runInContext('_isHost = true; _gameStarted = false; _knownSeatCount = 2; _departedHandled = false;', hw);
+  hw._syncSeatTracking({ status: 'waiting', seats: [{ seatIndex: 0 }] });
+  eq(hw.__dialogs.length, 0, '等候室房主不应弹解散弹窗');
+
+  // 对局中：其他成员收到等待房主解散提示
+  const m = make();
+  vm.runInContext('_gameStarted = true; _knownSeatCount = 2; _departedHandled = false;', m);
+  m._syncSeatTracking({ status: 'playing', seats: [{ seatIndex: 0 }] });
+  eq(m.__alerts.length, 1, '对局中成员离开应提示');
+  assert(String(m.__alerts[0]).includes('等待房主解散'), '提示文案应为等待房主解散');
+  eq(m.__dialogs.length, 0);
+
+  // 对局中：房主收到解散弹窗
+  const h = make();
+  vm.runInContext('_isHost = true; _gameStarted = true; _knownSeatCount = 2; _departedHandled = false;', h);
+  h._syncSeatTracking({ status: 'playing', seats: [{ seatIndex: 0 }] });
+  eq(h.__dialogs.length, 1, '对局中房主应弹解散弹窗');
+  eq(h.__alerts.length, 0);
+});
+
 await t('联机：推送串行化——在途只标记，完成后用最新状态补发', async () => {
   const o = loadOnline();
   o.__sent = [];

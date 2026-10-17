@@ -233,15 +233,15 @@ function renderLandingHTML() {
   <div class="landing">
     ${_landingDecoHTML()}
     <h1 class="landing-title">炸弹克星</h1>
-    <div class="landing-sub">2~5 人 · 合作推理拆弹 · 联机桌游</div>
+    <div class="landing-sub">2~5 人 · 合作推理桌游</div>
     <div class="landing-tags">
-      <span class="landing-tag">🃏 相邻推理</span>
+      <span class="landing-tag">🔍 数字推理</span>
       <span class="landing-tag">🤝 全队合作</span>
-      <span class="landing-tag">✂️ 一次剪错就危险</span>
+      <span class="landing-tag">✂️ 剪到红线就爆炸</span>
     </div>
     <div class="landing-btns">
       <!--ONLINE_BTN-->
-      <button class="start-btn ghost" onclick="showRules()">📜 规则</button>
+      <button class="start-btn ghost" onclick="showRules()">📜 规则速览</button>
     </div>
     <div class="credit">@imStar100</div>
   </div>`;
@@ -258,53 +258,56 @@ function showRules() {
     <h2>📜 规则速览</h2>
     <div class="rules-scroll">
       <h3>🎯 胜利条件</h3>
-      <p>全队合作：场上所有导线（48 蓝 + 全部黄 + 红）<b>全部公开</b> = 拆弹成功。</p>
+      <p>全队合作：场上所有导线（48 个蓝导线 + X 个黄导线 + X 个红导线）<b>全部公开</b> = 拆弹成功</p>
       <h3>🧩 开局导线分配</h3>
+      <p>① 导线构成<u>（红/黄线开局将自动标记到数轴）</u><br>
+      · 蓝线 1~12 <b>各 4 张</b>（共 48）<br>
+      · 红线 1.5~11.5 随机 X 张<br>
+      · 黄线 1.1~11.1 随机 X 张<br>
+      ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线</p>
       <table>
-        <thead><tr><th>人数</th><th>手牌分配</th><th>黄线</th></tr></thead>
+        <thead><tr><th>人数</th><th>手牌分配</th></tr></thead>
         <tbody>
-          <tr><td>2 人</td><td>每人 2 份</td><td>4 张</td></tr>
-          <tr><td>3 人</td><td>队长 2 份，其余各 1 份</td><td>2 张</td></tr>
-          <tr><td>4 人</td><td>每人 1 份</td><td>2 张</td></tr>
-          <tr><td>5 人</td><td>每人 1 份</td><td>2 张</td></tr>
+          <tr><td>2 人</td><td>将导线分成 4 份，每人 2 份</td></tr>
+          <tr><td>3 人</td><td>将导线分成 4 份，队长 2 份，其余各 1 份</td></tr>
+          <tr><td>4 人</td><td>将导线分成 4 份，每人 1 份</td></tr>
+          <tr><td>5 人</td><td>将导线分成 5 份，每人 1 份</td></tr>
         </tbody>
       </table>
-      <p>导线构成：蓝线 1~12 <b>各 4 张</b>（共 48）；红线 1.5~11.5 随机 1 张；黄线 1.1~11.1 随机。<br>随机产生队长；全部导线洗混均分，每份从小到大排列。发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线（数字全场公开）；红/黄数字开局即标记到数轴（全场公开）。</p>
       <h3>🔁 回合内操作</h3>
-      <p>回合 = <b>1 次行动 + 免费道具</b>。</p>
+      <p>可随意使用道具、技能，并执行<b>1 次行动</b></p>
       <table>
         <thead><tr><th>行动</th><th>说明</th></tr></thead>
         <tbody>
-          <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」。命中 → 该牌与你的同数字（或黄色）牌各公开 1 张；失误 → 该牌真实身份被标记公开（牌面仍隐藏）并累计 1 次失误。<b>若指认到红色导线 → 立即爆炸！</b></td></tr>
-          <tr><td>✂️ 单人剪线</td><td>① 某数字已公开 2 张且剩余 2 张都在你手上 → 公开这 2 张；② 你持有某数字全部 4 张 → 全部公开；③ 全部未公开黄线都在你手上 → 清收。</td></tr>
-          <tr><td>🚨 公开红线</td><td>持红者在自己其余牌全部公开后，可在回合中公开红线。</td></tr>
+          <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」。命中 → 该牌与你的同数字（或黄色）牌各公开 1 张；失误 → 该牌真实信息将被标记，并累计 1 次失误。<br><b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
+          <tr><td>✂️ 单人剪线</td><td>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → <br>可全部公开（清收）。</td></tr>
+          <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开红色导线。</td></tr>
         </tbody>
       </table>
-      <p>⏭️ 手牌已全部公开的玩家没有可执行的行动，轮到其回合时将<b>自动跳过</b>。</p>
-      <h3>🎁 道具介绍</h3>
-      <p>开局随机抽「人数」张上桌（锁定）；某蓝数字 4/4 拆除时解锁对应编号道具，每张每局限用 1 次。</p>
+      <p>⏭️ 已公开全部手牌的玩家，轮到其回合时将<b>自动跳过</b></p>
+      <h3>🔧 道具介绍</h3>
+      <p>开局随机抽「人数」张道具加入游戏；某蓝色导线全部拆除时，自动解锁对应编号道具，每张每局限用 1 次</p>
       <table>
         <thead><tr><th>道具</th><th>效果</th></tr></thead>
         <tbody>
           <tr><td>① ≠标签</td><td>选自己同一份相邻 2 张（编号不同、至少 1 张蓝、可含已公开）标【≠】，宣告两张编号不同</td></tr>
-          <tr><td>② 📻 对讲机</td><td>与另一名玩家各选 1 张未公开导线交换；被交换牌的标记自动废弃，双方立即重排</td></tr>
-          <tr><td>③ 🔍 三重探测器</td><td>立即剪线：选他人同一份相邻 3 张，猜「其中至少 1 张为蓝色 N」</td></tr>
-          <tr><td>④ 📝 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
-          <tr><td>⑤ 🛰️ 超级探测器</td><td>立即剪线：选他人一整份手牌，猜「其中有蓝色 N」，命中者自选 1 张公开</td></tr>
+          <tr><td>② 📻 对讲机</td><td>与另一名玩家各选 1 张未公开导线交换；双方拿到新导线后<b>自动按照顺序</b>加入手牌</td></tr>
+          <tr><td>③ 🔍 三重探测器</td><td>立即剪线：选其他玩家同一份相邻 3 张手牌，猜「其中至少 1 张为蓝色 N」</td></tr>
+          <tr><td>④ � 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
+          <tr><td>⑤ 🛰️ 超级探测器</td><td>立即剪线：选其他玩家一整份手牌，猜「其中有蓝色 N」，命中者自选 1 张公开</td></tr>
           <tr><td>⑥ 🧯 抑制器</td><td>失误 −1（失误为 0 时不可用）</td></tr>
           <tr><td>⑦ 🔋 备用电池</td><td>恢复 1~2 名本局已用过「双重探测器」者的使用次数</td></tr>
-          <tr><td>⑧ 📡 通用雷达</td><td>选一个数字：自动公布各人各份是否还有该数字蓝线</td></tr>
-          <tr><td>⑨ 🧪 稳定剂</td><td>本回合剪线失误不计、红线不引爆；可取消，剪线结算时消耗</td></tr>
-          <tr><td>⑩ 🩻 X/Y射线</td><td>立即剪线：指定他人 1 张牌，猜「蓝 A 或蓝 B / 蓝 A 或黄」两个选项之一</td></tr>
+          <tr><td>⑧ 📡 通用雷达</td><td>选一个数字：自动公布每人各手牌是否还有该数字蓝线未公开</td></tr>
+          <tr><td>⑨ 🧪 稳定剂</td><td>本回合剪线失误不计、红线不引爆</td></tr>
+          <tr><td>⑩ ⛓ X/Y射线</td><td>立即剪线：指定其他玩家 1 张牌，进行 2 个选项猜测「蓝 A 或蓝 B / 蓝 A 或黄」</td></tr>
           <tr><td>⑪ ☕ 咖啡瓶</td><td>跳过自己回合，指定 1 名仍有未公开手牌的玩家接续</td></tr>
           <tr><td>⑫ ＝标签</td><td>选自己同一份相邻 2 张（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标【＝】，宣告两张编号相同</td></tr>
         </tbody>
       </table>
-      <p>⚡ <b>③/⑤/⑩ 使用后立即进入剪线环节</b>，结算后结束回合；其余道具不占行动。</p>
       <h3>💥 失误</h3>
-      <p>允许 人数−1 次失误；第 N 次失误（N = 人数）立即爆炸失败。</p>
+      <p>允许 人数−1 次失误，第 N 次失误（N = 人数）时游戏失败。（双人剪线时，指认到红色导线时，立刻游戏失败）</p>
       <h3>🔎 双重探测器（每人每局 1 次）</h3>
-      <p>本回合的双人剪线升级为：指定他人同一份内相邻 2 张，猜「其中至少 1 张是蓝色 N」。命中 → 对方自选 1 张公开、你公开同数字导线；未命中 → 对方避开红色标记 1 张非红牌（<b>不爆炸</b>）。</p>
+      <p>本回合的双人剪线升级为：指定他人同一份内相邻 2 张，猜「其中至少 1 张是蓝色 N」。命中 → 对方自选 1 张公开、你公开同数字导线；未命中 → 对方标记 1 张非红色导线。</p>
     </div>
     <button class="btn-full btn-primary" onclick="closeModal('modalOverlay')">知道了</button>`;
   const ov = document.getElementById('modalOverlay');
@@ -325,13 +328,13 @@ function _lastLogHTML() {
   const list = (S && S.log) || [];
   const last = list[list.length - 1];
   if (!last) return '<span class="log-hint">💬 日志</span>';
-  return `<span class="log-msg ${last.cls || ''}">${_esc(last.msg)}</span><span class="log-hint">💬 展开</span>`;
+  return `<span class="log-msg ${last.cls || ''}">${_esc(last.msg)}</span><span class="log-hint">💬 日志</span>`;
 }
 
 function _logListHTML() {
   const list = (S && S.log) ? S.log.slice().reverse() : [];
   return `
-  <div class="sheet-head"><span>📜 对局日志</span><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+  <div class="sheet-head"><span>💬 对局日志</span><button class="sheet-close" onclick="closeSheet()">✕</button></div>
   <div class="log-list">
     ${list.map(l => `<div class="log-item ${l.cls || ''}">${_esc(l.msg)}</div>`).join('')}
   </div>`;
@@ -388,8 +391,8 @@ function _gameShellHTML(core) {
   <div class="game-header">
     <span class="header-title">💣 炸弹克星</span>
     <span class="header-btns">
-      <button class="icon-btn" onclick="showRules()">规则</button>
-      <button class="icon-btn" onclick="resetGame()">退出</button>
+      <button class="icon-btn" onclick="showRules()">📜规则</button>
+      <button class="icon-btn" onclick="resetGame()">🚪退出</button>
     </span>
   </div>
   ${core}`;
@@ -591,7 +594,7 @@ function _cardMarkersHTML(card, share, idx) {
   let span = '';
   let out = '';
   if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${_fmtNum(card.info.num)}</span>`;
-  if (card.fail) out += `<span class="marker marker-fail" title="身份标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
+  if (card.fail) out += `<span class="marker marker-fail" title="信息标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
   const pairCls = _pairSpanCls(card, share, idx);
   if (pairCls.includes('neq-l')) span += `<span class="neq-span" title="编号不同">≠</span>`;
   else if (card.neq && !pairCls.includes('neq-r')) out += `<span class="marker marker-neq" title="编号不同">≠</span>`;
@@ -604,8 +607,6 @@ function _cardMarkersHTML(card, share, idx) {
 function _enemyCardHTML(card, share, idx) {
   const sel = _ui.scanSel.some(x => x.id === card.id) || _ui.targetCardId === card.id;
   const picked = S.pending && S.pending.type === 'walkie' && S.pending.fromCardId === card.id;
-  const hit = S.pending && (S.pending.type === 'scanPick' || S.pending.type === 'superPick')
-    && S.pending.cards.indexOf(card.id) >= 0;
   const markers = _cardMarkersHTML(card, share, idx);
   const byMePicker = S.pending ? canActAs(S.pending.toSeat) : false;
 
@@ -630,7 +631,6 @@ function _enemyCardHTML(card, share, idx) {
     cls.push('card-back');
     if (sel) cls.push('selected');
     if (picked) cls.push('picked');
-    if (hit) cls.push('hit');
     if (selectable) cls.push('selectable');
     body = `${markers}`;
   }
@@ -819,13 +819,13 @@ function _modeHintBar() {
     return `<div class="action-bar"><div class="mode-hint">📻 点选自己的 1 张未公开导线</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'sticky') {
-    return `<div class="action-bar"><div class="mode-hint">📝 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
+    return `<div class="action-bar"><div class="mode-hint">� 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'super') {
     return `<div class="action-bar"><div class="mode-hint">🛰️ 点击其他玩家某一份中的一张未公开牌（将扫描该整份手牌）</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'ray-target') {
-    return `<div class="action-bar"><div class="mode-hint">🩻 点击其他玩家的一张未公开导线（将猜「两个选项之一」）</div>${_cancelBtn()}</div>`;
+    return `<div class="action-bar"><div class="mode-hint">⛓ 点击其他玩家的一张未公开导线（将猜「两个选项之一」）</div>${_cancelBtn()}</div>`;
   }
   return null;
 }
@@ -840,7 +840,7 @@ function _actionBarHTML() {
     if (_myTurn()) {
       if (_ui.mode !== 'scan') {
         return `<div class="action-bar">
-          <div class="mode-hint">🔎 已启动双重探测器：本回合须扫描相邻 ${S.scanMode.count} 张手牌</div>
+          <div class="mode-hint">🔎 已启动双重探测器：请扫描相邻 ${S.scanMode.count} 张手牌</div>
           <div class="arm-row">
             <button class="action-btn cancel" data-testid="btn-cancel-skill" onclick="cancelSkillFlow()">取消</button>
             <button class="action-btn primary" data-testid="btn-scan" onclick="startScanFlow('skill')">开始扫描</button>
@@ -868,7 +868,7 @@ function _actionBarHTML() {
   const redOK = canRevealRed(actor);
   const skillOK = !S.players[actor].skillUsed;
   return `<div class="action-bar">
-    <div class="bar-title">🎯 你的回合：选择 1 次行动（道具免费）</div>
+    <div class="bar-title">🎯 你的回合：选择 1 次行动（可选用道具）</div>
     ${stabSeat !== null ? '<div class="mode-hint stabilize-hint">🧪 稳定状态生效中：本回合剪线失误不计、红线不爆（点道具 9 可取消）</div>' : ''}
     <div class="bar-btns">
       <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线</button>
@@ -917,14 +917,14 @@ function _pendingHTML() {
         </button>`;
       }).join('');
       const title = pd.type === 'superMark'
-        ? '🔖 未命中！请从该份未公开蓝线中选 1 张放置身份标记'
-        : '🔖 未命中！请从下面选 1 张非红色导线放置身份标记';
+        ? '🔖 未命中！请从该份未公开蓝线中选 1 张放置信息标记'
+        : '🔖 未命中！请从下面选 1 张非红色导线放置信息标记';
       return `<div class="action-bar pending">
         <div class="pending-title">${title}</div>
         <div class="pick-row">${btns}</div>
       </div>`;
     }
-    return _waitHTML(`🔖 等待 ${_esc(_playerName(pd.toSeat))} 放置身份标记…`);
+    return _waitHTML(`🔖 等待 ${_esc(_playerName(pd.toSeat))} 放置信息标记…`);
   }
 
   if (pd.type === 'walkie') {
@@ -1019,7 +1019,7 @@ function _ownPickSheetHTML() {
     : '—';
   return `${_sheetHead('✂️ 命中后公开你的导线')}
   <div class="sheet-body">
-    <div class="sheet-sub">命中时你需同步公开 1 张「${guessLabel}」牌（预先选定，保证结算原子）</div>
+    <div class="sheet-sub">命中时你需同步公开 1 张「${guessLabel}」牌（预先选定）</div>
     <div class="pick-row">${btns}</div>
     <button class="btn-full btn-primary" data-testid="confirm"${_ui.ownCard ? '' : ' disabled'} onclick="onConfirmCut()">确认${isScan ? '扫描' : '剪线'}</button>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
@@ -1084,7 +1084,7 @@ function _rayGuessSheetHTML() {
   const tSeat = _ui.targetSeat;
   const tName = (tSeat === null || tSeat === undefined) ? '' : _esc(_playerName(tSeat));
   if (actor === null) {
-    return `${_sheetHead('🩻 X/Y射线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+    return `${_sheetHead('⛓ X/Y射线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
   }
   const opts = legalGuessOptions(actor);
   const picked = _ui.rayOpts.map(_rayOptKey);
@@ -1099,7 +1099,7 @@ function _rayGuessSheetHTML() {
   const yellowBtn = (opts.yellow || ySel)
     ? `<button class="guess-btn yellow${ySel ? ' selected' : ''}${yDim ? ' dim' : ''}" data-guess="yellow" onclick="onRayOptTg('yellow')">黄色</button>`
     : '';
-  return `${_sheetHead(`🩻 声明${tName}的这张牌是——`)}
+  return `${_sheetHead(`⛓ 声明${tName}的这张牌是——`)}
   <div class="sheet-body">
     <div class="sheet-sub">一次声明 2 个选项：「蓝A 或 蓝B」/「蓝A 或 黄」；两个选项都须持有对应未公开导线</div>
     <div class="guess-grid">${btns}${yellowBtn}</div>
@@ -1111,7 +1111,7 @@ function _rayGuessSheetHTML() {
 function _rayOwnSheetHTML() {
   const actor = _actorSeat();
   if (actor === null) {
-    return `${_sheetHead('🩻 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
+    return `${_sheetHead('⛓ 公开你的导线')}<div class="sheet-body"><div class="sheet-empty">等待中…</div></div>`;
   }
   const rowFor = (opt, which, pickedId) => {
     const cands = _ownCandsFor(actor, opt);
@@ -1124,9 +1124,9 @@ function _rayOwnSheetHTML() {
       <div class="pick-row">${btns || '<div class="sheet-empty">没有对应的未公开导线</div>'}</div>`;
   };
   const ok = _ui.rayOpts.length === 2 && _ui.rayOwn.a && _ui.rayOwn.b;
-  return `${_sheetHead('🩻 命中时公开你的导线')}
+  return `${_sheetHead('⛓ 命中时公开你的导线')}
   <div class="sheet-body">
-    <div class="sheet-sub">两个选项各自预先选定 1 张（保证结算原子，命中哪项就公开哪张）</div>
+    <div class="sheet-sub">两个选项各自预先选定 1 张（命中哪项就公开哪张）</div>
     ${_ui.rayOpts.length === 2 ? rowFor(_ui.rayOpts[0], 'a', _ui.rayOwn.a) : ''}
     ${_ui.rayOpts.length === 2 ? rowFor(_ui.rayOpts[1], 'b', _ui.rayOwn.b) : ''}
     <button class="btn-full btn-primary" data-testid="ray-settle"${ok ? '' : ' disabled'} onclick="onConfirmRay()">确认射线</button>
@@ -1181,7 +1181,7 @@ function _coffeeSheetHTML() {
       <span class="pc-pos">未公开 ${hidden} 张</span>
     </button>`);
   }
-  return `${_sheetHead('☕ 咖啡瓶：跳过回合，交给谁？')}
+  return `${_sheetHead('☕ 咖啡瓶：跳过回合，请选择交给谁？')}
   <div class="sheet-body">
     <div class="sheet-sub">你本回合不行动；从所选玩家开始继续后续回合（该玩家须仍有未公开手牌）</div>
     <div class="pick-row">${btns.join('') || '<div class="sheet-empty">没有符合条件的其他玩家</div>'}</div>
@@ -1448,7 +1448,7 @@ function _scanSelect(cardId) {
     showToast('已切换目标玩家');
   } else if (found.si !== cur[0].si) {
     _ui.scanSel = [entry];
-    showToast('已切换为新的份');
+    showToast('已切换为新的手牌');
   } else {
     const idxs = cur.map(x => x.idx).concat(found.idx).sort((a, b) => a - b);
     let contiguous = true;
@@ -1483,7 +1483,7 @@ function _neqSelect(seat, cardId) {
   }
   const first = cur[0];
   if (found.si !== first.si || Math.abs(found.idx - first.idx) !== 1) {
-    showToast('须选择同一份内相邻的 2 张牌');
+    showToast('须选择同一份手牌内相邻的 2 张牌');
     return;
   }
   const a = first.idx < found.idx ? first.id : cardId;
@@ -1516,7 +1516,7 @@ function _eqtagSelect(seat, cardId) {
   }
   const first = cur[0];
   if (found.si !== first.si || Math.abs(found.idx - first.idx) !== 1) {
-    showToast('须选择同一份内相邻的 2 张牌');
+    showToast('须选择同一份手牌内相邻的 2 张牌');
     return;
   }
   const r = useEqTag(first.si, first.id, cardId);
@@ -1568,7 +1568,7 @@ function _bubbleText(fx, phase) {
   const toMine = mySeat() !== null && fx.to === mySeat();
   const to = toMine ? '' : _playerName(fx.to) + '：';
   if (fx.kind === 'pair') return fx.hit ? `${to}被你猜中了！` : `${to}猜错啦～`;
-  if (fx.superScan) return fx.hit ? `${to}命中了！这份里有「${fx.label}」` : `${to}这份里没有「${fx.label}」…`;
+  if (fx.superScan) return fx.hit ? `${to}命中了！这份手牌里有「${fx.label}」` : `${to}这份手牌里没有「${fx.label}」…`;
   return fx.hit ? `${to}命中了！有「${fx.label}」` : `${to}这里没有「${fx.label}」…`;
 }
 

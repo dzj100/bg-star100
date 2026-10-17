@@ -89,7 +89,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .deco-cat { top: 7%; right: -6px; width: 86px; --rot: 6deg; animation-duration: 7s; }
 .deco-bunny { bottom: 11%; left: -6px; width: 88px; --rot: -5deg; animation-duration: 6.2s; animation-delay: -1.4s; }
 .deco-dog { bottom: 44%; right: -8px; width: 78px; --rot: 5deg; animation-duration: 6.8s; animation-delay: -3s; }
-.deco-bomb { bottom: 4%; right: -4px; width: 160px; --rot: 7deg; animation-duration: 7.5s; }
+.deco-bomb { bottom: 1%; right: -4px; width: 160px; --rot: 7deg; animation-duration: 7.5s; }
 .deco-star1 { top: 20%; right: 22%; width: 26px; --rot: 12deg; }
 .deco-star2 { top: 5%; left: 30%; width: 18px; --rot: -10deg; animation-duration: 5.6s; }
 .deco-star3 { top: 41%; left: 3%; width: 20px; --rot: 8deg; animation-duration: 6.4s; }
@@ -102,10 +102,10 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .landing-btns { position: relative; z-index: 1; }
 
 .landing-title {
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 900;
   letter-spacing: .12em;
-  margin: 18px 0 0;
+  margin: 0 0 12px;
   color: #fff;
   -webkit-text-stroke: 3px var(--ink);
   text-shadow: 0 6px 0 var(--ink), 0 14px 20px rgba(37, 50, 78, .22);
@@ -694,7 +694,6 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .card.selectable { animation: selPulse 1.3s ease-in-out infinite; cursor: pointer; }
 .card.selected { outline: 3px solid var(--gold); outline-offset: 1px; transform: translateY(-4px); }
 .card.picked { border: 2.5px solid var(--gold) !important; }
-.card.hit { border-color: var(--gold) !important; box-shadow: 0 0 10px var(--gold); }
 
 /* ============================================================
    本设备手牌区

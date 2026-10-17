@@ -35,7 +35,7 @@ const YELLOW_NUMS = Array.from({ length: 11 }, (_, i) => i + 1.1);        // 1.1
 
 /** 关卡配置（本版固定第一关；后续按任务卡扩展） */
 const MISSIONS = {
-  1: { id: 1, name: '第一关 · 初见端倪', red: 1, yellow: 2, yellow2p: 4 },
+  1: { id: 1, name: '#4 实地练习第一天', red: 1, yellow: 2, yellow2p: 4 },
 };
 const CURRENT_MISSION = 1;
 
@@ -44,13 +44,13 @@ const EQUIPMENT_LIB = {
   1:  { no: 1,  name: '≠标签',    icon: '≠',  desc: '选择自己同一份内相邻的 2 张导线（编号不同、至少含 1 张蓝色，可含已公开牌）标记【≠】，向全场宣告两张编号不同。' },
   2:  { no: 2,  name: '对讲机',   icon: '📻', desc: '与另一名玩家各选 1 张未公开导线交换；被交换牌的标记自动废弃，双方立即重排。' },
   3:  { no: 3,  name: '三重探测器', icon: '🔍', desc: '立即进入剪线环节（本回合行动）：选择另一名玩家同一份内相邻的 3 张未公开导线，猜「其中至少 1 张为蓝色 N」。' },
-  4:  { no: 4,  name: '便利贴',   icon: '📝', desc: '再标记自己 1 张未公开且无信息标记的蓝色导线，向全场宣告其数字。' },
+  4:  { no: 4,  name: '便利贴',   icon: '📃', desc: '再标记自己 1 张未公开且无信息标记的蓝色导线，向全场宣告其数字。' },
   5:  { no: 5,  name: '超级探测器', icon: '🛰️', desc: '立即进入剪线环节（本回合行动）：选择另一名玩家的一整份手牌，猜「其中有蓝色 N」；命中者自选 1 张公开。' },
   6:  { no: 6,  name: '抑制器',   icon: '🧯', desc: '当前失败数 −1，起爆器指针回退一格（失败数为 0 时不可使用）。' },
   7:  { no: 7,  name: '备用电池', icon: '🔋', desc: '指定 1~2 名本局已使用过「双重探测器」的玩家（可含自己），恢复其技能使用次数。' },
   8:  { no: 8,  name: '通用雷达', icon: '📡', desc: '选择 1~12 一个数字：系统自动公布每名玩家每份手牌是否还有未公开的该数字蓝线。' },
-  9:  { no: 9,  name: '稳定剂',   icon: '🧪', desc: '进入稳定状态（不锁定行动）：本回合剪线失误不计失败、指向红线不引爆；可取消，剪线结算时消耗。' },
-  10: { no: 10, name: 'X/Y射线',  icon: '🩻', desc: '立即进入剪线环节（本回合行动）：指定他人 1 张未公开牌，猜「蓝 A 或蓝 B / 蓝 A 或黄」两个选项之一。' },
+  9:  { no: 9,  name: '稳定剂',   icon: '🧪', desc: '进入稳定状态（不锁定行动）：本回合剪线失误不计失败、指向红线不引爆。' },
+  10: { no: 10, name: 'X/Y射线',  icon: '⛓', desc: '立即进入剪线环节（本回合行动）：指定他人 1 张未公开牌，进行 2 个选项猜测「蓝 A 或蓝 B / 蓝 A 或黄」' },
   11: { no: 11, name: '咖啡瓶',   icon: '☕', desc: '跳过自己本回合（不执行行动），指定 1 名仍有未公开手牌的其他玩家从其开始继续。' },
   12: { no: 12, name: '＝标签',   icon: '＝', desc: '选择自己同一份内相邻的 2 张牌（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标记【＝】，宣告两张编号相同。' },
 };
@@ -478,7 +478,7 @@ function _applyPairCut(plan) {
     }
     if (card.kind !== 'red') {
       card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
-      addLog('🔖 该牌真实身份已被标记公开（牌面仍未公开，可再次猜测）');
+      addLog('🔖 该牌真实信息已被标记公开');
     }
     endTurn();
   }
@@ -515,7 +515,7 @@ function doSoloCut(opt) {
 /** 校验并生成单人剪线计划（纯校验，无状态改动）；UI 层可在气泡对话后调用 _applySoloCut */
 function _planSoloCut(opt) {
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
-  if (S.scanMode) return { ok: false, msg: '已启动探测器，本回合须执行扫描' };
+  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = S.currentSeat;
 
   if (opt && (opt.kind === 'pair' || opt.kind === 'all')) {
@@ -573,7 +573,7 @@ function doRevealRed() {
 /** 校验并生成公开红线计划（纯校验，无状态改动）；UI 层可在气泡对话后调用 _applyRevealRed */
 function _planRevealRed() {
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
-  if (S.scanMode) return { ok: false, msg: '已启动探测器，本回合须执行扫描' };
+  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = S.currentSeat;
   if (!canRevealRed(actor)) return { ok: false, msg: '只有持红者在自己其余牌全部公开时才能公开红线' };
   return { ok: true, actor, card: hiddenCards(actor)[0], count: 1, label: '红色导线' };
@@ -601,7 +601,7 @@ function useSkill() {
   if (S.scanMode) return { ok: false, msg: '已启动探测器' };
   p.skillUsed = true;
   S.scanMode = { count: 2, src: 'skill' };
-  addLog(`🔎 ${p.name} 启动双重探测器：本回合须扫描相邻 2 张手牌`, 'good');
+  addLog(`🔎 ${p.name} 启动双重探测器：请扫描相邻 2 张手牌`, 'good');
   saveState();
   _render();
   return { ok: true };
@@ -642,7 +642,7 @@ function _planScan(cardIds, num, ownCardId, src) {
   if (src === 'skill') {
     if (!S.scanMode || S.scanMode.src !== 'skill') return { ok: false, msg: '请先启动双重探测器' };
   } else {
-    if (S.scanMode) return { ok: false, msg: '已启动技能扫描，请直接执行扫描' };
+    if (S.scanMode) return { ok: false, msg: '已启动技能扫描，请执行扫描' };
   }
 
   let eq3 = null;
@@ -660,7 +660,7 @@ function _planScan(cardIds, num, ownCardId, src) {
     const r = _adjacentRun((S.players[s].shares || []), cardIds, count);
     if (r) { targetSeat = s; loc = r; break; }
   }
-  if (targetSeat === null) return { ok: false, msg: '须为同一名玩家的同一份内相邻牌' };
+  if (targetSeat === null) return { ok: false, msg: '须为同一名玩家的同一份相邻导线' };
 
   const targetCards = loc.idxs.map(i => S.players[targetSeat].shares[loc.si][i]);
   if (targetCards.some(c => c.revealed)) return { ok: false, msg: '只能扫描未公开的牌' };
@@ -761,7 +761,7 @@ function resolveScanMark(cardId) {
 
 function _placeScanMark(card, targetSeat, fromSeat, src) {
   card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
-  addLog(`🔖 ${S.players[targetSeat].name} 放置身份标记：${card.fail.type === 'blue' ? '蓝色 ' + card.fail.num : '黄色'}（真实身份公开，红线避开）`);
+  addLog(`🔖 ${S.players[targetSeat].name} 放置信息标记：${card.fail.type === 'blue' ? '蓝色 ' + card.fail.num : '黄色'}`);
   // 探测器类皆为「本回合行动」：标记落定即结束回合
   endTurn();
 }
@@ -914,7 +914,7 @@ function _validateNeqPairs() {
 /** 取道具并做通用可用性校验（未解锁 / 已使用 / 探测器启动中封锁道具） */
 function _equipUsable(no) {
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
-  if (S.scanMode) return { ok: false, msg: '已启动探测器，本回合须执行扫描' };
+  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const eq = S.equipment.find(e => e.no === no);
   if (!eq || !eq.unlocked || eq.used) {
     return { ok: false, msg: `【${(EQUIPMENT_LIB[no] || {}).name || '道具 ' + no}】不可用` };
@@ -935,7 +935,7 @@ function useStickyNote(cardId) {
 
   card.info = { num: card.num };
   g.eq.used = true;
-  addLog(`📝 ${S.players[actor].name} 使用便利贴，标记：蓝色 ${card.num}`, 'good');
+  addLog(`📃 ${S.players[actor].name} 使用便利贴，标记：蓝色 ${card.num}`, 'good');
   saveState();
   _render();
   return { ok: true };
@@ -960,7 +960,7 @@ function _planSuperScan(toSeat, shareIdx, num, ownCardId) {
   const actor = S.currentSeat;
   if (toSeat === actor || !S.players[toSeat]) return { ok: false, msg: '请选择其他玩家' };
   const share = (S.players[toSeat].shares || [])[shareIdx];
-  if (!share) return { ok: false, msg: '无效的份' };
+  if (!share) return { ok: false, msg: '无效的手牌' };
   const hidden = share.filter(c => !c.revealed);
   if (hidden.length === 0) return { ok: false, msg: '该份手牌已全部公开' };
   if (!(Number.isInteger(num) && num >= 1 && num <= 12)) return { ok: false, msg: '无效的数字' };
@@ -1005,7 +1005,7 @@ function _applySuperScan(plan) {
 
   const markable = targetCards.filter(c => c.kind === 'blue');
   if (markable.length === 0) {
-    addLog('🔖 该份没有未公开蓝线，跳过身份标记', 'warn');
+    addLog('🔖 该份没有未公开蓝线，跳过信息标记', 'warn');
     endTurn();
   } else if (markable.length === 1) {
     _placeScanMark(markable[0], toSeat, actor, 'eq5');
@@ -1199,7 +1199,7 @@ function _applyRayCut(plan) {
     }
     if (card.kind !== 'red') {
       card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
-      addLog('🔖 该牌真实身份已被标记公开（牌面仍未公开，可再次猜测）');
+      addLog('🔖 该牌真实信息已被标记公开');
     }
     endTurn();
   }
@@ -1229,7 +1229,7 @@ function useEqTag(shareIdx, cardId1, cardId2) {
   if (!g.ok) return g;
   const p = S.players[S.currentSeat];
   const share = (p.shares || [])[shareIdx];
-  if (!share) return { ok: false, msg: '无效的份' };
+  if (!share) return { ok: false, msg: '无效的手牌' };
   const i1 = share.findIndex(c => c.id === cardId1);
   const i2 = share.findIndex(c => c.id === cardId2);
   if (i1 < 0 || i2 < 0 || Math.abs(i1 - i2) !== 1) return { ok: false, msg: '须为同一份内相邻的 2 张牌' };
@@ -1254,7 +1254,7 @@ function useEqTag(shareIdx, cardId1, cardId2) {
   c1.eqp = pairId;
   c2.eqp = pairId;
   g.eq.used = true;
-  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】：${desc}`, 'good');
+  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】`, 'good');
   saveState();
   _render();
   return { ok: true };
@@ -1272,7 +1272,7 @@ function _updateDefused(num) {
     const eq = S.equipment.find(e => e.no === num);
     if (eq && !eq.unlocked) {
       eq.unlocked = true;
-      addLog(`🎁 道具解锁：【${(EQUIPMENT_LIB[num] || {}).name || num}】`, 'good');
+      addLog(`🔧 道具解锁：【${(EQUIPMENT_LIB[num] || {}).name || num}】`, 'good');
     }
   }
 }
