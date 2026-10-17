@@ -652,6 +652,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .marker-fail { background: #d9f0f3; color: #a52a18; border-color: #4f959d; }
 .marker-neq { background: #6d28d9; color: #f3e8ff; border-color: #4c1d95; }
 .marker-eqp { background: #0f766e; color: #ccfbf1; border-color: #115e59; }
+.marker-walkie { background: #e0f2fe; color: #075985; border-color: #38bdf8; }
 
 /* 配对卡上的徽章让位给 ≠/＝ 横条，落到牌面顶部 */
 .card.neq-l > .markers,
@@ -694,6 +695,8 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .card.selectable { animation: selPulse 1.3s ease-in-out infinite; cursor: pointer; }
 .card.selected { outline: 3px solid var(--gold); outline-offset: 1px; transform: translateY(-4px); }
 .card.picked { border: 2.5px solid var(--gold) !important; }
+/* 对讲机交换过的牌：全场可见的落点光圈（不占用 outline，避免压过选中/聚光态） */
+.card.walkie-swapped { box-shadow: 0 0 0 2px #38bdf8, 0 0 9px rgba(56, 189, 248, .6); }
 
 /* ============================================================
    本设备手牌区
@@ -885,6 +888,23 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .radar-chip.yes { background: #d9f0f3; color: #0d4a52; border-color: #4f959d; }
 .radar-chip.no { background: #ece9df; color: #8b8574; }
+
+/* ============================================================
+   对讲机交换结果面板
+   ============================================================ */
+
+.walkie-panel {
+  background: var(--surface);
+  border: 2.5px solid #38bdf8;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  animation: dealIn .3s ease both;
+}
+.walkie-head { font-size: .78rem; font-weight: 800; color: #075985; margin-bottom: 6px; }
+.walkie-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+.walkie-name { flex: 0 0 auto; font-size: .78rem; font-weight: 800; color: var(--ink); min-width: 64px; }
+.walkie-line { font-size: .72rem; font-weight: 700; color: var(--ink); }
 
 /* ============================================================
    日志（位于数轴板上方）

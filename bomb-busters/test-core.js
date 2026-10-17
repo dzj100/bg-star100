@@ -719,6 +719,37 @@ await t('对讲机：各选 1 张交换、重排升序、双方标记自动废�
   eq(infoCard.info, null, '被交换牌的信息标记自动废弃');
   eq(S.pending, null);
   eq(S.currentSeat, 0, '回合归还发起者（道具不占行动）');
+
+  // 挑出/落点位次：随状态同步，供全场查看（牌面仍隐藏）
+  assert(S.walkieInfo, '应记录交换位次');
+  eq(S.walkieInfo.aCardId, infoCard.id);
+  eq(S.walkieInfo.bCardId, t9.id);
+  eq(S.walkieInfo.aOut.si, 0); eq(S.walkieInfo.aOut.idx, 0);
+  eq(S.walkieInfo.bOut.si, 0); eq(S.walkieInfo.bOut.idx, 0);
+  eq(S.walkieInfo.aIn.si, 0); eq(S.walkieInfo.aIn.idx, 1, 'B 交出的 9 落在发起方首位之后');
+  eq(S.walkieInfo.bIn.si, 0); eq(S.walkieInfo.bIn.idx, 0, 'A 交出的 3 落在接收方首位');
+  const walkieLog = S.log[S.log.length - 1].msg;
+  includes(walkieLog, '交出 第 1 份 · 第 1 张');
+  includes(walkieLog, '落点 第 1 份 · 第 2 张');
+  includes(walkieLog, '牌面保持隐藏');
+});
+
+await t('对讲机位次：多份时落点记在各自交牌份内，且按重排后的位置计算', () => {
+  const g = loadGame();
+  const a4 = C('blue', 4), a8 = C('blue', 8);
+  const b2 = C('blue', 2), b6 = C('blue', 6), b10 = C('blue', 10);
+  const S = use(g, sc(2, [
+    [[a4, a8], [C('blue', 11)]],
+    [[C('blue', 12)], [b2, b6, b10]],
+  ], { equipment: [{ no: 2, unlocked: true, used: false }] }));
+  assert(g.useWalkie(a8.id, 1).ok);
+  assert(g.resolveWalkie(b2.id).ok);
+  eq(S.walkieInfo.aOut.si, 0); eq(S.walkieInfo.aOut.idx, 1);
+  eq(S.walkieInfo.bOut.si, 1); eq(S.walkieInfo.bOut.idx, 0);
+  eq(S.walkieInfo.aIn.si, 0); eq(S.walkieInfo.aIn.idx, 0, '收到的 2 重排到 A 第 1 份首位');
+  eq(S.walkieInfo.bIn.si, 1); eq(S.walkieInfo.bIn.idx, 1, '收到的 8 重排到 B 第 2 份第 2 位');
+  eq(S.players[0].shares[1].map(c => c.num).join(','), '11', '未涉及的份不受影响');
+  eq(S.players[1].shares[0].map(c => c.num).join(','), '12', '未涉及的份不受影响');
 });
 
 await t('对讲机拒绝：交换已公开牌 / 指定自己', () => {

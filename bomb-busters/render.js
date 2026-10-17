@@ -455,6 +455,7 @@ function _gameViewHTML() {
   ${_equipRowHTML()}
   ${_boardHTML()}
   ${_radarPanelHTML()}
+  ${_walkiePanelHTML()}
   <div class="players">${rows.join('')}</div>
   <div class="own-area">${ownSeats.map(s => _ownHandHTML(s)).join('')}</div>
   ${S.phase === 'over' ? _endActionHTML() : _actionBarHTML()}`;
@@ -476,6 +477,22 @@ function _radarPanelHTML() {
   return `<div class="radar-panel" data-testid="radar-panel">
     <div class="radar-head">📡 通用雷达：蓝色 ${r.num} 的未公开残留</div>
     ${rows}
+  </div>`;
+}
+
+/** 【对讲机】交换结果面板：双方挑出/落点位次（牌面保持隐藏） */
+function _walkiePanelHTML() {
+  const w = S && S.walkieInfo;
+  if (!w) return '';
+  const pos = p => `第 ${p.si + 1} 份 · 第 ${p.idx + 1} 张`;
+  const row = (seat, out, into) => `<div class="walkie-row">
+    <span class="walkie-name">${_esc(_playerName(seat))}</span>
+    <span class="walkie-line">交出 ${pos(out)} → 收到牌落点 ${pos(into)}</span>
+  </div>`;
+  return `<div class="walkie-panel" data-testid="walkie-panel">
+    <div class="walkie-head">📻 对讲机交换完成（带 ⇄ 的为换入牌，牌面保持隐藏）</div>
+    ${row(w.aSeat, w.aOut, w.aIn)}
+    ${row(w.bSeat, w.bOut, w.bIn)}
   </div>`;
 }
 
@@ -590,11 +607,18 @@ function _pairSpanCls(card, share, idx) {
   return out;
 }
 
+/** 对讲机交换过的牌（全场可见的落点标记） */
+function _isWalkieSwapped(card) {
+  const w = S && S.walkieInfo;
+  return !!(w && card && (w.aCardId === card.id || w.bCardId === card.id));
+}
+
 function _cardMarkersHTML(card, share, idx) {
   let span = '';
   let out = '';
   if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${_fmtNum(card.info.num)}</span>`;
   if (card.fail) out += `<span class="marker marker-fail" title="信息标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
+  if (_isWalkieSwapped(card)) out += `<span class="marker marker-walkie" title="经对讲机交换的牌">⇄</span>`;
   const pairCls = _pairSpanCls(card, share, idx);
   if (pairCls.includes('neq-l')) span += `<span class="neq-span" title="编号不同">≠</span>`;
   else if (card.neq && !pairCls.includes('neq-r')) out += `<span class="marker marker-neq" title="编号不同">≠</span>`;
@@ -603,9 +627,20 @@ function _cardMarkersHTML(card, share, idx) {
   return span + (out ? `<span class="markers">${out}</span>` : '');
 }
 
+/** 超级探测器：点选一张即代表整份，整份未公开牌一起高亮 */
+function _isSuperShareSelected(card, seat, si) {
+  const m = _ui.mode;
+  return (m === 'super' || m === 'super-guess' || m === 'super-own')
+    && _ui.superShare !== null
+    && seat === _ui.targetSeat
+    && si === _ui.superShare
+    && !card.revealed;
+}
+
 /** 他人牌：未公开 = 牌背；已公开 = 亮面 */
-function _enemyCardHTML(card, share, idx) {
+function _enemyCardHTML(card, share, idx, seat, si) {
   const sel = _ui.scanSel.some(x => x.id === card.id) || _ui.targetCardId === card.id;
+  const superSel = _isSuperShareSelected(card, seat, si);
   const picked = S.pending && S.pending.type === 'walkie' && S.pending.fromCardId === card.id;
   const markers = _cardMarkersHTML(card, share, idx);
   const byMePicker = S.pending ? canActAs(S.pending.toSeat) : false;
@@ -619,17 +654,18 @@ function _enemyCardHTML(card, share, idx) {
   const cls = ['card'];
   const fxSpot = !!(S.fx && S.fx.ids && S.fx.ids.indexOf(card.id) >= 0);
   if (fxSpot) cls.push('fx-target');
+  if (_isWalkieSwapped(card)) cls.push('walkie-swapped');
   _pairSpanCls(card, share, idx).trim().split(' ').forEach(c => c && cls.push(c));
   let body;
   let attrs = ` data-cardid="${card.id}"`;
   if (card.revealed) {
     cls.push('revealed', 'kind-' + card.kind);
-    if (sel) cls.push('selected');
+    if (sel || superSel) cls.push('selected');
     attrs += ` data-kind="${card.kind}" data-num="${_fmtNum(card.num)}"`;
     body = `<span class="card-num">${_fmtNum(card.num)}</span><span class="card-kind">${_kindLabel(card.kind)}</span>${markers}`;
   } else {
     cls.push('card-back');
-    if (sel) cls.push('selected');
+    if (sel || superSel) cls.push('selected');
     if (picked) cls.push('picked');
     if (selectable) cls.push('selectable');
     body = `${markers}`;
@@ -645,6 +681,7 @@ function _ownCardHTML(seat, si, card, share, idx) {
   const cls = ['card', 'card-own', 'kind-' + card.kind];
   const fxSpot = !!(S.fx && S.fx.ids && S.fx.ids.indexOf(card.id) >= 0);
   if (fxSpot) cls.push('fx-target');
+  if (_isWalkieSwapped(card)) cls.push('walkie-swapped');
   _pairSpanCls(card, share, idx).trim().split(' ').forEach(c => c && cls.push(c));
   if (card.revealed) cls.push('revealed');
   if (sel) cls.push('selected');
@@ -685,7 +722,7 @@ function _playerRowHTML(seat) {
   const isCur = S.phase === 'play' && S.currentSeat === seat && !S.result;
   const color = PLAYER_COLORS[seat % PLAYER_COLORS.length];
   const shares = (p.shares || []).map((share, si) =>
-    `<div class="cards" data-share="${si}">${share.map((c, i) => _enemyCardHTML(c, share, i)).join('')}</div>`).join('');
+    `<div class="cards" data-share="${si}">${share.map((c, i) => _enemyCardHTML(c, share, i, seat, si)).join('')}</div>`).join('');
   const markBadge = S.phase === 'mark'
     ? (S.ready[seat] ? '<span class="mark-badge ok">✅ 已标记</span>' : '<span class="mark-badge wait">⏳ 标记中</span>')
     : '';
@@ -989,13 +1026,13 @@ function _guessSheetHTML() {
   const empty = (opts.nums.length === 0 && (isScan || !opts.yellow))
     ? '<div class="sheet-empty">你没有可猜的类型</div>' : '';
   const head = isSuper ? `🛰️ 猜${tName}的整份手牌里有——` : `🔎 猜${tName}的这张牌是——`;
-  const sub = isSuper ? '猜「该份中至少 1 张是蓝色 N」'
+  const sub = isSuper ? '猜「该份手牌中至少 1 张是蓝色 N」'
     : isScan ? '猜「其中至少 1 张是蓝色 N」'
     : '仅可猜你手上持有的未公开类型';
 
   return `${_sheetHead(head)}
   <div class="sheet-body">
-    <div class="sheet-sub">${sub}（数字 ×4 张）</div>
+    <div class="sheet-sub">${sub}（蓝色每数字各 4 张）</div>
     <div class="guess-grid">${btns}${yellowBtn}</div>
     ${empty}
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>

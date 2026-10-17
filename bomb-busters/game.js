@@ -847,6 +847,21 @@ function resolveWalkie(cardId) {
   a.shares[fa.si].sort(_numCmp);
   b.shares[tb.si].sort(_numCmp);
 
+  // 挑出与落点位次（全网可见，牌面保持隐藏）
+  const aInLoc = _locate(toCard, a.shares);    // B 交出的牌落在 A 的位次
+  const bInLoc = _locate(fromCard, b.shares);  // A 交出的牌落在 B 的位次
+  const posLabel = l => `第 ${l.si + 1} 份 · 第 ${l.idx + 1} 张`;
+  S.walkieInfo = {
+    aSeat: pd.fromSeat,
+    bSeat: pd.toSeat,
+    aCardId: fromCard.id,
+    bCardId: toCard.id,
+    aOut: { si: fa.si, idx: fa.idx },
+    bOut: { si: tb.si, idx: tb.idx },
+    aIn: { si: aInLoc.si, idx: aInLoc.idx },
+    bIn: { si: bInLoc.si, idx: bInLoc.idx },
+  };
+
   // 被交换牌的标记自动废弃（信息/失败/≠ 均不随牌移动）
   _voidCardMarkers(fromCard);
   _voidCardMarkers(toCard);
@@ -854,7 +869,8 @@ function resolveWalkie(cardId) {
 
   S.pending = null;
   S.currentSeat = pd.fromSeat;          // 回合归还发起者（道具不占行动，继续本回合）
-  addLog(`📻 ${a.name} 与 ${b.name} 交换了一张导线（挑出与落点位置可见，牌面保持隐藏）`, 'warn');
+  addLog(`📻 ${a.name} 交出 ${posLabel(S.walkieInfo.aOut)} → ${b.name} 落点 ${posLabel(S.walkieInfo.bIn)}；`
+    + `${b.name} 交出 ${posLabel(S.walkieInfo.bOut)} → ${a.name} 落点 ${posLabel(S.walkieInfo.aIn)}（牌面保持隐藏）`, 'warn');
   saveStateDirect();
   _render();
   return { ok: true };
