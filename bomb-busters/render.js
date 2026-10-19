@@ -266,7 +266,7 @@ function showRules() {
       <h3>🎯 胜利条件</h3>
       <p>全队合作：场上所有导线（48 个蓝导线 + X 个黄导线 + X 个红导线）<b>全部公开</b> = 拆弹成功</p>
       <h3>🧩 开局导线分配</h3>
-      <p>① 导线构成<u>（红/黄线开局将自动标记到数轴；各关卡抽取/使用数量见等候室关卡卡）</u><br>
+      <p>① 导线构成<u>（红/黄线开局将自动标记到数轴）</u><br>
       · 蓝线 1~12 <b>各 4 张</b>（共 48 张）<br>
       · 红线 1.5~11.5 按关卡随机抽取<br>
       · 黄线 1.1~11.1 按关卡随机抽取<br>
@@ -578,11 +578,37 @@ function _boardHTML() {
   }
   const redIcon = redHollow ? '<span class="legend-ring"></span>' : '🚨';
   const yellowIcon = yellowHollow ? '<span class="legend-ring"></span>' : '🟡';
+  const orderNums = Array.isArray(b.orderNums) ? b.orderNums : [];
+  let orderHTML = '';
+  if (orderNums.length) {
+    const steps = orderNums.map((n, i) => {
+      const prev = i > 0 ? orderNums[i - 1] : null;
+      const prevRev = prev === null ? 0 : blueRevealedCount(prev);
+      const locked = i > 0 && prevRev < 2;
+      const rev = blueRevealedCount(n);
+      const sub = locked ? `🔒 先 ${prev}×2` : `${rev}/4`;
+      const tip = i === 0
+        ? '首个数字，无需前置'
+        : locked
+          ? `需先公开 2 根蓝色 ${prev}（当前 ${prevRev} 根）`
+          : `已解锁：蓝色 ${prev} 已公开 ${prevRev} 根`;
+      const arrow = i > 0 ? '<span class="order-arrow">→</span>' : '';
+      return `${arrow}<span class="order-step${i === 0 ? ' first' : ''}${locked ? ' locked' : ''}" data-order-num="${n}" title="${tip}">
+        <span class="order-num">${n}</span><span class="order-sub">${sub}</span>
+      </span>`;
+    }).join('');
+    orderHTML = `<div class="board-order" data-testid="cut-order" data-order-nums="${orderNums.join(',')}">
+      <span class="order-title">⏱ 剪线顺序</span>
+      <span class="order-steps">${steps}</span>
+      <span class="order-tip">前序公开 ≥2 根解锁下一数字</span>
+    </div>`;
+  }
   return `<div class="board" id="board">
     <div class="board-head">
       <span class="board-title">数轴板</span>
       <span class="fail-count" data-testid="fail-count">💥 失误 ${S.failures}/${S.pCount}</span>
     </div>
+    ${orderHTML}
     <div class="board-cells">${cells.join('')}</div>
     <div class="board-legend">
       <span class="legend legend-r">${redIcon} 红导线${redNote ? `（${redNote}）` : ''}：${redNums.join('、') || '—'}</span>
@@ -1028,6 +1054,12 @@ function _ownGuessCandidates(seat, guess, isScan) {
   return isScan ? [] : cards.filter(c => c.kind === 'yellow');
 }
 
+function _orderWarnHTML() {
+  const order = (S && S.board && Array.isArray(S.board.orderNums)) ? S.board.orderNums : [];
+  if (!order.length) return '';
+  return `<div class="order-warn">⏱ 剪线顺序：${order.join(' → ')}；命中未解锁数字会立即爆炸</div>`;
+}
+
 function _guessSheetHTML() {
   const actor = _actorSeat();
   const isSuper = _ui.mode === 'super-guess';
@@ -1057,6 +1089,7 @@ function _guessSheetHTML() {
   return `${_sheetHead(head)}
   <div class="sheet-body">
     <div class="sheet-sub">${sub}（蓝色每数字各 4 张）</div>
+    ${_orderWarnHTML()}
     <div class="guess-grid">${btns}${yellowBtn}</div>
     ${empty}
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
@@ -1103,6 +1136,7 @@ function _soloSheetHTML() {
   return `${_sheetHead('🎯 单人剪线')}
   <div class="sheet-body">
     <div class="sheet-sub">符合条件即可一次公开多张</div>
+    ${_orderWarnHTML()}
     <div class="pick-row">${opts.length ? btns : '<div class="sheet-empty">当前没有可用的单人剪线</div>'}</div>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
   </div>`;
@@ -1163,6 +1197,7 @@ function _rayGuessSheetHTML() {
   return `${_sheetHead(`➿ 声明${tName}的这张牌是——`)}
   <div class="sheet-body">
     <div class="sheet-sub">一次声明 2 个选项：「蓝A 或 蓝B」/「蓝A 或 黄」；两个选项都须持有对应未公开导线</div>
+    ${_orderWarnHTML()}
     <div class="guess-grid">${btns}${yellowBtn}</div>
     <button class="btn-full btn-primary" data-testid="ray-confirm"${_ui.rayOpts.length === 2 ? '' : ' disabled'} onclick="onRayConfirm()">确认选项（${_ui.rayOpts.length}/2）</button>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
@@ -1927,7 +1962,9 @@ function showEndModal() {
     ? '全场导线全部公开，完美拆弹！'
     : reason === 'boom-red'
       ? '指认到了红色导线——炸弹起爆！'
-      : '失误达到上限——炸弹起爆！';
+      : reason === 'boom-order'
+        ? '未按剪线顺序公开蓝色导线——炸弹起爆！'
+        : '失误达到上限——炸弹起爆！';
   let hiddenTotal = 0;
   _eachCard(c => { if (!c.revealed) hiddenTotal++; });
   const defusedN = ((S.board && S.board.defused) || []).filter(Boolean).length;

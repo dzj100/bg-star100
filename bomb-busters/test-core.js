@@ -322,6 +322,7 @@ await t('关卡默认 #4：实心标记、无括号备注、红 1 黄 2（51 张
   eq(S.board.yellowMark, 'solid');
   eq(S.board.redNote, '');
   eq(S.board.yellowNote, '');
+  eq(S.board.orderNums.length, 0, '非 #9 无顺序剪线');
   includes(S.log[0].msg, '#4 实地练习第一天');
 });
 
@@ -427,6 +428,123 @@ await t('#8 双人局：3 红 + 4 黄候选全标板，牌库 3选1 + 4 黄（53
   eq(S.board.yellowMark, 'hollow');
 });
 
+await t('#9 三人局：1 红 + 2 黄（51 张），公开 3 个不重复的蓝线顺序', () => {
+  const g = dealMission(6, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 6);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄');
+  eq(S.board.redNums.length, 1);
+  eq(S.board.yellowNums.length, 2);
+  eq(S.board.orderNums.length, 3);
+  eq(new Set(S.board.orderNums).size, 3, '顺序数字应互不重复');
+  S.board.orderNums.forEach(n => assert(Number.isInteger(n) && n >= 1 && n <= 12, '顺序数字应在 1~12'));
+  includes(S.log[0].msg, '#9 轻重缓急');
+  const orderText = S.board.orderNums.map(n => '蓝色 ' + n).join(' → ');
+  assert(S.log.some(l => l.msg.includes('剪线顺序') && l.msg.includes(orderText)), '开局日志应公开剪线顺序');
+});
+
+await t('#9 双人局：2 红 + 4 黄（54 张），同样 3 个蓝线顺序', () => {
+  const g = dealMission(6, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 54, '48 蓝 + 2 红 + 4 黄');
+  eq(S.board.redNums.length, 2);
+  eq(S.board.yellowNums.length, 4);
+  eq(S.board.orderNums.length, 3);
+  eq(new Set(S.board.orderNums).size, 3);
+});
+
+await t('#9 顺序数字：多局洗牌后始终为 1~12 的 3 个不同数字', () => {
+  for (let r = 0; r < 15; r++) {
+    const g = dealMission(6, ['A', 'B', 'C']);
+    const order = st(g).board.orderNums;
+    eq(order.length, 3, '第 ' + (r + 1) + ' 局顺序长度');
+    eq(new Set(order).size, 3, '第 ' + (r + 1) + ' 局不应重复');
+    assert(order.every(n => Number.isInteger(n) && n >= 1 && n <= 12), '第 ' + (r + 1) + ' 局数字范围');
+  }
+});
+
+await t('#9 未满足前置：双人剪线命中后续数字 → 立即爆炸（boom-order）', () => {
+  const g = loadGame();
+  const own10 = C('blue', 10), target10 = C('blue', 10);
+  const S = use(g, sc(2, [[[own10]], [[target10]]], { board: { orderNums: [5, 10, 3] } }));
+  const r = g.doPairCut(1, target10.id, { kind: 'blue', num: 10 }, own10.id);
+  assert(r.ok);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-order');
+  assert(!own10.revealed && !target10.revealed, '违规牌不应公开');
+  assert(S.log.some(l => l.msg.includes('须先公开 2 根蓝色 5')), '日志应说明缺失的前置');
+});
+
+await t('#9 已满足前置：公开 2 根蓝色 5 后可公开蓝色 10', () => {
+  const g = loadGame();
+  const f1 = C('blue', 5, { revealed: true }), f2 = C('blue', 5, { revealed: true });
+  const own10 = C('blue', 10), target10 = C('blue', 10);
+  const S = use(g, sc(2, [[[own10]], [[target10, f1, f2, C('blue', 9)]]], { board: { orderNums: [5, 10, 3] } }));
+  const r = g.doPairCut(1, target10.id, { kind: 'blue', num: 10 }, own10.id);
+  assert(r.ok && r.hit, '前置满足应命中');
+  assert(own10.revealed && target10.revealed);
+  eq(S.result, null);
+});
+
+await t('#9 第一个数字与未列入顺序的蓝线不受限制', () => {
+  const g = loadGame();
+  const own5 = C('blue', 5), target5 = C('blue', 5);
+  const S = use(g, sc(2, [[[own5]], [[target5, C('blue', 9)]]], { board: { orderNums: [5, 10, 3] } }));
+  assert(g.doPairCut(1, target5.id, { kind: 'blue', num: 5 }, own5.id).ok, '第一个数字应可直接公开');
+  assert(own5.revealed && target5.revealed);
+  eq(S.result, null, '仍有未公开牌，对局继续');
+
+  const own7 = C('blue', 7), target7 = C('blue', 7);
+  const S2 = use(g, sc(2, [[[own7]], [[target7, C('blue', 9)]]], { board: { orderNums: [5, 10, 3] } }));
+  assert(g.doPairCut(1, target7.id, { kind: 'blue', num: 7 }, own7.id).ok, '非顺序数字不受限制');
+  assert(own7.revealed && target7.revealed);
+  eq(S2.result, null);
+});
+
+await t('#9 单人剪线未解锁数字 → 立即爆炸', () => {
+  const g = loadGame();
+  const cs = [C('blue', 10), C('blue', 10), C('blue', 10), C('blue', 10)];
+  const S = use(g, sc(2, [[cs], [[C('blue', 9)]]], { board: { orderNums: [5, 10, 3] } }));
+  assert(g.doSoloCut({ kind: 'all', num: 10 }).ok);
+  eq(S.result.reason, 'boom-order');
+  assert(cs.every(c => !c.revealed), '违规牌不应公开');
+});
+
+await t('#9 探测器命中未解锁数字 → 立即爆炸，不进入待选', () => {
+  const g = loadGame();
+  const own10 = C('blue', 10);
+  const a = C('blue', 10), b = C('blue', 9);
+  const S = use(g, sc(2, [[[own10, C('blue', 12)]], [[a, b]]], { board: { orderNums: [5, 10, 3] } }));
+  assert(g.useSkill().ok);
+  assert(g.doScan([a.id, b.id], 10, own10.id, 'skill').ok);
+  eq(S.result.reason, 'boom-order');
+  eq(S.pending, null, '不应进入待选公开');
+  assert(!own10.revealed && !a.revealed);
+});
+
+await t('#9 超级探测器 / X/Y射线命中未解锁数字 → 立即爆炸', () => {
+  const g = loadGame();
+  const own10a = C('blue', 10);
+  const target10a = C('blue', 10);
+  const S = use(g, sc(2, [[[own10a]], [[target10a]]], {
+    board: { orderNums: [5, 10, 3] },
+    equipment: [{ no: 5, unlocked: true, used: false }],
+  }));
+  assert(g.doSuperScan(1, 0, 10, own10a.id).ok);
+  eq(S.result.reason, 'boom-order');
+  eq(S.pending, null);
+
+  const own10b = C('blue', 10), ownY = C('yellow', 2.1);
+  const target10b = C('blue', 10);
+  const S2 = use(g, sc(2, [[[own10b, ownY]], [[target10b]]], {
+    board: { orderNums: [5, 10, 3] },
+    equipment: [{ no: 10, unlocked: true, used: false }],
+  }));
+  assert(g.doRayCut(1, target10b.id, { kind: 'blue', num: 10 }, { kind: 'yellow' }, own10b.id, ownY.id).ok);
+  eq(S2.result.reason, 'boom-order');
+  assert(!own10b.revealed && !target10b.revealed);
+});
+
 await t('X选Y：多局洗牌后，牌库导线始终是板上候选的随机子集', () => {
   for (let r = 0; r < 15; r++) {
     const g = dealMission(5, ['A', 'B', 'C', 'D']);
@@ -490,10 +608,24 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   g.openMissionSheet();
   const sheet = g.document.getElementById('sheetContent').innerHTML;
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="5"', '抽屉应列出全部 5 关');
+  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 6 关');
   includes(sheet, 'mi-tag current', '当前关卡应有标记');
   includes(sheet, '>#8<');
   includes(sheet, '最终测试');
+  includes(sheet, '>#9<');
+  includes(sheet, '轻重缓急');
+});
+
+await t('#9 选关卡片：显示“3 个蓝线数字顺序剪线”追加规则', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(6).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#9 轻重缓急');
+  includes(html, '3 个蓝线数字的剪线顺序');
+  includes(html, '前一个数字公开 ≥2 根');
+  includes(html, '违者立即爆炸');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 6 }));
 });
 
 await t('选关守卫：非房主 / 对局中 / 无效关卡均被拒绝', () => {

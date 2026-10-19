@@ -1,6 +1,6 @@
 /**
  * 炸弹克星 端到端测试（Playwright）
- * 覆盖：着陆页+规则 → 建房/加入 → 房主切换关卡（成员同步）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
+ * 覆盖：着陆页+规则（含 #9 顺序规则）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
@@ -63,6 +63,7 @@ const rules = await p1.evaluate(() => {
   };
 });
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
+if (!rules.text.includes('#9 轻重缓急') || !rules.text.includes('违反顺序立即爆炸')) throw new Error('规则弹层缺少 #9 顺序剪线说明');
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
 if (rules.rows.join(',') !== '4,3,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
 if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
@@ -108,7 +109,10 @@ if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-swit
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
-if (missionCount !== 5) throw new Error('关卡抽屉应列出 5 关，得到 ' + missionCount);
+if (missionCount !== 6) throw new Error('关卡抽屉应列出 6 关，得到 ' + missionCount);
+if (!(await p1.evaluate(() => !!document.querySelector('[data-testid="mission-item-6"]')))) {
+  throw new Error('关卡抽屉应包含 #9');
+}
 await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
 await p1.click('[data-testid="mission-item-2"]');
 await p1.waitForTimeout(500);
@@ -124,6 +128,20 @@ await waitEval(p2, () => {
   return el && el.textContent.includes('#5 实地练习第二天') ? el.textContent : '';
 }, '成员同步收到 #5 选关');
 console.log('成员同步 #5 OK');
+
+// 再切 #9：等候室应显示顺序剪线追加规则
+await p1.click('[data-testid="mission-switch"]');
+await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await p1.click('[data-testid="mission-item-6"]');
+const host9 = await p1.textContent('.waiting-extras');
+if (!host9.includes('#9 轻重缓急') || !host9.includes('剪线顺序') || !host9.includes('违者立即爆炸')) {
+  throw new Error('房主关卡卡片未显示 #9 追加规则: ' + host9);
+}
+await waitEval(p2, () => {
+  const el = document.querySelector('#online .waiting-extras');
+  return el && el.textContent.includes('#9 轻重缓急') && el.textContent.includes('剪线顺序') ? el.textContent : '';
+}, '成员同步收到 #9 选关');
+console.log('成员同步 #9 OK');
 
 // 切回 #4：后续用例沿用默认关卡的开局牌数
 await p1.click('[data-testid="mission-switch"]');

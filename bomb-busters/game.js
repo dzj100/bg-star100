@@ -78,6 +78,14 @@ const MISSIONS = {
     },
     marks: { red: 'hollow', yellow: 'hollow' },
   },
+  6: {
+    id: 6, name: '#9 轻重缓急',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 2, use: 2 } },
+      two:      { red: { draw: 2, use: 2 }, yellow: { draw: 4, use: 4 } },
+    },
+    orderCount: 3,
+  },
 };
 
 /** 按人数展开关卡的开局参数 */
@@ -92,6 +100,7 @@ function missionSetup(mission, pCount) {
     yellowNote: cfg.yellow.note || '',
     redMark: (mission.marks && mission.marks.red) || 'solid',
     yellowMark: (mission.marks && mission.marks.yellow) || 'solid',
+    orderCount: mission.orderCount || 0,
   };
 }
 
@@ -241,6 +250,41 @@ function blueRevealedCount(num) {
   return n;
 }
 
+/**
+ * #9 顺序剪线：检查本次即将公开的蓝色数字是否违反解锁顺序。
+ * 规则：序列中第 k 个数字须在第 k-1 个数字已公开 ≥2 根后才能公开。
+ * @returns {null|{num:number, prev:number, have:number, need:number, idx:number}}
+ */
+function orderRevealViolation(nums) {
+  const order = (S && S.board && Array.isArray(S.board.orderNums)) ? S.board.orderNums : [];
+  if (!order.length) return null;
+  const seen = new Set();
+  for (const num of nums) {
+    if (!Number.isInteger(num) || seen.has(num)) continue;
+    seen.add(num);
+    const idx = order.indexOf(num);
+    if (idx <= 0) continue;
+    const prev = order[idx - 1];
+    const have = blueRevealedCount(prev);
+    if (have < 2) return { num, prev, have, need: 2, idx };
+  }
+  return null;
+}
+
+/** 违反顺序：立即爆炸（不消耗稳定剂） */
+function _boomOrder(v) {
+  addLog(`💥 剪线顺序错误：蓝色 ${v.num} 须先公开 2 根蓝色 ${v.prev}（当前 ${v.have} 根）`, 'bad');
+  _boom('boom-order');
+}
+
+/** 检查顺序；违规时立即爆炸并返回 true */
+function _checkOrderOrBoom(nums) {
+  const v = orderRevealViolation(nums);
+  if (!v) return false;
+  _boomOrder(v);
+  return true;
+}
+
 function _hiddenYellowAll() {
   const out = [];
   _eachCard(c => { if (c.kind === 'yellow' && !c.revealed) out.push(c); });
@@ -366,6 +410,8 @@ function dealGame(names, missionId) {
   const yellowDrawNums = shuffle(YELLOW_NUMS).slice(0, setup.yellowDraw).sort((a, b) => a - b);
   const redUseNums = shuffle(redDrawNums).slice(0, setup.redUse).sort((a, b) => a - b);
   const yellowUseNums = shuffle(yellowDrawNums).slice(0, setup.yellowUse).sort((a, b) => a - b);
+  // #9：抽出 3 个互不重复的蓝色数字，按抽出顺序解锁剪线
+  const orderNums = setup.orderCount > 0 ? shuffle(BLUE_NUMS).slice(0, setup.orderCount) : [];
 
   // 构造牌库：48 蓝 + 本局实际使用的红/黄导线
   let seq = 0;
@@ -429,6 +475,7 @@ function dealGame(names, missionId) {
       yellowMark: setup.yellowMark,
       redNote: setup.redNote,
       yellowNote: setup.yellowNote,
+      orderNums,                                           // #9：蓝线剪线解锁顺序（空数组=无顺序限制）
       defused: Array(12).fill(false),
     },
     failures: 0,
@@ -447,6 +494,9 @@ function dealGame(names, missionId) {
   };
 
   addLog(`🧨 ${mission.name} 开始！${pCount} 人局：${missionWiresText(setup)} 已标记到板上`);
+  if (orderNums.length) {
+    addLog(`⏱ 本局剪线顺序：${orderNums.map(n => '蓝色 ' + n).join(' → ')}（前一个数字公开 ≥2 根后才能公开下一个）`, 'warn');
+  }
   addLog(`🎖 随机队长：${names[captainSeat]}。请所有人放置信息标记（标记 1 张自己的蓝色导线）`);
   saveStateDirect();
   _render();
@@ -563,6 +613,7 @@ function _applyPairCut(plan) {
   const tName = S.players[toSeat].name;
 
   if (hit) {
+    if (guess.kind === 'blue' && _checkOrderOrBoom([guess.num])) return { ok: true, hit: true, boom: true };
     card.revealed = true;
     own.revealed = true;
     addLog(`✂️ ${aName} 指出 ${tName} 的导线为${label}，命中！双方各公开 1 张`, 'good');
@@ -642,6 +693,7 @@ function _applySoloCut(plan) {
   const { actor, kind, num, cards } = plan;
   const name = S.players[actor].name;
 
+  if (kind !== 'yellow' && _checkOrderOrBoom([num])) return { ok: true, boom: true };
   cards.forEach(c => { c.revealed = true; });
   if (kind === 'yellow') {
     addLog(`✂️ ${name} 单人剪线：清收全部黄导线 ×${cards.length}`, 'good');
@@ -790,6 +842,7 @@ function _applyScan(plan) {
   const tName = S.players[targetSeat].name;
 
   if (matched.length > 0) {
+    if (_checkOrderOrBoom([num])) return { ok: true, hit: true, boom: true };
     addLog(`🔎 ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，命中蓝色 ${num}！`, 'good');
     _consumeStabilize(false);
     S.pending = {
@@ -834,6 +887,7 @@ function resolveScanPick(cardId) {
   const own = _findCardById(pd.ownCardId);
   if (!card || card.revealed || !own || own.revealed) return { ok: false, msg: '状态已变化，请重试' };
 
+  if (_checkOrderOrBoom([card.num])) return { ok: true, boom: true };
   card.revealed = true;
   own.revealed = true;
   addLog(`🔎 ${S.players[pd.toSeat].name} 公开了蓝色 ${card.num}；${S.players[pd.fromSeat].name} 同步公开蓝色 ${own.num}`, 'good');
@@ -1104,6 +1158,7 @@ function _applySuperScan(plan) {
   const tName = S.players[toSeat].name;
 
   if (matched.length > 0) {
+    if (_checkOrderOrBoom([num])) return { ok: true, hit: true, boom: true };
     addLog(`🛰️ ${aName} 用超级探测器扫描 ${tName} 的整份手牌，命中蓝色 ${num}！`, 'good');
     _consumeStabilize(false);
     S.pending = {
@@ -1302,6 +1357,9 @@ function _applyRayCut(plan) {
   const tName = S.players[toSeat].name;
 
   if (hit) {
+    if (plan.matchedOwn.kind === 'blue' && _checkOrderOrBoom([plan.matchedOwn.num])) {
+      return { ok: true, hit: true, boom: true };
+    }
     card.revealed = true;
     plan.matchedOwn.revealed = true;
     addLog(`✂️ ${aName} 用 X/Y 射线指出 ${tName} 的导线为「${label}」之一，命中！`, 'good');
@@ -1424,6 +1482,8 @@ function _finish(win, reason) {
     addLog('🎉 全场导线全部公开——拆弹成功！', 'good');
   } else if (reason === 'boom-red') {
     addLog('💥 指向了红色导线——炸弹起爆！', 'bad');
+  } else if (reason === 'boom-order') {
+    addLog('💥 未按剪线顺序公开蓝色导线——炸弹起爆！', 'bad');
   } else {
     addLog('💥 失误达到上限——炸弹起爆！', 'bad');
   }
@@ -1577,7 +1637,7 @@ function openMissionSheet() {
         ${selected ? '<span class="mi-tag current">当前</span>' : ''}
         ${passed ? '<span class="mi-tag passed">已通关</span>' : ''}
       </span>
-      <span class="mi-desc">3~5 人：${std}${two !== std ? ` ｜ 2 人：${two}` : ''}</span>
+      <span class="mi-desc">3~5 人：${std}${two !== std ? ` ｜ 2 人：${two}` : ''}${m.orderCount ? ` ｜ ⏱ ${m.orderCount} 个蓝线数字顺序剪线` : ''}</span>
     </button>`;
   }).join('');
   content.innerHTML = `
@@ -1619,6 +1679,7 @@ function waitingExtrasHTML() {
       </div>
       <div class="we-line">开局：${std}${two !== std ? `（2 人局：${two}）` : ''} 标记到板上</div>
       ${missionHasHiddenPick(mission) ? '<div class="we-line">数轴标出全部候选；牌库只混入其中随机选中的导线，具体是哪几条保密</div>' : ''}
+      ${mission.orderCount ? `<div class="we-line">本关追加：开场公开 ${mission.orderCount} 个蓝线数字的剪线顺序；前一个数字公开 ≥2 根后才能公开下一个，违者立即爆炸</div>` : ''}
       <div class="we-line">失误上限：人数 − 1 次（第 N 次失误，N = 人数，即爆炸）</div>
       <div class="we-line">本关进度：${prog.passed ? '已通关 ✓' : '未通关'}</div>
     </div>`;

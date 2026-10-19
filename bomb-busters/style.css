@@ -610,6 +610,50 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   vertical-align: -1px;
 }
 
+/* #9 轻重缓急：剪线顺序条 */
+.board-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: -1px 0 8px;
+  padding: 5px 7px;
+  background: #fff6de;
+  border: 1.5px solid #e8c97a;
+  border-radius: 8px;
+}
+.order-title { font-size: .7rem; font-weight: 900; color: #8a5a00; letter-spacing: .04em; }
+.order-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.order-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1.5px solid #e6d6a8;
+  font-size: .74rem;
+  font-weight: 800;
+  color: #6b4a00;
+}
+.order-step.first { border-color: #d6a83a; }
+.order-step.locked { opacity: .62; }
+.order-num { font-size: .88rem; font-weight: 900; }
+.order-sub { font-size: .58rem; font-weight: 700; color: #9a7a35; }
+.order-arrow { color: #b08a2e; font-size: .72rem; font-weight: 900; }
+.order-tip { margin-left: auto; font-size: .58rem; font-weight: 700; color: #9a7a35; }
+.order-warn {
+  margin: 0 0 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #fff1e6;
+  border: 1.5px solid #e9b07e;
+  color: #a3480f;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 /* ============================================================
    玩家行 / 手牌
    ============================================================ */
