@@ -217,8 +217,10 @@ button { font-family: inherit; touch-action: manipulation; }
 /* 合法移动标记：目标格上的箭头 */
 .cell.hint-move { background: rgba(35, 32, 24, .05); }
 .arrow {
-  position: absolute; font-size: clamp(17px, 6vw, 26px); font-weight: 900; pointer-events: none;
-  color: var(--ink); text-shadow: 0 0 0 transparent;
+  position: absolute; z-index: 2; font-size: clamp(17px, 6vw, 26px); font-weight: 900; pointer-events: none;
+  color: var(--ink);
+  /* 目标格可能有棋子/树，抬高绘制层级并用纸色描边保证可读 */
+  text-shadow: 0 1px 0 var(--paper), 0 -1px 0 var(--paper), 1px 0 0 var(--paper), -1px 0 0 var(--paper);
 }
 .cell.hint-push .arrow { color: var(--red); transform: scale(1.15); }
 .arrow span { display: block; animation: hop .9s ease-in-out infinite; }

@@ -643,14 +643,207 @@ function showRulesModal() {
   document.getElementById('modalOverlay').classList.add('show');
 }
 
+/* 首页主视觉：金色天文钟盘 + 月相徽章 + 蜻蜓/荷叶（纯 SVG） */
+function _landingHeroSVG() {
+  const numerals = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+  let ticks = '';
+  for (let k = 0; k < 72; k++) {
+    const major = k % 6 === 0;
+    ticks += `<line x1="220" y1="${major ? 45 : 46}" x2="220" y2="${major ? 33 : 41}" transform="rotate(${k * 5} 220 220)" stroke="url(#ttHeroGold)" stroke-width="${major ? 1.6 : .8}" opacity="${major ? .9 : .4}" stroke-linecap="round"/>`;
+  }
+  const marks = numerals.map((n, i) =>
+    `<g transform="rotate(${i * 30} 220 220)"><text x="220" y="68" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="17.5" font-weight="700" letter-spacing="1.5" fill="url(#ttHeroGold)">${n}</text></g>`
+  ).join('');
+
+  return `
+  <svg class="tt-hero" viewBox="0 0 440 440" aria-hidden="true">
+    <defs>
+      <radialGradient id="ttHeroDial" cx="44%" cy="34%" r="74%">
+        <stop offset="0" stop-color="#3fc6a7"/>
+        <stop offset=".3" stop-color="#178d82"/>
+        <stop offset=".6" stop-color="#0b4e59"/>
+        <stop offset=".85" stop-color="#082b3e"/>
+        <stop offset="1" stop-color="#061b2b"/>
+      </radialGradient>
+      <radialGradient id="ttHeroGlow" cx="42%" cy="32%" r="62%">
+        <stop offset="0" stop-color="#6be0bd" stop-opacity=".5"/>
+        <stop offset=".45" stop-color="#21998d" stop-opacity=".16"/>
+        <stop offset="1" stop-color="#08283a" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="ttHeroGold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff3c6"/>
+        <stop offset=".26" stop-color="#eacd83"/>
+        <stop offset=".52" stop-color="#b9862f"/>
+        <stop offset=".76" stop-color="#f4dc99"/>
+        <stop offset="1" stop-color="#c79a42"/>
+      </linearGradient>
+      <linearGradient id="ttHeroBand" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7d5524"/>
+        <stop offset=".28" stop-color="#c79e51"/>
+        <stop offset=".5" stop-color="#eed48b"/>
+        <stop offset=".72" stop-color="#9a6d2d"/>
+        <stop offset="1" stop-color="#573b18"/>
+      </linearGradient>
+      <radialGradient id="ttHeroCoin" cx="34%" cy="28%" r="78%">
+        <stop offset="0" stop-color="#f9eab7"/>
+        <stop offset=".55" stop-color="#ccA55a"/>
+        <stop offset="1" stop-color="#7f5a24"/>
+      </radialGradient>
+      <linearGradient id="ttHeroLily" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5cb99c"/>
+        <stop offset=".55" stop-color="#2e8a78"/>
+        <stop offset="1" stop-color="#155b56"/>
+      </linearGradient>
+      <linearGradient id="ttHeroWing" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#a9eee0" stop-opacity=".9"/>
+        <stop offset="1" stop-color="#2f9295" stop-opacity=".35"/>
+      </linearGradient>
+      <path id="ttHeroSpark" d="M0,-6 L1.6,-1.6 L6,0 L1.6,1.6 L0,6 L-1.6,1.6 L-6,0 L-1.6,-1.6 Z"/>
+      <!-- 俯视荷叶：椭圆盘面 + 楔形缺口 + 叶脉 -->
+      <g id="ttHeroPad">
+        <path d="M0 0 L12 -22.9 A 40 24 0 1 1 -12 -22.9 Z" fill="url(#ttHeroLily)" stroke="#e6c780" stroke-width="1.1"/>
+        <g fill="none" stroke="#c9efda" stroke-width=".7" opacity=".32">
+          <path d="M0 0 L-37 -4 M0 0 L-30 12 M0 0 L-12 22 M0 0 L12 22 M0 0 L29 14 M0 0 L37 -3"/>
+        </g>
+        <path d="M-31 -13 A 34 20 0 0 1 -1 -23" fill="none" stroke="#e8f7e4" stroke-width="1" opacity=".22"/>
+      </g>
+    </defs>
+
+    <!-- 外圈光晕与星轨 -->
+    <circle class="tt-halo" cx="220" cy="220" r="211" fill="none" stroke="url(#ttHeroGold)" stroke-width="1" opacity=".3"/>
+    <circle cx="220" cy="220" r="203" fill="none" stroke="url(#ttHeroGold)" stroke-width="1" opacity=".5" stroke-dasharray="1 6" stroke-linecap="round"/>
+    <path d="M336 42 A 203 203 0 0 1 421 148" fill="none" stroke="url(#ttHeroGold)" stroke-width=".8" opacity=".5" stroke-dasharray="2 7"/>
+    <circle cx="421" cy="148" r="2.2" fill="#f7e6ad" opacity=".8"/>
+    <path d="M24 298 A 206 206 0 0 0 106 419" fill="none" stroke="url(#ttHeroGold)" stroke-width=".7" opacity=".25"/>
+
+    <!-- 罗盘尖角 -->
+    <g fill="url(#ttHeroGold)">
+      <path d="M220 2 L226.5 17 L220 24 L213.5 17 Z"/>
+      <path d="M220 438 L226.5 423 L220 416 L213.5 423 Z" opacity=".8"/>
+      <path d="M2 220 L17 213.5 L24 220 L17 226.5 Z" opacity=".8"/>
+      <path d="M438 220 L423 213.5 L416 220 L423 226.5 Z" opacity=".8"/>
+    </g>
+
+    <!-- 刻度 / 铜金环带 / 罗马数字 -->
+    <g>${ticks}</g>
+    <circle cx="220" cy="220" r="160" fill="none" stroke="url(#ttHeroBand)" stroke-width="30" opacity=".96"/>
+    <circle cx="220" cy="220" r="175" fill="none" stroke="url(#ttHeroGold)" stroke-width="2.2"/>
+    <circle cx="220" cy="220" r="145" fill="none" stroke="url(#ttHeroGold)" stroke-width="1.6"/>
+    <circle cx="220" cy="220" r="140.5" fill="none" stroke="#f2dda0" stroke-width=".8" opacity=".55" stroke-dasharray="2 5"/>
+    <g>${marks}</g>
+
+    <!-- 内盘 -->
+    <circle cx="220" cy="220" r="135" fill="url(#ttHeroDial)" stroke="#061825" stroke-width="3"/>
+    <circle cx="220" cy="220" r="135" fill="url(#ttHeroGlow)"/>
+    <circle cx="220" cy="220" r="124" fill="none" stroke="#f0d99c" stroke-width=".8" opacity=".34" stroke-dasharray="1 6"/>
+    <circle cx="220" cy="220" r="105" fill="none" stroke="#f0d99c" stroke-width=".6" opacity=".18"/>
+    <g fill="url(#ttHeroGold)" opacity=".55">
+      <path d="M220 104 l2.6 4.4 -2.6 4.4 -2.6 -4.4 Z"/>
+      <path d="M336 220 l4.4 2.6 -4.4 2.6 -4.4 -2.6 Z"/>
+      <path d="M220 336 l2.6 4.4 -2.6 4.4 -2.6 -4.4 Z"/>
+      <path d="M104 220 l4.4 2.6 -4.4 2.6 -4.4 -2.6 Z"/>
+    </g>
+
+    <!-- 盘中星图 -->
+    <g stroke="url(#ttHeroGold)" stroke-width=".8" opacity=".5" fill="none">
+      <path d="M104 158 L122 133 L146 143 L137 168"/>
+    </g>
+    <g fill="#f7e6ad">
+      <circle cx="104" cy="158" r="1.7"/><circle cx="122" cy="133" r="1.2"/>
+      <circle cx="146" cy="143" r="1.5"/><circle cx="137" cy="168" r="1"/>
+      <circle cx="304" cy="130" r="1.3" opacity=".8"/>
+      <circle cx="326" cy="292" r="1.6" opacity=".7"/>
+      <circle cx="128" cy="296" r="1.1" opacity=".6"/>
+      <circle cx="272" cy="332" r="1.2" opacity=".7"/>
+    </g>
+    <use href="#ttHeroSpark" class="tt-twinkle" transform="translate(292 118) scale(.7)" fill="#ffeebc"/>
+    <use href="#ttHeroSpark" class="tt-twinkle tt-tw2" transform="translate(320 258) scale(.5)" fill="#ffeebc"/>
+    <use href="#ttHeroSpark" class="tt-twinkle tt-tw3" transform="translate(132 248) scale(.55)" fill="#ffeebc"/>
+
+    <!-- 盘中旧式指针（压低存在感，只作纹理） -->
+    <g opacity=".16" stroke="url(#ttHeroGold)" stroke-linecap="round">
+      <path d="M220 220 L166 158" stroke-width="3"/>
+      <path d="M220 220 L272 176" stroke-width="1.6"/>
+      <circle cx="220" cy="220" r="5" fill="url(#ttHeroGold)" stroke="none"/>
+    </g>
+
+    <!-- 月相徽章 -->
+    <g class="tt-coin" transform="translate(58 110) rotate(-8)">
+      <circle r="23" fill="url(#ttHeroCoin)" stroke="#6d4c20" stroke-width="1.2"/>
+      <circle r="18.5" fill="#0c2a38" stroke="#efd99f" stroke-width="1"/>
+      <circle r="15" fill="none" stroke="#c9a558" stroke-width=".6" stroke-dasharray="2 2"/>
+      <circle cx="-2" cy="-1" r="8" fill="url(#ttHeroGold)"/>
+      <circle cx="4" cy="3" r="7" fill="#0c2a38"/>
+      <circle cx="10" cy="-11" r="1.3" fill="#f7e6ad"/>
+    </g>
+    <g class="tt-coin" transform="translate(382 110) rotate(8)">
+      <circle r="23" fill="url(#ttHeroCoin)" stroke="#6d4c20" stroke-width="1.2"/>
+      <circle r="18.5" fill="#0c2a38" stroke="#efd99f" stroke-width="1"/>
+      <circle r="15" fill="none" stroke="#c9a558" stroke-width=".6" stroke-dasharray="2 2"/>
+      <rect x="-9.5" y="-10" width="19" height="3" rx="1.5" fill="url(#ttHeroGold)"/>
+      <rect x="-9.5" y="7" width="19" height="3" rx="1.5" fill="url(#ttHeroGold)"/>
+      <path d="M-7 -7 H7 L1 0 L7 7 H-7 L-1 0 Z" fill="url(#ttHeroGold)"/>
+      <circle cx="10" cy="-11" r="1.3" fill="#f7e6ad"/>
+    </g>
+
+    <!-- 蜻蜓 -->
+    <g transform="translate(390 300) rotate(12)">
+      <g class="tt-dragonfly">
+        <path d="M0,-4 C-24,-30 -42,-26 -30,-6 C-20,8 -6,6 0,2 Z" fill="url(#ttHeroWing)" stroke="#efd99f" stroke-width=".9"/>
+        <path d="M0,0 C-28,2 -40,16 -22,24 C-10,29 -2,18 0,8 Z" fill="url(#ttHeroWing)" stroke="#efd99f" stroke-width=".9"/>
+        <path d="M2,-4 C26,-30 44,-26 32,-6 C22,8 8,6 2,2 Z" fill="url(#ttHeroWing)" stroke="#efd99f" stroke-width=".9"/>
+        <path d="M2,0 C30,2 42,16 24,24 C12,29 4,18 2,8 Z" fill="url(#ttHeroWing)" stroke="#efd99f" stroke-width=".9"/>
+        <rect x="-1.5" y="-10" width="3" height="40" rx="1.5" fill="url(#ttHeroGold)"/>
+        <circle cx="0" cy="-11" r="3" fill="#0b2433" stroke="#efd99f" stroke-width=".8"/>
+        <path d="M-1,-14 L-5,-20 M1,-14 L5,-20" stroke="#efd99f" stroke-width=".7" stroke-linecap="round" fill="none"/>
+      </g>
+    </g>
+
+    <!-- 荷叶 -->
+    <g class="tt-lilies">
+      <use href="#ttHeroPad" transform="translate(60 372) rotate(-8)"/>
+      <use href="#ttHeroPad" transform="translate(24 412) rotate(16) scale(.62)" opacity=".95"/>
+      <use href="#ttHeroPad" transform="translate(114 428) rotate(-30) scale(.44)" opacity=".85"/>
+      <ellipse cx="62" cy="396" rx="52" ry="11" fill="none" stroke="#efd99f" stroke-width=".7" opacity=".16"/>
+      <path d="M2 430 Q 44 416 96 430" fill="none" stroke="#efd99f" stroke-width=".7" opacity=".18"/>
+    </g>
+
+    <!-- 右下弦月 + 星屑 -->
+    <g transform="translate(366 370)">
+      <path d="M2 -10 A10 10 0 1 1 -7 7 A7.6 7.6 0 1 0 2 -10 Z" fill="url(#ttHeroGold)"/>
+      <circle cx="15" cy="-11" r="1.4" fill="#f7e6ad" opacity=".9"/>
+      <use href="#ttHeroSpark" class="tt-twinkle tt-tw4" transform="translate(10 14) scale(.45)" fill="#ffeebc"/>
+    </g>
+
+    <!-- 左上星图 -->
+    <g stroke="url(#ttHeroGold)" stroke-width=".8" opacity=".45" fill="none">
+      <path d="M30 58 L56 38 L80 50 L72 74"/>
+    </g>
+    <g fill="#f7e6ad" opacity=".8">
+      <circle cx="30" cy="58" r="1.5"/><circle cx="56" cy="38" r="1.1"/>
+      <circle cx="80" cy="50" r="1.4"/><circle cx="72" cy="74" r="1"/>
+    </g>
+  </svg>`;
+}
+
 function renderLandingHTML() {
   return `
   <div class="landing">
-    <div class="rules-corner"><button class="icon-btn" onclick="showRulesModal()">📖 规则</button></div>
-    <div class="landing-icon">🕰️</div>
-    <h1>时序谜局</h1>
-    <p class="subtitle">Take Time · 2~4人合作默契配合</p>
-    <!--ONLINE_BTN-->
+    <div class="rules-corner"><button class="icon-btn landing-rules" onclick="showRulesModal()">规则</button></div>
+    <div class="landing-main">
+      <div class="landing-hero">
+        ${_landingHeroSVG()}
+        <div class="hero-copy">
+          <h1>时序谜局</h1>
+          <span class="hero-en">TAKE TIME</span>
+          <span class="hero-ornament" aria-hidden="true"><i></i></span>
+        </div>
+      </div>
+      <p class="landing-subtitle"><span>2~4 人</span><i aria-hidden="true"></i><span>合作默契解谜</span></p>
+      <div class="landing-actions">
+        <!--ONLINE_BTN-->
+      </div>
+    </div>
     <div class="credit">@imStar100</div>
   </div>`;
 }

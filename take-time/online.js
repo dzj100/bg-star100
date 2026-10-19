@@ -1196,7 +1196,11 @@ function initOnline(hooks) {
   if (HOOK_renderLanding) {
     window.renderLanding = function() {
       const landingHTML = HOOK_renderLanding();
-      const btn = `<button class="start-btn" onclick="showOnlineLobby()" style="background:var(--surface);border:2px solid var(--gold);color:var(--gold);margin-top:12px;">🌐 联机模式</button>`;
+      const btn = `<button class="start-btn landing-cta" onclick="showOnlineLobby()">
+        <span class="cta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.2 2.1"/><path d="M12 3.6v1.2M12 19.2v1.2M3.6 12h1.2M19.2 12h1.2" opacity=".55"/></svg></span>
+        <span class="cta-copy"><b>联机模式</b><small>创建 / 加入房间</small></span>
+        <span class="cta-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
+      </button>`;
       if (landingHTML.includes('<!--ONLINE_BTN-->')) {
         return landingHTML.replace('<!--ONLINE_BTN-->', btn);
       }
