@@ -266,10 +266,10 @@ function showRules() {
       <h3>🎯 胜利条件</h3>
       <p>全队合作：场上所有导线（48 个蓝导线 + X 个黄导线 + X 个红导线）<b>全部公开</b> = 拆弹成功</p>
       <h3>🧩 开局导线分配</h3>
-      <p>① 导线构成<u>（红/黄线开局将自动标记到数轴）</u><br>
+      <p>① 导线构成<u>（红/黄线开局将自动标记到数轴；各关卡抽取/使用数量见等候室关卡卡）</u><br>
       · 蓝线 1~12 <b>各 4 张</b>（共 48 张）<br>
-      · 红线 1.5~11.5 随机 X 张<br>
-      · 黄线 1.1~11.1 随机 X 张<br>
+      · 红线 1.5~11.5 按关卡随机抽取<br>
+      · 黄线 1.1~11.1 按关卡随机抽取<br>
       ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线</p>
       <table>
         <thead><tr><th>人数</th><th>手牌分配</th></tr></thead>
@@ -290,7 +290,7 @@ function showRules() {
           × 失误 → 该牌真实信息将被标记，并累计 1 次失误<br>
           <b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
           <tr><td>✂️ 单人剪线</td><td>仅以下场景可以进行：<br>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → 可全部公开（清收）；</td></tr>
-          <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开红色导线。</td></tr>
+          <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开自己剩余的全部红色导线。</td></tr>
         </tbody>
       </table>
       <p>⏭️ 已公开全部手牌的玩家，轮到其回合时将<b>自动跳过</b></p>
@@ -550,19 +550,34 @@ function onEndBackToRoom() {
 function _boardHTML() {
   const b = (S && S.board) || {};
   const yellowNums = b.yellowNums || [];
+  const redNums = Array.isArray(b.redNums)
+    ? b.redNums
+    : (typeof b.redNum === 'number' ? [b.redNum] : []);
+  const redHollow = b.redMark === 'hollow';
+  const yellowHollow = b.yellowMark === 'hollow';
+  const redNote = b.redNote || '';
+  const yellowNote = b.yellowNote || '';
   const cells = [];
   for (let n = 1; n <= 12; n++) {
     const hasYellow = yellowNums.indexOf(n + 0.1) >= 0;
-    const hasRed = b.redNum === n + 0.5;
+    const hasRed = redNums.indexOf(n + 0.5) >= 0;
     const defused = !!(b.defused || [])[n - 1];
     const rev = blueRevealedCount(n);
+    const yellowDot = hasYellow
+      ? `<span class="dot dot-y${yellowHollow ? ' dot-hollow' : ''}" title="黄导线${yellowNote ? '（' + yellowNote + '）' : ''}"></span>`
+      : '';
+    const redDot = hasRed
+      ? `<span class="dot dot-r${redHollow ? ' dot-hollow' : ''}" title="红导线${redNote ? '（' + redNote + '）' : ''}"></span>`
+      : '';
     cells.push(`<div class="cell${defused ? ' defused' : ''}${rev >= 4 ? ' full' : ''}" data-cell="${n}">
       <span class="cell-num">${n}</span>
       <span class="cell-rev">${rev}/4</span>
-      ${(hasYellow || hasRed) ? `<span class="cell-dots">${hasYellow ? '<span class="dot dot-y"></span>' : ''}${hasRed ? '<span class="dot dot-r"></span>' : ''}</span>` : ''}
+      ${(hasYellow || hasRed) ? `<span class="cell-dots">${yellowDot}${redDot}</span>` : ''}
       ${defused ? '<span class="cell-check">✓</span>' : ''}
     </div>`);
   }
+  const redIcon = redHollow ? '<span class="legend-ring"></span>' : '🚨';
+  const yellowIcon = yellowHollow ? '<span class="legend-ring"></span>' : '🟡';
   return `<div class="board" id="board">
     <div class="board-head">
       <span class="board-title">数轴板</span>
@@ -570,8 +585,8 @@ function _boardHTML() {
     </div>
     <div class="board-cells">${cells.join('')}</div>
     <div class="board-legend">
-      <span class="legend legend-r">🚨 红 ${b.redNum}</span>
-      <span class="legend legend-y">🟡 黄 ${yellowNums.join('、') || '—'}</span>
+      <span class="legend legend-r">${redIcon} 红导线${redNote ? `（${redNote}）` : ''}：${redNums.join('、') || '—'}</span>
+      <span class="legend legend-y">${yellowIcon} 黄导线${yellowNote ? `（${yellowNote}）` : ''}：${yellowNums.join('、') || '—'}</span>
     </div>
   </div>`;
 }
@@ -1607,7 +1622,7 @@ function _bubbleText(fx, phase) {
     const by = mine ? '' : _playerName(fx.by) + '：';
     if (fx.kind === 'pair') return `${by}这张是「${fx.label}」！`;
     if (fx.kind === 'solo') return `${by}我公开我手上的 ${fx.count} 张「${fx.label}」！`;
-    if (fx.kind === 'red') return `${by}我公开我手上最后一张红色导线！`;
+    if (fx.kind === 'red') return `${by}我公开我手上最后${(fx.count || 1) > 1 ? ` ${fx.count} 张` : '一张'}红色导线！`;
     if (fx.superScan) return `${by}超级探测器扫描你整份手牌——我猜有「${fx.label}」！`;
     return `${by}扫描这 ${fx.count} 张——我猜有「${fx.label}」！`;
   }
@@ -1649,7 +1664,8 @@ function _playBubbles(fx) {
 function _startFxSequence(kind, plan) {
   const ids = kind === 'scan' ? plan.targetCards.map(c => c.id)
     : kind === 'solo' ? plan.cards.map(c => c.id)
-    : [plan.card.id];                     // pair / ray / red：单张目标
+    : kind === 'red' ? plan.cards.map(c => c.id)
+    : [plan.card.id];                     // pair / ray：单张目标
   const fx = {
     id: 'fx' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     kind,
@@ -1657,7 +1673,7 @@ function _startFxSequence(kind, plan) {
     to: kind === 'pair' ? plan.toSeat : kind === 'scan' ? plan.targetSeat : plan.actor,
     label: plan.label,
     hit: !!plan.hit,
-    count: kind === 'scan' || kind === 'solo' ? plan.count : 0,
+    count: kind === 'scan' || kind === 'solo' || kind === 'red' ? plan.count : 0,
     superScan: kind === 'scan' && plan.src === 'eq5',
     ids,                                  // 被指认的牌：气泡期间聚光高亮
   };

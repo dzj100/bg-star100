@@ -273,6 +273,265 @@ await t('洗牌：蓝色数字应跨玩家分布（回归：deck 未被洗牌的
   }
 });
 
+/* ──────────────────────────── 关卡与多红导线 ──────────────────────────── */
+
+console.log('── 关卡与多红导线 ──');
+
+/** 按关卡开局（联机时关卡来自房间 pendingChallenge） */
+function dealMission(id, names) {
+  const g = loadGame();
+  g.window._olPendingChallenge = { missionId: id };
+  g.dealGame(names);
+  return g;
+}
+
+function boardTotals(g) {
+  let total = 0;
+  for (const p of st(g).players) for (const sh of p.shares) total += sh.length;
+  return total;
+}
+
+/** 本局实际进入牌库（手牌）的红/黄数字 */
+function handWireNums(g) {
+  const out = { red: [], yellow: [] };
+  for (const p of st(g).players) for (const sh of p.shares) for (const c of sh) {
+    if (c.kind === 'red' || c.kind === 'yellow') out[c.kind].push(c.num);
+  }
+  out.red.sort((a, b) => a - b);
+  out.yellow.sort((a, b) => a - b);
+  return out;
+}
+
+function subsetOf(nums, pool) {
+  return nums.every(n => pool.indexOf(n) >= 0);
+}
+
+await t('关卡默认 #4：实心标记、无括号备注、红 1 黄 2（51 张）', () => {
+  const g = loadGame();
+  eq(g.currentMissionId(), 1, '未选关时默认第一关');
+  g.dealGame(['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 1);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄');
+  eq(S.board.redNums.length, 1);
+  eq(S.board.yellowNums.length, 2);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 2);
+  eq(S.board.redMark, 'solid');
+  eq(S.board.yellowMark, 'solid');
+  eq(S.board.redNote, '');
+  eq(S.board.yellowNote, '');
+  includes(S.log[0].msg, '#4 实地练习第一天');
+});
+
+await t('#5 三人局：抽 1 红 + 3 黄全标板，牌库 3选2（51 张），黄线空心', () => {
+  const g = dealMission(2, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 2);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄（实际入库）');
+  eq(S.board.redNums.length, 1);
+  eq(S.board.yellowNums.length, 3, '抽出的 3 根黄线全部标到数轴');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 2, '牌库只混入 3选2 的 2 根');
+  assert(subsetOf(hand.red, S.board.redNums), '入库红线应来自板上候选');
+  assert(subsetOf(hand.yellow, S.board.yellowNums), '入库黄线应来自板上候选');
+  eq(S.board.yellowMark, 'hollow', '黄线空心标记');
+  eq(S.board.redMark, 'solid', '红线仍实心');
+  eq(S.board.yellowNote, '3选2');
+  eq(S.board.redNote, '');
+  assert(S.board.redNums.every(n => Number.isInteger(n - 0.5)), '红线应取自 1.5~11.5');
+  assert(S.board.yellowNums.every(n => Math.abs(n % 1 - 0.1) < 1e-9), '黄线应取自 1.1~11.1');
+  includes(S.log[0].msg, '#5 实地练习第二天');
+  includes(S.log[0].msg, '3 条黄导线（3选2）');
+});
+
+await t('#5 双人局：2 红 + 3 黄候选，牌库 2 红 + 3选2 黄（52 张）', () => {
+  const g = dealMission(2, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 52, '48 蓝 + 2 红 + 2 黄（实际入库）');
+  eq(S.board.redNums.length, 2);
+  eq(S.board.yellowNums.length, 3);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 2);
+  eq(hand.yellow.length, 2);
+  assert(subsetOf(hand.yellow, S.board.yellowNums));
+  eq(S.board.yellowMark, 'hollow');
+});
+
+await t('#6 双人局：2 红 + 4 黄（54 张），实心标记无备注', () => {
+  const g = dealMission(3, ['A', 'B']);
+  const S = st(g);
+  eq(S.missionId, 3);
+  eq(boardTotals(g), 54, '48 蓝 + 2 红 + 4 黄');
+  eq(S.board.redNums.length, 2);
+  eq(S.board.yellowNums.length, 4);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 2);
+  eq(hand.yellow.length, 4);
+  eq(S.board.redMark, 'solid');
+  eq(S.board.yellowMark, 'solid');
+  eq(S.board.redNote, '');
+  eq(S.board.yellowNote, '');
+  includes(S.log[0].msg, '#6 实地练习第三天');
+});
+
+await t('#7 双人局：3 个红候选全标板、牌库 3选1（49 张），红线空心', () => {
+  const g = dealMission(4, ['A', 'B']);
+  const S = st(g);
+  eq(S.missionId, 4);
+  eq(boardTotals(g), 49, '48 蓝 + 1 红（实际入库）');
+  eq(S.board.redNums.length, 3, '抽出的 3 根红线全部标到数轴');
+  eq(S.board.yellowNums.length, 0);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1, '牌库只混入 3选1 的 1 根');
+  assert(subsetOf(hand.red, S.board.redNums), '入库红线应来自板上候选');
+  eq(S.board.redMark, 'hollow', '红线空心标记');
+  eq(S.board.redNote, '3选1');
+  eq(S.board.yellowNote, '');
+  includes(S.log[0].msg, '3 条红导线（3选1）');
+});
+
+await t('#8 五人局：抽 2 红 + 3 黄全标板，牌库 2选1 / 3选2（51 张），红黄均空心', () => {
+  const g = dealMission(5, ['A', 'B', 'C', 'D', 'E']);
+  const S = st(g);
+  eq(S.missionId, 5);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄（实际入库）');
+  eq(S.board.redNums.length, 2, '抽出的 2 根红线全部标到数轴');
+  eq(S.board.yellowNums.length, 3, '抽出的 3 根黄线全部标到数轴');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 2);
+  assert(subsetOf(hand.red, S.board.redNums));
+  assert(subsetOf(hand.yellow, S.board.yellowNums));
+  eq(S.board.redMark, 'hollow');
+  eq(S.board.yellowMark, 'hollow');
+  eq(S.board.redNote, '2选1');
+  eq(S.board.yellowNote, '3选2');
+  includes(S.log[0].msg, '2 条红导线（2选1） + 3 条黄导线（3选2）');
+});
+
+await t('#8 双人局：3 红 + 4 黄候选全标板，牌库 3选1 + 4 黄（53 张）', () => {
+  const g = dealMission(5, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 53, '48 蓝 + 1 红 + 4 黄（实际入库）');
+  eq(S.board.redNums.length, 3);
+  eq(S.board.yellowNums.length, 4);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 4);
+  assert(subsetOf(hand.red, S.board.redNums));
+  eq(S.board.redNote, '3选1');
+  eq(S.board.yellowNote, '');
+  eq(S.board.yellowMark, 'hollow');
+});
+
+await t('X选Y：多局洗牌后，牌库导线始终是板上候选的随机子集', () => {
+  for (let r = 0; r < 15; r++) {
+    const g = dealMission(5, ['A', 'B', 'C', 'D']);
+    const S = st(g);
+    eq(S.board.redNums.length, 2);
+    eq(S.board.yellowNums.length, 3);
+    const hand = handWireNums(g);
+    eq(hand.red.length, 1, '第 ' + (r + 1) + ' 局实际入库红线');
+    eq(hand.yellow.length, 2, '第 ' + (r + 1) + ' 局实际入库黄线');
+    assert(subsetOf(hand.red, S.board.redNums), '第 ' + (r + 1) + ' 局红线应来自候选');
+    assert(subsetOf(hand.yellow, S.board.yellowNums), '第 ' + (r + 1) + ' 局黄线应来自候选');
+  }
+});
+
+await t('公开红线：多红关卡仅剩红线时可一次公开全部', () => {
+  const g = loadGame();
+  const r1 = C('red', 4.5), r2 = C('red', 9.5);
+  use(g, sc(2, [[[r1, r2]], [[C('blue', 3)]]], { current: 0 }));
+  assert(g.canRevealRed(0), '仅剩红牌应可公开');
+  const plan = g._planRevealRed();
+  assert(plan.ok);
+  eq(plan.count, 2);
+  assert(g._applyRevealRed(plan).ok);
+  assert(r1.revealed && r2.revealed, '两张红线应同时公开');
+  assert(st(g).log.some(l => l.msg.includes('2 张红色导线')));
+});
+
+await t('公开红线拒绝：仍有未公开蓝/黄线时不可公开', () => {
+  const g = loadGame();
+  const red = C('red', 6.5), blue = C('blue', 7), y = C('yellow', 2.1);
+  use(g, sc(2, [[[red, blue]], [[y]]], { current: 0 }));
+  assert(!g.canRevealRed(0), '有蓝线时不可公开');
+  includes(g.doRevealRed().msg, '只有持红者');
+  // 双人局也要看本玩家全部份：另一份仍有未公开牌时同样不可公开
+  const red2 = C('red', 8.5);
+  use(g, sc(2, [[[red2], [C('blue', 11)]], [[y]]], { current: 0 }));
+  assert(!g.canRevealRed(0), '其他份有未公开牌时不可公开');
+});
+
+await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMission 上报并刷新卡片', () => {
+  const g = loadGame();
+  let refreshed = 0;
+  g.window._olRefreshWaitingRoom = () => { refreshed++; };
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 1 }), '默认上报 #4');
+
+  includes(g.waitingExtrasHTML(), '#4 实地练习第一天');
+  includes(g.waitingExtrasHTML(), 'data-testid="mission-switch"', '房主应看到切换按钮');
+
+  const r = g.selectMission(2);
+  assert(r.ok);
+  eq(JSON.stringify(g.window._olPendingChallenge), JSON.stringify({ missionId: 2 }));
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 2 }));
+  eq(refreshed, 1, '应立即上报等候室');
+  const html = g.waitingExtrasHTML();
+  includes(html, '#5 实地练习第二天');
+  includes(html, '3选2');
+  includes(html, '3 条黄导线（3选2）', '文案按抽出的候选数描述');
+  includes(html, '（2 人局：2 条红导线 + 3 条黄导线（3选2））', '双人局说明');
+  includes(html, '具体是哪几条保密', 'X选Y 保密提示');
+
+  g.openMissionSheet();
+  const sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
+  includes(sheet, 'data-mission-id="5"', '抽屉应列出全部 5 关');
+  includes(sheet, 'mi-tag current', '当前关卡应有标记');
+  includes(sheet, '>#8<');
+  includes(sheet, '最终测试');
+});
+
+await t('选关守卫：非房主 / 对局中 / 无效关卡均被拒绝', () => {
+  const g = loadGame();
+  includes(g.selectMission(99).msg, '无效的关卡');
+  g.window._olIsHost = () => false;
+  includes(g.selectMission(2).msg, '只有房主');
+  assert(!g.waitingExtrasHTML().includes('mission-switch'), '非房主不显示切换按钮');
+  g.window._olIsHost = () => true;
+  g.window.S.phase = 'play';
+  includes(g.selectMission(2).msg, '对局中不能切换关卡');
+});
+
+await t('进度：按实际关卡记录，#5 通关不覆盖 #4', () => {
+  const g = dealMission(2, ['A', 'B', 'C']);
+  g.updateLocalProgress(true);
+  const prog = JSON.parse(g.localStorage.getItem('bomb-progress'));
+  assert(prog['2'] && prog['2'].passed, '#5 应记录为通关');
+  assert(!prog['1'], '不应写入 #4');
+});
+
+await t('再来一局：沿用本局关卡（刷新后选关丢失也不回退 #4）', () => {
+  const g = dealMission(5, ['A', 'B', 'C']);
+  const S = st(g);
+  S.phase = 'over';
+  S.result = { win: true };
+  g.window._olPendingChallenge = null;   // 模拟刷新后等候室选关尚未恢复
+  assert(g.restartGame().ok);
+  const S2 = st(g);
+  eq(S2.missionId, 5);
+  eq(S2.phase, 'mark');
+  eq(S2.board.redNums.length, 2, '#8 三人局候选红线 2 个');
+  eq(S2.board.yellowNums.length, 3, '#8 三人局候选黄线 3 个');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 2);
+});
+
 /* ──────────────────────────── 信息标记阶段 ──────────────────────────── */
 
 console.log('── 信息标记阶段 ──');

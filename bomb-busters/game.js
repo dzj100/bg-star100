@@ -33,11 +33,101 @@ const BLUE_NUMS   = Array.from({ length: 12 }, (_, i) => i + 1);          // 1..
 const RED_NUMS    = Array.from({ length: 11 }, (_, i) => i + 1.5);        // 1.5..11.5
 const YELLOW_NUMS = Array.from({ length: 11 }, (_, i) => i + 1.1);        // 1.1..11.1
 
-/** 关卡配置（本版固定第一关；后续按任务卡扩展） */
+/**
+ * 关卡配置（默认 #4；房主可在等候室切换）。
+ * draw = 随机抽出张数，use = 实际加入导线库张数（其余放回盒中不参与本局）；
+ * note = 文字说明中的括号备注（如 3选2 / 2选1）；marks = 数轴标记样式（hollow = 空心黄色圆圈）。
+ */
+const DEFAULT_MISSION_ID = 1;
 const MISSIONS = {
-  1: { id: 1, name: '#4 实地练习第一天', red: 1, yellow: 2, yellow2p: 4 },
+  1: {
+    id: 1, name: '#4 实地练习第一天',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 2, use: 2 } },
+      two:      { red: { draw: 1, use: 1 }, yellow: { draw: 4, use: 4 } },
+    },
+  },
+  2: {
+    id: 2, name: '#5 实地练习第二天',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+      two:      { red: { draw: 2, use: 2 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+    },
+    marks: { yellow: 'hollow' },
+  },
+  3: {
+    id: 3, name: '#6 实地练习第三天',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 4, use: 4 } },
+      two:      { red: { draw: 2, use: 2 }, yellow: { draw: 4, use: 4 } },
+    },
+  },
+  4: {
+    id: 4, name: '#7 练习结课日',
+    setup: {
+      standard: { red: { draw: 2, use: 1, note: '2选1' }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 3, use: 1, note: '3选1' }, yellow: { draw: 0, use: 0 } },
+    },
+    marks: { red: 'hollow' },
+  },
+  5: {
+    id: 5, name: '#8 最终测试',
+    setup: {
+      standard: { red: { draw: 2, use: 1, note: '2选1' }, yellow: { draw: 3, use: 2, note: '3选2' } },
+      two:      { red: { draw: 3, use: 1, note: '3选1' }, yellow: { draw: 4, use: 4 } },
+    },
+    marks: { red: 'hollow', yellow: 'hollow' },
+  },
 };
-const CURRENT_MISSION = 1;
+
+/** 按人数展开关卡的开局参数 */
+function missionSetup(mission, pCount) {
+  const cfg = (pCount === 2 ? mission.setup.two : mission.setup.standard);
+  return {
+    redDraw: cfg.red.draw || 0,
+    redUse: cfg.red.use || 0,
+    redNote: cfg.red.note || '',
+    yellowDraw: cfg.yellow.draw || 0,
+    yellowUse: cfg.yellow.use || 0,
+    yellowNote: cfg.yellow.note || '',
+    redMark: (mission.marks && mission.marks.red) || 'solid',
+    yellowMark: (mission.marks && mission.marks.yellow) || 'solid',
+  };
+}
+
+/** 当前选关：联机时以房间状态 pendingChallenge 为准；新建房间未选关时默认 #4 */
+function currentMissionId() {
+  const ch = (typeof window !== 'undefined') ? window._olPendingChallenge : null;
+  const id = (ch && typeof ch === 'object') ? ch.missionId : ch;
+  return MISSIONS[id] ? id : DEFAULT_MISSION_ID;
+}
+
+function currentMission() { return MISSIONS[currentMissionId()]; }
+
+/** 等候室选关同步给联机层（online.js 的 _olRefreshWaitingRoom 调用） */
+window._olGetPendingChallenge = function () {
+  return { missionId: currentMissionId() };
+};
+
+/**
+ * 开局红/黄导线文字（带关卡括号备注）。
+ * 数字取「抽出的全部候选」X：X选Y 时板上标 X 个位置，牌库只混入随机 Y 个，
+ * 玩家不知道具体是哪 Y 个，因此说明里不能用实际入库数。
+ */
+function missionWiresText(setup) {
+  const parts = [];
+  if (setup.redDraw > 0) parts.push(`${setup.redDraw} 条红导线${setup.redNote ? '（' + setup.redNote + '）' : ''}`);
+  if (setup.yellowDraw > 0) parts.push(`${setup.yellowDraw} 条黄导线${setup.yellowNote ? '（' + setup.yellowNote + '）' : ''}`);
+  return parts.join(' + ');
+}
+
+/** 本关是否存在「抽 X 用 Y」的保密选择 */
+function missionHasHiddenPick(mission) {
+  return ['standard', 'two'].some(key => {
+    const cfg = mission.setup[key];
+    return (cfg.red.draw || 0) > (cfg.red.use || 0) || (cfg.yellow.draw || 0) > (cfg.yellow.use || 0);
+  });
+}
 
 /** 道具注册表（编号 1~12；解锁 = 蓝 N 4/4，编号 N） */
 const EQUIPMENT_LIB = {
@@ -263,18 +353,21 @@ function clearState() {
  * → 抽道具 → 进入信息标记阶段。
  * @param {string[]} names 2~5 名玩家昵称（按座位序）
  */
-function dealGame(names) {
+function dealGame(names, missionId) {
   const pCount = names.length;
   if (pCount < 2 || pCount > 5) return;
 
-  const mission = MISSIONS[CURRENT_MISSION];
-  const yellowCount = pCount === 2 ? mission.yellow2p : mission.yellow;
+  const mission = MISSIONS[missionId] || currentMission();
+  const setup = missionSetup(mission, pCount);
 
-  // 抽红 / 黄并公开标记
-  const redNum = shuffle(RED_NUMS)[0];
-  const yellowNums = shuffle(YELLOW_NUMS).slice(0, yellowCount).sort((a, b) => a - b);
+  // 抽出的全部 X 个候选数字都标到数轴上；牌库只混入其中随机选出的 Y 个，
+  // 使玩家无法从板上得知具体是哪 Y 个进入了本局。
+  const redDrawNums = shuffle(RED_NUMS).slice(0, setup.redDraw).sort((a, b) => a - b);
+  const yellowDrawNums = shuffle(YELLOW_NUMS).slice(0, setup.yellowDraw).sort((a, b) => a - b);
+  const redUseNums = shuffle(redDrawNums).slice(0, setup.redUse).sort((a, b) => a - b);
+  const yellowUseNums = shuffle(yellowDrawNums).slice(0, setup.yellowUse).sort((a, b) => a - b);
 
-  // 构造牌库：48 蓝 + 1 红 + 黄
+  // 构造牌库：48 蓝 + 本局实际使用的红/黄导线
   let seq = 0;
   const mk = (kind, num) => ({
     id: 'c' + (++seq), kind, num,
@@ -282,8 +375,8 @@ function dealGame(names) {
   });
   let deck = [];
   for (const n of BLUE_NUMS) for (let k = 0; k < 4; k++) deck.push(mk('blue', n));
-  deck.push(mk('red', redNum));
-  for (const n of yellowNums) deck.push(mk('yellow', n));
+  for (const n of redUseNums) deck.push(mk('red', n));
+  for (const n of yellowUseNums) deck.push(mk('yellow', n));
 
   // 分份（尽可能均分）：2 人局 4 份（每人 2 份）；3 人局 4 份（队长 2 份）；4/5 人局每人 1 份
   const shareCount = pCount <= 3 ? 4 : pCount;
@@ -323,12 +416,21 @@ function dealGame(names) {
   S = {
     players,
     phase: 'mark',
-    missionId: CURRENT_MISSION,
+    missionId: mission.id,
     dealStamp: Date.now(),           // 每局唯一（结算弹窗按此去重展示）
     captainSeat,
     currentSeat: -1,                 // 标记阶段无行动者
     turnNo: prevTurnNo,
-    board: { redNum, yellowNums, defused: Array(12).fill(false) },
+    board: {
+      redNum: redDrawNums.length ? redDrawNums[0] : null,   // 兼容旧快照/旧测试
+      redNums: redDrawNums,                                // 抽出的全部候选（板上标记）
+      yellowNums: yellowDrawNums,                          // 抽出的全部候选（板上标记）
+      redMark: setup.redMark,
+      yellowMark: setup.yellowMark,
+      redNote: setup.redNote,
+      yellowNote: setup.yellowNote,
+      defused: Array(12).fill(false),
+    },
     failures: 0,
     pCount,
     equipment: eqNos.sort((a, b) => a - b).map(no => ({ no, unlocked: false, used: false })),
@@ -344,17 +446,17 @@ function dealGame(names) {
     gameOver: false,
   };
 
-  addLog(`🧨 ${mission.name} 开始！${pCount} 人局：1 条红导线 + ${yellowCount} 条黄导线已标记到板上`);
+  addLog(`🧨 ${mission.name} 开始！${pCount} 人局：${missionWiresText(setup)} 已标记到板上`);
   addLog(`🎖 随机队长：${names[captainSeat]}。请所有人放置信息标记（标记 1 张自己的蓝色导线）`);
   saveStateDirect();
   _render();
 }
 
-/** 房主：再来一局（结算后） */
+/** 房主：再来一局（结算后；沿用本局关卡，避免刷新后选关丢失回退默认关） */
 function restartGame() {
   if (S.phase !== 'over') return { ok: false, msg: '当前不在结算阶段' };
   if (!isHost()) return { ok: false, msg: '等待房主开始下一局' };
-  dealGame(S.players.map(p => p.name));
+  dealGame(S.players.map(p => p.name), S.missionId);
   return { ok: true };
 }
 
@@ -557,11 +659,11 @@ function _applySoloCut(plan) {
 //  行动 3：公开红线
 // ════════════════════════════════════════════════════════════════
 
-/** 持红者自己仅剩红线未公开时可公开 */
+/** 持红者自己仅剩红线未公开时可公开（多红关卡一次公开自己剩余的全部红导线） */
 function canRevealRed(seat) {
   if (S.phase !== 'play' || S.pending || S.scanMode || S.result) return false;
   const hidden = hiddenCards(seat);
-  return hidden.length === 1 && hidden[0].kind === 'red';
+  return hidden.length > 0 && hidden.every(c => c.kind === 'red');
 }
 
 function doRevealRed() {
@@ -576,13 +678,15 @@ function _planRevealRed() {
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = S.currentSeat;
   if (!canRevealRed(actor)) return { ok: false, msg: '只有持红者在自己其余牌全部公开时才能公开红线' };
-  return { ok: true, actor, card: hiddenCards(actor)[0], count: 1, label: '红色导线' };
+  const cards = hiddenCards(actor);
+  return { ok: true, actor, cards, card: cards[0], count: cards.length, label: '红色导线' };
 }
 
 /** 执行公开红线结算（气泡对话结束后由 UI 层调用） */
 function _applyRevealRed(plan) {
-  plan.card.revealed = true;
-  addLog(`🚨 ${S.players[plan.actor].name} 公开了红色导线！`, 'warn');
+  const cards = plan.cards || [plan.card];
+  cards.forEach(c => { c.revealed = true; });
+  addLog(`🚨 ${S.players[plan.actor].name} 公开了${cards.length > 1 ? ` ${cards.length} 张` : ''}红色导线！`, 'warn');
   if (_checkVictory()) return { ok: true };
   endTurn();
   return { ok: true };
@@ -1354,25 +1458,30 @@ function endTurn() {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  本地进度（仅第一关；供等候室展示 / 退出时重置未通关记录）
+//  本地进度（按关卡记录；供等候室展示 / 退出时重置未通关记录）
 // ════════════════════════════════════════════════════════════════
 
 function loadProgress() {
   try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; } catch (e) { return {}; }
 }
 
+function _activeMissionId() {
+  return (S && MISSIONS[S.missionId]) ? S.missionId : currentMissionId();
+}
+
 function updateLocalProgress(win) {
   const prog = loadProgress();
-  prog[CURRENT_MISSION] = { passed: !!win, ts: Date.now() };
+  prog[_activeMissionId()] = { passed: !!win, ts: Date.now() };
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(prog)); } catch (e) {}
 }
 
 /** 联机层退出房间前调用：重置本关未通关的进度（已通关保留，防刷） */
 window._olResetProgress = function () {
   if (!S || (S.phase !== 'mark' && S.phase !== 'play')) return;
+  const id = _activeMissionId();
   const prog = loadProgress();
-  if (prog[CURRENT_MISSION] && !prog[CURRENT_MISSION].passed) {
-    delete prog[CURRENT_MISSION];
+  if (prog[id] && !prog[id].passed) {
+    delete prog[id];
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(prog)); } catch (e) {}
   }
 };
@@ -1429,16 +1538,87 @@ function getOnlineState() {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  等候室（房主选关区展示：本版固定第一关）
+//  等候室（关卡卡片 + 房主切换抽屉；点选后上报房间状态）
 // ════════════════════════════════════════════════════════════════
 
+/** '#5 实地练习第二天' → { code:'#5', name:'实地练习第二天' } */
+function _missionMeta(mission) {
+  const m = /^(#\d+)\s*(.*)$/.exec(mission.name);
+  return m ? { code: m[1], name: m[2] } : { code: '', name: mission.name };
+}
+
+/** 当前关卡按人数展开的开局文字 */
+function _missionTexts(mission) {
+  const std = missionWiresText(missionSetup(mission, 5));
+  const two = missionWiresText(missionSetup(mission, 2));
+  return { std, two };
+}
+
+/** 房主：展开关卡列表抽屉 */
+function openMissionSheet() {
+  if (!isHost()) { showToast('只有房主可以切换关卡'); return; }
+  const content = document.getElementById('sheetContent');
+  const ov = document.getElementById('sheetOverlay');
+  if (!content || !ov) return;
+  const current = currentMissionId();
+  const prog = loadProgress();
+  const items = Object.keys(MISSIONS).map(key => {
+    const m = MISSIONS[key];
+    const meta = _missionMeta(m);
+    const { std, two } = _missionTexts(m);
+    const selected = m.id === current;
+    const passed = !!(prog[m.id] && prog[m.id].passed);
+    return `<button type="button" class="mission-item${selected ? ' selected' : ''}"
+        data-mission-id="${m.id}" data-testid="mission-item-${m.id}"
+        onclick="selectMission(${m.id})">
+      <span class="mi-top">
+        <span class="mi-code">${meta.code}</span>
+        <span class="mi-name">${meta.name}</span>
+        ${selected ? '<span class="mi-tag current">当前</span>' : ''}
+        ${passed ? '<span class="mi-tag passed">已通关</span>' : ''}
+      </span>
+      <span class="mi-desc">3~5 人：${std}${two !== std ? ` ｜ 2 人：${two}` : ''}</span>
+    </button>`;
+  }).join('');
+  content.innerHTML = `
+    <div class="sheet-head"><span>🗂 选择关卡</span><button class="sheet-close" onclick="closeSheet()">✕</button></div>
+    <div class="sheet-sub">点选关卡后立即同步给房间内所有成员</div>
+    <div class="mission-list">${items}</div>`;
+  ov.classList.add('show');
+}
+
+/** 房主点选关卡：收起抽屉 → 本地刷新卡片 → 上报房间（其余成员经 Realtime/轮询同步） */
+function selectMission(id) {
+  if (!MISSIONS[id]) return { ok: false, msg: '无效的关卡' };
+  if (!isHost()) return { ok: false, msg: '只有房主可以切换关卡' };
+  if (S.phase === 'mark' || S.phase === 'play') return { ok: false, msg: '对局中不能切换关卡' };
+  window._olPendingChallenge = { missionId: id };
+  if (typeof closeSheet === 'function') closeSheet();
+  _refreshWaitingMissionCard();
+  if (typeof window._olRefreshWaitingRoom === 'function') window._olRefreshWaitingRoom();
+  showToast(`已切换至 ${MISSIONS[id].name}`);
+  return { ok: true };
+}
+
+/** 点选后立即更新等候室卡片（不等网络往返） */
+function _refreshWaitingMissionCard() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const el = document.querySelector('#online .waiting-extras');
+  if (el) el.outerHTML = waitingExtrasHTML();
+}
+
 function waitingExtrasHTML() {
-  const mission = MISSIONS[CURRENT_MISSION];
-  const prog = loadProgress()[CURRENT_MISSION] || {};
+  const mission = currentMission();
+  const prog = loadProgress()[mission.id] || {};
+  const { std, two } = _missionTexts(mission);
   return `
-    <div class="waiting-extras">
-      <div class="we-title">💣 ${mission.name}</div>
-      <div class="we-line">开局：1 条红导线 + 2 条黄导线（2 人局 4 条）标记到板上</div>
+    <div class="waiting-extras mission-card">
+      <div class="we-head">
+        <div class="we-title">💣 ${mission.name}</div>
+        ${isHost() ? '<button class="we-switch" type="button" data-testid="mission-switch" onclick="openMissionSheet()">切换</button>' : ''}
+      </div>
+      <div class="we-line">开局：${std}${two !== std ? `（2 人局：${two}）` : ''} 标记到板上</div>
+      ${missionHasHiddenPick(mission) ? '<div class="we-line">数轴标出全部候选；牌库只混入其中随机选中的导线，具体是哪几条保密</div>' : ''}
       <div class="we-line">失误上限：人数 − 1 次（第 N 次失误，N = 人数，即爆炸）</div>
       <div class="we-line">本关进度：${prog.passed ? '已通关 ✓' : '未通关'}</div>
     </div>`;

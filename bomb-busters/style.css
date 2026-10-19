@@ -235,6 +235,67 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .waiting-extras .we-title { font-weight: 800; margin-bottom: 6px; }
 .waiting-extras .we-line { color: var(--text-dim); font-size: .78rem; line-height: 1.7; }
+.waiting-extras .we-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.waiting-extras .we-head .we-title { margin-bottom: 0; }
+.we-switch {
+  flex: 0 0 auto;
+  background: #fff;
+  border: 2px solid var(--gold);
+  color: #8a6a06;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: .78rem;
+  font-weight: 800;
+  box-shadow: 0 2px 0 rgba(37, 50, 78, .18);
+}
+.we-switch:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(37, 50, 78, .18); }
+
+/* 选关抽屉 */
+.mission-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.mission-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+}
+.mission-item.selected {
+  border-color: var(--gold);
+  background: #fff7dc;
+  box-shadow: inset 0 0 0 1px rgba(246, 182, 43, .35);
+}
+.mission-item:active { transform: translateY(1px); }
+.mi-top { display: flex; align-items: center; gap: 7px; font-weight: 800; }
+.mi-code {
+  flex: 0 0 auto;
+  font-size: .76rem;
+  background: var(--surface2);
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  padding: 1px 6px;
+}
+.mi-name { flex: 1; min-width: 0; }
+.mi-tag {
+  flex: 0 0 auto;
+  font-size: .66rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.mi-tag.current { background: var(--gold); color: var(--ink); }
+.mi-tag.passed { background: #e8f7ec; color: #217a3c; border: 1px solid #9ed7ae; }
+.mi-desc { font-size: .72rem; color: var(--text-dim); line-height: 1.5; }
 
 /* ============================================================
    弹窗 / 弹层 / 吐司 / 初始化遮罩
@@ -513,16 +574,41 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   right: 0;
   bottom: 2px;
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
 }
 .dot { width: 5px; height: 5px; border-radius: 50%; }
 .dot-y { background: var(--wire-yellow); }
 .dot-r { background: var(--wire-red); box-shadow: 0 0 7px rgba(220, 61, 54, .7); }
+/* 空心黄色圆圈（关卡 #5/#7/#8 的特定导线标记） */
+.dot-hollow {
+  width: 7px;
+  height: 7px;
+  background: transparent !important;
+  border: 1.5px solid var(--wire-yellow);
+  box-shadow: none !important;
+}
 
-.board-legend { display: flex; gap: 14px; margin-top: 8px; font-size: .74rem; font-weight: 700; }
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: .74rem;
+  font-weight: 700;
+}
 .legend-r { color: #c22c25; }
 .legend-y { color: #8a6a06; }
+.legend-ring {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--wire-yellow);
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
 
 /* ============================================================
    玩家行 / 手牌

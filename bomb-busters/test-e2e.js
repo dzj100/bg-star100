@@ -1,6 +1,6 @@
 /**
  * 炸弹克星 端到端测试（Playwright）
- * 覆盖：着陆页+规则 → 建房/加入 → 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
+ * 覆盖：着陆页+规则 → 建房/加入 → 房主切换关卡（成员同步）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
@@ -65,7 +65,7 @@ const rules = await p1.evaluate(() => {
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
 if (rules.rows.join(',') !== '4,3,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
-if (rules.heads.join('|') !== '人数手牌分配黄线|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
+if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
 for (const kw of ['≠标签', '对讲机', '三重探测器', 'X/Y射线', '咖啡瓶', '＝标签']) {
   if (!rules.text.includes(kw)) throw new Error('道具表缺少: ' + kw);
 }
@@ -85,7 +85,10 @@ await p1.screenshot({ path: SHOTS + '/e2e-2-waiting-host.png' });
 const code = (await p1.textContent('.setup-header h1')).match(/\d{4}/)[0];
 console.log('房间号:', code);
 const extras = await p1.textContent('.waiting-extras');
-if (!extras.includes('初见端倪')) throw new Error('等候室选关信息缺失: ' + extras);
+if (!extras.includes('#4 实地练习第一天')) throw new Error('等候室默认关卡应为 #4: ' + extras);
+if (!(await p1.evaluate(() => !!document.querySelector('[data-testid="mission-switch"]')))) {
+  throw new Error('房主等候室应显示「切换」按钮');
+}
 
 console.log('== 加入房间 ==');
 const p2 = await mkPage('P2');
@@ -97,6 +100,41 @@ await p2.waitForTimeout(2500);
 await p1.waitForTimeout(1500);
 await p1.screenshot({ path: SHOTS + '/e2e-3-waiting-2p-host.png' });
 await p2.screenshot({ path: SHOTS + '/e2e-4-waiting-2p-p2.png' });
+
+console.log('== 房主切换关卡（成员同步）==');
+if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-switch"]'))) {
+  throw new Error('成员端不应显示「切换」按钮');
+}
+await p1.click('[data-testid="mission-switch"]');
+await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
+if (missionCount !== 5) throw new Error('关卡抽屉应列出 5 关，得到 ' + missionCount);
+await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
+await p1.click('[data-testid="mission-item-2"]');
+await p1.waitForTimeout(500);
+if (await p1.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) {
+  throw new Error('点选关卡后抽屉应收起');
+}
+const hostCard = await p1.textContent('.waiting-extras');
+if (!hostCard.includes('#5 实地练习第二天') || !hostCard.includes('3选2')) {
+  throw new Error('房主关卡卡片未更新为 #5: ' + hostCard);
+}
+await waitEval(p2, () => {
+  const el = document.querySelector('#online .waiting-extras');
+  return el && el.textContent.includes('#5 实地练习第二天') ? el.textContent : '';
+}, '成员同步收到 #5 选关');
+console.log('成员同步 #5 OK');
+
+// 切回 #4：后续用例沿用默认关卡的开局牌数
+await p1.click('[data-testid="mission-switch"]');
+await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await p1.click('[data-testid="mission-item-1"]');
+await waitEval(p2, () => {
+  const el = document.querySelector('#online .waiting-extras');
+  return el && el.textContent.includes('#4 实地练习第一天') ? el.textContent : '';
+}, '成员同步切回 #4');
+console.log('成员同步切回 #4 OK');
+await p1.waitForTimeout(1900); // 等「已切换至…」吐司消失，避免干扰开局吐司断言
 
 await p1.click('text=开始游戏');
 // 发牌后吐司提示全员标记（每端各自弹出，1.6s 自动消失 → 实时抓取文案）
