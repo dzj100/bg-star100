@@ -93,8 +93,19 @@ function _refreshSheet() {
    ============================================================ */
 
 function _actorSeat() {
-  if (!S || typeof S.currentSeat !== 'number' || S.currentSeat < 0) return null;
-  if (!S.players || !S.players[S.currentSeat]) return null;
+  if (!S || !S.players) return null;
+  if (S.freeCut) {
+    if (S.phase !== 'play') return null;
+    const mine = mySeat();
+    if (mine !== null) return _freeCutEligible(mine) ? mine : null;
+    if (typeof S.currentSeat === 'number' && S.currentSeat >= 0
+        && S.players[S.currentSeat] && _freeCutEligible(S.currentSeat)) {
+      return S.currentSeat;
+    }
+    return null;
+  }
+  if (typeof S.currentSeat !== 'number' || S.currentSeat < 0) return null;
+  if (!S.players[S.currentSeat]) return null;
   return S.currentSeat;
 }
 
@@ -257,6 +268,72 @@ function renderLandingHTML() {
    规则弹窗（着陆页与对局内共用 #modalOverlay）
    ============================================================ */
 
+function _missionSpecialRulesHTML(mission, pCount) {
+  const setup = missionSetup(mission, pCount);
+  const blocks = [];
+  if (setup.orderCount) {
+    const order = (S && S.board && Array.isArray(S.board.orderNums)) ? S.board.orderNums : [];
+    blocks.push(`<h3>⏱ 剪线顺序</h3>
+      <p>开局随机抽出 ${setup.orderCount} 个蓝色数字作为剪线顺序${order.length ? `：<b>${order.join(' → ')}</b>` : ''}。必须按该顺序公开蓝色导线，前一个数字公开 ≥2 根后才能公开下一个；违反顺序立即爆炸。</p>`);
+  }
+  if (setup.freeCut) {
+    const mins = Math.round((mission.timerSec || 0) / 60);
+    const mins2 = Math.round((mission.timerSecTwo || mission.timerSec || 0) / 60);
+    blocks.push(`<h3>⌛ 倒计时与自由剪线</h3>
+      <p>从发牌后可查看手牌开始 ${mins} 分钟倒计时（2 人局 ${mins2} 分钟）；归零时仍有导线未公开即失败。任意玩家均可剪线，但同一时间只能一人操作；3 人及以上时，刚剪过线的玩家不能连续再剪。</p>`);
+    if (setup.excludeEquip.length) {
+      const names = setup.excludeEquip.map(n => `【${EQUIPMENT_LIB[n] ? EQUIPMENT_LIB[n].name : n}】`).join('、');
+      blocks.push(`<p>本关不会抽到 ${names}，抽到会重抽。</p>`);
+    }
+  }
+  if (setup.redBlueCount) {
+    const nums = (S && S.board && Array.isArray(S.board.redBlueNums)) ? S.board.redBlueNums : [];
+    blocks.push(`<h3>🔴 蓝线视为红导线</h3>
+      <p>开局随机选出 ${setup.redBlueCount} 个数字${nums.length ? `（本局：<b>${nums.join('、')}</b>）` : ''}，这些数字的蓝导线本局视为红色导线：不能作为蓝色被猜测/扫描；只能在该玩家手上只剩这些牌时通过「公开红色导线」公开。对应数字的道具不会出现。</p>
+      <p>开局蓝线信息标记仍可正常放置。2 人局：队长不能进行开局蓝线信息标记。</p>`);
+  }
+  if (setup.equipLocks) {
+    const locks = (S && Array.isArray(S.equipment))
+      ? S.equipment.filter(e => typeof e.lockNum === 'number').map(e => `道具${e.no} (🔒${e.lockNum})`)
+      : [];
+    blocks.push(`<h3>🔒 失踪的装备</h3>
+      <p>每张道具都被锁上了${locks.length ? `（${locks.join('、 ')}）` : ''}。道具激活需同时满足：原编号蓝色导线全部公开 + 🔒数字在场上公开 ≥2 张。</p>`);
+  }
+  return blocks.join('');
+}
+
+/** 对局内关卡标签：查看本关规则（含本局随机结果） */
+function showMissionRules() {
+  if (!S || !S.missionId || !MISSIONS[S.missionId]) return;
+  const mission = MISSIONS[S.missionId];
+  const meta = _missionMeta(mission);
+  const pCount = S.pCount || 2;
+  const el = document.getElementById('modalContent');
+  if (!el) return;
+  const setup = missionSetup(mission, pCount);
+  const hidden = missionHasHiddenPick(mission)
+    ? '<p>数轴板会标出全部候选导线；牌库只随机混入其中「用」的数量，具体哪几条进入本局保密。</p>'
+    : '';
+  el.innerHTML = `
+    <h2>📜 ${_esc(meta.code)} ${_esc(meta.name)}</h2>
+    <div class="rules-scroll">
+      <h3>🧵 本局导线（${pCount} 人局）</h3>
+      <p>${_esc(missionWiresText(setup) || '无红/黄导线')}</p>
+      ${hidden}
+      ${_missionSpecialRulesHTML(mission, pCount)}
+      <h3>🎯 胜利条件</h3>
+      <p>全场所有导线全部公开即拆弹成功${setup.freeCut ? '；倒计时内未完成则失败' : ''}。</p>
+      <h3>🔁 回合与行动</h3>
+      <p>每回合可使用已解锁道具（每张限 1 次），并执行 1 次行动：双人剪线、单人剪线或公开红色导线。开局每人必须公开标记 1 张自己的蓝色导线。</p>
+      <h3>💥 失误</h3>
+      <p>${pCount} 人局允许 ${pCount - 1} 次失误，第 ${pCount} 次失误失败；指认到红色导线立即爆炸。</p>
+    </div>
+    <button class="btn-full btn-primary" data-testid="mission-rules-close" onclick="closeModal('modalOverlay')">知道了</button>
+    <button class="btn-full btn-secondary" onclick="showRules()">📜 查看完整规则</button>`;
+  const ov = document.getElementById('modalOverlay');
+  if (ov) ov.classList.add('show');
+}
+
 function showRules() {
   const el = document.getElementById('modalContent');
   if (!el) return;
@@ -394,11 +471,19 @@ function render() {
   if (typeof onlineAfterRender === 'function') onlineAfterRender();
 }
 
+/** 当前关卡小标签（#4 等），点击查看本关规则 */
+function _missionTagHTML() {
+  if (!S || !MISSIONS || !MISSIONS[S.missionId]) return '';
+  const meta = _missionMeta(MISSIONS[S.missionId]);
+  if (!meta.code) return '';
+  return `<button class="mission-tag" data-testid="mission-tag" onclick="showMissionRules()" title="查看本关规则">${_esc(meta.code)}</button>`;
+}
+
 /** 游戏页公共外壳：头部（标题左 / 按钮右）+ 内容 */
 function _gameShellHTML(core) {
   return `
   <div class="game-header">
-    <span class="header-title">${_bombSVG('header-bomb')}<span>炸弹克星</span></span>
+    <span class="header-title">${_bombSVG('header-bomb')}<span>炸弹克星</span>${_missionTagHTML()}</span>
     <span class="header-btns">
       <button class="icon-btn" onclick="showRules()">📜 规则</button>
       <button class="icon-btn" onclick="resetGame()">🚪 退出</button>
@@ -547,20 +632,32 @@ function onEndBackToRoom() {
    数轴板（1~12 蓝 + 红/黄位置 + 拆除印章 + 失误计数）
    ============================================================ */
 
+/** 倒计时 mm:ss */
+function _fmtClock(msLeft) {
+  const sec = Math.max(0, Math.ceil(msLeft / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
 function _boardHTML() {
   const b = (S && S.board) || {};
   const yellowNums = b.yellowNums || [];
   const redNums = Array.isArray(b.redNums)
     ? b.redNums
     : (typeof b.redNum === 'number' ? [b.redNum] : []);
+  const redBlueNums = Array.isArray(b.redBlueNums) ? b.redBlueNums : [];
   const redHollow = b.redMark === 'hollow';
   const yellowHollow = b.yellowMark === 'hollow';
   const redNote = b.redNote || '';
   const yellowNote = b.yellowNote || '';
+  const deadline = b.deadline || 0;
+  const left = deadline ? deadline - Date.now() : 0;
   const cells = [];
   for (let n = 1; n <= 12; n++) {
     const hasYellow = yellowNums.indexOf(n + 0.1) >= 0;
     const hasRed = redNums.indexOf(n + 0.5) >= 0;
+    const redLike = redBlueNums.indexOf(n) >= 0;
     const defused = !!(b.defused || [])[n - 1];
     const rev = blueRevealedCount(n);
     const yellowDot = hasYellow
@@ -569,9 +666,10 @@ function _boardHTML() {
     const redDot = hasRed
       ? `<span class="dot dot-r${redHollow ? ' dot-hollow' : ''}" title="红导线${redNote ? '（' + redNote + '）' : ''}"></span>`
       : '';
-    cells.push(`<div class="cell${defused ? ' defused' : ''}${rev >= 4 ? ' full' : ''}" data-cell="${n}">
+    cells.push(`<div class="cell${defused ? ' defused' : ''}${rev >= 4 ? ' full' : ''}${redLike ? ' red-blue' : ''}" data-cell="${n}"${redLike ? ' title="本局该数字蓝线视为红色导线"' : ''}>
       <span class="cell-num">${n}</span>
       <span class="cell-rev">${rev}/4</span>
+      ${redLike ? '<span class="cell-rb">蓝→红</span>' : ''}
       ${(hasYellow || hasRed) ? `<span class="cell-dots">${yellowDot}${redDot}</span>` : ''}
       ${defused ? '<span class="cell-check">✓</span>' : ''}
     </div>`);
@@ -603,18 +701,52 @@ function _boardHTML() {
       <span class="order-tip">前序公开 ≥2 根解锁下一数字</span>
     </div>`;
   }
+  const countdownHTML = deadline
+    ? `<span class="countdown${left <= 60000 ? ' urgent' : ''}${left <= 0 ? ' expired' : ''}" data-deadline="${deadline}" data-testid="countdown" title="倒计时结束仍未公开全部导线即失败">⏳ <span class="cd-time">${_fmtClock(left)}</span></span>`
+    : '';
+  const lastCutter = (S.freeCut && typeof S.lastCutterSeat === 'number' && S.players[S.lastCutterSeat])
+    ? S.players[S.lastCutterSeat].name : '';
+  const freeHTML = S.freeCut
+    ? `<div class="board-free" data-testid="free-cut">
+        🔓 自由剪线：任意玩家可行动${S.pCount > 2 ? '，但不能连续剪线' : ''}${lastCutter ? ` · 上一位：${_esc(lastCutter)}` : ''}
+      </div>`
+    : '';
+  const rbLegend = redBlueNums.length
+    ? `<div class="legend legend-rb">🔴 蓝线 ${redBlueNums.join('、')} 本局视为红导线：只能在自己手上只剩这些牌时用「公开红线」公开</div>`
+    : '';
   return `<div class="board" id="board">
     <div class="board-head">
       <span class="board-title">数轴板</span>
-      <span class="fail-count" data-testid="fail-count">💥 失误 ${S.failures}/${S.pCount}</span>
+      <span class="board-head-right">${countdownHTML}<span class="fail-count" data-testid="fail-count">💥 失误 ${S.failures}/${S.pCount}</span></span>
     </div>
+    ${freeHTML}
     ${orderHTML}
     <div class="board-cells">${cells.join('')}</div>
     <div class="board-legend">
       <span class="legend legend-r">${redIcon} 红导线${redNote ? `（${redNote}）` : ''}：${redNums.join('、') || '—'}</span>
       <span class="legend legend-y">${yellowIcon} 黄导线${yellowNote ? `（${yellowNote}）` : ''}：${yellowNums.join('、') || '—'}</span>
+      ${rbLegend}
     </div>
   </div>`;
+}
+
+/** #10 倒计时走秒：各端按同一 deadline 展示；归零时任意端触发判负 */
+function _tickCountdown() {
+  if (!S || (S.phase !== 'mark' && S.phase !== 'play')) return;
+  const deadline = S.board && S.board.deadline;
+  if (!deadline) return;
+  const left = deadline - Date.now();
+  document.querySelectorAll('[data-deadline]').forEach(el => {
+    const t = el.querySelector('.cd-time');
+    if (t) t.textContent = _fmtClock(left);
+    el.classList.toggle('urgent', left > 0 && left <= 60000);
+    el.classList.toggle('expired', left <= 0);
+  });
+  if (left <= 0 && typeof timeoutGameIfNeeded === 'function') timeoutGameIfNeeded();
+}
+
+if (typeof window !== 'undefined' && typeof setInterval === 'function') {
+  setInterval(_tickCountdown, 1000);
 }
 
 /* ============================================================
@@ -754,7 +886,7 @@ function _ownCardSelectable(seat, card) {
     return S.pending.type === 'walkie' && seat === S.pending.toSeat && canActAs(seat) && !card.revealed;
   }
   if (!_myTurn()) return false;
-  if (seat !== S.currentSeat) return false;
+  if (seat !== _actorSeat()) return false;
   if (_ui.mode === 'neq') return true;                    // ≠ 标签可含已公开牌
   if (_ui.mode === 'walkie-card') return !card.revealed;
   if (_ui.mode === 'sticky') return card.kind === 'blue' && !card.revealed && !card.info;
@@ -769,17 +901,24 @@ function _ownCardSelectable(seat, card) {
 function _playerRowHTML(seat) {
   const p = S.players && S.players[seat];
   if (!p) return '';
-  const isCur = S.phase === 'play' && S.currentSeat === seat && !S.result;
+  const isCur = S.phase === 'play' && !S.result && seat === _actorSeat();
+  const noMark = (S.noMarkSeats || []).indexOf(seat) >= 0;
+  const lastCut = S.freeCut && S.phase === 'play' && S.lastCutterSeat === seat;
   const color = PLAYER_COLORS[seat % PLAYER_COLORS.length];
   const shares = (p.shares || []).map((share, si) =>
     `<div class="cards" data-share="${si}">${share.map((c, i) => _enemyCardHTML(c, share, i, seat, si)).join('')}</div>`).join('');
   const markBadge = S.phase === 'mark'
-    ? (S.ready[seat] ? '<span class="mark-badge ok">✅ 已标记</span>' : '<span class="mark-badge wait">⏳ 标记中</span>')
+    ? (S.ready[seat]
+      ? `<span class="mark-badge ok">${noMark ? '🎖 免标记' : '✅ 已标记'}</span>`
+      : '<span class="mark-badge wait">⏳ 标记中</span>')
+    : '';
+  const lastBadge = lastCut
+    ? `<span class="last-cut-badge">✂️ ${S.pCount > 2 ? '刚剪线' : '上一位'}</span>`
     : '';
   return `<div class="player-row${isCur ? ' current' : ''}" data-seat="${seat}">
     <div class="pr-head">
       <span class="p-chip${isCur ? ' active' : ''}" style="--pc:${color}">${_esc(p.name)}${seat === S.captainSeat ? ' 🎖' : ''}</span>
-      ${markBadge}
+      ${markBadge}${lastBadge}
       <span class="pr-meta">未公开 ${hiddenCards(seat).length}</span>
     </div>
     <div class="pr-shares">${shares}</div>
@@ -790,17 +929,26 @@ function _ownHandHTML(seat) {
   const p = S.players && S.players[seat];
   if (!p) return '';
   const mine = mySeat() === seat;
-  const isCur = S.phase === 'play' && S.currentSeat === seat && !S.result;
+  const isCur = S.phase === 'play' && !S.result && seat === _actorSeat();
+  const noMark = (S.noMarkSeats || []).indexOf(seat) >= 0;
   const color = PLAYER_COLORS[seat % PLAYER_COLORS.length];
   const shares = (p.shares || []).map((share, si) =>
     `<div class="cards" data-share="${si}">${share.map((c, i) => _ownCardHTML(seat, si, c, share, i)).join('')}</div>`).join('');
   let status = '';
   if (S.phase === 'mark') {
     status = S.ready[seat]
-      ? '<span class="mark-badge ok">✅ 已放置信息标记</span>'
+      ? `<span class="mark-badge ok">${noMark ? '🎖 本关免标记（队长）' : '✅ 已放置信息标记'}</span>`
       : '<span class="mark-badge wait">⏳ 请点选 1 张蓝色导线</span>';
   } else if (isCur) {
-    status = '<span class="mark-badge now">🎯 你的回合</span>';
+    status = `<span class="mark-badge now">${S.freeCut ? '✂️ 轮到你剪线' : '🎯 你的回合'}</span>`;
+  } else if (S.phase === 'play' && S.freeCut && !S.result) {
+    if (hiddenCards(seat).length === 0) {
+      status = '<span class="mark-badge ok">✅ 手牌已全部公开</span>';
+    } else if (S.pCount > 2 && S.lastCutterSeat === seat) {
+      status = '<span class="mark-badge wait">⏳ 刚剪线，等待其他玩家</span>';
+    } else {
+      status = '<span class="mark-badge now">✂️ 可随时剪线</span>';
+    }
   }
   return `<div class="own-hand${isCur ? ' current' : ''}" data-seat="${seat}" style="--pc:${color}">
     <div class="oh-head">
@@ -849,6 +997,7 @@ function _equipRowHTML() {
   const btns = S.equipment.map(e => {
     const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[e.no]) || null;
     const name = lib ? lib.name : '道具 ' + e.no;
+    const lockNum = typeof e.lockNum === 'number' ? e.lockNum : null;
     // 该道具已进入选择流程（尚未使用）：按钮呈激活态，再点可取消
     const active = !e.used && e.unlocked && (
       (e.no === 1 && _ui.mode === 'neq') ||
@@ -868,9 +1017,19 @@ function _equipRowHTML() {
       if (active) cls += ' active';
       onclk = ` onclick="onEquipClick(${e.no})"`;
     } else { cls += ' locked'; disabled = ' disabled'; }
-    const tip = lib && lib.desc ? `<span class="equip-tip">${_esc(lib.desc)}</span>` : '';
-    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${onclk}${disabled}>
-      <span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
+    const tipText = lib && lib.desc ? _esc(lib.desc) : '';
+    const lockTip = lockNum !== null
+      ? `解锁条件：蓝色 ${e.no} 全部公开（${blueRevealedCount(e.no)}/4）+ 🔒${lockNum} 公开 ≥2（${blueRevealedCount(lockNum)}/2）`
+      : '';
+    const tip = (tipText || lockTip)
+      ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : ''].filter(Boolean).join(' ｜ ')}</span>`
+      : '';
+    const lockCleared = lockNum !== null && blueRevealedCount(lockNum) >= 2;
+    const lockBadge = lockNum !== null
+      ? `<span class="equip-lock${e.unlocked ? ' open' : ''}${lockCleared ? ' cleared' : ''}" data-testid="equip-lock-${e.no}" title="${_esc(lockTip)}">${lockCleared ? '🔓' : '🔒'}${lockNum}</span>`
+      : '';
+    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${onclk}${disabled}>
+      ${lockBadge}<span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
     </button>`;
   }).join('');
   return `<div class="equip-row" data-testid="equipment">
@@ -903,7 +1062,11 @@ function _modeHintBar() {
     return `<div class="action-bar"><div class="mode-hint">＝ 点选自己同一份内相邻的 2 张同色牌（已选 ${_ui.scanSel.length}/2）</div>${_cancelBtn()}</div>`;
   }
   if (_ui.mode === 'walkie-card') {
-    return `<div class="action-bar"><div class="mode-hint">📻 点选自己的 1 张未公开导线</div>${_cancelBtn()}</div>`;
+    return `<div class="action-bar">
+      <div class="mode-desc">📻 用法：选自己 1 张未公开导线，再指定另一名玩家；对方选定 1 张后双方交换并各自按顺序重排，被交换牌原标记自动废弃。</div>
+      <div class="mode-hint">请先点选自己的 1 张未公开导线</div>
+      ${_cancelBtn()}
+    </div>`;
   }
   if (_ui.mode === 'sticky') {
     return `<div class="action-bar"><div class="mode-hint">📃 点选自己 1 张未公开且无信息标记的蓝色导线</div>${_cancelBtn()}</div>`;
@@ -924,7 +1087,10 @@ function _actionBarHTML() {
 
   // 技能探测器已启动：本回合只允许扫描（未执行前可取消）
   if (S.scanMode && S.scanMode.src === 'skill') {
-    if (_myTurn()) {
+    const scanBy = (typeof S.scanMode.by === 'number') ? S.scanMode.by : S.currentSeat;
+    const canScan = canActAs(scanBy)
+      && (S.freeCut ? _actorSeat() === scanBy : scanBy === S.currentSeat);
+    if (canScan) {
       if (_ui.mode !== 'scan') {
         return `<div class="action-bar">
           <div class="mode-hint">🔎 已启动双重探测器：请扫描相邻 ${S.scanMode.count} 张手牌</div>
@@ -934,8 +1100,8 @@ function _actionBarHTML() {
           </div>
         </div>`;
       }
-    } else if (!S.pending) {
-      return _waitHTML(`🔎 ${_esc(_playerName(S.currentSeat))} 正在使用探测器…`);
+    } else {
+      return _waitHTML(`🔎 ${_esc(_playerName(scanBy))} 正在使用探测器…`);
     }
   }
 
@@ -945,17 +1111,40 @@ function _actionBarHTML() {
   const stabSeat = (S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined)
     ? S.cutMods.stabilize : null;
 
+  // 自由剪线（本机多人）：先在可行动玩家中选择当前操作者
+  if (S.freeCut && mySeat() === null && !_myTurn()) {
+    const seats = [];
+    for (let s = 0; s < S.pCount; s++) if (_freeCutEligible(s)) seats.push(s);
+    if (!seats.length) return _waitHTML('✅ 已没有可剪线的玩家…');
+    return `<div class="action-bar free-seat-bar" data-testid="free-seat-bar">
+      <div class="bar-title">🔓 自由剪线：选择本机操作的玩家</div>
+      <div class="bar-btns">${seats.map(s => `<button class="action-btn" data-testid="free-seat-${s}" onclick="onFreeSeatPick(${s})">${_esc(_playerName(s))}</button>`).join('')}</div>
+      <div class="waiting-hint">同一时间只能一名玩家剪线${S.pCount > 2 ? '；刚剪过线的玩家需等待其他人行动' : ''}</div>
+    </div>`;
+  }
+
   if (!_myTurn()) {
+    if (S.freeCut) {
+      const mine = mySeat();
+      if (mine !== null && hiddenCards(mine).length === 0) {
+        return _waitHTML('✅ 你的手牌已全部公开，等待队友完成拆弹…');
+      }
+      if (mine !== null && S.pCount > 2 && S.lastCutterSeat === mine) {
+        return _waitHTML('⏳ 你刚完成一次剪线，等待其他玩家剪线…');
+      }
+      return _waitHTML('⏳ 等待其他玩家行动…');
+    }
     const stab = stabSeat !== null ? `（🧪 ${_esc(_playerName(stabSeat))} 已使用稳定剂）` : '';
     return _waitHTML(`⏳ 等待 ${_esc(_playerName(S.currentSeat))} 行动…${stab}`);
   }
 
-  const actor = S.currentSeat;
+  const actor = _actorSeat();
+  if (actor === null) return _waitHTML('⏳ 等待其他玩家行动…');
   const soloOK = soloOptions(actor).length > 0;
   const redOK = canRevealRed(actor);
   const skillOK = !S.players[actor].skillUsed;
   return `<div class="action-bar">
-    <div class="bar-title">🎯 你的回合：选择 1 次行动（可选用道具）</div>
+    <div class="bar-title">${S.freeCut ? '🔓 自由剪线：选择 1 次行动' : '🎯 你的回合：选择 1 次行动'}（可选用道具）</div>
     ${stabSeat !== null ? '<div class="mode-hint stabilize-hint">🧪 稳定状态生效中：本回合剪线失误不计、红线不爆（点道具 9 可取消）</div>' : ''}
     <div class="bar-btns">
       <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线</button>
@@ -964,6 +1153,15 @@ function _actionBarHTML() {
       <button class="action-btn" data-action="skill" data-testid="btn-skill"${skillOK ? '' : ' disabled'} onclick="startSkill()">🔎 双重探测器</button>
     </div>
   </div>`;
+}
+
+/** 单机自由剪线：选定本机当前操作的玩家 */
+function onFreeSeatPick(seat) {
+  if (!S || !S.freeCut) return;
+  if (!_freeCutEligible(seat)) { showToast('该玩家当前不能剪线'); return; }
+  if (mySeat() !== null && mySeat() !== seat) return;
+  S.currentSeat = seat;
+  render();
 }
 
 /* ============================================================
@@ -1050,7 +1248,7 @@ function _ownGuessCandidates(seat, guess, isScan) {
   if (!guess || seat === null) return [];
   const p = S.players[seat];
   const cards = ((p && p.shares) || []).flat().filter(c => !c.revealed);
-  if (guess.kind === 'blue') return cards.filter(c => c.kind === 'blue' && c.num === guess.num);
+  if (guess.kind === 'blue') return cards.filter(c => c.kind === 'blue' && c.num === guess.num && !isRedLikeCard(c));
   return isScan ? [] : cards.filter(c => c.kind === 'yellow');
 }
 
@@ -1115,7 +1313,7 @@ function _ownPickSheetHTML() {
   <div class="sheet-body">
     <div class="sheet-sub">命中时你需同步公开 1 张「${guessLabel}」牌（预先选定）</div>
     <div class="pick-row">${btns}</div>
-    <button class="btn-full btn-primary" data-testid="confirm"${_ui.ownCard ? '' : ' disabled'} onclick="onConfirmCut()">确认${isScan ? '扫描' : '剪线'}</button>
+    <button class="btn-full btn-primary${_ui.ownCard ? '' : ' dim'}" data-testid="confirm" onclick="onConfirmCut()">确认${isScan ? '扫描' : '剪线'}</button>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
   </div>`;
 }
@@ -1156,6 +1354,7 @@ function _walkieTargetSheetHTML() {
   <div class="sheet-body">
     <div class="sheet-sub">你已挑出 1 张未公开导线，请选择与谁交换（对方再选 1 张）</div>
     <div class="pick-row">${btns.join('')}</div>
+    <div class="mode-desc">📻 对方选定后立即交换，双方手牌按顺序重新排列；被交换牌原标记自动废弃。</div>
     <button class="btn-full btn-secondary" onclick="closeSheet()">取消</button>
   </div>`;
 }
@@ -1167,7 +1366,7 @@ function _ownCandsFor(seat, opt) {
   if (!opt || seat === null) return [];
   const p = S.players[seat];
   const cards = ((p && p.shares) || []).flat().filter(c => !c.revealed);
-  if (opt.kind === 'blue') return cards.filter(c => c.kind === 'blue' && c.num === opt.num);
+  if (opt.kind === 'blue') return cards.filter(c => c.kind === 'blue' && c.num === opt.num && !isRedLikeCard(c));
   return cards.filter(c => c.kind === 'yellow');
 }
 
@@ -1365,7 +1564,12 @@ function onEquipClick(no) {
     return;
   }
   if (eq.used) { showToast('该道具已使用过'); return; }
-  if (!eq.unlocked) { showToast('该道具尚未解锁（蓝 4/4 拆除后解锁）'); return; }
+  if (!eq.unlocked) {
+    showToast(typeof eq.lockNum === 'number'
+      ? `该道具尚未解锁（蓝色 ${eq.no} 全部公开，且 🔒${eq.lockNum} 公开 ≥2）`
+      : '该道具尚未解锁（蓝 4/4 拆除后解锁）');
+    return;
+  }
   if (S.scanMode) { showToast('已启动探测器，本回合只能扫描'); return; }
   const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB) ? EQUIPMENT_LIB[no] : null;
   if (!lib) { showToast('该道具规则后续开放'); return; }
@@ -1431,7 +1635,7 @@ function onEnemyCardClick(cardId) {
   if (_ui.mode === 'pair-target') {
     const loc = _locateCardAnywhere(cardId);
     const card = _findCardById(cardId);
-    if (!loc || loc.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+    if (!loc || loc.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
     if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
     _ui.targetSeat = loc.seat;
     _ui.targetCardId = cardId;
@@ -1445,7 +1649,7 @@ function onEnemyCardClick(cardId) {
   if (_ui.mode === 'super') {
     const loc = _locateCardAnywhere(cardId);
     const card = _findCardById(cardId);
-    if (!loc || loc.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+    if (!loc || loc.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
     if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
     _ui.targetSeat = loc.seat;
     _ui.targetCardId = cardId;      // 高亮所选份中的这张（代表整份）
@@ -1460,7 +1664,7 @@ function onEnemyCardClick(cardId) {
   if (_ui.mode === 'ray-target') {
     const loc = _locateCardAnywhere(cardId);
     const card = _findCardById(cardId);
-    if (!loc || loc.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+    if (!loc || loc.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
     if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
     _ui.targetSeat = loc.seat;
     _ui.targetCardId = cardId;
@@ -1497,7 +1701,7 @@ function onOwnCardClick(seat, si, cardId) {
     return;
   }
 
-  if (!_myTurn() || seat !== S.currentSeat) return;
+  if (!_myTurn() || seat !== _actorSeat()) return;
 
   if (_ui.mode === 'neq') {
     _neqSelect(seat, cardId);
@@ -1534,7 +1738,7 @@ function _scanSelect(cardId) {
   }
   const found = _locateCardAnywhere(cardId);
   if (!found) return;
-  if (found.seat === S.currentSeat) { showToast('请选择其他玩家的牌'); return; }
+  if (found.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
   const entry = { id: cardId, seat: found.seat, si: found.si, idx: found.idx };
   const cur = _ui.scanSel;
   if (cur.length === 0) {
@@ -1564,7 +1768,7 @@ function _scanSelect(cardId) {
 /** ≠ 标签选牌：自己同一份内相邻 2 张（可含已公开牌），满 2 张立即执行 */
 function _neqSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
-  if (!found || found.seat !== S.currentSeat) return;
+  if (!found || found.seat !== _actorSeat()) return;
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);
@@ -1597,7 +1801,7 @@ function _neqSelect(seat, cardId) {
 /** ＝ 标签选牌：自己同一份内相邻 2 张（可含已公开牌，须同色），满 2 张立即执行 */
 function _eqtagSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
-  if (!found || found.seat !== S.currentSeat) return;
+  if (!found || found.seat !== _actorSeat()) return;
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);
@@ -1964,7 +2168,9 @@ function showEndModal() {
       ? '指认到了红色导线——炸弹起爆！'
       : reason === 'boom-order'
         ? '未按剪线顺序公开蓝色导线——炸弹起爆！'
-        : '失误达到上限——炸弹起爆！';
+        : reason === 'boom-timeout'
+          ? '倒计时结束，仍有导线未公开——炸弹起爆！'
+          : '失误达到上限——炸弹起爆！';
   let hiddenTotal = 0;
   _eachCard(c => { if (!c.revealed) hiddenTotal++; });
   const defusedN = ((S.board && S.board.defused) || []).filter(Boolean).length;

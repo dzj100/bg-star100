@@ -778,14 +778,15 @@ function onlinePushState() {
   const state = window._getOnlineState();
   if (state && state.gameOver) return;
 
-  // 操作者判定
+  // 操作者判定；#10 自由剪线没有唯一行动者，任一端都可推送（由时间戳/推送 ID 去重）
+  const isFreeCut = !!(state && state.freeCut);
   const isCurrentActor = state && state.currentPlayer === _mySeatIndex;
   const isOutgoingActor = _pendingPushSeat === _mySeatIndex;
   const turnJustHandedOff =
     _lastPushedCurrentSeat !== null
     && _lastPushedCurrentSeat !== state.currentPlayer
     && _lastPushedCurrentSeat === _mySeatIndex;
-  const canPush = isCurrentActor || isOutgoingActor || turnJustHandedOff;
+  const canPush = isFreeCut || isCurrentActor || isOutgoingActor || turnJustHandedOff;
   if (!canPush) {
     if (state && typeof state.currentPlayer === 'number') {
       _pendingPushSeat = state.currentPlayer;
@@ -852,6 +853,7 @@ async function _markPushAndSend(stateObj, status) {
 window._olIsActor = function() {
   if (!_onlineRoomId) return true;
   const state = window._getOnlineState();
+  if (state && state.freeCut) return true;   // #10：自由剪线，具体资格由游戏层判定
   return !!state && state.currentPlayer === _mySeatIndex;
 };
 

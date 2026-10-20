@@ -1,6 +1,6 @@
 /**
  * 炸弹克星 端到端测试（Playwright）
- * 覆盖：着陆页+规则（含 #9 顺序规则）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
+ * 覆盖：着陆页+规则（含 #9 顺序规则与 #10~#12 特殊关卡）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9/#10~#12）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
@@ -64,6 +64,9 @@ const rules = await p1.evaluate(() => {
 });
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
 if (!rules.text.includes('#9 轻重缓急') || !rules.text.includes('违反顺序立即爆炸')) throw new Error('规则弹层缺少 #9 顺序剪线说明');
+for (const kw of ['#10 困境', '自由剪线', '#11 又蓝又红', '视为红色导线', '#12 失踪的装备', '🔒']) {
+  if (!rules.text.includes(kw)) throw new Error('规则弹层缺少特殊关卡说明: ' + kw);
+}
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
 if (rules.rows.join(',') !== '4,3,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
 if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
@@ -109,9 +112,15 @@ if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-swit
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
-if (missionCount !== 6) throw new Error('关卡抽屉应列出 6 关，得到 ' + missionCount);
-if (!(await p1.evaluate(() => !!document.querySelector('[data-testid="mission-item-6"]')))) {
-  throw new Error('关卡抽屉应包含 #9');
+if (missionCount !== 9) throw new Error('关卡抽屉应列出 9 关，得到 ' + missionCount);
+for (const id of [6, 7, 8, 9]) {
+  if (!(await p1.evaluate(n => !!document.querySelector(`[data-testid="mission-item-${n}"]`), id))) {
+    throw new Error('关卡抽屉应包含 mission-item-' + id);
+  }
+}
+const sheetText = await p1.textContent('#sheetContent');
+for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备']) {
+  if (!sheetText.includes(kw)) throw new Error('关卡抽屉缺少 ' + kw);
 }
 await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
 await p1.click('[data-testid="mission-item-2"]');
@@ -142,6 +151,27 @@ await waitEval(p2, () => {
   return el && el.textContent.includes('#9 轻重缓急') && el.textContent.includes('剪线顺序') ? el.textContent : '';
 }, '成员同步收到 #9 选关');
 console.log('成员同步 #9 OK');
+
+// #10~#12：追加规则文案与成员同步
+const specials = [
+  { id: 7, name: '#10 困境', kws: ['15 分钟倒计时', '自由剪线', '咖啡瓶'] },
+  { id: 8, name: '#11 又蓝又红', kws: ['视为红色导线', '队长不能进行蓝线信息标记'] },
+  { id: 9, name: '#12 失踪的装备', kws: ['额外 🔒 一个数字', '锁数字公开 ≥2'] },
+];
+for (const m of specials) {
+  await p1.click('[data-testid="mission-switch"]');
+  await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+  await p1.click(`[data-testid="mission-item-${m.id}"]`);
+  const hostCard = await p1.textContent('.waiting-extras');
+  for (const kw of [m.name].concat(m.kws)) {
+    if (!hostCard.includes(kw)) throw new Error(`房主关卡卡片缺少「${kw}」: ` + hostCard);
+  }
+  await waitEval(p2, (name) => {
+    const el = document.querySelector('#online .waiting-extras');
+    return el && el.textContent.includes(name) ? el.textContent : '';
+  }, `成员同步收到 ${m.name}`, m.name);
+  console.log(`成员同步 ${m.name} OK`);
+}
 
 // 切回 #4：后续用例沿用默认关卡的开局牌数
 await p1.click('[data-testid="mission-switch"]');
@@ -293,6 +323,7 @@ const ui = await devA.evaluate(() => {
     titleLeft: Math.round(t.left),
     btnsRight: Math.round(b.right),
     btns: [...h.querySelectorAll('button')].map(x => x.textContent.trim()),
+    missionTag: (h.querySelector('[data-testid="mission-tag"]') || {}).textContent,
     cells: document.querySelectorAll('#board .cell').length,
     equipBtns: document.querySelectorAll('[data-testid="equipment"] .equip-btn').length,
     equipState: (window.S.equipment || []).length,
@@ -309,6 +340,7 @@ const ui = await devA.evaluate(() => {
 });
 if (ui.titleLeft > ui.btnsRight) throw new Error('头部布局错误：标题应在左、按钮应在右');
 if (!ui.btns.some(x => x.includes('退出')) || !ui.btns.some(x => x.includes('规则'))) throw new Error('头部按钮缺失: ' + JSON.stringify(ui.btns));
+if (ui.missionTag !== '#4') throw new Error('头部当前关卡标签应为 #4，得到 ' + ui.missionTag);
 if (ui.cells !== 12) throw new Error('数轴格数应为 12，得到 ' + ui.cells);
 if (!(ui.logTop < ui.equipTop && ui.equipTop < ui.boardTop)) throw new Error(`布局顺序应为 日志→道具→数轴板，得到 log=${ui.logTop} equip=${ui.equipTop} board=${ui.boardTop}`);
 if (ui.equipBtns !== ui.equipState) throw new Error(`道具位数量不符: DOM ${ui.equipBtns} vs 状态 ${ui.equipState}`);
@@ -316,6 +348,19 @@ if (!ui.failText.includes('失误')) throw new Error('失误计数缺失: ' + ui
 if (!ui.pairBtn || !ui.soloBtn || !ui.redBtn || !ui.skillBtn) throw new Error('行动按钮缺失: ' + JSON.stringify(ui));
 if (!ui.exitBtn) throw new Error('联机退出按钮缺失');
 console.log('界面契约 OK:', JSON.stringify(ui));
+
+// 关卡标签弹窗：展示当前关卡规则（#4 含通用规则）
+await devA.click('[data-testid="mission-tag"]');
+await devA.waitForSelector('#modalOverlay.show', { timeout: 5000 });
+const missionRulesText = await devA.textContent('#modalContent');
+for (const kw of ['#4 实地练习第一天', '本局导线', '胜利条件', '双人剪线']) {
+  if (!missionRulesText.includes(kw)) throw new Error('关卡规则弹窗缺少「' + kw + '」: ' + missionRulesText);
+}
+await devA.screenshot({ path: SHOTS + '/e2e-12d-mission-rules.png' });
+await devA.click('[data-testid="mission-rules-close"]');
+await devA.waitForTimeout(300);
+if (await devA.evaluate(() => document.getElementById('modalOverlay').classList.contains('show'))) throw new Error('关卡规则弹窗未关闭');
+console.log('关卡标签与规则弹窗 OK');
 
 if (!(await devB.evaluate(() => !!document.querySelector('.waiting-hint')))) throw new Error('等待端缺 waiting-hint');
 
@@ -380,8 +425,10 @@ await waitEval(devA, () => !document.querySelector('.mode-hint'), '取消按钮�
 // ③ 对讲机：选自己的牌 → 对象弹层 → 弹层取消 → 弹层关闭且未消耗道具
 await devA.click('[data-testid="equip-2"]');
 await waitEval(devA, () => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes('点选自己的 1 张未公开导线')); }, '点击道具2进入对讲机选牌态');
+await waitEval(devA, () => { const d = document.querySelector('.mode-desc'); return !!(d && d.textContent.includes('用法') && d.textContent.includes('被交换牌原标记自动废弃')); }, '对讲机选牌态展示用法说明');
 await devA.click(`.own-hand[data-seat="${seatA}"] .card-own:not(.revealed)`);
 await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await waitEval(devA, () => { const d = document.querySelector('#sheetContent .mode-desc'); return !!(d && d.textContent.includes('被交换牌原标记自动废弃')); }, '对讲机选人弹层在取消按钮上方展示用法');
 await devA.waitForTimeout(300);
 await devA.screenshot({ path: SHOTS + '/e2e-12c-walkie-cancel.png' });
 await devA.click('#sheetContent .btn-secondary');

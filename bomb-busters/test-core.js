@@ -162,6 +162,9 @@ function sc(pCount, hands, opts) {
     failures: opts.failures || 0,
     pCount,
     equipment: opts.equipment || [],
+    freeCut: !!opts.freeCut,
+    lastCutterSeat: opts.lastCutterSeat !== undefined ? opts.lastCutterSeat : null,
+    noMarkSeats: opts.noMarkSeats || [],
     pending: null,
     scanMode: null,
     result: null,
@@ -608,12 +611,21 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   g.openMissionSheet();
   const sheet = g.document.getElementById('sheetContent').innerHTML;
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 6 关');
+  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 9 关');
+  includes(sheet, 'data-mission-id="7"', '抽屉应包含 #10');
+  includes(sheet, 'data-mission-id="8"', '抽屉应包含 #11');
+  includes(sheet, 'data-mission-id="9"', '抽屉应包含 #12');
   includes(sheet, 'mi-tag current', '当前关卡应有标记');
   includes(sheet, '>#8<');
   includes(sheet, '最终测试');
   includes(sheet, '>#9<');
   includes(sheet, '轻重缓急');
+  includes(sheet, '>#10<');
+  includes(sheet, '困境');
+  includes(sheet, '>#11<');
+  includes(sheet, '又蓝又红');
+  includes(sheet, '>#12<');
+  includes(sheet, '失踪的装备');
 });
 
 await t('#9 选关卡片：显示“3 个蓝线数字顺序剪线”追加规则', () => {
@@ -626,6 +638,277 @@ await t('#9 选关卡片：显示“3 个蓝线数字顺序剪线”追加规则
   includes(html, '前一个数字公开 ≥2 根');
   includes(html, '违者立即爆炸');
   eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 6 }));
+});
+
+/* ──────────────────────────── #10 困境 ──────────────────────────── */
+
+await t('#10 困境：3 人局 53 张 / 自由剪线 / 15 分钟倒计时 / 排除咖啡瓶', () => {
+  const g = dealMission(7, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 7);
+  eq(boardTotals(g), 53, '48 蓝 + 1 红 + 4 黄');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 4);
+  assert(S.freeCut, '应启用自由剪线');
+  eq(S.board.orderNums.length, 0, '#10 无顺序限制');
+  eq(S.board.timeLimitSec, 900);
+  const left = S.board.deadline - Date.now();
+  assert(left > 895000 && left <= 900000, '截止时间应约为 15 分钟后');
+  assert(!S.equipment.some(e => e.no === 11), '不应抽到咖啡瓶');
+  assert(S.log.some(l => l.msg.includes('倒计时 15 分钟')), '应记录倒计时开始');
+  assert(S.log.some(l => l.msg.includes('自由剪线')), '应记录自由剪线规则');
+});
+
+await t('#10 困境：2 人局倒计时 12 分钟，其余规则同上', () => {
+  const g = dealMission(7, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 53);
+  assert(S.freeCut);
+  eq(S.board.timeLimitSec, 720);
+  const left = S.board.deadline - Date.now();
+  assert(left > 715000 && left <= 720000, '截止时间应约为 12 分钟后');
+  assert(!S.equipment.some(e => e.no === 11));
+});
+
+await t('#10 困境：多次发牌均不会出现咖啡瓶', () => {
+  for (let i = 0; i < 8; i++) {
+    const g = dealMission(7, ['A', 'B', 'C']);
+    assert(!st(g).equipment.some(e => e.no === 11), `第 ${i + 1} 局抽到了咖啡瓶`);
+  }
+});
+
+await t('#10 自由剪线资格：>2 人不能连续剪线；2 人可连续；空手不可剪', () => {
+  const g = loadGame();
+  const c = () => C('blue', 5);
+  use(g, sc(3, [[[c()]], [[c()]], [[c()]]], { freeCut: true, lastCutterSeat: 1 }));
+  assert(g._freeCutEligible(0), '未剪过的玩家可剪');
+  assert(!g._freeCutEligible(1), '上一位剪线者不能连续剪');
+  assert(g._freeCutEligible(2));
+
+  use(g, sc(2, [[[c()]], [[c()]]], { freeCut: true, lastCutterSeat: 1 }));
+  assert(g._freeCutEligible(1), '2 人局允许连续剪线');
+
+  const b = C('blue', 6);
+  use(g, sc(3, [[[]], [[b]], [[b]]], { freeCut: true }));
+  assert(!g._freeCutEligible(0), '手牌已全部公开的玩家不可剪');
+});
+
+await t('#10 自由剪线结算：记录上一位剪线者并回到无人锁定态', () => {
+  const g = loadGame();
+  const own = C('blue', 5), yellow = C('yellow', 2.1), target = C('blue', 5), other = C('blue', 9);
+  use(g, sc(3, [[[own, yellow]], [[target]], [[other]]], { freeCut: true, current: 0 }));
+  const r = g.doPairCut(1, target.id, { kind: 'blue', num: 5 }, own.id);
+  assert(r.ok && r.hit, '自由剪线应命中');
+  const S = st(g);
+  eq(S.lastCutterSeat, 0, '应记录本回合剪线者');
+  eq(S.currentSeat, -2, '结算后回到无人锁定态');
+  S.currentSeat = 0;                       // 模拟再次选择刚剪过的玩家
+  includes(g.doPairCut(1, target.id, { kind: 'blue', num: 5 }, own.id).msg, '现在不能行动',
+    '>2 人时同一玩家不能连续剪线');
+});
+
+await t('#10 倒计时结束：立即判负（含标记阶段）', () => {
+  const g = loadGame();
+  use(g, sc(2, [[[C('blue', 1)]], [[C('blue', 2)]]],
+    { board: { deadline: Date.now() - 1000 }, freeCut: true, current: 0 }));
+  assert(g.timeoutGameIfNeeded(), '超时应触发');
+  const S = st(g);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-timeout');
+  assert(S.log.some(l => l.msg.includes('倒计时结束')), '应记录超时爆炸');
+
+  const g2 = dealMission(7, ['A', 'B', 'C']);
+  const S2 = st(g2);
+  S2.board.deadline = Date.now() - 1;
+  const r = g2.placeInfoToken('whatever');
+  includes(r.msg, '倒计时已结束');
+  eq(S2.phase, 'over', '标记阶段超时同样判负');
+});
+
+/* ──────────────────────────── #11 又蓝又红 ──────────────────────────── */
+
+await t('#11 又蓝又红：3 人局 50 张 / 2 黄 / 1 个视红数字 / 排除同号道具', () => {
+  const g = dealMission(8, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 8);
+  eq(boardTotals(g), 50, '48 蓝 + 0 红 + 2 黄');
+  eq(S.board.redNums.length, 0);
+  eq(S.board.yellowNums.length, 2);
+  eq(S.board.redBlueNums.length, 1, '应抽出 1 个视红数字');
+  const rb = S.board.redBlueNums[0];
+  assert(rb >= 1 && rb <= 12 && Number.isInteger(rb));
+  eq(S.equipment.length, 3);
+  assert(!S.equipment.some(e => e.no === rb), '不应抽到视红数字对应的道具');
+  assert(S.log.some(l => l.msg.includes('视为红色导线')), '应记录视红规则');
+});
+
+await t('#11 又蓝又红：2 人局 4 黄，队长免标记且不能标记', () => {
+  const g = dealMission(8, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 52, '48 蓝 + 0 红 + 4 黄');
+  eq(S.board.yellowNums.length, 4);
+  assert(S.noMarkSeats.indexOf(S.captainSeat) >= 0, '队长应免标记');
+  assert(S.ready[S.captainSeat], '队长就绪位应预置');
+  const capBlue = S.players[S.captainSeat].shares.flat().find(c => c.kind === 'blue' && !c.revealed);
+  includes(g.placeInfoToken(capBlue.id).msg, '本关队长不能进行蓝线信息标记');
+  let marked = null;
+  S.players.forEach((p, seat) => {
+    if (seat === S.captainSeat || marked) return;
+    const b = p.shares.flat().find(c => c.kind === 'blue' && !c.revealed);
+    if (b) marked = { seat, id: b.id };
+  });
+  assert(marked, '其他玩家应有可标记蓝线');
+  assert(g.placeInfoToken(marked.id).ok, '其他玩家可正常标记');
+  assert(S.ready[marked.seat]);
+});
+
+await t('#11 视红蓝线：开局可放置蓝色信息标记', () => {
+  const g = loadGame();
+  const rb = C('blue', 5), y = C('yellow', 2.1);
+  use(g, sc(3, [[[rb, y]], [[C('blue', 6)]], [[C('blue', 7)]]],
+    { phase: 'mark', current: -1, board: { redBlueNums: [5] } }));
+  const r = g.placeInfoToken(rb.id);
+  assert(r.ok, '视红蓝线仍可进行蓝线信息标记');
+  eq(rb.info.num, 5);
+});
+
+await t('#11 视红蓝线：不可作为蓝色猜测项、猜错立即引爆且不留失误标记', () => {
+  const g = loadGame();
+  const ownRb = C('blue', 5), ownY = C('yellow', 2.1);
+  const targetRb = C('blue', 5), other = C('blue', 9);
+  use(g, sc(3, [[[ownRb, ownY]], [[targetRb]], [[other]]],
+    { board: { redBlueNums: [5] } }));
+  eq(g.legalGuessOptions(0).nums.indexOf(5), -1, '视红蓝线不应出现在合法蓝线猜测中');
+  includes(g.doPairCut(1, targetRb.id, { kind: 'blue', num: 5 }, ownRb.id).msg,
+    '没有未公开的蓝色 5', '不能拿视红蓝线做蓝线猜测');
+
+  const r = g.doPairCut(1, targetRb.id, { kind: 'yellow' }, ownY.id);
+  assert(r.ok, '猜测流程应执行');
+  const S = st(g);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-red', '指向视红蓝线应引爆');
+  eq(S.failures, 1);
+  eq(targetRb.fail, null, '视红蓝线不应暴露失误标记');
+  assert(!targetRb.revealed, '引爆后不公开该牌');
+});
+
+await t('#11 视红蓝线：仅剩视红蓝线时可「公开红色导线」并记日志', () => {
+  const g = loadGame();
+  const rb = C('blue', 5), b7 = C('blue', 7);
+  use(g, sc(3, [[[rb, b7]], [[C('blue', 8)]], [[C('blue', 9)]]],
+    { board: { redBlueNums: [5] } }));
+  assert(!g.canRevealRed(0), '仍有普通蓝线时不可公开');
+  b7.revealed = true;
+  assert(g.canRevealRed(0), '仅剩视红蓝线应可公开');
+  const plan = g._planRevealRed();
+  assert(plan.ok);
+  eq(plan.count, 1);
+  assert(g._applyRevealRed(plan).ok);
+  assert(rb.revealed, '视红蓝线应被公开');
+  assert(st(g).log.some(l => l.msg.includes('视为红线的蓝色导线')), '日志应说明含视红蓝线');
+});
+
+await t('#11 视红蓝线：扫描未命中且份内无可标记牌时跳过标记', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const targetRb = C('blue', 5);
+  const S = use(g, sc(2, [[[own7, C('blue', 12)]], [[targetRb]]],
+    { equipment: [{ no: 5, unlocked: true, used: false }], board: { redBlueNums: [5] } }));
+  const r = g.doSuperScan(1, 0, 7, own7.id);
+  assert(r.ok && !r.hit);
+  eq(S.failures, 1);
+  eq(S.pending, null, '份内仅剩视红蓝线时不应生成空选择面板');
+  eq(S.currentSeat, 1, '回合应正常流转');
+  assert(S.log.some(l => l.msg.includes('跳过身份标记')));
+});
+
+/* ──────────────────────────── #12 失踪的装备 ──────────────────────────── */
+
+await t('#12 失踪的装备：3 人局 53 张 / 3 张道具各带唯一锁数字', () => {
+  const g = dealMission(9, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 9);
+  eq(boardTotals(g), 53, '48 蓝 + 1 红 + 4 黄');
+  eq(S.equipment.length, 3);
+  const locks = S.equipment.map(e => e.lockNum);
+  eq(new Set(locks).size, 3, '锁数字应互不重复');
+  locks.forEach(n => {
+    assert(Number.isInteger(n) && n >= 1 && n <= 12, '锁数字应在 1~12');
+  });
+  assert(S.equipment.every(e => !e.unlocked), '开局全部上锁');
+  assert(S.log.some(l => l.msg.includes('道具额外上锁')), '应记录额外上锁');
+});
+
+await t('#12 失踪的装备：2 人局 54 张，道具同样带锁', () => {
+  const g = dealMission(9, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 54, '48 蓝 + 2 红 + 4 黄');
+  eq(S.equipment.length, 2);
+  assert(S.equipment.every(e => Number.isInteger(e.lockNum)), '每张道具都应有锁数字');
+  eq(new Set(S.equipment.map(e => e.lockNum)).size, 2);
+});
+
+await t('#12 解锁条件：原数字 4/4 且锁数字公开 ≥2；两个条件先后达成均可', () => {
+  const g = loadGame();
+  const b1 = [0, 1, 2, 3].map(() => C('blue', 1, { revealed: true }));
+  const b2r = C('blue', 2, { revealed: true });
+  const b2a = C('blue', 2), b2b = C('blue', 2), b2c = C('blue', 2);
+  const b3a = C('blue', 3), b3b = C('blue', 3), extra = C('blue', 4);
+  const equipment = [
+    { no: 1, unlocked: false, used: false, lockNum: 2 },
+    { no: 2, unlocked: false, used: false, lockNum: 3 },
+  ];
+  use(g, sc(3, [
+    [b1.concat([b2r])],
+    [[b2a, b3a, extra]],
+    [[b2b, b2c, b3b]],
+  ], { equipment }));
+  const S = st(g);
+
+  g._checkEquipUnlocks();
+  assert(!S.equipment[0].unlocked, '锁数字仅 1 张时不解锁');
+
+  b2a.revealed = true;                     // 锁数字 2 达到 2 张
+  g._updateDefused(2);
+  assert(S.equipment[0].unlocked, '原数字 4/4 + 锁数字 ≥2 应解锁');
+  assert(!S.equipment[1].unlocked, '道具 2 原数字未 4/4，不应解锁');
+  assert(S.log.some(l => l.msg.includes('锁数字 2 已公开 ≥2')), '解锁日志应带锁条件');
+
+  b2b.revealed = true;
+  b2c.revealed = true;
+  b3a.revealed = true;
+  b3b.revealed = true;
+  g._updateDefused(3);
+  assert(S.equipment[1].unlocked, '原数字随后 4/4 且锁数字达成也应解锁');
+});
+
+await t('#10~#12 选关卡片：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+
+  assert(g.selectMission(7).ok);
+  let html = g.waitingExtrasHTML();
+  includes(html, '#10 困境');
+  includes(html, '15 分钟倒计时');
+  includes(html, '2 人局 12 分钟');
+  includes(html, '自由剪线');
+  includes(html, '咖啡瓶');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 7 }));
+
+  assert(g.selectMission(8).ok);
+  html = g.waitingExtrasHTML();
+  includes(html, '#11 又蓝又红');
+  includes(html, '视为红色导线');
+  includes(html, '2 人局队长不能进行蓝线信息标记');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 8 }));
+
+  assert(g.selectMission(9).ok);
+  html = g.waitingExtrasHTML();
+  includes(html, '#12 失踪的装备');
+  includes(html, '额外 🔒 一个数字');
+  includes(html, '锁数字公开 ≥2');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 9 }));
 });
 
 await t('选关守卫：非房主 / 对局中 / 无效关卡均被拒绝', () => {
@@ -1141,6 +1424,28 @@ await t('对讲机位次：多份时落点记在各自交牌份内，且按重�
   eq(S.walkieInfo.bIn.si, 1); eq(S.walkieInfo.bIn.idx, 1, '收到的 8 重排到 B 第 2 份第 2 位');
   eq(S.players[0].shares[1].map(c => c.num).join(','), '11', '未涉及的份不受影响');
   eq(S.players[1].shares[0].map(c => c.num).join(','), '12', '未涉及的份不受影响');
+});
+
+await t('对讲机结果面板：回合结束与终局自动关闭（与雷达一致）', () => {
+  const g = loadGame();
+  const a = C('blue', 3), other = C('blue', 8);
+  const S = use(g, sc(2, [[[a, other]], [[C('blue', 9), C('blue', 10)]]],
+    { equipment: [{ no: 2, unlocked: true, used: false }] }));
+  assert(g.useWalkie(a.id, 1).ok);
+  assert(g.resolveWalkie(S.players[1].shares[0][0].id).ok);
+  assert(S.walkieInfo, '交换后展示结果面板');
+  g.endTurn();
+  eq(S.walkieInfo, null, '回合结束清空对讲机结果');
+
+  const g2 = loadGame();
+  const a2 = C('blue', 3), other2 = C('blue', 8);
+  const S2 = use(g2, sc(2, [[[a2, other2]], [[C('blue', 9), C('blue', 10)]]],
+    { equipment: [{ no: 2, unlocked: true, used: false }] }));
+  assert(g2.useWalkie(a2.id, 1).ok);
+  assert(g2.resolveWalkie(S2.players[1].shares[0][0].id).ok);
+  assert(S2.walkieInfo);
+  g2._finish(true);
+  eq(S2.walkieInfo, null, '终局清空对讲机结果');
 });
 
 await t('对讲机拒绝：交换已公开牌 / 指定自己', () => {
