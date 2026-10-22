@@ -54,7 +54,10 @@ function cardBackMiniHTML(c) {
 function segCondHTML(i) {
   if (!S.segCond || !S.segCond[i]) return '';
   const cond = S.segCond[i];
-  const cls = cond.key === 'free' ? 'seg-cond free' : 'seg-cond';
+  let cls = 'seg-cond';
+  if (cond.key === 'free') cls += ' free';
+  else if (cond.key === 'blocked') cls += ' blocked';
+  else if (cond.key === 'cw' || cond.key === 'ccw') cls += ' rot';
   return `<div class="${cls}">${esc(cond.short || cond.label)}</div>`;
 }
 
@@ -73,12 +76,13 @@ function segHTML(i) {
     //if (visibleSum > 0) body += `<div class="seg-vis">${visibleSum}</div>`;
   }
   let cls = '';
+  if (!S.settled && segBlocked(i)) cls += ' seg-blocked';
   if (S.settled) {
     // 自定义关卡用 check.segBad，否则用基础检查
-    cls = S.check.segBad ? (S.check.segBad[i] ? ' seg-bad' : '') : (!(S.check.segOK[i] && S.check.sumOK[i]) ? ' seg-bad' : '');
+    cls += S.check.segBad ? (S.check.segBad[i] ? ' seg-bad' : '') : (!(S.check.segOK[i] && S.check.sumOK[i]) ? ' seg-bad' : '');
   }
   return `<div class="seg${cls}" data-i="${i}" style="left:${pos.x}%;top:${pos.y}%">
-    <div class="seg-idx">${i + 1}</div>
+    <div class="seg-idx">${segNumber(i)}</div>
     ${body}
     ${segCondHTML(i)}
   </div>`;
@@ -98,6 +102,84 @@ function clockHTML() {
       <div class="cc-eye">👁 <b>${eyeLeft()}</b><span class="cc-eye-sub">基础${S.eyeBase}+赠${S.eyeBonus}</span></div>
     </div>
   </div>`;
+}
+
+// ========================================
+// 第8章：区域规则旋转动画
+// 各端收到同一个 rotAnim.seq 后，只播放一次：
+// 新落到每个区域的条件标签，从旋转前所在的区域沿钟面弧线飞入。
+// ========================================
+
+let _rotSeenStartAt = null;
+let _rotSeenSeq = 0;
+let _rotAnims = [];
+
+function playCondRotateAnim() {
+  if (!S) return;
+  const rot = S.rotAnim;
+  if (S.startAt !== _rotSeenStartAt) {
+    // 新一局 / 中途加入 / 刷新恢复：把状态里已有的旋转事件视为已播，避免重放历史动画
+    _rotSeenStartAt = S.startAt;
+    _rotSeenSeq = rot ? (rot.seq || 0) : 0;
+  }
+  if (!rot || !S.segCond) return;
+  if (!rot.seq || rot.seq === _rotSeenSeq) return;
+  _rotSeenSeq = rot.seq;
+  if (typeof document.querySelector !== 'function' || typeof document.querySelectorAll !== 'function') return;
+  const wrap = document.querySelector('.clock-wrap');
+  const segEls = Array.from(document.querySelectorAll('.seg'));
+  if (!wrap || segEls.length !== 6) return;
+  const wr = wrap.getBoundingClientRect();
+  if (!wr.width) return;
+  const cx = wr.left + wr.width / 2;
+  const cy = wr.top + wr.height / 2;
+  const centers = segEls.map(el => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+  const R = Math.hypot(centers[0].x - cx, centers[0].y - cy);
+  if (!isFinite(R) || R <= 0) return;
+
+  _rotAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
+  _rotAnims = [];
+  const span = (Math.PI * 2) / 6;
+  for (let i = 0; i < 6; i++) {
+    // 规则标签与区域编号一起沿弧线转到新位置（牌不动）
+    const parts = [segEls[i].querySelector('.seg-cond'), segEls[i].querySelector('.seg-idx')];
+    const aEnd = Math.atan2(centers[i].y - cy, centers[i].x - cx);
+    // 顺时针：本区域的新条件/编号从上一区域（i-1）转来；逆时针从下一区域（i+1）转来
+    const aStart = aEnd + (rot.dir === 'cw' ? -span : span);
+    const frames = [];
+    const steps = 4;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const a = aStart + (aEnd - aStart) * t;
+      const x = cx + R * Math.cos(a);
+      const y = cy + R * Math.sin(a);
+      const sc = 1 - Math.sin(Math.PI * t) * 0.16;
+      frames.push({
+        offset: t,
+        transform: `translate(${x - centers[i].x}px, ${y - centers[i].y}px) scale(${sc})`,
+      });
+    }
+    for (const chip of parts) {
+      if (!chip || typeof chip.animate !== 'function') continue;
+      chip.classList.add('cond-rot-fly');
+      const anim = chip.animate(frames, { duration: 460, easing: 'cubic-bezier(.25,.8,.3,1)' });
+      anim.onfinish = () => chip.classList.remove('cond-rot-fly');
+      anim.oncancel = () => chip.classList.remove('cond-rot-fly');
+      _rotAnims.push(anim);
+    }
+  }
+
+  const center = wrap.querySelector('.clock-center');
+  if (center) {
+    const flash = document.createElement('div');
+    flash.className = 'rot-flash';
+    flash.textContent = rot.dir === 'cw' ? '↻' : '↺';
+    center.appendChild(flash);
+    setTimeout(() => { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 700);
+  }
 }
 
 // ========================================
@@ -171,8 +253,9 @@ function handHTML() {
 function resultHTML() {
   const chk = S.check;
   const pass = S.pass;
-  const sumChips = S.sums.map((_, i) =>
-    `<span class="sum-chip ${chk.segOK[i] && chk.sumOK[i] ? 'ok' : 'bad'}">${i + 1}:${segShowVal(i)}</span>`).join('');
+  const sumChips = Array.from({ length: SEG_COUNT }, (_, i) => i)
+    .sort((a, b) => segNumber(a) - segNumber(b))
+    .map(i => `<span class="sum-chip ${chk.segOK[i] && chk.sumOK[i] ? 'ok' : 'bad'}">${segNumber(i)}:${segShowVal(i)}</span>`).join('');
   // 自定义关卡展示 check.items，否则展示默认三项
   const checks = (chk.items && chk.items.length)
     ? chk.items
@@ -361,12 +444,12 @@ function cardDragMove(e) {
   }
   // transform 定位（像素偏移，不用百分比）：合成层移动，不触发布局
   _drag.ghost.style.transform = `translate(${e.clientX - GHOST_W / 2}px, ${e.clientY - GHOST_H / 2}px) rotate(-4deg)`;
-  // 几何命中：指针在哪个区域圆内（第5章已放满的区域不可作为落点）
+  // 几何命中：指针在哪个区域圆内（已放满/无法放牌的区域不可作为落点）
   let segIdx = -1;
   for (let k = _drag.circles.length - 1; k >= 0; k--) {
     const c = _drag.circles[k];
     const d = Math.hypot(e.clientX - c.cx, e.clientY - c.cy);
-    if (d <= c.r * 1.1 && !segFull(k)) { segIdx = k; break; }
+    if (d <= c.r * 1.1 && !segFull(k) && !segBlocked(k)) { segIdx = k; break; }
   }
   if (segIdx !== _drag.seg) {
     const segs = document.querySelectorAll('.seg');
@@ -407,12 +490,16 @@ function renderPlaySheet() {
     const visibleSum = seg.cards.filter(c => c.revealed).reduce((a, c) => a + c.v, 0);
     const sel = pendingPlay.seg === i ? ' sel' : '';
     const full = segFull(i);
-    return `<button class="seg-btn${sel}" onclick="pickSeg(${i})" ${full ? 'disabled' : ''}>
-      区域${i + 1}<span class="sg-sub">${seg.cards.length}张${full ? '·已满' : ''}${!full && visibleSum ? '·' + visibleSum : ''}</span>
+    const blocked = segBlocked(i);
+    const sub = blocked
+      ? `无法放牌${seg.cards.length ? '·' + seg.cards.length + '张' : ''}`
+      : `${seg.cards.length}张${full ? '·已满' : ''}${!full && visibleSum ? '·' + visibleSum : ''}`;
+    return `<button class="seg-btn${sel}${blocked ? ' blocked' : ''}" onclick="pickSeg(${i})" ${full || blocked ? 'disabled' : ''}>
+      区域${segNumber(i)}<span class="sg-sub">${sub}</span>
     </button>`;
   }).join('')}</div>`;
   const title = pendingPlay.seg >= 0
-    ? `是否将 ${cardBigHTML(card)} 放置到 <b>${pendingPlay.seg + 1}号区域</b>？`
+    ? `是否将 ${cardBigHTML(card)} 放置到 <b>${segNumber(pendingPlay.seg)}号区域</b>？`
     : `将 ${cardBigHTML(card)} 放置到哪个区域？`;
 
   const eyeChip = left > 0
@@ -424,12 +511,17 @@ function renderPlaySheet() {
   const drawHint = segCondNow && segCondNow.key === 'draw1'
     ? `<div class="wait-text">该区域「摸1张」：放置后从未加入游戏的备用牌堆摸 1 张到手牌</div>`
     : '';
+  // 第8章旋转区域：放置后区域编号与规则一起旋转
+  const rotHint = segCondNow && (segCondNow.key === 'cw' || segCondNow.key === 'ccw')
+    ? `<div class="wait-text">该区域「${segCondNow.key === 'cw' ? '顺时针旋转' : '逆时针旋转'}」：放置后 6 个区域的编号与规则一起${segCondNow.key === 'cw' ? '顺' : '逆'}时针旋转 1 格（牌留在原位）</div>`
+    : '';
 
   content.innerHTML = `
     <h3>${title}</h3>
     ${segGrid}
     ${eyeChip}
     ${drawHint}
+    ${rotHint}
     <button class="btn-full btn-primary" onclick="placeCard()" ${pendingPlay.seg === -1 ? 'disabled' : ''}>确认放置</button>
     <button class="btn-full btn-secondary" onclick="closePlaySheet()">取消</button>`;
   sheet.classList.add('show');
@@ -877,6 +969,7 @@ function render() {
   `;
 
   renderPlaySheet();
+  playCondRotateAnim();
 
   // 入场动效只播一次：渲染后清除 fresh，避免后续 render（点选手牌等）重播动画
   S.segments.forEach(seg => seg.cards.forEach(c => { c.fresh = false; }));

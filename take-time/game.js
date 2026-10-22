@@ -81,6 +81,52 @@ function ch7Check(sums, segs) {
   };
 }
 
+/**
+ * 第8章通用判定：基础三项 + 按旋转后的最终区域条件逐项检查。
+ * 第8章旋转时区域编号会随规则一起移动（S.segOrder 记录每个物理区域当前的编号），
+ * 因此「区域1→6总和递增」按当前编号顺序取总和，条件项也按当前编号标注。
+ * 约束型条件：sum16_20（总和16~20）、exact1（仅1张）、exact2（须2张）；
+ * blocked（无法放牌）/ cw（顺时针旋转）/ ccw（逆时针旋转）仅影响出牌过程，无结算约束。
+ */
+function ch8Check(sums, segs) {
+  const order = S.segOrder && S.segOrder.length === SEG_COUNT
+    ? S.segOrder
+    : Array.from({ length: SEG_COUNT }, (_, i) => i + 1);
+  const segOK = segs.map(seg => seg.cards.length >= 1);
+  const sumOK = sums.map(s => s <= 24);
+  const sumsByNumber = new Array(SEG_COUNT);
+  order.forEach((num, slot) => { sumsByNumber[num - 1] = sums[slot]; });
+  const ascOK = sumsByNumber.every((s, i) => i === 0 || s >= sumsByNumber[i - 1]);
+  const items = [
+    { label: '每区域至少1张', ok: segOK.every(Boolean) },
+    { label: '每区域总和≤24', ok: sumOK.every(Boolean) },
+    { label: '区域1→6总和递增', ok: ascOK },
+  ];
+  const segBad = segs.map((_, i) => !(segOK[i] && sumOK[i]));
+  const conds = S.segCond || [];
+  let condOK = true;
+  conds.forEach((cond, i) => {
+    const regionNo = order[i];
+    if (cond.key === 'sum16_20') {
+      const ok = sums[i] >= 16 && sums[i] <= 20;
+      items.push({ label: `${regionNo}号位：总和在16~20之间（${sums[i]}）`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    } else if (cond.key === 'exact1') {
+      const ok = segs[i].cards.length === 1;
+      items.push({ label: `${regionNo}号位：恰好放1张牌（${segs[i].cards.length}张）`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    } else if (cond.key === 'exact2') {
+      const ok = segs[i].cards.length === 2;
+      items.push({ label: `${regionNo}号位：恰好放2张牌（${segs[i].cards.length}张）`, ok });
+      if (!ok) { segBad[i] = true; condOK = false; }
+    }
+  });
+  return {
+    segOK, sumOK, ascOK, items, segBad,
+    pass: condOK && segOK.every(Boolean) && sumOK.every(Boolean) && ascOK,
+  };
+}
+
 const CHALLENGE_LIB = {
   // ── 第1章 ──
   1: {
@@ -1101,6 +1147,75 @@ const CHALLENGE_LIB = {
     desc: '区域规则为“无限制->摸1张->无限制->摸1张->无限制->摸1张”；看牌前，房主可自行将限制条件按顺序设置到对应区域',
     check: ch7Check,
   },
+  // ── 第8章（转盘选条件 + 「顺时针/逆时针旋转」与「无法放牌」） ──
+  /**
+   * 顺流（第8章第1关）：一个封区 + 一个总和区间 + 一个顺时针旋转。
+   */
+  29: {
+    name: '顺流', chapter: 8, test: 1,
+    rotate: true,
+    conds: [
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'blocked', label: '无法放牌', short: '无法放牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'sum16_20', label: '总和为16~20', short: '总和16~20' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+    ],
+    desc: '区域规则为“无限制->无法放牌->无限制->总和为16~20->无限制->顺时针旋转”；看牌前，房主可自行将限制条件按顺序设置到对应区域；放牌到旋转区域后，6个区域的规则与编号一起旋转1格（区域内的牌不移动）；无法放牌区域不可放置（已有牌保留）',
+    check: ch8Check,
+  },
+  /**
+   * 双锁（第8章第2关）：三处封区 + 两处顺时针旋转。
+   */
+  30: {
+    name: '双锁', chapter: 8, test: 2,
+    rotate: true,
+    conds: [
+      { key: 'blocked', label: '无法放牌', short: '无法放牌' },
+      { key: 'blocked', label: '无法放牌', short: '无法放牌' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'blocked', label: '无法放牌', short: '无法放牌' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+    ],
+    desc: '区域规则为“无法放牌->无法放牌->顺时针旋转->无限制->无法放牌->顺时针旋转”；看牌前，房主可自行将限制条件按顺序设置到对应区域；放牌到旋转区域后，6个区域的规则与编号一起旋转1格（区域内的牌不移动）；无法放牌区域不可放置（已有牌保留）',
+    check: ch8Check,
+  },
+  /**
+   * 三旋（第8章第3关）：三连顺时针旋转 + 仅1张/须2张约束。
+   */
+  31: {
+    name: '三旋', chapter: 8, test: 3,
+    rotate: true,
+    conds: [
+      { key: 'exact1', label: '仅1张牌', short: '仅1张牌' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'exact2', label: '必须放2张牌', short: '放2张牌' },
+      { key: 'free', label: '无限制', short: '无限制' },
+    ],
+    desc: '区域规则为“仅1张牌->顺时针旋转->顺时针旋转->顺时针旋转->必须放2张牌->无限制”；看牌前，房主可自行将限制条件按顺序设置到对应区域；放牌到旋转区域后，6个区域的规则与编号一起旋转1格（区域内的牌不移动）',
+    check: ch8Check,
+  },
+  /**
+   * 往复（第8章第4关）：规则固定、不可调整；两处顺时针旋转 + 两处逆时针旋转。
+   */
+  32: {
+    name: '往复', chapter: 8, test: 4,
+    fixedConds: true,
+    conds: [
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'cw', label: '顺时针旋转', short: '↻ 顺时针' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'free', label: '无限制', short: '无限制' },
+      { key: 'ccw', label: '逆时针旋转', short: '↺ 逆时针' },
+      { key: 'ccw', label: '逆时针旋转', short: '↺ 逆时针' },
+    ],
+    desc: '区域规则固定为“顺时针旋转->顺时针旋转->无限制->无限制->逆时针旋转->逆时针旋转”（不可调整）；放牌到旋转区域后，6个区域的规则与编号一起旋转1格（区域内的牌不移动）',
+    check: ch8Check,
+  },
 };
 
 /** 通过 window 暴露（测试扩展用） */
@@ -1228,6 +1343,17 @@ function segFull(i) {
   return cap !== null && !!S.segments[i] && S.segments[i].cards.length >= cap;
 }
 
+/** 第8章：该区域当前条件是否为「无法放牌」（已有牌保留，但不可再放置新牌） */
+function segBlocked(i) {
+  const cond = S.segCond && S.segCond[i];
+  return !!(cond && cond.key === 'blocked');
+}
+
+/** 第8章：该物理区域当前的区域编号（编号随旋转移动，牌留在物理位置） */
+function segNumber(i) {
+  return S.segOrder && S.segOrder[i] ? S.segOrder[i] : i + 1;
+}
+
 // ========================================
 // 进度存储（关卡赠送眼标记 / 通过状态）
 // ========================================
@@ -1338,7 +1464,9 @@ function dealGame(names, challenge) {
     phase: 'discuss',
     challenge: ch,
     segments: Array.from({ length: SEG_COUNT }, () => ({ cards: [] })),
+    segOrder: Array.from({ length: SEG_COUNT }, (_, i) => i + 1), // 每个物理区域当前的区域编号（第8章旋转时随规则移动）
     reserve,
+    segCond: null,
     firstSeat: null,
     currentSeat: 0,
     turnNo: 0,
@@ -1351,6 +1479,8 @@ function dealGame(names, challenge) {
     pass: null,
     sums: null,
     check: null,
+    rotAnim: null,       // 第8章：最近一次规则旋转事件（dir/seq/turn），各端同步播放动画
+    rotAnimSeq: 0,
     settleStamp: 0,
     startAt: Date.now(),
     log: [],
@@ -1363,6 +1493,8 @@ function dealGame(names, challenge) {
   if (lib && lib.noEye) { S.eyeBase = 0; S.eyeBonus = 0; }
   // 定首类关卡：先手选定前不分配区域条件（聚光灯停止后进入 cond 阶段）
   if (lib && lib.rotate) S.segCond = null;
+  // 固定条件关卡（第8章第4关）：规则开局即生效，房主不可调整
+  else if (lib && lib.fixedConds && lib.conds) S.segCond = lib.conds.map(c => ({ ...c }));
 
   const eyeTotal = S.eyeBase + S.eyeBonus;
   addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${eyeTotal}个眼标记`);
@@ -1466,6 +1598,26 @@ function chooseFirstCond(idx) {
   render();
 }
 
+/**
+ * 第8章：顺时针/逆时针旋转1格。
+ * 顺时针 = 区域编号与条件一起从 i 号物理位移到 i+1 号位（6号位回1号位），逆时针反之；
+ * 区域内的牌留在原物理位置，因此旋转后牌所属的区域编号会改变。
+ */
+function rotateRegions(dir) {
+  if (!S.segCond) return;
+  const n = S.segCond.length;
+  const order = S.segOrder || Array.from({ length: n }, (_, i) => i + 1);
+  const nextCond = new Array(n);
+  const nextOrder = new Array(n);
+  S.segCond.forEach((cond, i) => {
+    const to = dir === 'cw' ? (i + 1) % n : (i - 1 + n) % n;
+    nextCond[to] = cond;
+    nextOrder[to] = order[i];
+  });
+  S.segCond = nextCond;
+  S.segOrder = nextOrder;
+}
+
 // ========================================
 // 出牌
 // ========================================
@@ -1524,6 +1676,7 @@ function selectCard(i) {
 function pickSeg(i) {
   if (!pendingPlay) return;
   if (i < 0 || i >= SEG_COUNT) return;
+  if (segBlocked(i)) { showToast('该区域当前无法放牌'); return; }
   pendingPlay.seg = i;
   render();
 }
@@ -1547,10 +1700,14 @@ function placeCard() {
   if (pendingPlay.useEye && eyeLeft() <= 0) return;
   // 第5章封区兜底：满 2 张的区域不可放置（正常路径在 UI 已拦截）
   if (segFull(pendingPlay.seg)) { showToast('该区域已满 2 张，不能再放置'); return; }
+  // 第8章封区：无法放牌的区域不可放置（已有牌保留；正常路径在 UI 已拦截）
+  if (segBlocked(pendingPlay.seg)) { showToast('该区域当前无法放牌，等待规则旋转'); return; }
 
   const me = actionSeat();
   if (me === null) return;
   const segIdx = pendingPlay.seg;
+  const segNo = segNumber(segIdx);
+  const placedCond = S.segCond && S.segCond[segIdx];
   const card = S.players[me].hand.splice(pendingPlay.cardIndex, 1)[0];
   if (!card) return;
   card.revealed = pendingPlay.useEye;
@@ -1562,13 +1719,25 @@ function placeCard() {
 
   addLog(
     pendingPlay.useEye
-      ? `${S.players[me].name} 明置 ☀${card.v} 到区域${segIdx + 1}（用1眼标记）`
-      : `${S.players[me].name} 暗置1张牌到区域${segIdx + 1}`
+      ? `${S.players[me].name} 明置 ☀${card.v} 到区域${segNo}（用1眼标记）`
+      : `${S.players[me].name} 暗置1张牌到区域${segNo}`
   );
   console.log('[taketime] place:', card.v, '-> seg', segIdx, 'revealed', pendingPlay.useEye);
 
   pendingPlay = null;
   S.turnNo++;
+
+  // 第8章：放置到旋转区域后，6个区域的编号与规则一起旋转1格（区域内的牌不移动，
+  // 因此牌所属的区域编号会改变）。rotAnim 随状态同步，各端据此播放标签沿钟面转动的动画。
+  if (placedCond && (placedCond.key === 'cw' || placedCond.key === 'ccw')) {
+    rotateRegions(placedCond.key);
+    S.rotAnimSeq = (S.rotAnimSeq || 0) + 1;
+    S.rotAnim = { dir: placedCond.key, seq: S.rotAnimSeq, turn: S.turnNo };
+    addLog(placedCond.key === 'cw'
+      ? `区域${segNo}触发顺时针旋转：6个区域的编号与规则整体顺移1格`
+      : `区域${segNo}触发逆时针旋转：6个区域的编号与规则整体逆移1格`);
+    showToast(placedCond.key === 'cw' ? '↻ 区域编号与规则顺时针旋转1格' : '↺ 区域编号与规则逆时针旋转1格');
+  }
 
   // 第7章「摸1张」：向该区域放牌后，放牌玩家从未加入游戏的备用牌堆摸1张进手牌。
   // 日志不写颜色/数字（颜色由玩家条 ☀/☾ 计数+1 自然暴露）；再次放入摸1张区域会连锁摸牌。

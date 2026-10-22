@@ -98,6 +98,42 @@ input { font-family:inherit; }
   pointer-events:none;
 }
 .seg-cond.free { color:var(--text-dim); opacity:.8; }
+.seg-cond.blocked {
+  color:#ff9b95; background:rgba(120,20,20,.55);
+  border:1px solid rgba(244,67,54,.4);
+}
+.seg-cond.rot {
+  color:#8fd3ff; background:rgba(13,57,96,.6);
+  border:1px solid rgba(90,170,255,.4);
+}
+/* 第8章：无法放牌的区域（牌保留，仅禁止再放入） */
+.seg.seg-blocked {
+  border-style:dashed; border-color:rgba(244,67,54,.55);
+  box-shadow:inset 0 0 14px rgba(244,67,54,.18);
+}
+.seg.seg-blocked::after {
+  content:'🚫'; position:absolute; top:1px; right:4px;
+  font-size:.62rem; opacity:.9; pointer-events:none;
+}
+/* 旋转中的条件标签/编号：飞越区域时浮在所有内容上方 */
+.cond-rot-fly {
+  z-index:6; box-shadow:0 0 12px rgba(245,197,24,.85);
+  filter:brightness(1.3);
+}
+/* 钟面中心的方向提示 */
+.rot-flash {
+  position:absolute; left:50%; top:50%; width:64px; height:64px;
+  margin:-32px 0 0 -32px; display:flex; align-items:center; justify-content:center;
+  font-size:2.4rem; font-weight:700; color:rgba(245,197,24,.92);
+  text-shadow:0 0 14px rgba(245,197,24,.75);
+  pointer-events:none; z-index:6;
+  animation:rot-flash .7s ease-out forwards;
+}
+@keyframes rot-flash {
+  0% { opacity:0; transform:scale(.5) rotate(-18deg); }
+  25% { opacity:1; transform:scale(1.15) rotate(0); }
+  100% { opacity:0; transform:scale(1.55) rotate(8deg); }
+}
 
 /* 桌面中央的牌：与手牌同款式，多张横置按比例缩放 */
 .mini-card {
@@ -330,6 +366,7 @@ input { font-family:inherit; }
 }
 .seg-btn.sel { border-color:var(--gold); background:rgba(245,197,24,.18); color:var(--gold); }
 .seg-btn:disabled { opacity:.45; }
+.seg-btn.blocked:disabled { opacity:.8; border-color:rgba(244,67,54,.5); background:rgba(90,20,20,.28); color:#ff9b95; }
 .sg-sub { font-size:.68rem; color:var(--text-dim); }
 .eye-opt {
   display:block; text-align:center; padding:12px; margin-bottom:12px;

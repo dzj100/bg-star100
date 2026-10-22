@@ -1227,6 +1227,158 @@ g.placeCard();
 assert(g.S.reserve.length === 11, '第28关：1号位放牌不摸牌');
 assert(g.S.currentSeat === 1, '第28关：回合照常轮转');
 
+// ── 12b. 第八章「顺流/双锁/三旋/往复」：转盘选条件 + 旋转/无法放牌机制 ──
+console.log('\n[第八章·旋转与封区]');
+
+const ch8Keys = id => g.CHALLENGE_LIB[id].conds.map(c => c.key).join(',');
+assert(ch8Keys(29) === 'free,blocked,free,sum16_20,free,cw', '第29关条件集', ch8Keys(29));
+assert(ch8Keys(30) === 'blocked,blocked,cw,free,blocked,cw', '第30关条件集', ch8Keys(30));
+assert(ch8Keys(31) === 'exact1,cw,cw,cw,exact2,free', '第31关条件集', ch8Keys(31));
+assert(ch8Keys(32) === 'cw,cw,free,free,ccw,ccw', '第32关条件集', ch8Keys(32));
+assert([29, 30, 31].every(id => g.CHALLENGE_LIB[id].rotate === true), '第8章前3关为转盘关（房主选1号位条件）');
+assert(g.CHALLENGE_LIB[32].rotate !== true && g.CHALLENGE_LIB[32].fixedConds === true, '第32关规则固定、房主不可调整');
+assert(g.CHALLENGE_LIB[29].conds[1].label === '无法放牌' && g.CHALLENGE_LIB[29].conds[5].short === '↻ 顺时针', '无法放牌/顺时针条件文案');
+assert(g.CHALLENGE_LIB[32].conds[4].short === '↺ 逆时针', '逆时针条件文案');
+assert(g.CHALLENGE_LIB[29].conds[3].label === '总和为16~20' && g.CHALLENGE_LIB[31].conds[0].label === '仅1张牌', '总和区间/仅1张条件文案');
+
+// 发牌：初始 discuss、segCond 未定、无旋转事件
+g._olSeatIndex = () => 0;
+g.dealGame(['A', 'B'], { chapter: 8, test: 1, id: 29 });
+assert(g.S.phase === 'discuss' && g.S.segCond === null, '第29关初始 discuss、segCond 未定');
+assert(g.S.segOrder.join(',') === '1,2,3,4,5,6', '初始区域编号 1~6');
+assert(g.S.rotAnim === null && g.S.rotAnimSeq === 0, '初始无旋转事件');
+
+// 转盘预览：选1号位 → 其余按顺序顺延；重新预览可覆盖
+g.chooseFirstCond(0);
+assert(g.S.segCond.map(c => c.key).join(',') === 'free,blocked,free,sum16_20,free,cw', '第29关预览（原顺序）', g.S.segCond.map(c => c.key));
+g.chooseFirstCond(1);
+assert(g.S.segCond.map(c => c.key).join(',') === 'blocked,free,sum16_20,free,cw,free', '第29关重选1号位后循环顺延', g.S.segCond.map(c => c.key));
+g.chooseFirstCond(0); // 恢复：1号位 free，2号位 blocked，6号位 cw
+
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 0;
+assert(g.S.players[0].hand.length === 6, '第29关：2人局6张手牌');
+
+// 无法放牌：2号位拒绝放牌，手牌/回合/计数均不变
+const handBeforeBlocked = g.S.players[0].hand.length;
+g._pendingPlay = { cardIndex: 0, seg: 1, useEye: false };
+g.placeCard();
+assert(g.S.segments[1].cards.length === 0 && g.S.players[0].hand.length === handBeforeBlocked, '无法放牌区域拒绝放置（牌仍在手牌）');
+assert(g.S.currentSeat === 0 && g.S.turnNo === 0, '无法放牌不改回合/放置序号');
+g._pendingPlay = { cardIndex: 0, seg: -1, useEye: false };
+g.pickSeg(1);
+assert(g._pendingPlay.seg === -1, '模拟选区的 pickSeg 同样拒绝无法放牌区域');
+g.pickSeg(2);
+assert(g._pendingPlay.seg === 2, 'pickSeg 允许选择无限制区域');
+g._pendingPlay = null;
+
+// 放到无限制区域：正常放置、不旋转
+g._pendingPlay = { cardIndex: 0, seg: 2, useEye: false };
+g.placeCard();
+assert(g.S.segments[2].cards.length === 1 && g.S.players[0].hand.length === 5, '第29关：3号位正常放牌');
+assert(g.S.segCond.map(c => c.key).join(',') === 'free,blocked,free,sum16_20,free,cw', '无限制区域放牌不触发旋转');
+assert(g.S.segOrder.join(',') === '1,2,3,4,5,6', '无限制区域放牌不改变区域编号');
+assert(g.S.rotAnim === null && g.S.rotAnimSeq === 0, '无限制区域放牌不产生旋转事件');
+assert(g.S.turnNo === 1 && g.S.currentSeat === 1, '放牌后放置序号+1、回合轮转');
+
+// 放到顺时针旋转区域（物理6号位、当前编号6）：编号与条件一起顺移1格，牌留在物理位置
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 5, useEye: false };
+g.placeCard();
+assert(g.S.segCond.map(c => c.key).join(',') === 'cw,free,blocked,free,sum16_20,free', '顺时针旋转：条件整体顺移1格', g.S.segCond.map(c => c.key));
+assert(g.S.segOrder.join(',') === '6,1,2,3,4,5', '顺时针旋转：区域编号一起顺移1格', g.S.segOrder.join(','));
+assert(g.S.rotAnim && g.S.rotAnim.dir === 'cw' && g.S.rotAnim.seq === 1, '顺时针旋转记录 rotAnim（dir=cw、seq=1）', g.S.rotAnim);
+assert(g.S.segments[2].cards.length === 1 && g.S.segments[5].cards.length === 1, '旋转只移动编号与规则，区域内的牌保留');
+assert(g.segNumber(2) === 2 && g.segNumber(5) === 5, '牌的所在编号随旋转改变（3号位→2号位、6号位→5号位）');
+assert(g.S.log[g.S.log.length - 1].msg.includes('区域6触发顺时针旋转'), '日志按旋转前编号记录', g.S.log[g.S.log.length - 1].msg);
+
+// 旋转后：物理3号位（有牌）变为无法放牌 → 拒绝；物理2号位解除封锁 → 可放
+assert(g.segBlocked(2) === true && g.segBlocked(1) === false, '旋转后封锁位置由物理2号位移到3号位');
+const handBeforeRetry = g.S.players[0].hand.length;
+g._pendingPlay = { cardIndex: 0, seg: 2, useEye: false };
+g.placeCard();
+assert(g.S.segments[2].cards.length === 1 && g.S.players[0].hand.length === handBeforeRetry, '新封锁区域拒绝放置，已有牌保留');
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 1, useEye: false }; // 物理2号位，当前为区域1（无限制）
+g.placeCard();
+assert(g.S.segments[1].cards.length === 1 && g.S.players[0].hand.length === handBeforeRetry - 1, '封锁移走后原区域恢复可放牌');
+assert(g.S.log[g.S.log.length - 1].msg.includes('到区域1'), '放牌日志使用旋转后的当前区域编号', g.S.log[g.S.log.length - 1].msg);
+
+// 第32关：规则固定（无需房主选择），编号与规则一起旋转
+g.dealGame(['A', 'B'], { chapter: 8, test: 4, id: 32 });
+assert(g.S.segCond && g.S.segCond.map(c => c.key).join(',') === 'cw,cw,free,free,ccw,ccw', '第32关开局即使用固定规则', g.S.segCond && g.S.segCond.map(c => c.key));
+assert(g.S.segOrder.join(',') === '1,2,3,4,5,6', '第32关初始区域编号 1~6');
+g.chooseFirstCond(3); // 固定关：选择器不可用，应无效果
+assert(g.S.segCond.map(c => c.key).join(',') === 'cw,cw,free,free,ccw,ccw', '第32关房主无法调整规则');
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 0;
+// 用户示例：在区域1（物理1号位）放一张月亮1，顺时针后它属于区域6，规则为原区域6的逆时针
+g._pendingPlay = { cardIndex: g.S.players[0].hand.findIndex(c => c.color === 'moon'), seg: 0, useEye: false };
+g.placeCard();
+assert(g.S.segments[0].cards.length === 1 && g.S.segments[0].cards[0].color === 'moon', '区域1放置一张月亮牌');
+assert(g.segNumber(0) === 6, '顺时针后该牌所在编号变为区域6', g.segNumber(0));
+assert(g.S.segCond[0].key === 'ccw', '顺时针后该位置规则为原区域6的逆时针', g.S.segCond[0].key);
+assert(g.S.segOrder.join(',') === '6,1,2,3,4,5', '第32关顺时针：编号顺移1格', g.S.segOrder.join(','));
+assert(g.S.segCond.map(c => c.key).join(',') === 'ccw,cw,cw,free,free,ccw', '第32关顺时针：条件顺移1格', g.S.segCond.map(c => c.key));
+assert(g.S.log[g.S.log.length - 1].msg.includes('区域1触发顺时针旋转'), '日志按旋转前编号记录顺时针', g.S.log[g.S.log.length - 1].msg);
+
+// 再向同一物理位（当前区域6、逆时针）放牌：编号与条件转回初始
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false };
+g.placeCard();
+assert(g.S.rotAnim && g.S.rotAnim.dir === 'ccw' && g.S.rotAnim.seq === 2, '逆时针旋转记录 rotAnim（dir=ccw、seq=2）', g.S.rotAnim);
+assert(g.S.segOrder.join(',') === '1,2,3,4,5,6', '第32关逆时针：编号逆移回 1~6', g.S.segOrder.join(','));
+assert(g.S.segCond.map(c => c.key).join(',') === 'cw,cw,free,free,ccw,ccw', '第32关逆时针：条件逆移回初始', g.S.segCond.map(c => c.key));
+assert(g.segNumber(0) === 1 && g.S.segCond[0].key === 'cw', '逆时针后该牌回到区域1、规则为顺时针', { no: g.segNumber(0), cond: g.S.segCond[0].key });
+assert(g.S.log[g.S.log.length - 1].msg.includes('区域6触发逆时针旋转'), '日志按旋转前编号记录逆时针', g.S.log[g.S.log.length - 1].msg);
+
+// 结算判定：仅1张/须2张/总和16~20（blocked 与 cw/ccw 无结算约束）
+g.S.segOrder = [1, 2, 3, 4, 5, 6];
+g.S.segCond = [
+  { key: 'exact1' }, { key: 'exact2' }, { key: 'free' },
+  { key: 'blocked' }, { key: 'cw' }, { key: 'sum16_20' },
+];
+const c29Segs = [
+  mkSeg([cd(2, 'sun')]),                         // 2：仅1张 ✓
+  mkSeg([cd(1, 'sun'), cd(1, 'moon')]),          // 2：须2张 ✓
+  mkSeg([cd(2, 'moon')]),                        // 2
+  mkSeg([cd(3, 'sun')]),                         // 3（无法放牌无约束）
+  mkSeg([cd(4, 'moon')]),                        // 4（旋转无约束）
+  mkSeg([cd(6, 'sun'), cd(10, 'moon')]),         // 16：总和16~20 ✓
+];
+const c29Sums = c29Segs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c29 = g.challengeCheck({ id: 29 }, c29Sums, c29Segs);
+assert(c29.pass === true, '第8章结算：仅1张/须2张/总和16~20全满足 → 通过', c29);
+assert(c29.items.length === 6, '第8章结算：基础三项 + 3条条件检查', c29.items.length);
+assert(c29.items.some(it => it.label.includes('恰好放1张牌') && it.ok === true), '结算项含仅1张牌');
+assert(c29.items.some(it => it.label.includes('恰好放2张牌') && it.ok === true), '结算项含须2张牌');
+assert(c29.items.some(it => it.label.includes('16~20') && it.ok === true), '结算项含总和16~20');
+
+// 编号旋转后的结算：递增按当前编号顺序取总和，条件项按当前编号标注
+g.S.segOrder = [2, 1, 3, 4, 5, 6];
+const c29Rot = g.challengeCheck({ id: 29 }, c29Sums, c29Segs);
+assert(c29Rot.pass === true, '编号轮换后按 1→6 编号顺序仍递增 → 通过', c29Rot);
+assert(c29Rot.items.some(it => it.label.includes('2号位：恰好放1张牌') && it.ok === true), '条件项按当前区域编号标注');
+assert(c29Rot.items.some(it => it.label.includes('1号位：恰好放2张牌') && it.ok === true), '编号1的条件取物理2号位数据');
+g.S.segOrder = [6, 1, 2, 3, 4, 5];
+const c29RotFail = g.challengeCheck({ id: 29 }, c29Sums, c29Segs);
+assert(c29RotFail.pass === false && c29RotFail.ascOK === false, '编号旋转后递增失败（区域5=16 > 区域6=2）', c29RotFail);
+g.S.segOrder = [1, 2, 3, 4, 5, 6];
+const c29FailSegs = [
+  mkSeg([cd(2, 'sun')]),
+  mkSeg([cd(1, 'sun')]),                         // 仅1张 → 须2张失败
+  mkSeg([cd(2, 'moon')]),
+  mkSeg([cd(3, 'sun')]),
+  mkSeg([cd(4, 'moon')]),
+  mkSeg([cd(6, 'sun'), cd(9, 'moon')]),          // 15 → 总和16~20失败
+];
+const c29FailSums = c29FailSegs.map(s => s.cards.reduce((a, c) => a + c.v, 0));
+const c29Fail = g.challengeCheck({ id: 29 }, c29FailSums, c29FailSegs);
+assert(c29Fail.pass === false && c29Fail.segBad[1] === true && c29Fail.segBad[5] === true, '第8章结算：张数/总和越界 → 失败');
+assert(c29Fail.items.some(it => it.label.includes('（15）') && it.ok === false), '失败项标注实际总和');
+
 // ── 13. 联机健壮性（过期快照过滤 / 重同步 / 未确认推送补发 / 断线恢复） ──
 (async () => {
   console.log('\n[联机健壮性]');
