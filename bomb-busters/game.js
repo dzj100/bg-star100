@@ -988,8 +988,10 @@ function _applyScan(plan) {
   const stable = _consumeStabilize(true, actor);
   if (!stable) {
     S.failures++;
-    addLog(`❌ ${aName} 扫描 ${count} 张未命中（失误 ${S.failures}/${S.pCount}）`, 'bad');
+    addLog(`❌ ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「有蓝色 ${num}」（失误 ${S.failures}/${S.pCount}）`, 'bad');
     if (S.failures >= S.pCount) { _boom('boom-failures'); return { ok: true, hit: false }; }
+  } else {
+    addLog(`🔎 ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「有蓝色 ${num}」`, 'warn');
   }
 
   const markable = targetCards.filter(c => !isRedLikeCard(c));
@@ -1393,8 +1395,12 @@ function useRadar(num) {
   }
   S.radar = { num, rows, by: actor };
   g.eq.used = true;
-  const desc = rows.map(r =>
-    `${S.players[r.seat].name}：${r.per.map(b => b ? '有' : '无').join('、')}`).join('；');
+  const desc = rows.map(r => {
+    const multi = r.per.length > 1;
+    const per = r.per.map((b, i) =>
+      `${multi ? `第${i + 1}份手牌` : '手牌'}${b ? '有' : '无'}数字${num}`).join('、');
+    return `${S.players[r.seat].name}：${per}`;
+  }).join('；');
   addLog(`📡 ${S.players[actor].name} 使用通用雷达探测蓝色 ${num}——${desc}`, 'good');
   saveState();
   _render();

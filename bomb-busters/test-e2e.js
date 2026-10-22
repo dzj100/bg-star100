@@ -5,7 +5,7 @@
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
  *       → 成员退出 + 房主解散房间（无接管选项，强制解散）
- * 前置：node bomb-busters/serve.js（端口 8124）
+ * 前置：node bomb-busters/serve.js（端口 8124）；Supabase 已执行 room-rpc.sql
  * 运行：node bomb-busters/test-e2e.js
  */
 const { chromium } = require('playwright');
@@ -211,12 +211,28 @@ for (const [page, tag] of [[p1, 'P1'], [p2, 'P2']]) {
 
 await p1.waitForSelector('.own-hand[data-seat="0"] .card-own.kind-blue.selectable', { timeout: 5000 });
 await p1.click('.own-hand[data-seat="0"] .card-own.kind-blue.selectable');
+await p1.waitForSelector('#sheetOverlay.show [data-testid="mark-confirm"]', { timeout: 5000 });
+if (await p1.evaluate(() => window.S.ready[0])) throw new Error('点选标记牌后不应立即提交');
+await p1.click('[data-testid="mark-cancel"]');
+await waitEval(p1, () => !document.getElementById('sheetOverlay').classList.contains('show'), '取消标记后抽屉关闭');
+if (await p1.evaluate(() => window.S.ready[0])) throw new Error('取消标记后不应提交');
+console.log('标记确认抽屉：点选不提交、取消不提交 OK');
+
+await p1.click('.own-hand[data-seat="0"] .card-own.kind-blue.selectable');
+await p1.waitForSelector('#sheetOverlay.show [data-testid="mark-confirm"]', { timeout: 5000 });
+const markPreview = await p1.evaluate(() => document.querySelector('#sheetContent .pick-card').textContent);
+if (!/蓝色\s*\d+/.test(markPreview) || !/第\d+份/.test(markPreview) || !/第\d+张/.test(markPreview)) {
+  throw new Error('标记确认抽屉应展示数字与份/位置: ' + markPreview);
+}
+await p1.click('[data-testid="mark-confirm"]');
 await p1.waitForTimeout(600);
-if (!(await p1.evaluate(() => window.S.ready[0]))) throw new Error('P1 标记后 ready[0] 应为 true');
+if (!(await p1.evaluate(() => window.S.ready[0]))) throw new Error('确认标记后 ready[0] 应为 true');
 await waitEval(p2, () => window.S.ready && window.S.ready[0] === true, 'P2 同步收到 P1 的标记');
 
 await p2.waitForSelector('.own-hand[data-seat="1"] .card-own.kind-blue.selectable', { timeout: 5000 });
 await p2.click('.own-hand[data-seat="1"] .card-own.kind-blue.selectable');
+await p2.waitForSelector('#sheetOverlay.show [data-testid="mark-confirm"]', { timeout: 5000 });
+await p2.click('[data-testid="mark-confirm"]');
 await p2.waitForTimeout(600);
 await waitEval(p1, () => window.S.phase === 'play', 'P1 进入对局');
 await waitEval(p2, () => window.S.phase === 'play', 'P2 进入对局');
@@ -566,12 +582,29 @@ const radarInfo = await devA.evaluate(() => ({
 if (radarInfo.rows !== radarInfo.p || radarInfo.num !== 3 || radarInfo.chips < radarInfo.p) {
   throw new Error('雷达面板呈现异常: ' + JSON.stringify(radarInfo));
 }
+const radarTextBad = await devA.evaluate(() => {
+  const r = window.S.radar;
+  const chips = Array.from(document.querySelectorAll('.radar-panel .radar-chip'));
+  let k = 0;
+  for (const row of r.rows) {
+    const per = row.per || [];
+    const multi = per.length > 1;
+    for (let i = 0; i < per.length; i++) {
+      const want = `${multi ? `第${i + 1}份手牌` : '手牌'}${per[i] ? '有' : '无'}数字${r.num}`;
+      const got = chips[k] ? chips[k].textContent.trim() : '';
+      if (got !== want) return { index: k, want, got };
+      k++;
+    }
+  }
+  return null;
+});
+if (radarTextBad) throw new Error('雷达文案不符合单份/多份规则: ' + JSON.stringify(radarTextBad));
 await devA.waitForTimeout(400);   // 等待面板入场动画（dealIn 0.3s）完成后再截图
 await devA.screenshot({ path: SHOTS + '/e2e-12g-radar-panel.png' });
 await devA.evaluate(() => { window.S.radar = null; window.saveStateDirect(); window.render(); });
 await devA.evaluate((orig) => { window.S.equipment = JSON.parse(orig); window.saveStateDirect(); window.render(); }, eqBefore2);
 await devA.waitForTimeout(300);
-console.log('道具 4~12 入口契约 OK（4/5/10/12 点选态+取消；7 选人启用；8 面板公布；11 列表；无残留）');
+console.log('道具 4~12 入口契约 OK（4/5/10/12 点选态+取消；7 选人启用；8 面板公布+文案单份/多份；11 列表；无残留）');
 
 console.log('== ≠/＝ 配对标签契约（横条横跨两张牌，两处手牌区各渲染 1 个）==');
 const neqBefore = await devA.evaluate(() => JSON.stringify(window.S.players));

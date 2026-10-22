@@ -334,8 +334,9 @@ async function onJoinRoom() {
     _saveSession();
     _departedHandled = false;
     _subscribeToRoom(roomId);
-    const seats = [...(room.seats || []), { name, joinedAt: new Date().toISOString(), seatIndex }];
-    _knownSeatCount = seats.length;
+    // join_room 返回的是加入后的权威快照（已包含自己）；
+    // 不能再用旧 room.seats 本地拼接，否则并发加入时会渲染出错误成员列表
+    _knownSeatCount = (room.seats || []).length;
     if (room.status === 'playing' && room.state) {
       // 加入时游戏已开始 → 直接进入
       _applyRemoteState(room.state);
@@ -345,7 +346,7 @@ async function onJoinRoom() {
       document.getElementById('app').style.display = 'block';
       if (typeof HOOK_render === 'function') HOOK_render();
     } else {
-      renderWaitingRoom({ ...room, seats });
+      renderWaitingRoom(room);
     }
   } catch (e) {
     alert(e.message || '加入失败');

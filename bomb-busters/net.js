@@ -7,6 +7,7 @@
  *      <script src="supabase.min.js"></script>
  *   2. 修改下方 CONFIG 中的项目凭证
  *   3. 按需调整 ROOM_PREFIX 和 MAX_PLAYERS
+ *   4. 在 Supabase SQL Editor 执行 room-rpc.sql（join_room / leave_room 原子入座）
  */
 
 // ════════════════════════════════════════════════════════════════
@@ -42,6 +43,17 @@ function _shortId(fullId) {
     : fullId;
 }
 
+/** 把 PostgREST / PL/pgSQL 错误转成玩家能看懂的提示 */
+function _rpcError(error, fallback) {
+  if (!error) return fallback;
+  const msg = String(error.message || error.details || '');
+  if (error.code === 'PGRST202' || /Could not find the function|schema cache/i.test(msg)) {
+    return '联机服务未初始化：请先在 Supabase SQL Editor 执行 room-rpc.sql';
+  }
+  const known = msg.match(/(房间不存在|游戏已开始|房间已满|房间号无效|昵称不能为空)/);
+  return known ? known[1] : (msg || fallback);
+}
+
 /* ------------------------------------------------------------------ */
 
 function generateRoomId() {
@@ -73,33 +85,28 @@ async function netCreateRoom(hostName) {
 }
 
 /**
- * 加入房间
+ * 加入房间（服务端原子操作）
+ *
+ * 并发加入必须由数据库串行化：join_room 会 SELECT ... FOR UPDATE 锁住房间行，
+ * 校验人数后在服务端分配 max(seatIndex)+1，避免两个客户端读到同一份旧 seats、
+ * 拿到同一个座位号、后写覆盖先写。RPC 见 room-rpc.sql。
+ *
  * @param {string} shortId - 用户输入的 4 位房间号（无前缀）
  * @param {string} playerName - 玩家昵称
- * @returns {{seatIndex: number, room: object}}
+ * @returns {{seatIndex: number, room: object}} room 为加入后的权威房间行
  */
 async function netJoinRoom(shortId, playerName) {
   const roomId = _fullId(shortId);
-  const { data: room, error } = await _supabase
-    .from('rooms')
-    .select('*')
-    .eq('id', roomId)
-    .single();
-  if (error || !room) throw new Error('房间不存在');
-  if (room.status === 'playing') throw new Error('游戏已开始');
-  if (room.seats.length >= NET_CONFIG.MAX_PLAYERS) throw new Error('房间已满');
-
-  const seats = [...room.seats];
-  const seatIndex = seats.length;
-  seats.push({ name: playerName, joinedAt: new Date().toISOString(), seatIndex });
-
-  const { error: updateError } = await _supabase
-    .from('rooms')
-    .update({ seats })
-    .eq('id', roomId);
-  if (updateError) throw updateError;
-
-  return { seatIndex, room };
+  const { data, error } = await _supabase.rpc('join_room', {
+    p_room_id: roomId,
+    p_name: playerName,
+    p_max_players: NET_CONFIG.MAX_PLAYERS,
+  });
+  if (error) throw new Error(_rpcError(error, '加入房间失败'));
+  if (!data || typeof data.seatIndex !== 'number' || !data.room || !Array.isArray(data.room.seats)) {
+    throw new Error('加入房间失败：服务端返回异常');
+  }
+  return { seatIndex: data.seatIndex, room: data.room };
 }
 
 /**
@@ -145,22 +152,18 @@ async function netSetRoomStatus(shortId, status) {
 }
 
 /**
- * 离开房间：从 seats 中移除自己
+ * 离开房间：服务端原子移除自己
+ * 与加入共用房间行锁，避免离开时整份覆盖掉同时加入的成员。
  * @param {string} shortId - 用户可见的 4 位房间号
  * @param {number} seatIndex - 自己的座位索引
  */
 async function netLeaveRoom(shortId, seatIndex) {
   const roomId = _fullId(shortId);
-  const { data: room, error } = await _supabase
-    .from('rooms').select('seats').eq('id', roomId).single();
-  if (error || !room) {
-    console.warn('[net] netLeaveRoom: fetch failed', error);
-    return;
-  }
-  const seats = (room.seats || []).filter(s => s.seatIndex !== seatIndex);
-  const { error: updateError } = await _supabase
-    .from('rooms').update({ seats }).eq('id', roomId);
-  if (updateError) console.warn('[net] netLeaveRoom update failed:', updateError);
+  const { error } = await _supabase.rpc('leave_room', {
+    p_room_id: roomId,
+    p_seat_index: seatIndex,
+  });
+  if (error) console.warn('[net] netLeaveRoom failed:', _rpcError(error, '离开房间失败'));
 }
 
 /**

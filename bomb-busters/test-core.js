@@ -1190,6 +1190,10 @@ await t('双重探测器未命中：失误 +1，对方自选非红牌放置身�
   const r = g.doScan([a.id, b.id], 11, own11.id, 'skill');
   assert(r.ok && !r.hit);
   eq(S.failures, 1);
+  const missLog = S.log.find(l => l.msg.includes('未命中'));
+  assert(missLog, '未命中应记入日志');
+  includes(missLog.msg, 'P1 的相邻 2 张手牌', '未命中日志应含目标玩家');
+  includes(missLog.msg, '「有蓝色 11」', '未命中日志应含发起方猜测数字');
   assert(S.pending && S.pending.type === 'scanMark', '两张可标记 → 待选择');
   eq(S.currentSeat, 1);
   assert(g.resolveScanMark(b.id).ok);
@@ -1641,7 +1645,10 @@ await t('通用雷达：自动公布每人每份是否还有未公开蓝 N（含
   eq(S.radar.rows[0].per[0], false, '已公开的蓝 7 不计数');
   eq(S.radar.rows[0].per[1], false);
   eq(S.radar.rows[1].per[0], true);
-  assert(S.log.some(l => l.msg.includes('通用雷达')));
+  const radarLog = S.log.find(l => l.msg.includes('通用雷达'));
+  assert(radarLog, '雷达结果应记入日志');
+  includes(radarLog.msg, 'P0：第1份手牌无数字7、第2份手牌无数字7', '多份日志应逐份带份号');
+  includes(radarLog.msg, 'P1：手牌有数字7', '单份日志不写份号');
   eq(S.currentSeat, 0, '雷达不占行动');
   g.endTurn();
   eq(S.radar, null, '回合结束清空雷达结果');
@@ -1745,6 +1752,10 @@ await t('稳定剂 × 双重探测器：先开稳定再启动探测器，扫描�
   const r = g.doScan([a.id, b.id], 11, own11.id, 'skill');
   assert(r.ok && !r.hit);
   eq(S.failures, 0, '扫描未命中受保护');
+  const protectedLog = S.log.find(l => l.msg.includes('未命中'));
+  assert(protectedLog, '稳定剂保护下仍应记录扫描结果');
+  includes(protectedLog.msg, 'P1 的相邻 2 张手牌');
+  includes(protectedLog.msg, '「有蓝色 11」');
   assert(S.pending && S.pending.type === 'scanMark');
   assert(g.resolveScanMark(a.id).ok);
   eq(S.equipment[0].used, true, '扫描结算时消耗');
@@ -2275,6 +2286,39 @@ await t('联机：成员返回房间后载荷未变，轮询兜底也切回等�
   eq(o.__renders, 1, '载荷未变也应兜住界面切换');
   eq(ev(o, '_gameStarted'), false, '应退出对局态');
   eq(o.document.getElementById('online').style.display, 'flex');
+});
+
+await t('联机：加入成功直接使用 RPC 权威快照，不再本地追加自己', async () => {
+  const o = loadOnline();
+  o._showNetLoading = () => {};
+  o._hideNetLoading = () => {};
+  o.netJoinRoom = async (roomId, name) => ({
+    seatIndex: 2,
+    room: {
+      id: 'bomb-1234', status: 'waiting', state: null,
+      seats: [
+        { seatIndex: 0, name: '房主' },
+        { seatIndex: 1, name: '甲' },
+        { seatIndex: 2, name },
+      ],
+    },
+  });
+  o.netSubscribeRoom = () => {
+    const unsub = () => {};
+    unsub.getStatus = () => 'SUBSCRIBED';
+    return unsub;
+  };
+  o.alert = msg => { throw new Error('不应 alert: ' + msg); };
+  o.document.getElementById('joinRoomInput').value = '1234';
+  o.document.getElementById('joinNameInput').value = '小明';
+
+  await o.onJoinRoom();
+
+  eq(ev(o, '_mySeatIndex'), 2, '应使用服务端分配的座位');
+  eq(ev(o, '_knownSeatCount'), 3, '席位计数应等于权威快照人数');
+  const html = o.document.getElementById('online').innerHTML;
+  eq((html.match(/class="setup-chip"/g) || []).length, 3,
+    '等候室应显示 3 个席位（旧逻辑会把返回快照再加一次，变成 4 个）');
 });
 
 /* ══════════════════════════════ 结果 ══════════════════════════════ */

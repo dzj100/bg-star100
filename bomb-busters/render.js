@@ -19,7 +19,7 @@ function _esc(str) {
    ============================================================ */
 
 let _ui = {
-  mode: null,          // null | pair-target | pair-guess | pair-own | solo | scan | scan-guess | scan-own
+  mode: null,          // null | mark-confirm | pair-target | pair-guess | pair-own | solo | scan | scan-guess | scan-own
                        // | neq | walkie-card | walkie-target | log | sticky | eqtag
                        // | super | super-guess | super-own | ray-target | ray-guess | ray-own
                        // | battery | radar | coffee
@@ -34,6 +34,7 @@ let _ui = {
   rayOpts: [],         // X/Y射线：两个猜测选项 [{kind,num}]
   rayOwn: { a: null, b: null }, // X/Y射线：两选项对应自选牌 id
   batterySel: [],      // 备用电池：已选玩家座位
+  markCardId: null,    // 开局标记：待确认的牌 id
 };
 
 let _prevAnim = { first: true, dealStamp: null, failures: 0, revealed: new Set(), defused: null };
@@ -62,6 +63,7 @@ function closeSheet() {
   _ui.rayOpts = [];
   _ui.rayOwn = { a: null, b: null };
   _ui.batterySel = [];
+  _ui.markCardId = null;
   render();
 }
 
@@ -75,7 +77,8 @@ function _refreshSheet() {
   const content = document.getElementById('sheetContent');
   if (!content) return;
   let html = null;
-  if (_ui.mode === 'solo') html = _soloSheetHTML();
+  if (_ui.mode === 'mark-confirm') html = _markConfirmSheetHTML();
+  else if (_ui.mode === 'solo') html = _soloSheetHTML();
   else if (_ui.mode === 'pair-guess' || _ui.mode === 'scan-guess' || _ui.mode === 'super-guess') html = _guessSheetHTML();
   else if (_ui.mode === 'pair-own' || _ui.mode === 'scan-own' || _ui.mode === 'super-own') html = _ownPickSheetHTML();
   else if (_ui.mode === 'walkie-target') html = _walkieTargetSheetHTML();
@@ -560,8 +563,10 @@ function _radarPanelHTML() {
   const r = S && S.radar;
   if (!r || !r.rows) return '';
   const rows = r.rows.map(row => {
-    const chips = (row.per || []).map((has, i) =>
-      `<span class="radar-chip ${has ? 'yes' : 'no'}">第 ${i + 1} 份 ${has ? '有' : '无'}</span>`).join('');
+    const per = row.per || [];
+    const multi = per.length > 1;
+    const chips = per.map((has, i) =>
+      `<span class="radar-chip ${has ? 'yes' : 'no'}">${multi ? `第${i + 1}份手牌` : '手牌'}${has ? '有' : '无'}数字${r.num}</span>`).join('');
     const mine = mySeat() !== null && row.seat === mySeat();
     return `<div class="radar-row${mine ? ' mine' : ''}">
       <span class="radar-name">${_esc(_playerName(row.seat))}</span>
@@ -1465,6 +1470,35 @@ function _radarSheetHTML() {
   </div>`;
 }
 
+function _markConfirmSheetHTML() {
+  const card = _findCardById(_ui.markCardId);
+  const loc = _locateCardAnywhere(_ui.markCardId);
+  if (!card || !loc) {
+    return `${_sheetHead('📌 确认放置信息标记')}
+    <div class="sheet-body">
+      <div class="sheet-empty">该牌状态已变化，请重新选择</div>
+      <button class="btn-full btn-secondary" data-testid="mark-cancel" onclick="closeSheet()">关闭</button>
+    </div>`;
+  }
+  return `${_sheetHead('📌 确认放置信息标记')}
+  <div class="sheet-body">
+    <div class="sheet-sub">你选中了自己手牌中的这张蓝色导线：</div>
+    <div class="pick-card">
+      <span class="pc-num">蓝色 ${card.num}</span>
+      <span class="pc-pos">第${loc.si + 1}份 · 第${loc.idx + 1}张</span>
+    </div>
+    <div class="sheet-sub">确认后将立即向全场宣告其数字，且不可撤销。</div>
+    <button class="btn-full btn-primary" data-testid="mark-confirm" onclick="onMarkConfirm()">确认标记</button>
+    <button class="btn-full btn-secondary" data-testid="mark-cancel" onclick="closeSheet()">取消</button>
+  </div>`;
+}
+
+function onMarkConfirm() {
+  const r = placeInfoToken(_ui.markCardId);
+  if (r && !r.ok) showToast(r.msg);
+  closeSheet();
+}
+
 function _coffeeSheetHTML() {
   const actor = _actorSeat();
   const btns = [];
@@ -1624,6 +1658,7 @@ function cancelFlow() {
   _ui.superShare = null;
   _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
   _ui.batterySel = [];
+  _ui.markCardId = null;
   render();
 }
 
@@ -1688,8 +1723,11 @@ function onOwnCardClick(seat, si, cardId) {
     if (S.ready[seat]) { showToast('该玩家已完成标记'); return; }
     if (card.kind !== 'blue') { showToast('只能标记蓝色导线'); return; }
     if (card.revealed) { showToast('只能标记未公开的导线'); return; }
-    const r = placeInfoToken(cardId);
-    if (r && !r.ok) showToast(r.msg);
+    _ui.mode = 'mark-confirm';
+    _ui.markCardId = cardId;
+    _openSheet();
+    _refreshSheet();
+    render();
     return;
   }
 
