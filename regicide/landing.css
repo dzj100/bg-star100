@@ -11,6 +11,7 @@
   --reg-bone: #e9ddc4;
   --reg-dim: #8c7a5f;
   --reg-crimson: #8f1e19;
+  --landing-title-size: clamp(2.8rem, 14.5vw, 3.8rem);
 
   position: relative;
   display: flex;
@@ -224,7 +225,7 @@
 }
 #landing .landing-crest-aura {
   position: absolute;
-  width: min(400px, 100vw);
+  width: min(300px, 75vw);
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(166, 48, 28, .32) 0%, rgba(115, 30, 20, .12) 40%, transparent 68%);
@@ -238,7 +239,8 @@
 
 #landing .landing-crest {
   position: relative;
-  width: clamp(230px, 66vw, 290px);
+  width: clamp(172px, 49.5vw, 218px);
+  max-width: calc(var(--landing-title-size) * 3.2);
   aspect-ratio: 1;
   filter:
     drop-shadow(0 18px 30px rgba(0, 0, 0, .52))
@@ -260,7 +262,7 @@
   margin: 2px 0 0;
   padding-left: .14em;
   font-family: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", Georgia, serif;
-  font-size: clamp(2.8rem, 14.5vw, 3.8rem);
+  font-size: var(--landing-title-size);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: .14em;
@@ -483,16 +485,16 @@
     margin-bottom: 8px;
   }
   #landing .landing-crest {
-    width: 148px;
+    width: 111px;
   }
   #landing .landing-crest-aura {
-    width: 250px;
+    width: 188px;
   }
   #landing .landing-hero {
     margin-top: 2px;
   }
-  #landing .landing-title {
-    font-size: 2.7rem;
+  #landing {
+    --landing-title-size: 2.7rem;
   }
   #landing .landing-court {
     display: none;
@@ -539,13 +541,13 @@
     margin-bottom: 16px;
   }
   #landing .landing-crest {
-    width: clamp(240px, 28vh, 300px);
+    width: clamp(180px, 21vh, 225px);
   }
   #landing .landing-crest-aura {
-    width: clamp(340px, 40vh, 440px);
+    width: clamp(255px, 30vh, 330px);
   }
-  #landing .landing-title {
-    font-size: clamp(3.6rem, 7.5vh, 4.6rem);
+  #landing {
+    --landing-title-size: clamp(3.6rem, 7.5vh, 4.6rem);
   }
   #landing .landing-en {
     font-size: 10px;
@@ -613,10 +615,11 @@
     margin-bottom: 0;
   }
   #landing .landing-crest {
-    width: min(190px, 42vh);
+    width: min(142px, 31.5vh);
+    max-width: none;
   }
   #landing .landing-crest-aura {
-    width: min(260px, 64vh);
+    width: min(195px, 48vh);
   }
   #landing .landing-copy {
     align-items: flex-start;

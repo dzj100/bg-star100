@@ -162,7 +162,7 @@ function renderLandingShell(mode) {
               <span class="lv2-sep">/</span> 2–5 PLAYERS
             </p>
             <h1 class="lv2-title" id="lv2-title">月面探险</h1>
-            <p class="lv2-tagline">氧气就是行动力，<br><em>一起活着回来。</em></p>
+            <p class="lv2-tagline">氧气就是行动力，<br><em>一起返回基地。</em></p>
             <div class="lv2-meta" aria-label="游戏特色" style="display:none;">
               <span><i class="lv2-dot lv2-dot--o2" aria-hidden="true"></i>氧气行动力</span>
               <span><i class="lv2-dot lv2-dot--team" aria-hidden="true"></i>团队共享</span>
@@ -175,7 +175,7 @@ function renderLandingShell(mode) {
               onclick="${isOnline ? 'showOnlineLobby()' : 'showSetup()'}">
               <span class="lv2-cta-icon" aria-hidden="true">${ctaIcon}</span>
               <span class="lv2-cta-text">
-                <b>${isOnline ? '进入联机大厅' : '开始探险'}</b>
+                <b>${isOnline ? '联机模式' : '开始探险'}</b>
                 <small>${isOnline ? '创建或加入房间 · 实时协作' : '2–5人同屏合作 · 立即出发'}</small>
               </span>
               <span class="lv2-cta-arrow" aria-hidden="true">

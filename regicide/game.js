@@ -1688,7 +1688,7 @@ function showRules() {
     <h2>📖 游戏规则</h2>
     <div class="rules-content">
       <h3>目标</h3>
-      <p>合作击败城堡中的12个Boss（4骑士→4王后→4国王）</p>
+      <p>使用扑克牌中的 1~10，合作击败城堡中的 12 个Boss（4骑士J → 4王后Q → 4国王K）</p>
 
       <h3>手牌上限</h3>
       <table style="width:100%;text-align:center;font-size:.85rem;margin:4px 0;">
