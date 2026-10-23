@@ -849,7 +849,7 @@ await t('#12 失踪的装备：2 人局 54 张，道具同样带锁', () => {
   eq(new Set(S.equipment.map(e => e.lockNum)).size, 2);
 });
 
-await t('#12 解锁条件：原数字 4/4 且锁数字公开 ≥2；两个条件先后达成均可', () => {
+await t('#12 解锁条件：原数字公开 ≥2 且锁数字公开 ≥2；两个条件先后达成均可', () => {
   const g = loadGame();
   const b1 = [0, 1, 2, 3].map(() => C('blue', 1, { revealed: true }));
   const b2r = C('blue', 2, { revealed: true });
@@ -872,15 +872,33 @@ await t('#12 解锁条件：原数字 4/4 且锁数字公开 ≥2；两个条件
   b2a.revealed = true;                     // 锁数字 2 达到 2 张
   g._updateDefused(2);
   assert(S.equipment[0].unlocked, '原数字 4/4 + 锁数字 ≥2 应解锁');
-  assert(!S.equipment[1].unlocked, '道具 2 原数字未 4/4，不应解锁');
+  assert(!S.equipment[1].unlocked, '锁数字 3 尚未公开，不应解锁');
   assert(S.log.some(l => l.msg.includes('锁数字 2 已公开 ≥2')), '解锁日志应带锁条件');
 
-  b2b.revealed = true;
-  b2c.revealed = true;
   b3a.revealed = true;
+  g._checkEquipUnlocks();
+  assert(!S.equipment[1].unlocked, '锁数字仅 1 张时仍不解锁');
   b3b.revealed = true;
   g._updateDefused(3);
-  assert(S.equipment[1].unlocked, '原数字随后 4/4 且锁数字达成也应解锁');
+  assert(S.equipment[1].unlocked, '原数字 2/4 + 锁数字 ≥2 也应解锁');
+  eq(S.board.defused[1], false, '原数字未 4/4 不应盖拆除章');
+});
+
+await t('道具解锁：对应编号蓝线公开 2 张即解锁（无需 4/4）', () => {
+  const g = loadGame();
+  const r1 = C('blue', 6, { revealed: true });
+  const r2 = C('blue', 6, { revealed: true });
+  const h1 = C('blue', 6);
+  const other = C('blue', 9);
+  const S = use(g, sc(2, [
+    [[h1, other]],
+    [[r1, r2]],
+  ], { equipment: [{ no: 6, unlocked: false, used: false }] }));
+
+  g._updateDefused(6);
+  eq(S.equipment[0].unlocked, true, '公开 2 张应解锁 6 号道具');
+  eq(S.board.defused[5], false, '未 4/4 不应盖拆除章');
+  assert(S.log.some(l => l.msg.includes('道具解锁')), '应写解锁日志');
 });
 
 await t('#10~#12 选关卡片：追加规则文案与同步', () => {
@@ -1572,7 +1590,7 @@ await t('超级探测器拒绝：全部公开的份 / 无效份 / 未持有数�
     [[rev], [a7, C('blue', 9)]],
   ], { equipment: [{ no: 5, unlocked: true, used: false }] }));
   includes(g.doSuperScan(1, 0, 7, own7.id).msg, '已全部公开');
-  includes(g.doSuperScan(1, 9, 7, own7.id).msg, '无效的份');
+  includes(g.doSuperScan(1, 9, 7, own7.id).msg, '无效的手牌');
   includes(g.doSuperScan(1, 1, 11, own7.id).msg, '没有未公开的蓝色 11');
   includes(g.doSuperScan(1, 1, 7, C('blue', 11).id).msg, '自选牌');
 });
@@ -1952,7 +1970,145 @@ await t('道具通用：已启动双重探测器时道具被封锁（须先执�
   use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
     { failures: 1, equipment: [{ no: 6, unlocked: true, used: false }] }));
   assert(g.useSkill().ok);
-  includes(g.useSuppressor().msg, '须执行扫描');
+  includes(g.useSuppressor().msg, '执行扫描');
+});
+
+/* ──────────────────────────── 道具跨回合全局锁 ──────────────────────────── */
+
+console.log('── 道具跨回合全局锁 ──');
+
+await t('跨回合锁：非行动者上锁后，全场（含行动者）普通行动被拦截', () => {
+  const g = loadGame();
+  const b5 = C('blue', 5), b6 = C('blue', 6);
+  const S = use(g, sc(2, [[[b5]], [[b6, C('blue', 7)]]], {
+    current: 0,
+    equipment: [{ no: 4, unlocked: true, used: false }],
+  }));
+  g.window._olSeatIndex = () => 1;
+  g.window._olIsActor = () => false;
+  eq(ev(g, '_canAct()'), false, '非行动者本来就不能行动');
+  const r = g._acquireEquipLock(4);
+  assert(r.ok, '非行动者应能抢占便利贴锁');
+  eq(S.equipLock.seat, 1);
+  eq(S.equipLock.no, 4);
+  eq(S.equipRev, 1, '上锁推进版本');
+
+  g.window._olSeatIndex = () => 0;
+  g.window._olIsActor = () => true;
+  eq(ev(g, '_canAct()'), false, '行动者被锁拦住');
+  includes(g.useStickyNote(b5.id).msg, '等待', '行动者不能使用他人锁定的道具');
+  includes(g._acquireEquipLock(1).msg, '正在使用', '上锁期间不能再抢锁');
+
+  g.window._olSeatIndex = () => 1;
+  const r2 = g.useStickyNote(b6.id);
+  assert(r2.ok, '持锁人可跨回合提交');
+  eq(b6.info.num, 6);
+  eq(S.equipment[0].used, true);
+  eq(S.equipLock, null, '提交后释放锁');
+  eq(S.equipRev, 2, '释放推进版本');
+  eq(S.currentSeat, 0, '跨回合道具不改变行动者');
+});
+
+await t('跨回合锁：取消 / 超时释放，行动恢复', () => {
+  const mk = () => {
+    const g = loadGame();
+    const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 6)]]], {
+      current: 0, equipment: [{ no: 1, unlocked: true, used: false }],
+    }));
+    g.window._olSeatIndex = () => 1;
+    g.window._olIsActor = () => false;
+    return { g, S };
+  };
+
+  const a = mk();
+  assert(a.g._acquireEquipLock(1).ok);
+  assert(a.g._cancelMyEquipLock(), '持锁人可取消');
+  eq(a.S.equipLock, null);
+  eq(a.S.equipRev, 2, '取消推进版本');
+  eq(a.S.equipment[0].used, false, '取消不消耗道具');
+  a.g.window._olSeatIndex = () => 0;
+  a.g.window._olIsActor = () => true;
+  eq(ev(a.g, '_canAct()'), true, '取消后行动者恢复行动');
+
+  const b = mk();
+  assert(b.g._acquireEquipLock(1).ok);
+  b.S.equipLock.at = Date.now() - ev(b.g, 'EQUIP_LOCK_MS') - 1;
+  eq(ev(b.g, '_equipLockActive()'), null, '超时锁应失效');
+  eq(b.S.equipLock, null, '失效锁应被清理');
+  b.g.window._olSeatIndex = () => 0;
+  b.g.window._olIsActor = () => true;
+  eq(ev(b.g, '_canAct()'), true, '超时后行动者恢复行动');
+});
+
+await t('道具锁过渡：行动者合并锁、释放整包应用、迟到旧锁不回灌', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 6)]]], { current: 0 }));
+  g.window._olSeatIndex = () => 0;
+  g.window._olIsActor = () => true;
+
+  const lockState = {
+    equipRev: 1,
+    equipLock: { seat: 1, no: 4, at: Date.now() - 99999, token: 'tk1' },
+  };
+  eq(g._olEquipLockTransition(lockState), 'merge', '他人上锁只合并锁字段');
+  eq(S.equipLock.seat, 1, '锁已合并');
+  eq(S.equipLock.no, 4);
+  assert(Math.abs(Date.now() - S.equipLock.at) < 1000, '合并时按本机时间重建 TTL');
+  eq(g._olEquipLockTransition(JSON.parse(JSON.stringify(lockState))), null,
+    '同一锁重复投递不重复处理');
+
+  const relState = { equipRev: 2, equipLock: null };
+  eq(g._olEquipLockTransition(relState), 'apply', '释放应整包应用');
+  S.equipLock = null;                         // 模拟 online 层已应用释放快照
+  eq(g._olEquipLockTransition(JSON.parse(JSON.stringify(lockState))), null,
+    '释放后迟到的旧锁快照应忽略');
+  eq(g._olEquipLockTransition(relState), null, '释放快照重复投递应忽略');
+  eq(g._olEquipLockTransition({
+    dealStamp: 999,
+    equipRev: 9,
+    equipLock: { seat: 1, no: 4, at: Date.now(), token: 'tk9' },
+  }), null, '不同局的锁快照不应影响当前局');
+
+  const g2 = loadGame();
+  use(g2, sc(2, [[[C('blue', 5)]], [[C('blue', 6)]]], { current: 0 }));
+  g2.window._olSeatIndex = () => 0;
+  g2.window._olIsActor = () => true;
+  eq(g2._olEquipLockTransition({ equipRev: 3, equipLock: null }), 'apply',
+    '错过上锁过程时，更新的释放版本仍需整包应用');
+  eq(g2._olEquipLockTransition({ equipRev: 3, equipLock: null }), null,
+    '补应用后不再重复');
+});
+
+await t('applyOnlineState：低版本锁快照不会重新上锁', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 6)]]], { current: 0 }));
+  S.equipRev = 5;
+  S.equipLock = null;
+
+  const old = JSON.parse(JSON.stringify(st(g)));
+  old.equipRev = 4;
+  old.equipLock = { seat: 1, no: 4, at: Date.now(), token: 'old' };
+  g.applyOnlineState(old);
+  eq(st(g).equipLock, null, '低于本地版本的锁应被丢弃');
+  eq(st(g).equipRev, 4, '其余字段仍按远端应用');
+
+  const fresh = JSON.parse(JSON.stringify(st(g)));
+  fresh.equipRev = 6;
+  fresh.equipLock = { seat: 1, no: 4, at: Date.now(), token: 'new' };
+  g.applyOnlineState(fresh);
+  eq(st(g).equipLock && st(g).equipLock.token, 'new', '更高版本的锁正常应用');
+
+  const heldAt = st(g).equipLock.at;
+  const same = JSON.parse(JSON.stringify(st(g)));
+  same.equipLock.at = 1;
+  g.applyOnlineState(same);
+  eq(st(g).equipLock.at, heldAt, '同一 token 的重复快照保留本地 TTL 起点');
+
+  const other = JSON.parse(JSON.stringify(st(g)));
+  other.equipRev = 7;
+  other.equipLock = { seat: 1, no: 4, at: 1, token: 'new2' };
+  g.applyOnlineState(other);
+  assert(st(g).equipLock.at >= heldAt, '新 token 按本机时间重新起算 TTL');
 });
 
 /* ──────────────────────────── 公开红线 / 胜利 / 联机合并 ──────────────────────────── */

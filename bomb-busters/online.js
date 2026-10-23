@@ -450,7 +450,15 @@ function _handleRemoteState(row, force) {
   const curPlayer = row.state.currentPlayer;
   const localCur = typeof HOOK_getCurrentPlayer === 'function' ? HOOK_getCurrentPlayer() : undefined;
   const iAmAlreadyOperator = curPlayer === _mySeatIndex && localCur === _mySeatIndex;
-  if (iAmAlreadyOperator) return;
+  let lockApply = false;
+  if (iAmAlreadyOperator) {
+    // 行动者默认忽略远端快照以防覆盖本端操作；但道具 1/4/12 的跨回合锁
+    // 必须先让行动者看到（上锁等待），释放时再整包应用道具结果。
+    const lockMode = typeof window._olEquipLockTransition === 'function'
+      ? window._olEquipLockTransition(row.state) : null;
+    if (lockMode !== 'apply') return;
+    lockApply = true;
+  }
 
   const remotePushId = row.state._pushId;
   if (remotePushId && _myPushedIds.has(remotePushId)) return;
@@ -458,8 +466,9 @@ function _handleRemoteState(row, force) {
     // 同一条状态重复投递（重订阅/重同步重复拉取）：跳过
     if (remotePushId && remotePushId === _lastAppliedPushId) return;
     // 过期快照防倒灌：Realtime 乱序投递/重连重放可能送来比本地旧的快照（留 3s 时钟偏差余量）
+    // 道具锁释放按 equipRev 判定，跨端时钟偏差不可靠，必须放行
     const remoteTs = row.state._ts || 0;
-    if (remoteTs && remoteTs < _lastAppliedTs - 3000) {
+    if (!lockApply && remoteTs && remoteTs < _lastAppliedTs - 3000) {
       console.log('[online] ignore stale state ts', remoteTs, '<', _lastAppliedTs - 3000);
       return;
     }

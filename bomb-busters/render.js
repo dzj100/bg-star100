@@ -48,7 +48,7 @@ function closeModal(id) {
   if (el) el.classList.remove('show');
 }
 
-function closeSheet() {
+function _resetUiFlow() {
   const ov = document.getElementById('sheetOverlay');
   if (ov) ov.classList.remove('show');
   _ui.mode = null;
@@ -64,6 +64,13 @@ function closeSheet() {
   _ui.rayOwn = { a: null, b: null };
   _ui.batterySel = [];
   _ui.markCardId = null;
+}
+
+/** 联机层收到他人道具锁时清理本端进行中的选择流程（不重绘，由调用方统一渲染） */
+window._olCancelLocalFlow = _resetUiFlow;
+
+function closeSheet() {
+  _resetUiFlow();
   render();
 }
 
@@ -110,6 +117,13 @@ function _actorSeat() {
   if (typeof S.currentSeat !== 'number' || S.currentSeat < 0) return null;
   if (!S.players[S.currentSeat]) return null;
   return S.currentSeat;
+}
+
+/** 当前道具选择流程的操作座位（跨回合道具锁优先） */
+function _equipFlowSeat() {
+  const lock = _equipLockActive();
+  if (lock) return _equipLockOwnedBy(mySeat()) ? lock.seat : null;
+  return _actorSeat();
 }
 
 /** 是否轮到本设备行动 */
@@ -300,7 +314,7 @@ function _missionSpecialRulesHTML(mission, pCount) {
       ? S.equipment.filter(e => typeof e.lockNum === 'number').map(e => `道具${e.no} (🔒${e.lockNum})`)
       : [];
     blocks.push(`<h3>🔒 失踪的装备</h3>
-      <p>每张道具都被锁上了${locks.length ? `（${locks.join('、 ')}）` : ''}。道具激活需同时满足：原编号蓝色导线全部公开 + 🔒数字在场上公开 ≥2 张。</p>`);
+      <p>每张道具都被锁上了${locks.length ? `（${locks.join('、 ')}）` : ''}。道具激活需同时满足：原编号蓝色导线公开 ≥2 张 + 🔒数字在场上公开 ≥2 张。</p>`);
   }
   return blocks.join('');
 }
@@ -375,14 +389,14 @@ function showRules() {
       </table>
       <p>⏭️ 已公开全部手牌的玩家，轮到其回合时将<b>自动跳过</b></p>
       <h3>🔧 道具介绍</h3>
-      <p>开局随机抽「人数」张道具加入游戏；某蓝色导线全部拆除时，自动解锁对应编号道具，每张每局限用 1 次</p>
+      <p>开局随机抽「人数」张道具加入游戏；某编号蓝色导线公开 ≥2 张时，自动解锁对应编号道具，每张每局限用 1 次。道具 1、4、12 可在任意玩家回合使用，其余道具仅在自己回合使用</p>
       <table>
         <thead><tr><th>道具</th><th>效果</th></tr></thead>
         <tbody>
-          <tr><td>① ≠标签</td><td>选自己同一份相邻 2 张（编号不同、至少 1 张蓝、可含已公开）标【≠】，宣告两张编号不同</td></tr>
+          <tr><td>① ≠标签</td><td>选自己同一份相邻 2 张（编号不同、至少 1 张蓝、可含已公开）标【≠】，宣告两张编号不同；<b>任意回合可用</b></td></tr>
           <tr><td>② 📻 对讲机</td><td>与另一名玩家各选 1 张未公开导线交换；双方拿到新导线后<b>自动按照顺序</b>加入手牌</td></tr>
           <tr><td>③ 🔍 三重探测器</td><td>立即剪线：选其他玩家同一份相邻 3 张手牌，猜「其中至少 1 张为蓝色 N」</td></tr>
-          <tr><td>④ 📃 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字</td></tr>
+          <tr><td>④ 📃 便利贴</td><td>再标记自己 1 张未标记的蓝色导线，向全场宣告其数字；<b>任意回合可用</b></td></tr>
           <tr><td>⑤ 🛰️ 超级探测器</td><td>立即剪线：选其他玩家一整份手牌，猜「其中有蓝色 N」，命中者自选 1 张公开</td></tr>
           <tr><td>⑥ 🧯 抑制器</td><td>失误 −1（失误为 0 时不可用）</td></tr>
           <tr><td>⑦ 🔋 备用电池</td><td>恢复 1~2 名本局已用过「双重探测器」者的使用次数</td></tr>
@@ -390,7 +404,7 @@ function showRules() {
           <tr><td>⑨ 🧪 稳定剂</td><td>本回合剪线失误不计、红线不引爆</td></tr>
           <tr><td>⑩ ➿ X/Y射线</td><td>立即剪线：指定其他玩家 1 张牌，进行 2 个选项猜测「（蓝A/蓝B）或（蓝A/黄）」</td></tr>
           <tr><td>⑪ ☕ 咖啡瓶</td><td>跳过自己回合，指定 1 名仍有未公开手牌的玩家接续</td></tr>
-          <tr><td>⑫ ＝标签</td><td>选自己同一份相邻 2 张（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标【＝】，宣告两张编号相同</td></tr>
+          <tr><td>⑫ ＝标签</td><td>选自己同一份相邻 2 张（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标【＝】，宣告两张编号相同；<b>任意回合可用</b></td></tr>
         </tbody>
       </table>
       <h3>💥 失误</h3>
@@ -833,7 +847,7 @@ function _enemyCardHTML(card, share, idx, seat, si) {
   const byMePicker = S.pending ? canActAs(S.pending.toSeat) : false;
 
   let selectable = false;
-  if (!card.revealed && !S.result && !byMePicker && !S.pending) {
+  if (!_equipLockActive() && !card.revealed && !S.result && !byMePicker && !S.pending) {
     if ((_ui.mode === 'pair-target' || _ui.mode === 'ray-target') && _myTurn()) selectable = true;
     if (_ui.mode === 'scan' || _ui.mode === 'super') selectable = true;
   }
@@ -889,6 +903,16 @@ function _ownCardSelectable(seat, card) {
   }
   if (S.pending) {
     return S.pending.type === 'walkie' && seat === S.pending.toSeat && canActAs(seat) && !card.revealed;
+  }
+  const lock = _equipLockActive();
+  if (lock) {
+    if (!_equipLockOwnedBy(mySeat()) || seat !== lock.seat) return false;
+    if (_ui.mode === 'neq') return lock.no === 1;
+    if (_ui.mode === 'sticky') {
+      return lock.no === 4 && card.kind === 'blue' && !card.revealed && !card.info;
+    }
+    if (_ui.mode === 'eqtag') return lock.no === 12;
+    return false;
   }
   if (!_myTurn()) return false;
   if (seat !== _actorSeat()) return false;
@@ -996,15 +1020,23 @@ window.addEventListener('resize', () => {
    道具行 / 行动条
    ============================================================ */
 
+function _equipLabel(no) {
+  const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[no]) || null;
+  return lib ? lib.name : ('道具 ' + no);
+}
+
 function _equipRowHTML() {
   if (!S.equipment || !S.equipment.length) return '';
   const stabActive = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
+  const lock = _equipLockActive();
+  const lockMine = !!lock && _equipLockOwnedBy(mySeat());
   const btns = S.equipment.map(e => {
     const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[e.no]) || null;
     const name = lib ? lib.name : '道具 ' + e.no;
     const lockNum = typeof e.lockNum === 'number' ? e.lockNum : null;
+    const itLocked = !!lock && !(lockMine && lock.no === e.no);
     // 该道具已进入选择流程（尚未使用）：按钮呈激活态，再点可取消
-    const active = !e.used && e.unlocked && (
+    const active = !itLocked && !e.used && e.unlocked && (
       (e.no === 1 && _ui.mode === 'neq') ||
       (e.no === 2 && _ui.mode === 'walkie-card') ||
       (e.no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3') ||
@@ -1018,13 +1050,16 @@ function _equipRowHTML() {
     let disabled = '';
     if (e.used) { cls += ' used'; disabled = ' disabled'; }
     else if (e.unlocked) {
-      cls += ' ready';
-      if (active) cls += ' active';
-      onclk = ` onclick="onEquipClick(${e.no})"`;
+      if (itLocked) { cls += ' locked'; disabled = ' disabled'; }
+      else {
+        cls += ' ready';
+        if (active) cls += ' active';
+        onclk = ` onclick="onEquipClick(${e.no})"`;
+      }
     } else { cls += ' locked'; disabled = ' disabled'; }
     const tipText = lib && lib.desc ? _esc(lib.desc) : '';
     const lockTip = lockNum !== null
-      ? `解锁条件：蓝色 ${e.no} 全部公开（${blueRevealedCount(e.no)}/4）+ 🔒${lockNum} 公开 ≥2（${blueRevealedCount(lockNum)}/2）`
+      ? `解锁条件：蓝色 ${e.no} 公开 ≥2（${Math.min(blueRevealedCount(e.no), 2)}/2）+ 🔒${lockNum} 公开 ≥2（${Math.min(blueRevealedCount(lockNum), 2)}/2）`
       : '';
     const tip = (tipText || lockTip)
       ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : ''].filter(Boolean).join(' ｜ ')}</span>`
@@ -1089,6 +1124,18 @@ function _actionBarHTML() {
   if (S.phase !== 'play' || S.result) return '';
   if (S.fx) return _waitHTML(S.fx.kind === 'solo' || S.fx.kind === 'red' ? '💬 公开结算中…' : '💬 猜测结算中…');
   if (S.pending) return _pendingHTML();
+
+  // 道具 1/4/12 跨回合操作锁：持有者提交/取消前，全场行动暂停
+  const lock = _equipLockActive();
+  if (lock && !_equipLockOwnedBy(mySeat())) {
+    return _waitHTML(`🔧 ${_esc(_playerName(lock.seat))} 正在使用【${_esc(_equipLabel(lock.no))}】，请稍候…`);
+  }
+  if (lock && !_ui.mode) {
+    return `<div class="action-bar">
+      <div class="mode-hint">🔧 你正在使用【${_esc(_equipLabel(lock.no))}】，请继续选牌或取消</div>
+      ${_cancelBtn()}
+    </div>`;
+  }
 
   // 技能探测器已启动：本回合只允许扫描（未执行前可取消）
   if (S.scanMode && S.scanMode.src === 'skill') {
@@ -1576,13 +1623,7 @@ function cancelSkillFlow() {
 }
 
 function onEquipClick(no) {
-  if (!_myTurn()) {
-    showToast((S.pending || S.fx) ? '请先完成当前操作' : '只能在自己回合使用道具');
-    return;
-  }
-  const eq = (S.equipment || []).find(e => e.no === no);
-  if (!eq) return;
-  const stabArmed = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
+  const lock = _equipLockActive();
   // 该道具已进入选择流程但尚未真正使用：再次点击 = 取消
   const active = (no === 1 && _ui.mode === 'neq')
     || (no === 2 && _ui.mode === 'walkie-card')
@@ -1591,6 +1632,23 @@ function onEquipClick(no) {
     || (no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own'))
     || (no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own'))
     || (no === 12 && _ui.mode === 'eqtag');
+  if (lock) {
+    if (active) { cancelFlow(); showToast('已取消使用道具'); return; }
+    if (_equipLockOwnedBy(mySeat()) && lock.no === no) {
+      cancelFlow(); showToast('已取消使用道具'); return;
+    }
+    showToast(_equipLockOwnedBy(mySeat())
+      ? `你正在使用【${_equipLabel(lock.no)}】，请先完成或取消`
+      : `${_playerName(lock.seat)} 正在使用【${_equipLabel(lock.no)}】，请稍候`);
+    return;
+  }
+  if (!S || S.phase !== 'play' || S.result || S.fx || S.pending) {
+    showToast((S && (S.pending || S.fx)) ? '请先完成当前操作' : '现在不能使用道具');
+    return;
+  }
+  const eq = (S.equipment || []).find(e => e.no === no);
+  if (!eq) return;
+  const stabArmed = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
   if (active) { cancelFlow(); showToast('已取消使用道具'); return; }
   if (no === 9 && stabArmed) {          // 稳定剂：取消 = 撤销稳定状态（未消耗）
     const rc = cancelStabilizer();
@@ -1600,22 +1658,40 @@ function onEquipClick(no) {
   if (eq.used) { showToast('该道具已使用过'); return; }
   if (!eq.unlocked) {
     showToast(typeof eq.lockNum === 'number'
-      ? `该道具尚未解锁（蓝色 ${eq.no} 全部公开，且 🔒${eq.lockNum} 公开 ≥2）`
-      : '该道具尚未解锁（蓝 4/4 拆除后解锁）');
+      ? `该道具尚未解锁（蓝色 ${eq.no} 公开 ≥2，且 🔒${eq.lockNum} 公开 ≥2）`
+      : `该道具尚未解锁（蓝色 ${eq.no} 公开 ≥2 后解锁）`);
     return;
   }
   if (S.scanMode) { showToast('已启动探测器，本回合只能扫描'); return; }
+  const offTurn = _canUseEquipAnytime(no);
+  if (!offTurn && !_myTurn()) { showToast('只能在自己回合使用道具'); return; }
+  if (offTurn && mySeat() === null && !_myTurn()) { showToast('现在不能行动'); return; }
   const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB) ? EQUIPMENT_LIB[no] : null;
   if (!lib) { showToast('该道具规则后续开放'); return; }
-  if (no === 1) {
-    _ui.mode = 'neq'; _ui.scanSel = [];
-  } else if (no === 2) {
+
+  if (offTurn) {
+    // 道具 1/4/12：先占住全场操作锁，再由持有者选自己的手牌
+    if (no === 1) {
+      _ui.mode = 'neq'; _ui.scanSel = [];
+    } else if (no === 4) {
+      _ui.mode = 'sticky';
+    } else {
+      _ui.mode = 'eqtag'; _ui.scanSel = [];
+    }
+    const r = _acquireEquipLock(no);
+    if (r && !r.ok) {
+      _resetUiFlow();
+      showToast(r.msg || '无法使用');
+      render();
+    }
+    return;
+  }
+
+  if (no === 2) {
     _ui.mode = 'walkie-card'; _ui.fromCardId = null;
   } else if (no === 3) {
     _ui.mode = 'scan'; _ui.scanSrc = 'eq3';
     _ui.scanSel = []; _ui.guess = null; _ui.ownCard = null;
-  } else if (no === 4) {
-    _ui.mode = 'sticky';
   } else if (no === 5) {
     _ui.mode = 'super';
     _ui.targetSeat = null; _ui.targetCardId = null; _ui.superShare = null;
@@ -1641,24 +1717,14 @@ function onEquipClick(no) {
   } else if (no === 11) {
     _ui.mode = 'coffee';
     _openSheet();
-  } else if (no === 12) {
-    _ui.mode = 'eqtag'; _ui.scanSel = [];
   }
   render();
 }
 
 function cancelFlow() {
-  const ov = document.getElementById('sheetOverlay');
-  if (ov) ov.classList.remove('show');
-  _ui.mode = null;
-  _ui.targetSeat = null; _ui.targetCardId = null;
-  _ui.guess = null; _ui.ownCard = null;
-  _ui.scanSrc = null; _ui.scanSel = [];
-  _ui.fromCardId = null;
-  _ui.superShare = null;
-  _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
-  _ui.batterySel = [];
-  _ui.markCardId = null;
+  const hadLock = _cancelMyEquipLock();
+  _resetUiFlow();
+  if (hadLock) saveStateDirect();
   render();
 }
 
@@ -1667,6 +1733,7 @@ function cancelFlow() {
    ============================================================ */
 
 function onEnemyCardClick(cardId) {
+  if (_equipLockActive()) return;
   if (_ui.mode === 'pair-target') {
     const loc = _locateCardAnywhere(cardId);
     const card = _findCardById(cardId);
@@ -1739,7 +1806,15 @@ function onOwnCardClick(seat, si, cardId) {
     return;
   }
 
-  if (!_myTurn() || seat !== _actorSeat()) return;
+  const lock = _equipLockActive();
+  if (lock) {
+    const flowOK = (lock.no === 1 && _ui.mode === 'neq')
+      || (lock.no === 4 && _ui.mode === 'sticky')
+      || (lock.no === 12 && _ui.mode === 'eqtag');
+    if (!flowOK || !_equipLockOwnedBy(mySeat()) || seat !== lock.seat) return;
+  } else if (!_myTurn() || seat !== _actorSeat()) {
+    return;
+  }
 
   if (_ui.mode === 'neq') {
     _neqSelect(seat, cardId);
@@ -1806,7 +1881,7 @@ function _scanSelect(cardId) {
 /** ≠ 标签选牌：自己同一份内相邻 2 张（可含已公开牌），满 2 张立即执行 */
 function _neqSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
-  if (!found || found.seat !== _actorSeat()) return;
+  if (!found || found.seat !== _equipFlowSeat()) return;
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);
@@ -1839,7 +1914,7 @@ function _neqSelect(seat, cardId) {
 /** ＝ 标签选牌：自己同一份内相邻 2 张（可含已公开牌，须同色），满 2 张立即执行 */
 function _eqtagSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
-  if (!found || found.seat !== _actorSeat()) return;
+  if (!found || found.seat !== _equipFlowSeat()) return;
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);

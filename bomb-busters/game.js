@@ -172,12 +172,12 @@ function missionHasHiddenPick(mission) {
   });
 }
 
-/** 道具注册表（编号 1~12；解锁 = 蓝 N 4/4，编号 N） */
+/** 道具注册表（编号 1~12；解锁 = 对应编号蓝线公开 ≥2 张） */
 const EQUIPMENT_LIB = {
-  1:  { no: 1,  name: '≠标签',    icon: '≠',  desc: '选择自己同一份内相邻的 2 张导线（编号不同、至少含 1 张蓝色，可含已公开牌）标记【≠】，向全场宣告两张编号不同。' },
+  1:  { no: 1,  name: '≠标签',    icon: '≠',  desc: '任意玩家回合可用（操作期间全场等待）：选择自己同一份内相邻的 2 张导线（编号不同、至少含 1 张蓝色，可含已公开牌）标记【≠】，向全场宣告两张编号不同。' },
   2:  { no: 2,  name: '对讲机',   icon: '📻', desc: '与另一名玩家各选 1 张未公开导线交换；被交换牌的标记自动废弃，双方立即重排。' },
   3:  { no: 3,  name: '三重探测器', icon: '🔍', desc: '立即进入剪线环节（本回合行动）：选择另一名玩家同一份内相邻的 3 张未公开导线，猜「其中至少 1 张为蓝色 N」。' },
-  4:  { no: 4,  name: '便利贴',   icon: '📃', desc: '再标记自己 1 张未公开且无信息标记的蓝色导线，向全场宣告其数字。' },
+  4:  { no: 4,  name: '便利贴',   icon: '📃', desc: '任意玩家回合可用（操作期间全场等待）：再标记自己 1 张未公开且无信息标记的蓝色导线，向全场宣告其数字。' },
   5:  { no: 5,  name: '超级探测器', icon: '🛰️', desc: '立即进入剪线环节（本回合行动）：选择另一名玩家的一整份手牌，猜「其中有蓝色 N」；命中者自选 1 张公开。' },
   6:  { no: 6,  name: '抑制器',   icon: '🧯', desc: '当前失败数 −1，起爆器指针回退一格（失败数为 0 时不可使用）。' },
   7:  { no: 7,  name: '备用电池', icon: '🔋', desc: '指定 1~2 名本局已使用过「双重探测器」的玩家（可含自己），恢复其技能使用次数。' },
@@ -185,7 +185,7 @@ const EQUIPMENT_LIB = {
   9:  { no: 9,  name: '稳定剂',   icon: '🧪', desc: '进入稳定状态（不锁定行动）：本回合剪线失误不计失败、指向红线不引爆。' },
   10: { no: 10, name: 'X/Y射线',  icon: '➿', desc: '立即进入剪线环节（本回合行动）：指定他人 1 张未公开牌，进行 2 个选项猜测「（蓝A/蓝B）或（蓝A/黄）」' },
   11: { no: 11, name: '咖啡瓶',   icon: '☕', desc: '跳过自己本回合（不执行行动），指定 1 名仍有未公开手牌的其他玩家从其开始继续。' },
-  12: { no: 12, name: '＝标签',   icon: '＝', desc: '选择自己同一份内相邻的 2 张牌（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标记【＝】，宣告两张编号相同。' },
+  12: { no: 12, name: '＝标签',   icon: '＝', desc: '任意玩家回合可用（操作期间全场等待）：选择自己同一份内相邻的 2 张牌（蓝蓝同数字 / 黄黄 / 红红，至少 1 张未公开）标记【＝】，宣告两张编号相同。' },
 };
 
 let S = { phase: 'landing', players: [], log: [], gameOver: false };
@@ -369,9 +369,42 @@ function canActAs(seat) {
   return s === seat;
 }
 
+/** 道具 1/4/12 的跨回合操作锁时长：持有者提交/取消前，全场行动暂停 */
+const EQUIP_LOCK_MS = 60000;
+
+/** 当前有效的道具操作锁；过期或道具已失效时顺带清理本地锁 */
+function _equipLockActive() {
+  const l = S && S.equipLock;
+  if (!l) return null;
+  const eq = (S.equipment || []).find(e => e.no === l.no);
+  const invalid = !(l.at > 0) || Date.now() - l.at > EQUIP_LOCK_MS
+    || !S.players || !S.players[l.seat] || !eq || eq.used || !eq.unlocked;
+  if (invalid) { S.equipLock = null; return null; }
+  return l;
+}
+
+function _equipLockOwnedBy(seat, lock) {
+  const l = lock || (S && S.equipLock);
+  if (!l) return false;
+  if (seat === null || seat === undefined) return canActAs(l.seat);
+  return l.seat === seat;
+}
+
+/** 释放道具锁并推进版本：远程端凭 equipRev 识别这是新状态，迟到的旧锁快照会被忽略 */
+function _releaseEquipLock() {
+  if (S.equipLock) S.equipRev = (S.equipRev || 0) + 1;
+  S.equipLock = null;
+}
+
+/** 仅道具 1/4/12 可在其他玩家回合使用 */
+function _canUseEquipAnytime(no) {
+  return no === 1 || no === 4 || no === 12;
+}
+
 function _canAct() {
   if (S.phase !== 'play' || S.pending || S.result || S.fx) return false;
   if (timeoutGameIfNeeded()) return false;
+  if (_equipLockActive()) return false;
   if (S.freeCut && _actionSeat() === null) return false;
   return isActor();
 }
@@ -465,6 +498,7 @@ function _render() {
 
 function clearState() {
   S = { phase: 'landing', players: [], log: [], gameOver: false };
+  _seenEquipRev = 0;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch (e) {}
 }
 
@@ -563,6 +597,8 @@ function dealGame(names, missionId) {
     captainSeat,
     currentSeat: -1,                 // 标记阶段无行动者
     turnNo: prevTurnNo,
+    equipRev: 0,                     // 道具锁版本（上锁/释放各 +1；远程端据此丢弃迟到旧锁）
+    equipLock: null,
     board: {
       redNum: redDrawNums.length ? redDrawNums[0] : null,   // 兼容旧快照/旧测试
       redNums: redDrawNums,                                // 抽出的全部候选（板上标记）
@@ -618,6 +654,7 @@ function dealGame(names, missionId) {
     addLog(`🎖 随机队长：${names[captainSeat]}。请所有人放置信息标记（标记 1 张自己的蓝色导线）`);
   }
   saveStateDirect();
+  _seenEquipRev = 0;                    // 新一局：道具锁版本重新计数
   _render();
 }
 
@@ -988,10 +1025,10 @@ function _applyScan(plan) {
   const stable = _consumeStabilize(true, actor);
   if (!stable) {
     S.failures++;
-    addLog(`❌ ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「有蓝色 ${num}」（失误 ${S.failures}/${S.pCount}）`, 'bad');
+    addLog(`❌ ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「蓝色 ${num}」（失误 ${S.failures}/${S.pCount}）`, 'bad');
     if (S.failures >= S.pCount) { _boom('boom-failures'); return { ok: true, hit: false }; }
   } else {
-    addLog(`🔎 ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「有蓝色 ${num}」`, 'warn');
+    addLog(`🔎 ${aName} 扫描 ${tName} 的相邻 ${count} 张手牌，未命中「蓝色 ${num}」`, 'warn');
   }
 
   const markable = targetCards.filter(c => !isRedLikeCard(c));
@@ -1068,12 +1105,12 @@ function _placeScanMark(card, targetSeat, fromSeat, src) {
 
 /** 【≠标签】：同一份内相邻 2 张（编号不同、至少 1 张蓝色，可含已公开牌） */
 function useNeqTag(shareIdx, cardId1, cardId2) {
-  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
-  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
-  const actor = _actionSeat();
-  if (actor === null) return { ok: false, msg: '现在不能行动' };
-  const eq = S.equipment.find(e => e.no === 1);
-  if (!eq || !eq.unlocked || eq.used) return { ok: false, msg: '【≠标签】不可用' };
+  const g = _equipBasic(1);
+  if (!g.ok) return g;
+  const a = _equipActor(1);
+  if (!a.ok) return a;
+  const actor = a.seat;
+  const eq = g.eq;
 
   const p = S.players[actor];
   const share = (p.shares || [])[shareIdx];
@@ -1091,8 +1128,9 @@ function useNeqTag(shareIdx, cardId1, cardId2) {
   c1.neq = pairId;
   c2.neq = pairId;
   eq.used = true;
+  _releaseEquipLock();
   addLog(`≠ ${p.name} 标记了两张相邻导线【≠】：编号不同`, 'good');
-  saveState();
+  saveStateDirect();
   _render();
   return { ok: true };
 }
@@ -1224,12 +1262,14 @@ function _validateNeqPairs() {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  道具 4~12（解锁 = 蓝 N 4/4；使用时机 = 自己回合行动结算前）
+//  道具 4~12（解锁 = 对应编号蓝线公开 ≥2；除 1/4/12 外仅自己回合可用）
 // ════════════════════════════════════════════════════════════════
 
-/** 取道具并做通用可用性校验（未解锁 / 已使用 / 探测器启动中封锁道具） */
-function _equipUsable(no) {
-  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
+/** 道具基础可用性（不含回合/操作锁判定） */
+function _equipBasic(no) {
+  if (!S || S.phase !== 'play' || S.pending || S.result || S.fx) {
+    return { ok: false, msg: '现在不能行动' };
+  }
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const eq = S.equipment.find(e => e.no === no);
   const name = (EQUIPMENT_LIB[no] || {}).name || ('道具 ' + no);
@@ -1237,18 +1277,90 @@ function _equipUsable(no) {
   if (eq.used) return { ok: false, msg: `【${name}】已使用过` };
   if (!eq.unlocked) {
     const lock = (typeof eq.lockNum === 'number')
-      ? `（需蓝色 ${eq.no} 全部公开，且蓝色 ${eq.lockNum} 公开 ≥2）` : '（蓝 4/4 拆除后解锁）';
+      ? `（需蓝色 ${eq.no} 公开 ≥2，且蓝色 ${eq.lockNum} 公开 ≥2）` : `（蓝色 ${eq.no} 公开 ≥2 后解锁）`;
     return { ok: false, msg: `【${name}】不可用：尚未解锁${lock}` };
   }
   return { ok: true, eq };
 }
 
-/** 【便利贴】：再标记自己 1 张未公开且无信息标记的蓝线（绑定于牌，交换废弃） */
-function useStickyNote(cardId) {
-  const g = _equipUsable(4);
-  if (!g.ok) return g;
+/** 取道具并做通用可用性校验（仅当前行动者；跨回合道具走 _equipBasic + _equipActor） */
+function _equipUsable(no) {
+  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
+  return _equipBasic(no);
+}
+
+/** 跨回合道具的提交守卫：必须持有对应操作锁；无锁时退回当前行动者（本地/旧流程） */
+function _equipActor(no) {
+  if (!S || S.phase !== 'play' || S.pending || S.result || S.fx) {
+    return { ok: false, msg: '现在不能行动' };
+  }
+  if (timeoutGameIfNeeded()) return { ok: false, msg: '现在不能行动' };
+  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
+  const lock = _equipLockActive();
+  if (lock) {
+    if (lock.no !== no) {
+      return { ok: false, msg: `请先完成【${(EQUIPMENT_LIB[lock.no] || {}).name || ('道具 ' + lock.no)}】的操作` };
+    }
+    if (!_equipLockOwnedBy(mySeat())) {
+      return { ok: false, msg: `等待 ${S.players[lock.seat].name} 完成道具操作` };
+    }
+    return { ok: true, seat: lock.seat, lock };
+  }
+  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  return { ok: true, seat: actor, lock: null };
+}
+
+/** 开始道具操作前的统一校验；返回错误文案或 null */
+function _equipStartBlock(no) {
+  if (!S || S.phase !== 'play' || S.result || S.fx) return '现在不能使用道具';
+  if (S.pending) return '请先完成当前操作';
+  if (timeoutGameIfNeeded()) return '现在不能行动';
+  if (S.scanMode) return '已启动探测器，本回合只能扫描';
+  const lock = _equipLockActive();
+  if (lock) {
+    if (!_equipLockOwnedBy(mySeat())) {
+      return `${S.players[lock.seat].name} 正在使用【${(EQUIPMENT_LIB[lock.no] || {}).name || ('道具 ' + lock.no)}】，请稍候`;
+    }
+    return '你正在使用道具，请先完成或取消';
+  }
+  if (!_canUseEquipAnytime(no) && !_myTurn()) return '只能在自己回合使用道具';
+  if (_canUseEquipAnytime(no) && mySeat() === null && !_myTurn()) return '现在不能行动';
+  const g = _equipBasic(no);
+  if (!g.ok) return g.msg;
+  return null;
+}
+
+/** 抢占跨回合道具操作锁：写入共享状态并立即推送，全场进入等待 */
+function _acquireEquipLock(no) {
+  const msg = _equipStartBlock(no);
+  if (msg) return { ok: false, msg };
+  const seat = mySeat() !== null ? mySeat() : _actionSeat();
+  if (seat === null || !S.players[seat]) return { ok: false, msg: '现在不能行动' };
+  const token = 'el' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  S.equipRev = (S.equipRev || 0) + 1;
+  S.equipLock = { seat, no, at: Date.now(), token };
+  saveStateDirect();
+  _render();
+  return { ok: true, seat, token };
+}
+
+/** 取消本端持有的操作锁（提交成功后也走这里清理） */
+function _cancelMyEquipLock() {
+  const l = _equipLockActive();
+  if (!l || !_equipLockOwnedBy(mySeat())) return false;
+  _releaseEquipLock();
+  return true;
+}
+
+/** 【便利贴】：再标记自己 1 张未公开且无信息标记的蓝线（绑定于牌，交换废弃） */
+function useStickyNote(cardId) {
+  const g = _equipBasic(4);
+  if (!g.ok) return g;
+  const a = _equipActor(4);
+  if (!a.ok) return a;
+  const actor = a.seat;
   const card = _findCardById(cardId);
   if (!card || !_isInShares(card, S.players[actor].shares)) return { ok: false, msg: '请选择自己的导线' };
   if (card.kind !== 'blue') return { ok: false, msg: '只能标记蓝色导线' };
@@ -1257,8 +1369,9 @@ function useStickyNote(cardId) {
 
   card.info = { num: card.num };
   g.eq.used = true;
+  _releaseEquipLock();
   addLog(`📃 ${S.players[actor].name} 使用便利贴，标记：蓝色 ${card.num}`, 'good');
-  saveState();
+  saveStateDirect();
   _render();
   return { ok: true };
 }
@@ -1323,7 +1436,7 @@ function _applySuperScan(plan) {
   const stable = _consumeStabilize(true, actor);
   if (!stable) {
     S.failures++;
-    addLog(`❌ ${aName} 的超级探测器未命中「有蓝色 ${num}」（失误 ${S.failures}/${S.pCount}）`, 'bad');
+    addLog(`❌ ${aName} 的超级探测器未命中「蓝色 ${num}」（失误 ${S.failures}/${S.pCount}）`, 'bad');
     if (S.failures >= S.pCount) { _boom('boom-failures'); return { ok: true, hit: false }; }
   }
 
@@ -1574,10 +1687,11 @@ function useCoffee(targetSeat) {
 
 /** 【＝标签】：同一份内相邻 2 张，宣告「编号相同」（蓝蓝同数字 / 黄黄 / 红红）；至少 1 张未公开 */
 function useEqTag(shareIdx, cardId1, cardId2) {
-  const g = _equipUsable(12);
+  const g = _equipBasic(12);
   if (!g.ok) return g;
-  const actor = _actionSeat();
-  if (actor === null) return { ok: false, msg: '现在不能行动' };
+  const a = _equipActor(12);
+  if (!a.ok) return a;
+  const actor = a.seat;
   const p = S.players[actor];
   const share = (p.shares || [])[shareIdx];
   if (!share) return { ok: false, msg: '无效的手牌' };
@@ -1605,8 +1719,9 @@ function useEqTag(shareIdx, cardId1, cardId2) {
   c1.eqp = pairId;
   c2.eqp = pairId;
   g.eq.used = true;
-  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】`, 'good');
-  saveState();
+  _releaseEquipLock();
+  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】${desc ? `（${desc}）` : ''}`, 'good');
+  saveStateDirect();
   _render();
   return { ok: true };
 }
@@ -1615,7 +1730,7 @@ function useEqTag(shareIdx, cardId1, cardId2) {
 //  结算：拆除 / 胜利 / 爆炸 / 回合流转
 // ════════════════════════════════════════════════════════════════
 
-/** 某蓝数字全场 4/4 公开 → 标记板盖「已拆除」，并检查道具解锁条件 */
+/** 蓝线公开后调用：4/4 时标记板盖「已拆除」，并检查道具解锁条件 */
 function _updateDefused(num) {
   if (blueRevealedCount(num) >= 4 && !S.board.defused[num - 1]) {
     S.board.defused[num - 1] = true;
@@ -1624,12 +1739,12 @@ function _updateDefused(num) {
   _checkEquipUnlocks();
 }
 
-/** 道具解锁：#12 还需锁数字公开 ≥2；每次蓝线公开后都要尝试（原数字可能早已 4/4） */
+/** 道具解锁：对应编号蓝线公开 ≥2；#12 还需锁数字公开 ≥2。每次蓝线公开后都要尝试（原数字可能早已达标） */
 function _checkEquipUnlocks() {
   if (!S || !S.equipment) return;
   for (const eq of S.equipment) {
     if (eq.unlocked) continue;
-    if (blueRevealedCount(eq.no) < 4) continue;
+    if (blueRevealedCount(eq.no) < 2) continue;
     if (typeof eq.lockNum === 'number' && blueRevealedCount(eq.lockNum) < 2) continue;
     eq.unlocked = true;
     const lockNote = (typeof eq.lockNum === 'number') ? `（锁数字 ${eq.lockNum} 已公开 ≥2）` : '';
@@ -1657,6 +1772,7 @@ function _finish(win, reason) {
   S.pending = null;
   S.fx = null;                         // 终止进行中的气泡宣告（其延时回调会因 fx 不匹配而放弃结算）
   S.scanMode = null;
+  _releaseEquipLock();
   S.cutMods = { stabilize: null };
   S.radar = null;
   S.walkieInfo = null;
@@ -1703,6 +1819,7 @@ function endTurn(actorSeat) {
   if (S.phase !== 'play') return;
   S.pending = null;
   S.scanMode = null;
+  _releaseEquipLock();
   _clearTurnEffects(actorSeat);
   if (S.freeCut) {
     const actor = (typeof actorSeat === 'number' && actorSeat >= 0)
@@ -1758,6 +1875,48 @@ window._olResetProgress = function () {
 //  联机状态应用
 // ════════════════════════════════════════════════════════════════
 
+/** 当前行动者端已处理到的道具锁版本（所有锁相关快照共用一个单调水位） */
+let _seenEquipRev = 0;
+
+/**
+ * 当前行动者端对道具锁的定向处理（online.js 在“我是行动者”早退前调用）：
+ *  - 他人上锁：只合并锁字段，避免整包远端状态覆盖本端尚未推送的行动；
+ *  - 释放锁：equipRev 更新后返回 'apply'，整包应用道具结果；
+ *  - 错过了整个锁（离线/后台）：释放快照的 equipRev 同样会触发整包应用。
+ * 返回 'merge'（已合并）/ 'apply'（交由联机层应用整包）/ null（无需处理）。
+ */
+window._olEquipLockTransition = function (remoteState) {
+  if (!S || !remoteState || S.phase !== 'play') return null;
+  if (remoteState.dealStamp && S.dealStamp && remoteState.dealStamp !== S.dealStamp) return null;
+  const local = S.equipLock || null;
+  const remote = remoteState.equipLock || null;
+  const remoteRev = remoteState.equipRev || 0;
+  if (local && _equipLockOwnedBy(mySeat(), local)) return null;   // 自己持有的锁以本地为准
+
+  if (remote) {
+    if (remoteRev <= _seenEquipRev) return null;                  // 已处理过的旧锁/迟到重放
+    const same = local && local.seat === remote.seat && local.no === remote.no
+      && local.token === remote.token;
+    if (same) return null;
+    _seenEquipRev = remoteRev;
+    // at 用本机时间重建：跨端时钟偏差不影响本地 TTL
+    S.equipLock = { seat: remote.seat, no: remote.no, at: Date.now(), token: remote.token };
+    if (typeof window._olCancelLocalFlow === 'function') window._olCancelLocalFlow();
+    _render();
+    return 'merge';
+  }
+
+  if (local) {
+    _seenEquipRev = Math.max(_seenEquipRev, remoteRev);
+    return 'apply';                                               // 释放：整包应用道具结果
+  }
+  if (remoteRev > _seenEquipRev) {
+    _seenEquipRev = remoteRev;
+    return 'apply';                                               // 本端错过了上锁过程，仍需补上结果
+  }
+  return null;
+};
+
 /**
  * 应用远端快照。
  * 标记阶段各端只写自己的标记位：若本端已完成标记而快照中尚无（并发推送互相覆盖），
@@ -1766,6 +1925,22 @@ window._olResetProgress = function () {
 function applyOnlineState(state) {
   const prev = S;
   let repush = false;
+
+  if (prev && state && prev.dealStamp && state.dealStamp
+      && prev.dealStamp !== state.dealStamp) {
+    _seenEquipRev = 0;               // 新一局：道具锁版本重新计数
+  }
+  // 迟到重放的旧锁快照：版本低于本地已应用的版本时不得重新上锁
+  if (prev && state && state.equipLock
+      && (state.equipRev || 0) < (prev.equipRev || 0)) {
+    state.equipLock = null;
+  }
+  // 锁 TTL 按本机首次收到该锁的时间起算，避免跨端时钟偏差导致提前失效或无限等待
+  if (state && state.equipLock) {
+    const pl = prev && prev.equipLock;
+    const sameToken = pl && pl.token && state.equipLock.token && pl.token === state.equipLock.token;
+    state.equipLock = Object.assign({}, state.equipLock, { at: sameToken ? pl.at : Date.now() });
+  }
 
   if (state && state.phase === 'mark' && prev && prev.phase === 'mark'
       && Array.isArray(state.players) && Array.isArray(prev.players)) {
@@ -1794,6 +1969,7 @@ function applyOnlineState(state) {
   }
 
   S = state;
+  _seenEquipRev = Math.max(_seenEquipRev, (state && state.equipRev) || 0);
   _render();
   if (window._fxReplay) window._fxReplay(state ? (state.fx || null) : null);
   if (repush) saveStateDirect();
@@ -1894,8 +2070,9 @@ function waitingExtrasHTML() {
       ${missionHasHiddenPick(mission) ? '<div class="we-line">数轴标出全部候选；牌库只混入其中随机选中的导线，具体是哪几条保密</div>' : ''}
       ${mission.orderCount ? `<div class="we-line">本关追加：开场公开 ${mission.orderCount} 个蓝线数字的剪线顺序；前一个数字公开 ≥2 根后才能公开下一个，违者立即爆炸</div>` : ''}
       ${mission.freeCut ? `<div class="we-line">本关追加：发牌即开始 ${Math.round((mission.timerSec || 0) / 60)} 分钟倒计时（2 人局 ${Math.round((mission.timerSecTwo || mission.timerSec || 0) / 60)} 分钟），超时失败；自由剪线（须等待上一位完成，3 人及以上不能连续剪线）</div>` : ''}
+      ${mission.excludeEquip && mission.excludeEquip.length ? `<div class="we-line">本局不出现的道具：${mission.excludeEquip.map(n => (EQUIPMENT_LIB[n] || {}).name || ('道具 ' + n)).join('、')}</div>` : ''}
       ${mission.redBlueCount ? `<div class="we-line">本关追加：随机 ${mission.redBlueCount} 个数字的蓝导线视为红色导线，只能在手中只剩这些牌时通过「公开红线」公开；对应数字道具不会出现${mission.twoCaptainNoMark ? '；2 人局队长不能进行蓝线信息标记' : ''}</div>` : ''}
-      ${mission.equipLocks ? '<div class="we-line">本关追加：每张道具额外 🔒 一个数字，需原数字导线全部公开且锁数字公开 ≥2 才解锁</div>' : ''}
+      ${mission.equipLocks ? '<div class="we-line">本关追加：每张道具额外 🔒 一个数字，需原数字导线公开 ≥2 且锁数字公开 ≥2 才解锁</div>' : ''}
       <div class="we-line">失误上限：人数 − 1 次（第 N 次失误，N = 人数，即爆炸）</div>
       <div class="we-line">本关进度：${prog.passed ? '已通关 ✓' : '未通关'}</div>
     </div>`;
