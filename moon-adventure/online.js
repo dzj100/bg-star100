@@ -883,19 +883,8 @@ async function _tryReconnect() {
    覆盖着陆页渲染
    ============================================================ */
 
-const _originalRenderLanding = window.renderLanding;
-
 window.renderLanding = function() {
-  return `
-    <div class="landing">
-      <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
-      <span class="moon-icon">🌕️</span>
-      <h1>月面探险</h1>
-      <p class="subtitle">2~5人 · 合作角色扮演</p>
-      <button class="start-btn" onclick="showSetup()" style="display:none;">🚀 开始游戏</button>
-      <button class="start-btn" onclick="showOnlineLobby()" style="background:var(--surface);border:2px solid var(--gold);color:var(--gold);margin-top:12px;">🌐 联机模式</button>
-      <div class="credit">@imStar100</div>
-    </div>`;
+  return window.renderLandingShell('online');
 };
 
 /* ============================================================

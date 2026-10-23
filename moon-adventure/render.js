@@ -12,6 +12,7 @@
 /** 主渲染函数，根据游戏阶段分发渲染 */
 function render() {
   const app = document.getElementById('app');
+  app.classList.toggle('app--landing', S.phase === 'landing');
 
   // 观战端：逐格移动/返回动画播放中收到最终位置状态（S._moveSteps/S._returnSteps 已被清除）时，
   // 延迟到动画播完再重建 DOM，避免 ghost 未走完就被替换、token 提前瞬移到终位
@@ -101,20 +102,359 @@ function observePlayerStrip() {
 }
 
 // ========================================
-// 着陆页（选择人数）
+// 着陆页（月球任务封面）
 // ========================================
 
-/** 渲染着陆页 */
+/** 渲染着陆页（单机） */
 function renderLanding() {
+  return renderLandingShell('single');
+}
+
+/**
+ * 着陆页共享外壳
+ * single / online 只切换顶部任务标签、入口按钮与说明，封面主体保持一致
+ */
+function renderLandingShell(mode) {
+  const isOnline = mode === 'online';
+  const ctaIcon = isOnline
+    ? `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="7.2" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M4.8 12h14.4M12 4.8c1.9 2.2 2.8 4.6 2.8 7.2s-.9 5-2.8 7.2c-1.9-2.2-2.8-4.6-2.8-7.2S10.1 7 12 4.8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3.2c3.1 1.9 4.6 5.1 4.6 8.4l-2.2 2.2H9.6L7.4 11.6C7.4 8.3 8.9 5.1 12 3.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <circle cx="12" cy="9.2" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M9.6 16.2 8 20l4-1.3M14.4 16.2 16 20l-4-1.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+
   return `
-    <div class="landing">
-      <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
-      <span class="moon-icon">🌕️</span>
-      <h1>月面探险</h1>
-      <p class="subtitle">2~5人 · 合作角色扮演</p>
-      <button class="start-btn" onclick="showSetup()">🚀 开始游戏</button>
-      <div class="credit">@imStar100</div>
+    <div class="landing-v2 ${isOnline ? 'landing-v2--online' : 'landing-v2--single'}">
+      <header class="lv2-top">
+        <div class="lv2-brand">
+          <span class="lv2-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="11.5" stroke="#f5c518" stroke-opacity=".5" stroke-width="1.2"/>
+              <path d="M20.2 8.6a8.2 8.2 0 1 0 0 14.8 8.2 8.2 0 0 1 0-14.8Z" fill="#f5c518"/>
+              <circle cx="23.6" cy="9.4" r="2" fill="#7fe3ff"/>
+              <path d="M8.5 22.8c2.6-1.6 5.5-2.3 8.8-2.1" stroke="#7fe3ff" stroke-width="1" stroke-linecap="round" stroke-dasharray="1 3"/>
+            </svg>
+          </span>
+          <span class="lv2-brand-text">
+            <b>MOON ADVENTURE</b>
+            <span>合作角色扮演</span>
+          </span>
+        </div>
+        <button class="lv2-rules" type="button" onclick="showRules()">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4.5 5.6A2.6 2.6 0 0 1 7.1 3H11v15.5H7.1a2.6 2.6 0 0 0-2.6 2.6V5.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M19.5 5.6A2.6 2.6 0 0 0 16.9 3H13v15.5h3.9a2.6 2.6 0 0 1 2.6 2.6V5.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+          <span>规则</span>
+        </button>
+      </header>
+
+      <main class="lv2-main">
+        <div class="lv2-side">
+          <section class="lv2-copy" aria-labelledby="lv2-title">
+            <p class="lv2-eyebrow">
+              <span class="lv2-live-dot" aria-hidden="true"></span>
+              ${isOnline ? 'ONLINE' : 'LOCAL'}
+              <span class="lv2-sep">/</span> 2–5 PLAYERS
+            </p>
+            <h1 class="lv2-title" id="lv2-title">月面探险</h1>
+            <p class="lv2-tagline">氧气就是行动力，<br><em>一起活着回来。</em></p>
+            <div class="lv2-meta" aria-label="游戏特色" style="display:none;">
+              <span><i class="lv2-dot lv2-dot--o2" aria-hidden="true"></i>氧气行动力</span>
+              <span><i class="lv2-dot lv2-dot--team" aria-hidden="true"></i>团队共享</span>
+              <span><i class="lv2-dot lv2-dot--storm" aria-hidden="true"></i>磁暴生存</span>
+            </div>
+          </section>
+
+          <div class="lv2-actions">
+            <button class="lv2-cta ${isOnline ? 'lv2-cta--online' : 'lv2-cta--solo'}" type="button"
+              onclick="${isOnline ? 'showOnlineLobby()' : 'showSetup()'}">
+              <span class="lv2-cta-icon" aria-hidden="true">${ctaIcon}</span>
+              <span class="lv2-cta-text">
+                <b>${isOnline ? '进入联机大厅' : '开始探险'}</b>
+                <small>${isOnline ? '创建或加入房间 · 实时协作' : '2–5人同屏合作 · 立即出发'}</small>
+              </span>
+              <span class="lv2-cta-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </button>
+            <p class="lv2-action-hint">和队友一起，把物资带回基地</p>
+          </div>
+        </div>
+
+        <div class="lv2-art" aria-hidden="true">
+          ${renderLandingScene()}
+        </div>
+      </main>
+
+      <footer class="lv2-foot">
+        <span class="lv2-foot-line" aria-hidden="true"></span>
+        <span>@imStar100</span>
+        <span class="lv2-foot-line" aria-hidden="true"></span>
+      </footer>
     </div>`;
+}
+
+/** 首页月面航线插画（纯装饰，所有图形本地 SVG 绘制） */
+function renderLandingScene() {
+  return `
+    <svg class="lv2-scene" viewBox="0 0 960 620" fill="none" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMax meet" focusable="false">
+      <defs>
+        <radialGradient id="mv2Halo" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#6fb9ff" stop-opacity=".24"/>
+          <stop offset=".45" stop-color="#3f7be0" stop-opacity=".09"/>
+          <stop offset="1" stop-color="#3f7be0" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="mv2Crater" cx="42%" cy="38%" r="64%">
+          <stop offset="0" stop-color="#0a1020" stop-opacity=".46"/>
+          <stop offset=".7" stop-color="#0a1020" stop-opacity=".2"/>
+          <stop offset="1" stop-color="#0a1020" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="mv2Earth" cx="34%" cy="28%" r="82%">
+          <stop offset="0" stop-color="#b8f1ff"/>
+          <stop offset=".4" stop-color="#4aa9ee"/>
+          <stop offset=".8" stop-color="#1d6cb4"/>
+          <stop offset="1" stop-color="#123f6f"/>
+        </radialGradient>
+        <radialGradient id="mv2EarthShade" cx="36%" cy="30%" r="76%">
+          <stop offset=".52" stop-color="#04101f" stop-opacity="0"/>
+          <stop offset="1" stop-color="#04101f" stop-opacity=".6"/>
+        </radialGradient>
+        <linearGradient id="mv2Ground" x1="480" y1="430" x2="480" y2="620" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#2b3554"/>
+          <stop offset=".3" stop-color="#1a2239"/>
+          <stop offset=".72" stop-color="#101629"/>
+          <stop offset="1" stop-color="#080c17"/>
+        </linearGradient>
+        <linearGradient id="mv2Route" x1="200" y1="510" x2="820" y2="430" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffd166"/>
+          <stop offset=".38" stop-color="#9ae8ff"/>
+          <stop offset="1" stop-color="#51b9ff"/>
+        </linearGradient>
+        <linearGradient id="mv2Dome" x1="-30" y1="-28" x2="40" y2="20" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#dbe5f5"/>
+          <stop offset=".55" stop-color="#8c9bbc"/>
+          <stop offset="1" stop-color="#485573"/>
+        </linearGradient>
+        <linearGradient id="mv2Visor" x1="-6" y1="-42" x2="7" y2="-30" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7fe3ff"/>
+          <stop offset=".6" stop-color="#2c8fca"/>
+          <stop offset="1" stop-color="#133b5f"/>
+        </linearGradient>
+        <linearGradient id="mv2Beam" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#7fe3ff" stop-opacity=".4"/>
+          <stop offset="1" stop-color="#7fe3ff" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="mv2Headlight" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffe6a8" stop-opacity=".5"/>
+          <stop offset="1" stop-color="#ffe6a8" stop-opacity="0"/>
+        </linearGradient>
+        <radialGradient id="mv2WarmGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#ffd166" stop-opacity=".45"/>
+          <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="mv2Glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="mv2Haze" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="10"/>
+        </filter>
+
+        <clipPath id="mv2EarthClip">
+          <circle r="62"/>
+        </clipPath>
+
+        <g id="mv2Astronaut">
+          <ellipse cx="0" cy="1" rx="14" ry="4" fill="#040810" opacity=".5"/>
+          <path d="M-6 -8-8 0M6 -8l2 8" stroke="#cdd9ed" stroke-width="5" stroke-linecap="round"/>
+          <rect x="-10" y="-28" width="20" height="23" rx="9" fill="#e8effb"/>
+          <rect x="-16" y="-25" width="7" height="17" rx="3.5" fill="#93a5c4"/>
+          <path d="M9 -18l8 9" stroke="#d6e1f2" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="0" cy="-38" r="10.5" fill="#f4f8ff"/>
+          <path d="M-9 -39c2.5-3 13-3 16 1-2.5 4-13 4-16-1Z" fill="url(#mv2Visor)"/>
+          <rect x="-5" y="-23" width="10" height="3" rx="1.5" fill="#f5c518" opacity=".85"/>
+          <path d="M-3 -30h6" stroke="#aab9d4" stroke-width="1" opacity=".7"/>
+        </g>
+      </defs>
+
+      <circle class="mv2-halo" cx="748" cy="198" r="168" fill="url(#mv2Halo)"/>
+
+      <!-- 星野点缀（页面底层已有星野，这里只补少量亮星） -->
+      <g class="mv2-sky" fill="#cddfff">
+        <circle cx="262" cy="118" r="1.3" opacity=".55"/>
+        <circle cx="404" cy="72" r="1" opacity=".4"/>
+        <circle cx="544" cy="132" r="1.6" opacity=".5"/>
+        <circle cx="612" cy="66" r="1.1" opacity=".35"/>
+        <path d="M342 104v9M337.5 108.5h9" stroke="#cddfff" stroke-width=".9" opacity=".4"/>
+        <path d="M636 158v7M632.5 161.5h7" stroke="#cddfff" stroke-width=".8" opacity=".3"/>
+      </g>
+
+      <!-- 地球：月面天空里唯一的星球 -->
+      <g class="mv2-earth" transform="translate(748 198)">
+        <circle r="112" fill="#4ea7ff" opacity=".045"/>
+        <circle r="86" fill="#4ea7ff" opacity=".04"/>
+        <circle r="62" fill="url(#mv2Earth)"/>
+        <g clip-path="url(#mv2EarthClip)">
+          <path d="M-38-36c12-9 26-7 33 2 6 8-2 16-12 19-10 3-11 10-21 9-10-1-15-7-13-16 1-7 6-11 13-14Z" fill="#6aa981" opacity=".85"/>
+          <path d="M6 0c11-6 24-3 30 7 5 9-1 19-11 23-11 5-23 0-25-10-2-10 1-15 6-20Z" fill="#74b089" opacity=".8"/>
+          <path d="M-24 32c7-4 15-1 17 6 2 8-4 14-12 13-8-1-12-7-10-13 1-3 2-5 5-6Z" fill="#5f9c76" opacity=".72"/>
+          <path d="M-54-16c21-8 44-4 64 5M-47 21c23-9 48-6 70 3M-16-54c13 9 27 12 42 11" stroke="#e9f9ff" stroke-width="5" stroke-linecap="round" opacity=".3"/>
+          <path d="M-54-16c21-8 44-4 64 5M-47 21c23-9 48-6 70 3" stroke="#e2f7ff" stroke-width="2.2" stroke-linecap="round" opacity=".6"/>
+          <circle r="62" fill="url(#mv2EarthShade)"/>
+          <ellipse cx="-25" cy="-29" rx="22" ry="14" fill="#d8f5ff" opacity=".12" transform="rotate(-30 -25 -29)"/>
+        </g>
+        <circle r="62" fill="none" stroke="#a9e9ff" stroke-opacity=".55" stroke-width="1.3"/>
+        <circle r="67" fill="none" stroke="#7fe3ff" stroke-opacity=".13" stroke-width="3"/>
+      </g>
+
+      <!-- 月面地形 -->
+      <path d="M0 452C120 430 225 434 330 424c125-12 210 6 310-6 115-14 220 0 320-12v214H0Z" fill="#0a0f1d"/>
+      <ellipse cx="610" cy="444" rx="330" ry="28" fill="#6f84b8" opacity=".05" filter="url(#mv2Haze)"/>
+      <g class="mv2-ridges" fill="#0e1626">
+        <path d="M108 458l30-19 24 10 28-17 22 14 18-6v18H108Z" opacity=".72"/>
+        <path d="M520 455l36-24 27 13 42-27 36 22 32-12v30H520Z" opacity=".8"/>
+        <path d="M748 449l27-18 22 10 31-20 35 21 28-7v20H748Z" opacity=".75"/>
+      </g>
+      <g stroke="#8ea0c9" stroke-opacity=".13" stroke-width="1" fill="none">
+        <path d="M556 431l42-27 36 22 28-10"/>
+        <path d="M828 415l35 21 28-7"/>
+        <path d="M114 439l30-19 24 10 20-9"/>
+      </g>
+      <path d="M0 483c120-24 240-16 360-14 140 2 240-28 350-30 115-2 195 12 250 20v161H0Z" fill="url(#mv2Ground)"/>
+      <path d="M0 483c120-24 240-16 360-14 140 2 240-28 350-30 115-2 195 12 250 20" stroke="#8ea0c9" stroke-opacity=".2" stroke-width="1.2" fill="none"/>
+      <path d="M0 548c150-20 300 4 470-8 180-12 330-28 490-8v88H0Z" fill="#090e1b" opacity=".5"/>
+
+      <g class="mv2-ground-detail">
+        <ellipse cx="255" cy="556" rx="64" ry="11" fill="url(#mv2Crater)"/>
+        <path d="M200 552a62 10 0 0 0 112-4" stroke="#8ea0c9" stroke-opacity=".13" fill="none"/>
+        <ellipse cx="782" cy="548" rx="88" ry="13" fill="url(#mv2Crater)"/>
+        <path d="M704 544a84 11 0 0 0 158-3" stroke="#8ea0c9" stroke-opacity=".15" fill="none"/>
+        <ellipse cx="700" cy="586" rx="36" ry="7" fill="url(#mv2Crater)"/>
+        <path d="M672 583a33 6 0 0 0 56-2" stroke="#8ea0c9" stroke-opacity=".1" fill="none"/>
+        <ellipse cx="512" cy="516" rx="30" ry="6" fill="#080d18" opacity=".4"/>
+        <ellipse cx="888" cy="494" rx="40" ry="8" fill="#080d18" opacity=".35"/>
+        <path d="M338 540l8-9 12 5-3 11-12 2z" fill="#1d2740" stroke="#7d8fb5" stroke-opacity=".14"/>
+        <path d="M852 566l6-8 10 4 1 8-9 3z" fill="#1b243b" stroke="#7d8fb5" stroke-opacity=".12"/>
+        <path d="M170 588l5-7 9 3 1 7-8 3z" fill="#1b243b" stroke="#7d8fb5" stroke-opacity=".1"/>
+      </g>
+
+      <!-- 任务航线 -->
+      <path d="M208 512c40-18 80-20 120-10s80 6 120-8c44-16 82-18 120-6 44 14 80-6 114-24 36-18 72-16 110-20"
+        stroke="#59caff" stroke-opacity=".055" stroke-width="26" stroke-linecap="round"/>
+      <path d="M208 512c40-18 80-20 120-10s80 6 120-8c44-16 82-18 120-6 44 14 80-6 114-24 36-18 72-16 110-20"
+        stroke="#59caff" stroke-opacity=".13" stroke-width="7" stroke-linecap="round"/>
+      <path class="mv2-route-line"
+        d="M208 512c40-18 80-20 120-10s80 6 120-8c44-16 82-18 120-6 44 14 80-6 114-24 36-18 72-16 110-20"
+        stroke="url(#mv2Route)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="2 12"/>
+
+      <g class="mv2-waypoints" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#9eb8d8">
+        <g transform="translate(328 502)">
+          <circle r="9" fill="#0a1220" stroke="#7fe3ff" stroke-opacity=".55" stroke-width="1.3"/>
+          <circle r="2.5" fill="#a9efff"/>
+        </g>
+        <text x="328" y="486" font-size="8.5" letter-spacing="1.5" text-anchor="middle" opacity=".78">01</text>
+        <g transform="translate(568 488)">
+          <circle r="9" fill="#0a1220" stroke="#7fe3ff" stroke-opacity=".5" stroke-width="1.3"/>
+          <circle r="2.5" fill="#a9efff"/>
+        </g>
+        <text x="568" y="472" font-size="8.5" letter-spacing="1.5" text-anchor="middle" opacity=".72">02</text>
+        <g transform="translate(718 455)">
+          <circle r="9" fill="#0a1220" stroke="#7fe3ff" stroke-opacity=".45" stroke-width="1.3"/>
+          <circle r="2.5" fill="#a9efff"/>
+        </g>
+        <text x="718" y="439" font-size="8.5" letter-spacing="1.5" text-anchor="middle" opacity=".68">03</text>
+      </g>
+
+      <!-- 基地 -->
+      <g class="mv2-base" transform="translate(142 512)">
+        <ellipse cx="8" cy="20" rx="84" ry="21" fill="url(#mv2WarmGlow)" opacity=".8"/>
+        <ellipse cx="4" cy="18" rx="56" ry="11" fill="#050810" opacity=".7"/>
+        <path d="M-40 17a40 33 0 0 1 80 0Z" fill="url(#mv2Dome)"/>
+        <path d="M-40 17a40 33 0 0 1 80 0" stroke="#c4d0e6" stroke-opacity=".35"/>
+        <path d="M-31 3Q0 9 31 3" stroke="#7384a8" stroke-opacity=".5" fill="none"/>
+        <circle cx="0" cy="-7" r="12" fill="#1b2742" stroke="#91a3c4" stroke-opacity=".55"/>
+        <circle cx="0" cy="-7" r="8.5" fill="#ffd166"/>
+        <circle cx="-3" cy="-10" r="3.5" fill="#fff4cc" opacity=".9"/>
+        <rect x="19" y="2" width="12" height="15" rx="5" fill="#101728" stroke="#8b9dbc" stroke-opacity=".45"/>
+        <path d="M-22-22-34-53" stroke="#a9b7d4" stroke-width="1.4" stroke-linecap="round"/>
+        <circle class="mv2-base-light" cx="-35" cy="-56" r="3" fill="#ff7b7b"/>
+        <path d="M22-20v-29" stroke="#c9d6ef" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M23-49 44-44 23-38Z" fill="#f5c518"/>
+        <text x="4" y="34" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" letter-spacing="2.5" fill="#6f80a2">BASE / 01</text>
+      </g>
+
+      <!-- OGS 信标 -->
+      <g class="mv2-ogs" transform="translate(804 446)">
+        <rect class="mv2-beacon-beam" x="-15" y="-112" width="30" height="62" rx="15" fill="url(#mv2Beam)"/>
+        <ellipse cx="0" cy="12" rx="44" ry="11" fill="#5ad8ff" opacity=".08"/>
+        <ellipse class="mv2-beacon-ring" cx="0" cy="12" rx="26" ry="7" stroke="#7fe3ff" stroke-opacity=".45" fill="none"/>
+        <ellipse cx="0" cy="12" rx="14" ry="4" stroke="#9cecff" stroke-opacity=".5" fill="none"/>
+        <path d="M0 12v-58" stroke="#a6b8d8" stroke-width="4" stroke-linecap="round"/>
+        <path d="M-17-33h34M-12-23h24" stroke="#a6b8d8" stroke-opacity=".55" stroke-width="1.2"/>
+        <circle class="mv2-beacon-core" cx="0" cy="-48" r="9" fill="#7fe3ff" filter="url(#mv2Glow)"/>
+        <circle cx="0" cy="-48" r="4" fill="#f3ffff"/>
+        <text x="0" y="34" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" letter-spacing="2.5" fill="#7fe3ff" opacity=".65">OGS</text>
+      </g>
+
+      <!-- 月球车 -->
+      <g class="mv2-rover" transform="translate(650 478)">
+        <ellipse cx="0" cy="16" rx="40" ry="8" fill="#040810" opacity=".55"/>
+        <g class="mv2-rover-light">
+          <path d="M30-6 88-24v40Z" fill="url(#mv2Headlight)"/>
+        </g>
+        <g stroke="#7082a8" stroke-opacity=".18" stroke-width="2" stroke-dasharray="3 7" stroke-linecap="round">
+          <path d="M-34 18c-24 2-48-1-70 2"/>
+        </g>
+        <circle cx="-23" cy="9" r="11" fill="#0a101e" stroke="#6f81a7" stroke-width="2"/>
+        <circle cx="-23" cy="9" r="4" fill="#98a9c9"/>
+        <circle cx="24" cy="9" r="11" fill="#0a101e" stroke="#6f81a7" stroke-width="2"/>
+        <circle cx="24" cy="9" r="4" fill="#98a9c9"/>
+        <path d="M-34 4Q-36-12-22-17h40Q32-14 34 2l-3 7Q0 15-32 9Z" fill="#dbe5f4" stroke="#91a3c4"/>
+        <path d="M-14-13H7l5 11h-28Z" fill="#12233c" stroke="#7fe3ff" stroke-opacity=".4"/>
+        <rect x="-26" y="-24" width="34" height="8" rx="3" fill="#2c3a5c" stroke="#9aaccb" stroke-opacity=".6"/>
+        <path d="M-26-20h34" stroke="#7fe3ff" stroke-opacity=".2"/>
+        <circle cx="28" cy="-4" r="3" fill="#ffd166"/>
+      </g>
+
+      <!-- 宇航员 -->
+      <use href="#mv2Astronaut" transform="translate(414 522) scale(.96)"/>
+      <use href="#mv2Astronaut" transform="translate(588 506) scale(-.84 .84)"/>
+
+      <!-- 物资牌 -->
+      <g class="mv2-supply" transform="translate(292 466) rotate(-8)">
+        <ellipse cx="2" cy="21" rx="21" ry="6" fill="#040810" opacity=".55"/>
+        <rect x="-20" y="-20" width="40" height="40" rx="9" fill="#f6efe1" stroke="#fffaf0" stroke-opacity=".55"/>
+        <path d="M0-11 11 7h-22Z" fill="#ff9f43" stroke="#e07a1f" stroke-width="1.2" stroke-linejoin="round"/>
+        <text x="12" y="15" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a7761">3</text>
+      </g>
+      <g class="mv2-supply" transform="translate(484 456) rotate(8)">
+        <ellipse cx="2" cy="21" rx="21" ry="6" fill="#040810" opacity=".55"/>
+        <rect x="-20" y="-20" width="40" height="40" rx="9" fill="#f6efe1" stroke="#fffaf0" stroke-opacity=".55"/>
+        <path d="M0-11 11 0 0 11-11 0Z" fill="#ffb05a" stroke="#db8a2b" stroke-width="1.2" stroke-linejoin="round"/>
+        <text x="12" y="15" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a7761">4</text>
+      </g>
+      <g class="mv2-supply" transform="translate(710 414) rotate(-6)">
+        <ellipse cx="2" cy="21" rx="21" ry="6" fill="#040810" opacity=".55"/>
+        <rect x="-20" y="-20" width="40" height="40" rx="9" fill="#f6efe1" stroke="#fffaf0" stroke-opacity=".55"/>
+        <path d="M0-12 11.4-3.7 7 9.7H-7L-11.4-3.7Z" fill="#ffd166" stroke="#d9a42c" stroke-width="1.2" stroke-linejoin="round"/>
+        <text x="12" y="15" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8" fill="#8a7761">5</text>
+      </g>
+
+      <!-- 磁暴预警：远景极小提示 -->
+      <g class="mv2-storm" transform="translate(884 128)">
+        <circle r="18" fill="#ff6b6b" opacity=".05"/>
+        <circle class="mv2-storm-dot" r="3.2" fill="#ff7b7b"/>
+        <circle r="10" stroke="#ff7b7b" stroke-opacity=".32" stroke-dasharray="2 5" fill="none"/>
+      </g>
+    </svg>`;
 }
 
 // ========================================
