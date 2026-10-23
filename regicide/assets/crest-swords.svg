@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="crestBladeLight" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#fff5d4"/>
+      <stop offset=".48" stop-color="#eccd85"/>
+      <stop offset="1" stop-color="#a87c3d"/>
+    </linearGradient>
+    <linearGradient id="crestBladeDark" x1=".2" y1="0" x2="1" y2="1">
+      <stop stop-color="#e3c179"/>
+      <stop offset=".55" stop-color="#b78d4b"/>
+      <stop offset="1" stop-color="#745127"/>
+    </linearGradient>
+    <linearGradient id="crestHilt" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#f2d89a"/>
+      <stop offset=".45" stop-color="#c69a51"/>
+      <stop offset="1" stop-color="#7c5728"/>
+    </linearGradient>
+    <linearGradient id="crestGrip" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#5b291c"/>
+      <stop offset=".5" stop-color="#3a1710"/>
+      <stop offset="1" stop-color="#210c08"/>
+    </linearGradient>
+    <linearGradient id="crestGem" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e4653f"/>
+      <stop offset="1" stop-color="#66170d"/>
+    </linearGradient>
+
+    <g id="crestSword">
+      <path d="M0 -140 L-7.4 -108 L-8.2 -18 L0 -9 L8.2 -18 L7.4 -108 Z"
+            fill="#1c1209" stroke="#2a1b0d" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M0 -137 L-6.8 -108 L-7.4 -18 L0 -12 Z" fill="url(#crestBladeDark)"/>
+      <path d="M0 -137 L6.8 -108 L7.4 -18 L0 -12 Z" fill="url(#crestBladeLight)"/>
+      <path d="M0 -130 L0 -15" stroke="#fff6d6" stroke-width=".9" opacity=".6"/>
+      <path d="M1.1 -123 L1.1 -17" stroke="#1c1209" stroke-width=".7" opacity=".3"/>
+
+      <rect x="-23" y="-13" width="46" height="6" rx="3"
+            fill="url(#crestHilt)" stroke="#221407" stroke-width="1.4"/>
+      <path d="M-18 -10.5 H18" stroke="#ffedb8" stroke-width=".9" stroke-linecap="round" opacity=".55"/>
+      <path d="M-4 -8 L4 -8 L3 -2 L-3 -2 Z"
+            fill="#d6ad61" stroke="#221407" stroke-width=".8" stroke-linejoin="round"/>
+
+      <path d="M-3.4 -6 L3.4 -6 L3 30 L-3 30 Z"
+            fill="url(#crestGrip)" stroke="#1d1209" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M-3.1 1 L3.1 5 M-3 9 L3 13 M-2.9 17 L2.9 21 M-2.8 25 L2.8 29"
+            stroke="#c49d5c" stroke-width="1" stroke-linecap="round" opacity=".75"/>
+
+      <path d="M0 29 L5.6 35 L0 45 L-5.6 35 Z"
+            fill="url(#crestHilt)" stroke="#221407" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M0 32 L3 35 L0 38 L-3 35 Z"
+            fill="url(#crestGem)" stroke="#4b1009" stroke-width=".6" stroke-linejoin="round"/>
+    </g>
+  </defs>
+
+  <g transform="translate(120 111) scale(1.5)">
+    <g transform="rotate(40) translate(0 55)" opacity=".92">
+      <use href="#crestSword"/>
+    </g>
+    <g transform="rotate(-40) translate(0 55)">
+      <use href="#crestSword"/>
+    </g>
+  </g>
+</svg>

@@ -3,20 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>弑君者</title>
-<link rel="stylesheet" href="style.css">
+<meta name="theme-color" content="#070509">
+<title>弑君者 · Regicide</title>
+<link rel="stylesheet" href="style.css?v=20261023">
 <link rel="stylesheet" href="cinematic.css">
+<link rel="stylesheet" href="landing.css?v=20261023b">
 </head>
 <body>
 
 <!-- 首页 -->
 <div id="landing">
-  <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
-  <div class="landing-icon">⚔️</div>
-  <h1>弑君者</h1>
-  <p class="subtitle">1~4人 · 合作扑克闯关</p>
-  <button class="start-btn" onclick="showSetup()">开始游戏</button>
-  <div class="credit">@imStar100</div>
+  <div class="landing-atmosphere" aria-hidden="true">
+    <div class="landing-king" id="landingKing"></div>
+    <div class="landing-embers" id="landingEmbers"></div>
+  </div>
+
+  <!-- <span class="landing-corner landing-corner--tl" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--tr" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--bl" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--br" aria-hidden="true"></span> -->
+
+  <header class="landing-top">
+    <div class="landing-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 8.2 7.4 11 12 4.8 16.6 11l4.2-2.8-1.7 9.6H4.9L3.2 8.2Z"/><path d="M5.2 20h13.6" opacity=".7"/></svg>
+      <span>REGICIDE</span>
+    </div>
+    <button type="button" class="landing-rules" onclick="showRules()">规则</button>
+  </header>
+
+  <main class="landing-main">
+    <p class="landing-kicker"><i></i><span>1~4人 合作扑克闯关</span><i></i></p>
+
+    <div class="landing-hero">
+      <div class="landing-crest-wrap" aria-hidden="true">
+        <div class="landing-crest-aura"></div>
+        <div class="landing-crest">
+          <img src="assets/crest-swords.svg?v=20261023b" alt="" width="240" height="240" fetchpriority="high">
+        </div>
+      </div>
+
+      <div class="landing-copy">
+        <h1 class="landing-title">弑君者</h1>
+        <!-- <div class="landing-en" aria-hidden="true">R E G I C I D E</div> -->
+        <div class="landing-divider" aria-hidden="true"><i></i><b></b><i></i></div>
+        <p class="landing-tagline">一副牌，十二位暴君，一场弑君之战</p>
+        <!-- <div class="landing-meta"><span>1–4 人</span><i></i><span>合作扑克闯关</span></div> -->
+        <button type="button" class="landing-cta" onclick="showSetup()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 20 4.2-4.2M14.8 5.2 20 4l-1.2 5.2M6.6 17.4 17.4 6.6M4.8 4.8l4.7 1.1 9.4 9.4-3.7 3.7L5.8 9.5 4.8 4.8Z" opacity=".9"/><path d="m5 5 3.3.9L17 14.5" opacity=".45"/></svg>
+          <span>开始冒险</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <div class="landing-court" id="landingCourt" aria-hidden="true"></div>
+  <div class="landing-credit">@imStar100</div>
 </div>
 
 <!-- 设置页 -->
@@ -54,6 +95,7 @@
 </div>
 
 <script src="boss-svg.js"></script>
+<script src="landing.js?v=20261023"></script>
 <script src="cinematic.js"></script>
 <script src="audio.js"></script>
 <script src="game.js"></script>

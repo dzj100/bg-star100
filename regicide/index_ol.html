@@ -3,16 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>弑君者</title>
-<link rel="stylesheet" href="style.css">
+<meta name="theme-color" content="#070509">
+<title>弑君者 · Regicide 联机版</title>
+<link rel="stylesheet" href="style.css?v=20261023">
 <link rel="stylesheet" href="cinematic.css">
+<link rel="stylesheet" href="landing.css?v=20261023b">
 </head>
 <body>
 
 <!-- 初始化加载遮罩：在 JS 全部载入前显示，online.js 末尾移除 -->
-<div id="init-loading-overlay" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#121218;">
-  <div style="text-align:center;color:#e8e6e3;font-size:1rem;">
-    <div style="width:36px;height:36px;border:3px solid #444;border-top-color:#d4a843;border-radius:50%;animation:irl-spin .7s linear infinite;margin:0 auto 14px;"></div>
+<div id="init-loading-overlay" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#070509;">
+  <div style="text-align:center;color:#e9ddc4;font-size:.9rem;letter-spacing:.18em;">
+    <div style="width:36px;height:36px;border:2px solid #2a2118;border-top-color:#c9a35b;border-radius:50%;animation:irl-spin .7s linear infinite;margin:0 auto 14px;"></div>
     载入中...
   </div>
   <style>@keyframes irl-spin{to{transform:rotate(360deg)}}</style>
@@ -20,13 +22,52 @@
 
 <!-- 首页 -->
 <div id="landing">
-  <div class="rules-corner"><button onclick="showRules()">📖 规则</button></div>
-  <div class="landing-icon">⚔️</div>
-  <h1>弑君者</h1>
-  <p class="subtitle">1~4人 · 合作扑克闯关</p>
-  <!-- <button class="start-btn" onclick="showSetup()">开始游戏</button> -->
-  <button class="start-btn" onclick="showOnlineLobby()" style="background:var(--surface);border:1px solid var(--gold);color:var(--gold);margin-top:8px;">联机模式</button>
-  <div class="credit">@imStar100</div>
+  <div class="landing-atmosphere" aria-hidden="true">
+    <div class="landing-king" id="landingKing"></div>
+    <div class="landing-embers" id="landingEmbers"></div>
+  </div>
+
+  <!-- <span class="landing-corner landing-corner--tl" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--tr" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--bl" aria-hidden="true"></span>
+  <span class="landing-corner landing-corner--br" aria-hidden="true"></span> -->
+
+  <header class="landing-top">
+    <div class="landing-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 8.2 7.4 11 12 4.8 16.6 11l4.2-2.8-1.7 9.6H4.9L3.2 8.2Z"/><path d="M5.2 20h13.6" opacity=".7"/></svg>
+      <span>REGICIDE</span>
+    </div>
+    <button type="button" class="landing-rules" onclick="showRules()">规则</button>
+  </header>
+
+  <main class="landing-main">
+    <p class="landing-kicker"><i></i><span>2~4人 实时联机合作</span><i></i></p>
+
+    <div class="landing-hero">
+      <div class="landing-crest-wrap" aria-hidden="true">
+        <div class="landing-crest-aura"></div>
+        <div class="landing-crest">
+          <img src="assets/crest-swords.svg?v=20261023b" alt="" width="240" height="240" fetchpriority="high">
+        </div>
+      </div>
+
+      <div class="landing-copy">
+        <h1 class="landing-title">弑君者</h1>
+        <!-- <div class="landing-en" aria-hidden="true">R E G I C I D E</div> -->
+        <div class="landing-divider" aria-hidden="true"><i></i><b></b><i></i></div>
+        <p class="landing-tagline">一副牌，十二位暴君，一场弑君之战</p>
+        <!-- <div class="landing-meta"><span>2–4 人</span><i></i><span>实时联机合作</span></div> -->
+        <button type="button" class="landing-cta" onclick="showOnlineLobby()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V3.5"/><path d="M6 4.5c3.2-2.2 5.8 2.1 12 .1v7.8c-6.2 2-8.8-2.3-12-.1z"/><path d="M9.5 8.6h5" opacity=".5"/></svg>
+          <span>联机出征</span>
+        </button>
+        <!-- <p class="landing-note">创建或加入房间 · 实时同步</p> -->
+      </div>
+    </div>
+  </main>
+
+  <div class="landing-court" id="landingCourt" aria-hidden="true"></div>
+  <div class="landing-credit">@imStar100</div>
 </div>
 
 <!-- 设置页 -->
@@ -67,10 +108,11 @@
 </div>
 
 <script src="boss-svg.js"></script>
+<script src="landing.js?v=20261023"></script>
 <script src="cinematic.js"></script>
 <script src="audio.js"></script>
 <script src="game.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.min.js?v=20261023"></script>
 <script src="net.js"></script>
 <script src="online.js"></script>
 </body>
