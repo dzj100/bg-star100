@@ -655,6 +655,66 @@ var aboutTitles = {
   disclaimer: '关于本站'
 };
 
+var SUPPORT_QR_EMPTY = '赞赏码准备中，先通过作者主页关注吧。';
+var supportQrItems = Array.isArray(ABOUT.supportQrs) ? ABOUT.supportQrs.filter(function(item){
+  return item && item.src;
+}) : [];
+var supportQrLoading = false;
+var supportQrReady = false;
+
+function finishSupportQrLoad(grid, empty, loaded){
+  supportQrLoading = false;
+  if (loaded > 0) {
+    supportQrReady = true;
+    empty.hidden = true;
+    return;
+  }
+  grid.hidden = true;
+  empty.hidden = false;
+  empty.textContent = SUPPORT_QR_EMPTY;
+}
+
+/* 赞赏码按需加载：第一次进入“支持作者”时才创建 img 并请求图片 */
+function loadSupportQrs(){
+  if (supportQrReady || supportQrLoading || !supportQrItems.length) return;
+  var grid = document.getElementById('supportQrGrid');
+  var empty = document.getElementById('supportQrEmpty');
+  supportQrLoading = true;
+  empty.textContent = '赞赏码加载中…';
+  empty.hidden = false;
+  grid.hidden = false;
+
+  var pending = supportQrItems.length;
+  var loaded = 0;
+  supportQrItems.forEach(function(item){
+    var box = document.createElement('div');
+    box.className = 'support-qr-item';
+    var img = document.createElement('img');
+    img.className = 'about-qr';
+    img.alt = (item.label || '作者') + '赞赏码';
+    img.addEventListener('load', function(){
+      loaded++;
+      pending--;
+      empty.hidden = true;
+      if (pending === 0) finishSupportQrLoad(grid, empty, loaded);
+    });
+    img.addEventListener('error', function(){
+      box.remove();
+      pending--;
+      if (pending === 0) finishSupportQrLoad(grid, empty, loaded);
+    });
+    box.appendChild(img);
+    if (item.label) {
+      var label = document.createElement('span');
+      label.className = 'support-qr-label';
+      label.textContent = item.label;
+      box.appendChild(label);
+    }
+    grid.appendChild(box);
+    img.src = item.src;
+  });
+}
+
 function showAboutView(name){
   Object.keys(aboutViews).forEach(function(key){
     aboutViews[key].hidden = key !== name;
@@ -663,9 +723,10 @@ function showAboutView(name){
   aboutBack.hidden = name === 'home';
   var body = aboutModal.querySelector('.about-body');
   if (body) body.scrollTop = 0;
+  if (name === 'support') loadSupportQrs();
 }
 
-/* 关于页基础信息：游戏数量、更新时间、作者链接、赞赏码 */
+/* 关于页基础信息：游戏数量、更新时间、作者链接 */
 (function initAboutMeta(){
   var updated = ABOUT.updated || '';
   document.getElementById('aboutMeta').textContent = GAMES.length + ' 个游戏入口' + (updated ? ' · 更新于 ' + updated : '');
@@ -675,39 +736,6 @@ function showAboutView(name){
     authorLink.href = ABOUT.authorUrl;
   } else {
     authorLink.hidden = true;
-  }
-  var qrGrid = document.getElementById('supportQrGrid');
-  var qrEmpty = document.getElementById('supportQrEmpty');
-  var qrs = Array.isArray(ABOUT.supportQrs) ? ABOUT.supportQrs.filter(function(item){
-    return item && item.src;
-  }) : [];
-  if (qrs.length) {
-    qrEmpty.hidden = true;
-    qrs.forEach(function(item){
-      var box = document.createElement('div');
-      box.className = 'support-qr-item';
-      var img = document.createElement('img');
-      img.className = 'about-qr';
-      img.src = item.src;
-      img.alt = (item.label || '作者') + '赞赏码';
-      img.loading = 'lazy';
-      img.addEventListener('error', function(){
-        box.remove();
-        if (!qrGrid.querySelector('.support-qr-item')) {
-          qrGrid.hidden = true;
-          qrEmpty.hidden = false;
-        }
-      });
-      box.appendChild(img);
-      if (item.label) {
-        var label = document.createElement('span');
-        label.className = 'support-qr-label';
-        label.textContent = item.label;
-        box.appendChild(label);
-      }
-      qrGrid.appendChild(box);
-    });
-    qrGrid.hidden = false;
   }
 })();
 
