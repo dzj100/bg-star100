@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>桌游助手合集</title>
+<title>star桌游助手合集</title>
 <meta name="theme-color" content="#6d4a2b">
 <meta name="description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家、巫师牌 — 多人聚会桌游在线助手">
-<meta property="og:title" content="桌游助手合集">
+<meta property="og:title" content="star桌游助手合集">
 <meta property="og:description" content="狼人真言、夺狗囧事、印加宝藏、捉虫猫日记、登山家、UNO、海底探险、月面探险、弑君者、无赖勇者、时序谜局、煞有其时、渗透因子、车票收藏家、巫师牌 — 多人聚会桌游在线助手">
 <meta property="og:image" content="https://bg-star100.pages.dev/og-icon.png">
 <meta property="og:type" content="website">
@@ -29,6 +29,7 @@
   --shell-half: calc(var(--rail-w) / 2 + 260px);
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+[hidden] { display:none !important; }
 html { scroll-behavior:smooth; }
 /* 背景 = 深胡桃木桌：底色 + 顶光 + 宽色斑 + 细木纹（SVG 噪声，无缝平铺） */
 body { font-family:-apple-system,system-ui,sans-serif; color:var(--text); min-height:100dvh; overflow-x:hidden;
@@ -58,6 +59,12 @@ button { font-family:inherit; }
 .tab:hover { color:rgba(250,241,226,.96); background:rgba(255,240,214,.07); }
 .tab.active { color:var(--gold-l); background:rgba(255,240,214,.10); }
 .tab.active::after { content:''; position:absolute; right:0; top:0; bottom:0; width:3px; background:var(--gold-l); }
+
+/* 关于：独立固定在侧栏可视区域底部（.rail 本身向下延伸到屏幕外，不能直接放进 flex 末端） */
+.rail-about { position:fixed; left:max(0px, calc(50% - var(--shell-half))); bottom:calc(14px + env(safe-area-inset-bottom)); z-index:31; width:var(--rail-w); display:flex; flex-direction:column; align-items:center; gap:5px; padding:11px 0 10px; border:none; border-top:1px solid rgba(255,240,214,.16); background:rgba(76,50,27,.95); color:rgba(244,233,215,.62); font:inherit; font-size:.66rem; font-weight:800; letter-spacing:.08em; cursor:pointer; transition:background .18s, color .18s; }
+.rail-about:hover { color:rgba(250,241,226,.96); background:rgba(255,240,214,.07); }
+.rail-about:active { background:rgba(255,240,214,.12); }
+.rail-about .tab-ico { font-size:17px; }
 
 /* ---------------- 内容 ---------------- */
 #portal { margin-left:var(--rail-w); min-width:0; max-width:520px; padding:16px 16px 28px; min-height:calc(100dvh - var(--tb)); display:flex; flex-direction:column; }
@@ -114,9 +121,82 @@ button { font-family:inherit; }
 .mode-online { background:rgba(201,59,47,.15); color:#ad3226; }
 .empty { padding:26px 0; text-align:center; font-size:.8rem; color:var(--text-dim); }
 
+/* ---------------- 关于 / 留言板 ---------------- */
+.modal-head-left { display:flex; align-items:center; gap:5px; min-width:0; }
+.about-back { flex:none; width:28px; height:28px; border:none; border-radius:50%; background:transparent; color:var(--text-dim); font-size:1.25rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.about-back:hover { background:rgba(43,38,32,.08); color:var(--text); }
+
+.about-modal { width:min(460px,100%); }
+.about-body { overflow-y:auto; overscroll-behavior:contain; }
+.about-view { display:flex; flex-direction:column; gap:13px; }
+.about-hero { display:flex; align-items:center; gap:12px; padding:2px 2px 12px; }
+.about-logo { flex:none; width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:24px; background:rgba(176,116,26,.14); border:1px solid rgba(176,116,26,.22); }
+.about-name { font-size:.95rem; font-weight:800; }
+.about-meta { display:block; margin-top:3px; font-size:.68rem; color:var(--text-dim); }
+.about-list { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--card-bg); }
+.about-item { display:flex; align-items:center; gap:10px; width:100%; padding:12px 13px; border:none; background:transparent; color:var(--text); font:inherit; font-size:.82rem; text-align:left; cursor:pointer; }
+.about-item + .about-item { border-top:1px solid var(--line); }
+.about-item:hover { background:rgba(176,116,26,.06); }
+.about-ico { flex:none; width:22px; text-align:center; font-size:16px; line-height:1; }
+.about-label { flex:1; font-weight:700; }
+.about-sub { flex:none; font-size:.64rem; color:var(--text-dim); font-weight:600; }
+.about-arrow { flex:none; color:var(--text-dim); font-size:1.1rem; line-height:1; }
+.about-foot { padding:2px 0 4px; text-align:center; font-size:.66rem; color:var(--text-dim); }
+.about-lead { font-size:.78rem; line-height:1.7; color:var(--text-dim); }
+.log-list { display:flex; flex-direction:column; gap:14px; }
+.log-group { display:flex; flex-direction:column; gap:7px; }
+.log-month { font-size:.7rem; font-weight:800; letter-spacing:.08em; color:var(--gold); }
+.log-item { display:flex; gap:9px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--card-bg); font-size:.78rem; line-height:1.45; }
+.log-date { flex:none; padding-top:1px; font-size:.66rem; font-weight:700; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+.log-text { min-width:0; }
+.about-qr-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; padding:14px; border:1px dashed rgba(176,116,26,.4); border-radius:14px; background:var(--card-bg); }
+.support-qr-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:14px; width:100%; }
+.support-qr-item { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; }
+.about-qr { display:block; width:100%; max-width:260px; border-radius:10px; }
+.support-qr-label { font-size:.7rem; font-weight:700; color:var(--text-dim); }
+.about-qr-empty { padding:18px 0; text-align:center; font-size:.76rem; line-height:1.6; color:var(--text-dim); }
+
+.modal-feedback { width:min(560px,100%); height:min(88dvh,760px); max-height:88dvh; }
+.feedback-body { overflow-y:auto; overscroll-behavior:contain; }
+.fb-form { display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--card-bg); }
+.fb-textarea { width:100%; min-height:76px; max-height:160px; resize:vertical; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; font-size:.85rem; line-height:1.5; outline:none; transition:border-color .15s, box-shadow .15s; }
+.fb-textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(176,116,26,.18); }
+.fb-form-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.fb-count { font-size:.66rem; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+.fb-form-actions { display:flex; align-items:center; gap:8px; }
+.fb-submit { border:none; border-radius:999px; padding:8px 16px; background:var(--gold); color:#fff; font-size:.76rem; font-weight:800; cursor:pointer; }
+.fb-submit:disabled { opacity:.5; cursor:default; }
+.fb-cancel { border:none; background:none; padding:4px 2px; color:var(--text-dim); font-size:.72rem; font-weight:700; cursor:pointer; }
+.fb-note { font-size:.64rem; line-height:1.5; color:var(--text-dim); }
+.fb-status { min-height:1em; font-size:.68rem; color:var(--text-dim); }
+.fb-status.err { color:var(--accent); }
+.fb-list-head { display:flex; align-items:center; justify-content:space-between; margin-top:2px; font-size:.72rem; font-weight:800; color:var(--text-dim); }
+.fb-refresh { border:none; background:none; padding:2px 0; color:var(--accent); font-size:.7rem; font-weight:800; cursor:pointer; }
+.fb-list { display:flex; flex-direction:column; gap:8px; }
+.fb-item { padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--card-bg); }
+.fb-item-head { display:flex; align-items:baseline; gap:8px; }
+.fb-name { max-width:150px; font-size:.8rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fb-time { font-size:.63rem; color:var(--text-dim); }
+.fb-edited { font-size:.6rem; color:var(--text-dim); }
+.fb-mine { margin-left:auto; font-size:.6rem; font-weight:800; color:var(--gold); }
+.fb-content { margin-top:6px; font-size:.8rem; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.fb-foot { display:flex; align-items:center; gap:12px; margin-top:7px; }
+.fb-like { display:inline-flex; align-items:center; gap:4px; border:none; background:none; padding:2px 0; color:var(--text-dim); font-size:.68rem; font-weight:700; cursor:pointer; }
+.fb-like.liked { color:var(--gold); }
+.fb-like:disabled { opacity:.5; cursor:default; }
+.fb-like-num { font-variant-numeric:tabular-nums; }
+.fb-tools { display:flex; gap:12px; margin-left:auto; }
+.fb-tool { border:none; background:none; padding:0; font-size:.68rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
+.fb-tool.danger { color:var(--accent); }
+.fb-empty { padding:22px 0; text-align:center; font-size:.78rem; color:var(--text-dim); }
+
+.toast { position:fixed; left:50%; bottom:calc(30px + env(safe-area-inset-bottom)); z-index:200; max-width:80vw; padding:9px 16px; border-radius:999px; background:rgba(43,38,32,.94); color:#f8f1e0; font-size:.75rem; font-weight:700; text-align:center; opacity:0; pointer-events:none; transform:translate(-50%,8px); transition:opacity .18s, transform .18s; }
+.toast.show { opacity:1; transform:translate(-50%,0); }
+
 @media (max-width:560px) {
   .modal-mask { align-items:flex-end; padding:0; }
   .modal { width:100%; max-height:82dvh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .modal-feedback { height:92dvh; max-height:92dvh; }
 }
 @media (max-width:360px) {
   :root { --rail-w:50px; }
@@ -150,6 +230,9 @@ button { font-family:inherit; }
     <button class="tab" type="button" data-target="sec-online"><span class="tab-ico">🌐</span>联机</button>
   </div>
 </nav>
+<button class="rail-about" id="aboutBtn" type="button" aria-haspopup="dialog" aria-controls="aboutModal">
+  <span class="tab-ico" aria-hidden="true">ⓘ</span>关于
+</button>
 
 <div id="portal">
   <main class="content">
@@ -190,6 +273,105 @@ button { font-family:inherit; }
   </div>
 </div>
 
+<div class="modal-mask hidden" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+  <div class="modal about-modal">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <button class="about-back" id="aboutBack" type="button" aria-label="返回" hidden>‹</button>
+        <h3 id="aboutTitle">关于桌游助手合集</h3>
+      </div>
+      <button class="modal-close" id="aboutClose" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body about-body">
+      <div class="about-view" id="aboutHome">
+        <div class="about-hero">
+          <div class="about-logo" aria-hidden="true">✨️</div>
+          <div>
+            <div class="about-name">star桌游助手合集</div>
+            <span class="about-meta" id="aboutMeta"></span>
+          </div>
+        </div>
+        <div class="about-list" id="aboutMenu">
+          <button class="about-item" type="button" data-action="changelog">
+            <span class="about-ico">📜</span><span class="about-label">更新日志</span><span class="about-sub" id="aboutLogSub"></span><span class="about-arrow">›</span>
+          </button>
+          <button class="about-item" type="button" data-action="feedback">
+            <span class="about-ico">💬</span><span class="about-label">留言板</span><span class="about-sub">最近 10 条</span><span class="about-arrow">›</span>
+          </button>
+          <a class="about-item" id="authorLink" href="https://xhslink.com/m/6v4n9vWAfvp" target="_blank" rel="noopener noreferrer">
+            <span class="about-ico">👤</span><span class="about-label">作者主页</span><span class="about-sub">小红书</span><span class="about-arrow">↗</span>
+          </a>
+          <button class="about-item" type="button" data-action="support">
+            <span class="about-ico">☕</span><span class="about-label">支持作者</span><span class="about-sub">赞赏码</span><span class="about-arrow">›</span>
+          </button>
+          <button class="about-item" type="button" data-action="share">
+            <span class="about-ico">🔗</span><span class="about-label">分享本站</span><span class="about-sub">发给好友</span><span class="about-arrow">›</span>
+          </button>
+          <button class="about-item" type="button" data-action="clear-plays">
+            <span class="about-ico">🧹</span><span class="about-label">清除常玩记录</span><span class="about-sub">本机数据</span><span class="about-arrow">›</span>
+          </button>
+          <button class="about-item" type="button" data-action="disclaimer">
+            <span class="about-ico">ℹ️</span><span class="about-label">关于本站 / 免责声明</span><span class="about-sub">版权说明</span><span class="about-arrow">›</span>
+          </button>
+        </div>
+        <p class="about-foot">© 2026 imStar100 · 仅供学习交流</p>
+      </div>
+
+      <div class="about-view" id="aboutChangelog" hidden>
+        <div class="log-list" id="changelogList"></div>
+      </div>
+
+      <div class="about-view" id="aboutSupport" hidden>
+        <p class="about-lead">如果这个站点帮到了你，欢迎扫码支持作者，或者去小红书点个关注～</p>
+        <div class="about-qr-wrap">
+          <div class="support-qr-grid" id="supportQrGrid" hidden></div>
+          <div class="about-qr-empty" id="supportQrEmpty">赞赏码准备中，先通过作者主页关注吧。</div>
+        </div>
+      </div>
+
+      <div class="about-view" id="aboutDisclaimer" hidden>
+        <p class="about-lead">本站是多人桌游的电子化辅助工具，游戏规则与相关版权归各原作者及出版社所有，仅供学习交流，如喜欢实体桌游请购买正版。</p>
+        <p class="about-lead">本站不设账号体系：常玩记录保存在本机缓存数据（localStorage）中；留言身份也只保存在当前浏览器，清除浏览器数据后，将无法编辑或删除此前发布的留言。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask hidden" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+  <div class="modal modal-feedback">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <button class="about-back" id="feedbackBack" type="button" aria-label="返回关于">‹</button>
+        <h3 id="feedbackTitle">留言板</h3>
+      </div>
+      <button class="modal-close" id="feedbackClose" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body feedback-body">
+      <form class="fb-form" id="fbForm">
+        <input class="search-input" id="fbNick" type="text" maxlength="12" placeholder="昵称（默认匿名玩家）" autocomplete="nickname">
+        <textarea class="fb-textarea" id="fbContent" maxlength="300" placeholder="聊聊玩法、提个建议，或者单纯留个脚印…"></textarea>
+        <div class="fb-form-foot">
+          <span class="fb-count" id="fbCount">0/300</span>
+          <div class="fb-form-actions">
+            <button class="fb-cancel" id="fbCancel" type="button" hidden>取消编辑</button>
+            <button class="fb-submit" id="fbSubmit" type="submit">发布留言</button>
+          </div>
+        </div>
+        <p class="fb-note">身份保存在本机浏览器；清除缓存或换设备后，将无法编辑旧留言。</p>
+        <p class="fb-status" id="fbStatus" role="status" aria-live="polite"></p>
+      </form>
+      <div class="fb-list-head">
+        <span>最近 10 条</span>
+        <button class="fb-refresh" id="fbRefresh" type="button">刷新</button>
+      </div>
+      <div class="fb-list" id="fbList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="about-data.js"></script>
 <script>
 (function(){
 'use strict';
@@ -452,6 +634,592 @@ document.getElementById('resetBtn').addEventListener('click', function(){
   var chips = chipsWrap.querySelectorAll('.chip');
   for (var i = 0; i < chips.length; i++) chips[i].classList.toggle('active', chips[i].dataset.num === '0');
   renderResults();
+});
+
+/* ---------------- 关于弹窗 ---------------- */
+var ABOUT = window.ABOUT_DATA || {};
+var aboutBtn = document.getElementById('aboutBtn');
+var aboutModal = document.getElementById('aboutModal');
+var aboutTitle = document.getElementById('aboutTitle');
+var aboutBack = document.getElementById('aboutBack');
+var aboutViews = {
+  home: document.getElementById('aboutHome'),
+  changelog: document.getElementById('aboutChangelog'),
+  support: document.getElementById('aboutSupport'),
+  disclaimer: document.getElementById('aboutDisclaimer')
+};
+var aboutTitles = {
+  home: '关于桌游助手合集',
+  changelog: '更新日志',
+  support: '支持作者',
+  disclaimer: '关于本站'
+};
+
+function showAboutView(name){
+  Object.keys(aboutViews).forEach(function(key){
+    aboutViews[key].hidden = key !== name;
+  });
+  aboutTitle.textContent = aboutTitles[name] || aboutTitles.home;
+  aboutBack.hidden = name === 'home';
+  var body = aboutModal.querySelector('.about-body');
+  if (body) body.scrollTop = 0;
+}
+
+/* 关于页基础信息：游戏数量、更新时间、作者链接、赞赏码 */
+(function initAboutMeta(){
+  var updated = ABOUT.updated || '';
+  document.getElementById('aboutMeta').textContent = GAMES.length + ' 个游戏入口' + (updated ? ' · 更新于 ' + updated : '');
+  document.getElementById('aboutLogSub').textContent = updated ? '更新于 ' + updated : '';
+  var authorLink = document.getElementById('authorLink');
+  if (ABOUT.authorUrl) {
+    authorLink.href = ABOUT.authorUrl;
+  } else {
+    authorLink.hidden = true;
+  }
+  var qrGrid = document.getElementById('supportQrGrid');
+  var qrEmpty = document.getElementById('supportQrEmpty');
+  var qrs = Array.isArray(ABOUT.supportQrs) ? ABOUT.supportQrs.filter(function(item){
+    return item && item.src;
+  }) : [];
+  if (qrs.length) {
+    qrEmpty.hidden = true;
+    qrs.forEach(function(item){
+      var box = document.createElement('div');
+      box.className = 'support-qr-item';
+      var img = document.createElement('img');
+      img.className = 'about-qr';
+      img.src = item.src;
+      img.alt = (item.label || '作者') + '赞赏码';
+      img.loading = 'lazy';
+      img.addEventListener('error', function(){
+        box.remove();
+        if (!qrGrid.querySelector('.support-qr-item')) {
+          qrGrid.hidden = true;
+          qrEmpty.hidden = false;
+        }
+      });
+      box.appendChild(img);
+      if (item.label) {
+        var label = document.createElement('span');
+        label.className = 'support-qr-label';
+        label.textContent = item.label;
+        box.appendChild(label);
+      }
+      qrGrid.appendChild(box);
+    });
+    qrGrid.hidden = false;
+  }
+})();
+
+/* 更新日志：按月份分组渲染，内容全部使用 textContent 避免注入 */
+(function initChangelog(){
+  var wrap = document.getElementById('changelogList');
+  var groups = ABOUT.changelog || [];
+  wrap.textContent = '';
+  if (!groups.length) {
+    var empty = document.createElement('p');
+    empty.className = 'about-lead';
+    empty.textContent = '暂无更新记录。';
+    wrap.appendChild(empty);
+    return;
+  }
+  groups.forEach(function(group){
+    var groupEl = document.createElement('div');
+    groupEl.className = 'log-group';
+    var month = document.createElement('div');
+    month.className = 'log-month';
+    month.textContent = group.month;
+    groupEl.appendChild(month);
+    (group.items || []).forEach(function(item){
+      var row = document.createElement('div');
+      row.className = 'log-item';
+      var date = document.createElement('span');
+      date.className = 'log-date';
+      date.textContent = item.d || '';
+      var text = document.createElement('span');
+      text.className = 'log-text';
+      text.textContent = item.t || '';
+      row.appendChild(date);
+      row.appendChild(text);
+      groupEl.appendChild(row);
+    });
+    wrap.appendChild(groupEl);
+  });
+})();
+
+function openAbout(){
+  showAboutView('home');
+  aboutModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  if (window.matchMedia && matchMedia('(pointer:fine)').matches) {
+    document.getElementById('aboutClose').focus();
+  }
+}
+
+function closeAbout(focusBack){
+  aboutModal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  if (focusBack !== false) aboutBtn.focus();
+}
+
+aboutBtn.addEventListener('click', openAbout);
+document.getElementById('aboutClose').addEventListener('click', function(){ closeAbout(true); });
+aboutBack.addEventListener('click', function(){ showAboutView('home'); });
+aboutModal.addEventListener('click', function(e){
+  if (e.target === aboutModal) closeAbout(true);
+});
+
+function showToast(text){
+  var toast = document.getElementById('toast');
+  toast.textContent = text;
+  toast.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(function(){ toast.classList.remove('show'); }, 1800);
+}
+
+function copyText(text){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise(function(resolve, reject){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy') ? resolve() : reject(new Error('copy failed'));
+    } catch (err) {
+      reject(err);
+    }
+    document.body.removeChild(ta);
+  });
+}
+
+function shareSite(){
+  var data = { title: document.title, text: '桌游助手合集', url: location.href };
+  if (navigator.share) {
+    navigator.share(data).catch(function(){});
+    return;
+  }
+  copyText(location.href).then(function(){
+    showToast('链接已复制，发给牌友吧');
+  }, function(){
+    showToast('复制失败，请手动复制地址栏');
+  });
+}
+
+function clearPlays(){
+  if (!window.confirm('确定清除本机的常玩记录吗？')) return;
+  try { localStorage.removeItem(PLAY_KEY); } catch (e) {}
+  showToast('已清除，正在刷新…');
+  setTimeout(function(){ location.reload(); }, 450);
+}
+
+document.getElementById('aboutMenu').addEventListener('click', function(e){
+  var item = e.target.closest('[data-action]');
+  if (!item) return;
+  var action = item.dataset.action;
+  if (action === 'changelog') showAboutView('changelog');
+  else if (action === 'support') showAboutView('support');
+  else if (action === 'disclaimer') showAboutView('disclaimer');
+  else if (action === 'feedback') openFeedbackFromAbout();
+  else if (action === 'share') shareSite();
+  else if (action === 'clear-plays') clearPlays();
+});
+
+/* ---------------- 留言板：最近 10 条 + 本机令牌编辑/删除 ---------------- */
+var FB_CONFIG = {
+  url: 'https://smcplxyjjvehbizirvrw.supabase.co',
+  anon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtY3BseHlqanZlaGJpemlydnJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNTQyMDgsImV4cCI6MjA5ODYzMDIwOH0.TNkL6gOBMyZIt8mB-b-JBPe7_LgJIHXXtHwOW_Xr0qM'
+};
+var FB_TOKEN_KEY = 'bg-star100:feedback-token';
+var FB_NICK_KEY = 'bg-star100:feedback-nick';
+var feedbackModal = document.getElementById('feedbackModal');
+var fbForm = document.getElementById('fbForm');
+var fbNick = document.getElementById('fbNick');
+var fbContent = document.getElementById('fbContent');
+var fbCount = document.getElementById('fbCount');
+var fbSubmit = document.getElementById('fbSubmit');
+var fbCancel = document.getElementById('fbCancel');
+var fbStatus = document.getElementById('fbStatus');
+var fbListEl = document.getElementById('fbList');
+var fbClient = null;
+var fbSdkPromise = null;
+var fbToken = null;
+var fbMessages = [];
+var fbEditingId = null;
+var fbBusy = false;
+var fbLoaded = false;
+
+function readStored(key){
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+function writeStored(key, value){
+  try { localStorage.setItem(key, value); } catch (e) {}
+}
+
+/* 64 位 hex 令牌；服务端只存 SHA-256，编辑/删除靠它证明“是自己” */
+function getFeedbackToken(){
+  if (fbToken) return fbToken;
+  var token = readStored(FB_TOKEN_KEY);
+  if (!token || token.length < 32) {
+    var bytes = new Uint8Array(32);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    token = '';
+    for (var i = 0; i < bytes.length; i++) token += ('0' + bytes[i].toString(16)).slice(-2);
+    writeStored(FB_TOKEN_KEY, token);
+  }
+  fbToken = token;
+  return fbToken;
+}
+
+function getFeedbackClient(){
+  if (fbClient) return Promise.resolve(fbClient);
+  if (!fbSdkPromise) {
+    fbSdkPromise = new Promise(function(resolve, reject){
+      if (window.supabase && window.supabase.createClient) { resolve(); return; }
+      var script = document.createElement('script');
+      script.src = 'supabase.min.js?v=2.112.4';
+      script.onload = resolve;
+      script.onerror = function(){ reject(new Error('留言服务脚本加载失败')); };
+      document.head.appendChild(script);
+    }).then(function(){
+      if (!window.supabase || !window.supabase.createClient) throw new Error('留言服务初始化失败');
+      fbClient = window.supabase.createClient(FB_CONFIG.url, FB_CONFIG.anon);
+      return fbClient;
+    }).catch(function(err){
+      fbSdkPromise = null;
+      throw err;
+    });
+  }
+  return fbSdkPromise;
+}
+
+function setFbStatus(text, isError){
+  fbStatus.textContent = text || '';
+  fbStatus.classList.toggle('err', !!isError);
+}
+
+function fbErrorMessage(err){
+  var msg = (err && err.message) || '';
+  if (/failed to fetch|network|load failed/i.test(msg)) return '网络不太稳定，请稍后重试';
+  if (/schema cache|does not exist|not found|404/i.test(msg)) return '留言服务暂时不可用，请稍后再试';
+  return msg || '操作失败，请稍后再试';
+}
+
+function fbTime(iso){
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  var diff = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+}
+
+function setLikeButton(btn, liked, count){
+  btn.classList.toggle('liked', liked);
+  btn.setAttribute('aria-pressed', liked ? 'true' : 'false');
+  btn.setAttribute('aria-label', (liked ? '取消点赞' : '点赞') + '，当前 ' + count + ' 个赞');
+  var label = btn.querySelector('.fb-like-label');
+  var num = btn.querySelector('.fb-like-num');
+  if (label) label.textContent = liked ? '已赞' : '赞';
+  if (num) num.textContent = String(count);
+}
+
+function makeLikeButton(msg){
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'fb-like';
+  btn.dataset.action = 'like';
+  btn.dataset.id = msg.id;
+  var label = document.createElement('span');
+  label.className = 'fb-like-label';
+  var num = document.createElement('span');
+  num.className = 'fb-like-num';
+  btn.appendChild(label);
+  btn.appendChild(num);
+  setLikeButton(btn, !!msg.liked_by_me, Number(msg.likes) || 0);
+  return btn;
+}
+
+function renderFeedback(){
+  fbListEl.textContent = '';
+  if (!fbMessages.length) {
+    var empty = document.createElement('div');
+    empty.className = 'fb-empty';
+    empty.textContent = '还没有留言，来抢个沙发吧～';
+    fbListEl.appendChild(empty);
+    return;
+  }
+  fbMessages.forEach(function(msg){
+    var item = document.createElement('div');
+    item.className = 'fb-item';
+
+    var head = document.createElement('div');
+    head.className = 'fb-item-head';
+    var name = document.createElement('span');
+    name.className = 'fb-name';
+    name.textContent = msg.nickname || '匿名玩家';
+    var time = document.createElement('span');
+    time.className = 'fb-time';
+    time.textContent = fbTime(msg.created_at);
+    head.appendChild(name);
+    head.appendChild(time);
+    if (msg.updated_at) {
+      var edited = document.createElement('span');
+      edited.className = 'fb-edited';
+      edited.textContent = '已编辑';
+      head.appendChild(edited);
+    }
+    if (msg.is_mine) {
+      var mine = document.createElement('span');
+      mine.className = 'fb-mine';
+      mine.textContent = '我的留言';
+      head.appendChild(mine);
+    }
+
+    var content = document.createElement('p');
+    content.className = 'fb-content';
+    content.textContent = msg.content || '';
+
+    item.appendChild(head);
+    item.appendChild(content);
+
+    var foot = document.createElement('div');
+    foot.className = 'fb-foot';
+    foot.appendChild(makeLikeButton(msg));
+
+    if (msg.is_mine) {
+      var tools = document.createElement('div');
+      tools.className = 'fb-tools';
+      var edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'fb-tool';
+      edit.dataset.action = 'edit';
+      edit.dataset.id = msg.id;
+      edit.textContent = '编辑';
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'fb-tool danger';
+      del.dataset.action = 'delete';
+      del.dataset.id = msg.id;
+      del.textContent = '删除';
+      tools.appendChild(edit);
+      tools.appendChild(del);
+      foot.appendChild(tools);
+    }
+    item.appendChild(foot);
+    fbListEl.appendChild(item);
+  });
+}
+
+function updateFbCount(){
+  fbCount.textContent = fbContent.value.length + '/300';
+}
+
+function resetFeedbackForm(){
+  fbEditingId = null;
+  fbContent.value = '';
+  fbNick.value = readStored(FB_NICK_KEY) || '';
+  fbSubmit.textContent = '发布留言';
+  fbCancel.hidden = true;
+  updateFbCount();
+}
+
+async function loadFeedback(){
+  setFbStatus('加载留言中…');
+  fbListEl.innerHTML = '<div class="fb-empty">加载中…</div>';
+  try {
+    var sb = await getFeedbackClient();
+    var res = await sb.rpc('feedback_list', { p_token: getFeedbackToken() });
+    if (res.error) throw res.error;
+    fbMessages = res.data || [];
+    renderFeedback();
+    setFbStatus('');
+    return true;
+  } catch (err) {
+    console.error('[feedback] load failed', err);
+    fbMessages = [];
+    fbListEl.textContent = '';
+    var empty = document.createElement('div');
+    empty.className = 'fb-empty';
+    empty.textContent = '留言暂时加载失败，请稍后再试';
+    fbListEl.appendChild(empty);
+    setFbStatus(fbErrorMessage(err), true);
+    return false;
+  }
+}
+
+function openFeedbackFromAbout(){
+  aboutModal.classList.add('hidden');
+  feedbackModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  if (!fbLoaded) {
+    fbLoaded = true;
+    fbNick.value = readStored(FB_NICK_KEY) || '';
+  }
+  updateFbCount();
+  loadFeedback();
+  if (window.matchMedia && matchMedia('(pointer:fine)').matches) fbNick.focus();
+}
+
+function closeFeedback(backToAbout){
+  feedbackModal.classList.add('hidden');
+  resetFeedbackForm();
+  if (backToAbout) {
+    aboutModal.classList.remove('hidden');
+    showAboutView('home');
+    document.body.classList.add('modal-open');
+    document.getElementById('aboutClose').focus();
+  } else {
+    document.body.classList.remove('modal-open');
+    aboutBtn.focus();
+  }
+}
+
+function startFeedbackEdit(id){
+  var msg = null;
+  for (var i = 0; i < fbMessages.length; i++) {
+    if (String(fbMessages[i].id) === String(id)) { msg = fbMessages[i]; break; }
+  }
+  if (!msg) return;
+  fbEditingId = msg.id;
+  fbNick.value = msg.nickname || '';
+  fbContent.value = msg.content || '';
+  fbSubmit.textContent = '保存修改';
+  fbCancel.hidden = false;
+  updateFbCount();
+  setFbStatus('正在编辑这条留言');
+  fbContent.focus();
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  fbForm.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+}
+
+async function submitFeedback(e){
+  e.preventDefault();
+  if (fbBusy) return;
+  var nickname = (fbNick.value || '').trim() || '匿名玩家';
+  if (nickname.length > 12) nickname = nickname.slice(0, 12);
+  var content = (fbContent.value || '').trim();
+  if (!content) {
+    setFbStatus('先写点内容再发布吧', true);
+    fbContent.focus();
+    return;
+  }
+  if (content.length > 300) {
+    setFbStatus('留言最多 300 字', true);
+    return;
+  }
+
+  var editing = fbEditingId;
+  fbBusy = true;
+  fbSubmit.disabled = true;
+  setFbStatus(editing ? '保存中…' : '发布中…');
+  try {
+    var sb = await getFeedbackClient();
+    var payload = {
+      p_token: getFeedbackToken(),
+      p_nickname: nickname,
+      p_content: content
+    };
+    var res;
+    if (editing) {
+      payload.p_id = editing;
+      res = await sb.rpc('feedback_update', payload);
+    } else {
+      res = await sb.rpc('feedback_create', payload);
+    }
+    if (res.error) throw res.error;
+    writeStored(FB_NICK_KEY, nickname);
+    resetFeedbackForm();
+    var ok = await loadFeedback();
+    if (ok) setFbStatus(editing ? '已保存修改' : '留言成功');
+  } catch (err) {
+    console.error('[feedback] save failed', err);
+    setFbStatus(fbErrorMessage(err), true);
+  } finally {
+    fbBusy = false;
+    fbSubmit.disabled = false;
+  }
+}
+
+async function deleteFeedback(id){
+  if (fbBusy) return;
+  if (!window.confirm('确定删除这条留言吗？')) return;
+  fbBusy = true;
+  setFbStatus('删除中…');
+  try {
+    var sb = await getFeedbackClient();
+    var res = await sb.rpc('feedback_delete', { p_id: id, p_token: getFeedbackToken() });
+    if (res.error) throw res.error;
+    if (fbEditingId && String(fbEditingId) === String(id)) resetFeedbackForm();
+    var ok = await loadFeedback();
+    if (ok) setFbStatus('已删除');
+  } catch (err) {
+    console.error('[feedback] delete failed', err);
+    setFbStatus(fbErrorMessage(err), true);
+  } finally {
+    fbBusy = false;
+  }
+}
+
+async function toggleFeedbackLike(id, btn){
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  try {
+    var sb = await getFeedbackClient();
+    var res = await sb.rpc('feedback_toggle_like', { p_id: id, p_token: getFeedbackToken() });
+    if (res.error) throw res.error;
+    var data = res.data || {};
+    var liked = !!data.liked;
+    var likes = Number(data.likes) || 0;
+    for (var i = 0; i < fbMessages.length; i++) {
+      if (String(fbMessages[i].id) === String(id)) {
+        fbMessages[i].liked_by_me = liked;
+        fbMessages[i].likes = likes;
+        break;
+      }
+    }
+    setLikeButton(btn, liked, likes);
+  } catch (err) {
+    console.error('[feedback] like failed', err);
+    showToast(fbErrorMessage(err));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+fbForm.addEventListener('submit', submitFeedback);
+fbContent.addEventListener('input', updateFbCount);
+fbCancel.addEventListener('click', function(){
+  resetFeedbackForm();
+  setFbStatus('');
+});
+document.getElementById('fbRefresh').addEventListener('click', loadFeedback);
+document.getElementById('feedbackBack').addEventListener('click', function(){ closeFeedback(true); });
+document.getElementById('feedbackClose').addEventListener('click', function(){ closeFeedback(false); });
+feedbackModal.addEventListener('click', function(e){
+  if (e.target === feedbackModal) closeFeedback(false);
+});
+fbListEl.addEventListener('click', function(e){
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'like') toggleFeedbackLike(btn.dataset.id, btn);
+  else if (btn.dataset.action === 'edit') startFeedbackEdit(btn.dataset.id);
+  else if (btn.dataset.action === 'delete') deleteFeedback(btn.dataset.id);
+});
+
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape') return;
+  if (!feedbackModal.classList.contains('hidden')) {
+    closeFeedback(false);
+  } else if (!aboutModal.classList.contains('hidden')) {
+    closeAbout(true);
+  }
 });
 
 /* ---------------- 左 TAB：点击跳转 + 滚动联动高亮 ---------------- */
