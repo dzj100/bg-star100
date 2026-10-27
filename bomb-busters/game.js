@@ -1856,7 +1856,10 @@ function _activeMissionId() {
 
 function updateLocalProgress(win) {
   const prog = loadProgress();
-  prog[_activeMissionId()] = { passed: !!win, ts: Date.now() };
+  const id = _activeMissionId();
+  const cur = prog[id] || {};
+  // 已通关的关卡重玩失败不降级，通关记录长期保留
+  prog[id] = { passed: !!(cur.passed || win), ts: Date.now() };
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(prog)); } catch (e) {}
 }
 

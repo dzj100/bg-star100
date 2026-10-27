@@ -1019,11 +1019,17 @@ assert(g.loadProgress()[1].passed === true, '通关进度写入');
 g._olResetProgress();
 assert(g.loadProgress()[1].passed === true, '通关记录在退出房间后保留（长期进度）');
 g.updateLocalProgress(1, false, 1001);
-assert((g.loadProgress()[1] || {}).bonus >= 1, '失败结算写入进度（覆盖记录）');
+assert(g.loadProgress()[1].passed === true, '已通关关卡重玩失败不清除通关标记');
+assert((g.loadProgress()[1] || {}).bonus === 0, '已通关关卡重玩失败不增加赠送标记');
 g._olResetProgress();
-assert(!g.loadProgress()[1], '退出房间后未通关进度（赠送标记）已清除');
+assert(g.loadProgress()[1].passed === true, '重玩失败后退出房间仍保留通关记录');
+g.updateLocalProgress(2, false, 1002);
+assert((g.loadProgress()[2] || {}).bonus >= 1, '未通关关卡失败写入赠送标记');
+g.S.challenge = { id: 2 };
+g._olResetProgress();
+assert(!g.loadProgress()[2], '退出房间后未通关进度（赠送标记）已清除');
 g.dealGame(['A', 'B'], { chapter: 1, test: 1, id: 1 });
-assert(g.S.eyeBonus === 0, '重置后重建房间重开同关 eyeBonus=0');
+assert(g.S.eyeBonus === 0, '通关后重建房间重开同关 eyeBonus=0');
 
 // ── 11. 结算日志展示挑战用时（从发牌起算） ──
 console.log('\n[挑战计时]');

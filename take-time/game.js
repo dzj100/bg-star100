@@ -1374,7 +1374,8 @@ function updateLocalProgress(id, pass, stamp) {
   const prog = loadProgress();
   const cur = prog[id] || {};
   if (cur.lastStamp === stamp) return;
-  if (pass) {
+  // 已通关的关卡重玩失败不降级，通关记录长期保留
+  if (pass || cur.passed) {
     prog[id] = { bonus: 0, passed: true, lastStamp: stamp };
   } else {
     prog[id] = { bonus: Math.min((cur.bonus || 0) + 1, MAX_EYE_BONUS), passed: false, lastStamp: stamp };

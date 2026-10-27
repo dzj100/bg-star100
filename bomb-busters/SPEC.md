@@ -285,7 +285,7 @@ S = {
 }
 ```
 
-- 关卡配置：`MISSIONS[1..9]` 定义各关 `setup.standard/two`（红/黄的 draw/use/note）、`marks` 以及 #9 `orderCount` / #10 `freeCut`+`timerSec`+`timerSecTwo`+`excludeEquip` / #11 `redBlueCount`+`twoCaptainNoMark` / #12 `equipLocks`；`DEFAULT_MISSION_ID = 1`。旧存档进度按 `missionId` 分关记录（#4 沿用键 `1`）。
+- 关卡配置：`MISSIONS[1..9]` 定义各关 `setup.standard/two`（红/黄的 draw/use/note）、`marks` 以及 #9 `orderCount` / #10 `freeCut`+`timerSec`+`timerSecTwo`+`excludeEquip` / #11 `redBlueCount`+`twoCaptainNoMark` / #12 `equipLocks`；`DEFAULT_MISSION_ID = 1`。旧存档进度按 `missionId` 分关记录（#4 沿用键 `1`）。已通关关卡重玩失败不降级（`passed` 保持 `true`）；退出房间仅清除当前关卡未通关记录。
 - 关卡选择：联机等待阶段由 `room.state.pendingChallenge = { missionId }` 同步；`currentMissionId()` 优先读取 `window._olPendingChallenge`，非法值回退默认 #4。
 - 本地（非共享）：多选态（双击/三重目标）、待确认猜测、对讲机等待态渲染。
 

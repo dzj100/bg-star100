@@ -60,11 +60,13 @@ button { font-family:inherit; }
 .tab.active { color:var(--gold-l); background:rgba(255,240,214,.10); }
 .tab.active::after { content:''; position:absolute; right:0; top:0; bottom:0; width:3px; background:var(--gold-l); }
 
-/* 关于：独立固定在侧栏可视区域底部（.rail 本身向下延伸到屏幕外，不能直接放进 flex 末端） */
-.rail-about { position:fixed; left:max(0px, calc(50% - var(--shell-half))); bottom:calc(14px + env(safe-area-inset-bottom)); z-index:31; width:var(--rail-w); display:flex; flex-direction:column; align-items:center; gap:5px; padding:11px 0 10px; border:none; border-top:1px solid rgba(255,240,214,.16); background:rgba(76,50,27,.95); color:rgba(244,233,215,.62); font:inherit; font-size:.66rem; font-weight:800; letter-spacing:.08em; cursor:pointer; transition:background .18s, color .18s; }
-.rail-about:hover { color:rgba(250,241,226,.96); background:rgba(255,240,214,.07); }
-.rail-about:active { background:rgba(255,240,214,.12); }
-.rail-about .tab-ico { font-size:17px; }
+/* 留言 / 关于：独立固定在侧栏可视区域底部（.rail 本身向下延伸到屏幕外，不能直接放进 flex 末端） */
+.rail-bottom { position:fixed; left:max(0px, calc(50% - var(--shell-half))); bottom:calc(14px + env(safe-area-inset-bottom)); z-index:31; width:var(--rail-w); display:flex; flex-direction:column; border-top:1px solid rgba(255,240,214,.16); background:rgba(76,50,27,.95); }
+.rail-action { display:flex; flex-direction:column; align-items:center; gap:5px; width:100%; padding:11px 0 10px; border:none; background:transparent; color:rgba(244,233,215,.62); font:inherit; font-size:.66rem; font-weight:800; letter-spacing:.08em; cursor:pointer; transition:background .18s, color .18s; }
+.rail-action + .rail-action { border-top:1px solid rgba(255,240,214,.10); }
+.rail-action:hover { color:rgba(250,241,226,.96); background:rgba(255,240,214,.07); }
+.rail-action:active { background:rgba(255,240,214,.12); }
+.rail-action .tab-ico { font-size:17px; }
 
 /* ---------------- 内容 ---------------- */
 #portal { margin-left:var(--rail-w); min-width:0; max-width:520px; padding:16px 16px 28px; min-height:calc(100vh - var(--tb)); min-height:calc(100dvh - var(--tb)); display:flex; flex-direction:column; }
@@ -231,9 +233,14 @@ button { font-family:inherit; }
     <button class="tab" type="button" data-target="sec-online"><span class="tab-ico">🌐</span>联机</button>
   </div>
 </nav>
-<button class="rail-about" id="aboutBtn" type="button" aria-haspopup="dialog" aria-controls="aboutModal">
-  <span class="tab-ico" aria-hidden="true">ⓘ</span>关于
-</button>
+<div class="rail-bottom">
+  <button class="rail-action" id="feedbackBtn" type="button" aria-haspopup="dialog" aria-controls="feedbackModal">
+    <span class="tab-ico" aria-hidden="true">💬</span>留言
+  </button>
+  <button class="rail-action" id="aboutBtn" type="button" aria-haspopup="dialog" aria-controls="aboutModal">
+    <span class="tab-ico" aria-hidden="true">ⓘ</span>关于
+  </button>
+</div>
 
 <div id="portal">
   <main class="content">
@@ -640,6 +647,7 @@ document.getElementById('resetBtn').addEventListener('click', function(){
 /* ---------------- 关于弹窗 ---------------- */
 var ABOUT = window.ABOUT_DATA || {};
 var aboutBtn = document.getElementById('aboutBtn');
+var feedbackBtn = document.getElementById('feedbackBtn');
 var aboutModal = document.getElementById('aboutModal');
 var aboutTitle = document.getElementById('aboutTitle');
 var aboutBack = document.getElementById('aboutBack');
@@ -792,6 +800,7 @@ function closeAbout(focusBack){
 }
 
 aboutBtn.addEventListener('click', openAbout);
+feedbackBtn.addEventListener('click', function(){ openFeedback(feedbackBtn); });
 document.getElementById('aboutClose').addEventListener('click', function(){ closeAbout(true); });
 aboutBack.addEventListener('click', function(){ showAboutView('home'); });
 aboutModal.addEventListener('click', function(e){
@@ -853,7 +862,7 @@ document.getElementById('aboutMenu').addEventListener('click', function(e){
   if (action === 'changelog') showAboutView('changelog');
   else if (action === 'support') showAboutView('support');
   else if (action === 'disclaimer') showAboutView('disclaimer');
-  else if (action === 'feedback') openFeedbackFromAbout();
+  else if (action === 'feedback') openFeedback(aboutBtn);
   else if (action === 'share') shareSite();
   else if (action === 'clear-plays') clearPlays();
 });
@@ -1109,9 +1118,15 @@ async function loadFeedback(){
   }
 }
 
-function openFeedbackFromAbout(){
+var fbFromAbout = false;
+var fbFocusTarget = null;
+
+function openFeedback(fromEl){
+  fbFromAbout = fromEl === aboutBtn;
+  fbFocusTarget = fromEl || aboutBtn;
   aboutModal.classList.add('hidden');
   feedbackModal.classList.remove('hidden');
+  document.getElementById('feedbackBack').hidden = !fbFromAbout;
   document.body.classList.add('modal-open');
   if (!fbLoaded) {
     fbLoaded = true;
@@ -1125,14 +1140,14 @@ function openFeedbackFromAbout(){
 function closeFeedback(backToAbout){
   feedbackModal.classList.add('hidden');
   resetFeedbackForm();
-  if (backToAbout) {
+  if (backToAbout && fbFromAbout) {
     aboutModal.classList.remove('hidden');
     showAboutView('home');
     document.body.classList.add('modal-open');
     document.getElementById('aboutClose').focus();
   } else {
     document.body.classList.remove('modal-open');
-    aboutBtn.focus();
+    (fbFocusTarget || aboutBtn).focus();
   }
 }
 

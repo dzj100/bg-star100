@@ -948,6 +948,27 @@ await t('进度：按实际关卡记录，#5 通关不覆盖 #4', () => {
   assert(!prog['1'], '不应写入 #4');
 });
 
+await t('进度：已通关关卡重玩失败不清除通关标记', () => {
+  const g = dealMission(2, ['A', 'B', 'C']);
+  g.updateLocalProgress(true);
+  g.updateLocalProgress(false);
+  let prog = JSON.parse(g.localStorage.getItem('bomb-progress'));
+  assert(prog['2'] && prog['2'].passed, '重玩失败后仍保留通关');
+  g._olResetProgress();
+  prog = JSON.parse(g.localStorage.getItem('bomb-progress'));
+  assert(prog['2'] && prog['2'].passed, '退出房间后仍保留通关');
+});
+
+await t('进度：未通关关卡失败仍会在退出房间时清除', () => {
+  const g = dealMission(3, ['A', 'B', 'C']);
+  g.updateLocalProgress(false);
+  let prog = JSON.parse(g.localStorage.getItem('bomb-progress'));
+  assert(prog['3'] && prog['3'].passed === false, '失败应先记录为未通关');
+  g._olResetProgress();
+  prog = JSON.parse(g.localStorage.getItem('bomb-progress'));
+  assert(!prog['3'], '退出房间后未通关记录应清除');
+});
+
 await t('再来一局：沿用本局关卡（刷新后选关丢失也不回退 #4）', () => {
   const g = dealMission(5, ['A', 'B', 'C']);
   const S = st(g);
