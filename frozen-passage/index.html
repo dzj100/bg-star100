@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f2f7fa">
+<meta name="description" content="流冰航路 The Frozen Passage — 单人合作解谜桌游的数字改编。铺满 15 张冰山卡，让颜色连成航路、数字依次递增。">
+<title>流冰航路 · The Frozen Passage</title>
+<link rel="stylesheet" href="style.css?v=20261027j">
+</head>
+<body>
+<div class="sky-glow" aria-hidden="true"></div>
+<div class="snow-field" aria-hidden="true"></div>
+
+<div class="page-deco" aria-hidden="true">
+  <svg class="deco deco-compass" viewBox="0 0 160 160" focusable="false">
+    <g fill="none" stroke="currentColor" stroke-width="1.2">
+      <circle cx="80" cy="80" r="62" opacity=".7"/>
+      <circle cx="80" cy="80" r="47" stroke-dasharray="2 7" opacity=".8"/>
+      <circle cx="80" cy="80" r="6"/>
+      <path d="M80 8v12M80 140v12M8 80h12M140 80h12" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M80 22l9 50-9-8-9 8Z" fill="#c43c34" stroke="none" opacity=".55"/>
+      <path d="M80 138l-9-50 9 8 9-8Z" fill="#1768b5" stroke="none" opacity=".45"/>
+    </g>
+  </svg>
+  <svg class="deco deco-route" viewBox="0 0 260 120" focusable="false">
+    <g fill="none" stroke-linecap="round">
+      <path d="M8 98C50 94 58 38 106 34s54 52 106 24" stroke="#5a93b8" stroke-width="1.3" stroke-dasharray="3 8" opacity=".85"/>
+      <circle cx="106" cy="34" r="3.2" stroke="#1768b5" stroke-width="1.2" opacity=".8"/>
+      <circle cx="160" cy="58" r="3.2" stroke="#1768b5" stroke-width="1.2" opacity=".8"/>
+      <path d="M18 24l7 7m0-7-7 7M236 90l6 6m0-6-6 6" stroke="#c43c34" stroke-width="1.2" opacity=".6"/>
+    </g>
+  </svg>
+  <svg class="deco deco-berg" viewBox="0 0 260 160" focusable="false">
+    <g stroke="#8fb6cf" stroke-width="1.3" stroke-linejoin="round">
+      <path d="M22 134 64 54l20-9 24 39 19-11 35 61Z" fill="#ffffff"/>
+      <path d="M64 54l20-9 24 39-26 50H66Z" fill="#e2f0f8"/>
+      <path d="M127 73l19-11 35 72h-48Z" fill="#f4fbfe"/>
+      <path d="M84 45l9-22 9 57-15 12Z" fill="#eaf5fb"/>
+    </g>
+    <g stroke="#9fc3d8" stroke-width="1.1" stroke-linecap="round" opacity=".8" fill="none">
+      <path d="M22 134h216" stroke-dasharray="3 7"/>
+      <path d="M40 145h52M108 145h38M166 145h56" stroke-dasharray="2 8" opacity=".7"/>
+    </g>
+  </svg>
+  <svg class="deco deco-buoy" viewBox="0 0 64 92" focusable="false">
+    <path d="M32 10v50" stroke="#7f98aa" stroke-width="1.3"/>
+    <path d="M32 11l15 5-15 6Z" fill="#c43c34"/>
+    <path d="M22 60h20l-3-9H25Z" fill="#ffffff" stroke="#8f2028" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M32 86c-8-11-11-18-11-26h22c0 8-3 15-11 26Z" fill="#e0262c" stroke="#8f2028" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="M25 74h14" stroke="#ffffff" stroke-width="2" opacity=".8"/>
+    <path d="M12 89h40" stroke="#9fc3d8" stroke-width="1.1" stroke-dasharray="2 6"/>
+  </svg>
+  <svg class="deco deco-spark spark-a" viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>
+  <svg class="deco deco-spark spark-b" viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>
+  <svg class="deco deco-spark spark-c" viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>
+</div>
+
+<div id="app">
+  <section id="setupScreen" class="setup-screen" aria-label="游戏设置"></section>
+  <section id="gameScreen" class="game-screen" aria-label="流冰航路对局" hidden></section>
+</div>
+
+<div id="overlay" class="overlay" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 class="sheet-title" id="sheetTitle"></h2>
+    <div class="sheet-body" id="sheetBody"></div>
+    <div class="sheet-actions" id="sheetActions"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="game.js?v=20261027j"></script>
+<script src="render.js?v=20261027j"></script>
+</body>
+</html>
