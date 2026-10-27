@@ -32,7 +32,7 @@
 [hidden] { display:none !important; }
 html { scroll-behavior:smooth; }
 /* 背景 = 深胡桃木桌：底色 + 顶光 + 宽色斑 + 细木纹（SVG 噪声，无缝平铺） */
-body { font-family:-apple-system,system-ui,sans-serif; color:var(--text); min-height:100dvh; overflow-x:hidden;
+body { font-family:-apple-system,system-ui,sans-serif; color:var(--text); min-height:100vh; min-height:100dvh; overflow-x:hidden;
   background-color:var(--bg);
   background-image:
     radial-gradient(1100px 620px at 50% -120px, rgba(255,226,178,.18), rgba(255,226,178,0) 72%),
@@ -67,7 +67,7 @@ button { font-family:inherit; }
 .rail-about .tab-ico { font-size:17px; }
 
 /* ---------------- 内容 ---------------- */
-#portal { margin-left:var(--rail-w); min-width:0; max-width:520px; padding:16px 16px 28px; min-height:calc(100dvh - var(--tb)); display:flex; flex-direction:column; }
+#portal { margin-left:var(--rail-w); min-width:0; max-width:520px; padding:16px 16px 28px; min-height:calc(100vh - var(--tb)); min-height:calc(100dvh - var(--tb)); display:flex; flex-direction:column; }
 .content { flex:1; min-width:0; display:flex; flex-direction:column; gap:26px; }
 .section { scroll-margin-top:calc(var(--tb) + 10px); }
 .section-head { display:flex; align-items:center; gap:8px; margin:0 2px 12px; }
@@ -91,7 +91,7 @@ button { font-family:inherit; }
 /* ---------------- 搜索弹窗 ---------------- */
 .modal-mask { position:fixed; inset:0; z-index:100; background:rgba(26,16,8,.55); display:flex; align-items:center; justify-content:center; padding:20px; }
 .modal-mask.hidden { display:none; }
-.modal { width:min(440px,100%); max-height:min(84dvh,660px); background:var(--surface); border-radius:18px; box-shadow:0 24px 60px rgba(0,0,0,.45); display:flex; flex-direction:column; overflow:hidden; animation:pop .18s ease; }
+.modal { width:min(440px,100%); max-height:84vh; max-height:min(84vh,660px); max-height:min(84dvh,660px); background:var(--surface); border-radius:18px; box-shadow:0 24px 60px rgba(0,0,0,.45); display:flex; flex-direction:column; overflow:hidden; animation:pop .18s ease; }
 @keyframes pop { from { transform:translateY(14px) scale(.98); opacity:.5; } to { transform:none; opacity:1; } }
 .modal-head { display:flex; align-items:center; justify-content:space-between; padding:15px 16px 11px; }
 .modal-head h3 { font-size:.98rem; }
@@ -127,7 +127,7 @@ button { font-family:inherit; }
 .about-back:hover { background:rgba(43,38,32,.08); color:var(--text); }
 
 .about-modal { width:min(460px,100%); }
-.about-body { overflow-y:auto; overscroll-behavior:contain; }
+.about-body { overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .about-view { display:flex; flex-direction:column; gap:13px; }
 .about-hero { display:flex; align-items:center; gap:12px; padding:2px 2px 12px; }
 .about-logo { flex:none; width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:24px; background:rgba(176,116,26,.14); border:1px solid rgba(176,116,26,.22); }
@@ -156,8 +156,8 @@ button { font-family:inherit; }
 .support-qr-label { font-size:.7rem; font-weight:700; color:var(--text-dim); }
 .about-qr-empty { padding:18px 0; text-align:center; font-size:.76rem; line-height:1.6; color:var(--text-dim); }
 
-.modal-feedback { width:min(560px,100%); height:min(88dvh,760px); max-height:88dvh; }
-.feedback-body { overflow-y:auto; overscroll-behavior:contain; }
+.modal-feedback { width:min(560px,100%); height:88vh; height:min(88vh,760px); height:min(88dvh,760px); max-height:88vh; max-height:min(88vh,760px); max-height:88dvh; }
+.feedback-body { overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .fb-form { display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--card-bg); }
 .fb-textarea { width:100%; min-height:76px; max-height:160px; resize:vertical; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font:inherit; font-size:.85rem; line-height:1.5; outline:none; transition:border-color .15s, box-shadow .15s; }
 .fb-textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(176,116,26,.18); }
@@ -189,14 +189,15 @@ button { font-family:inherit; }
 .fb-tool { border:none; background:none; padding:0; font-size:.68rem; font-weight:700; color:var(--text-dim); cursor:pointer; }
 .fb-tool.danger { color:var(--accent); }
 .fb-empty { padding:22px 0; text-align:center; font-size:.78rem; color:var(--text-dim); }
+.fb-retry { margin-top:8px; padding:5px 14px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--gold); font-size:.68rem; font-weight:800; cursor:pointer; }
 
 .toast { position:fixed; left:50%; bottom:calc(30px + env(safe-area-inset-bottom)); z-index:200; max-width:80vw; padding:9px 16px; border-radius:999px; background:rgba(43,38,32,.94); color:#f8f1e0; font-size:.75rem; font-weight:700; text-align:center; opacity:0; pointer-events:none; transform:translate(-50%,8px); transition:opacity .18s, transform .18s; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
 
 @media (max-width:560px) {
   .modal-mask { align-items:flex-end; padding:0; }
-  .modal { width:100%; max-height:82dvh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
-  .modal-feedback { height:92dvh; max-height:92dvh; }
+  .modal { width:100%; max-height:82vh; max-height:82dvh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .modal-feedback { height:92vh; height:92dvh; max-height:92vh; max-height:92dvh; }
 }
 @media (max-width:360px) {
   :root { --rail-w:50px; }
@@ -873,8 +874,6 @@ var fbSubmit = document.getElementById('fbSubmit');
 var fbCancel = document.getElementById('fbCancel');
 var fbStatus = document.getElementById('fbStatus');
 var fbListEl = document.getElementById('fbList');
-var fbClient = null;
-var fbSdkPromise = null;
 var fbToken = null;
 var fbMessages = [];
 var fbEditingId = null;
@@ -904,26 +903,45 @@ function getFeedbackToken(){
   return fbToken;
 }
 
-function getFeedbackClient(){
-  if (fbClient) return Promise.resolve(fbClient);
-  if (!fbSdkPromise) {
-    fbSdkPromise = new Promise(function(resolve, reject){
-      if (window.supabase && window.supabase.createClient) { resolve(); return; }
-      var script = document.createElement('script');
-      script.src = 'supabase.min.js?v=2.112.4';
-      script.onload = resolve;
-      script.onerror = function(){ reject(new Error('留言服务脚本加载失败')); };
-      document.head.appendChild(script);
-    }).then(function(){
-      if (!window.supabase || !window.supabase.createClient) throw new Error('留言服务初始化失败');
-      fbClient = window.supabase.createClient(FB_CONFIG.url, FB_CONFIG.anon);
-      return fbClient;
-    }).catch(function(err){
-      fbSdkPromise = null;
+/* 直接调用 PostgREST RPC，不加载 supabase-js，兼容旧版微信内核 */
+function fbRpc(fn, payload){
+  var controller = window.AbortController ? new AbortController() : null;
+  var options = {
+    method: 'POST',
+    headers: {
+      'apikey': FB_CONFIG.anon,
+      'Authorization': 'Bearer ' + FB_CONFIG.anon,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload || {})
+  };
+  if (controller) options.signal = controller.signal;
+
+  var request = fetch(FB_CONFIG.url + '/rest/v1/rpc/' + fn, options).then(function(res){
+    return res.text().then(function(text){
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) {}
+      if (res.ok) return data;
+      var msg = data && (data.message || data.error_description || data.hint || data.details);
+      var err = new Error(msg || ('请求失败（HTTP ' + res.status + '）'));
+      err.status = res.status;
       throw err;
     });
-  }
-  return fbSdkPromise;
+  });
+
+  return new Promise(function(resolve, reject){
+    var timer = setTimeout(function(){
+      if (controller) controller.abort();
+      reject(new Error('请求超时，请检查网络后重试'));
+    }, 15000);
+    request.then(function(data){
+      clearTimeout(timer);
+      resolve(data);
+    }, function(err){
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
 function setFbStatus(text, isError){
@@ -933,8 +951,12 @@ function setFbStatus(text, isError){
 
 function fbErrorMessage(err){
   var msg = (err && err.message) || '';
-  if (/failed to fetch|network|load failed/i.test(msg)) return '网络不太稳定，请稍后重试';
-  if (/schema cache|does not exist|not found|404/i.test(msg)) return '留言服务暂时不可用，请稍后再试';
+  var status = Number(err && err.status) || 0;
+  if (/failed to fetch|network|load failed|timeout|abort|超时/i.test(msg)) return '网络不太稳定，请稍后重试';
+  if (status === 401 || status === 403 || /invalid api key|jwt|unauthorized|401/i.test(msg)) return '留言服务配置异常，请稍后再试';
+  if (status === 429) return '操作太频繁，请稍后再试';
+  if (status >= 500) return '留言服务暂时不可用，请稍后再试';
+  if (status === 404 || /schema cache|does not exist|not found|404/i.test(msg)) return '留言服务暂时不可用，请稍后再试';
   return msg || '操作失败，请稍后再试';
 }
 
@@ -1062,10 +1084,8 @@ async function loadFeedback(){
   setFbStatus('加载留言中…');
   fbListEl.innerHTML = '<div class="fb-empty">加载中…</div>';
   try {
-    var sb = await getFeedbackClient();
-    var res = await sb.rpc('feedback_list', { p_token: getFeedbackToken() });
-    if (res.error) throw res.error;
-    fbMessages = res.data || [];
+    var data = await fbRpc('feedback_list', { p_token: getFeedbackToken() });
+    fbMessages = data || [];
     renderFeedback();
     setFbStatus('');
     return true;
@@ -1076,6 +1096,13 @@ async function loadFeedback(){
     var empty = document.createElement('div');
     empty.className = 'fb-empty';
     empty.textContent = '留言暂时加载失败，请稍后再试';
+    var retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'fb-retry';
+    retry.textContent = '重新加载';
+    retry.addEventListener('click', loadFeedback);
+    empty.appendChild(document.createElement('br'));
+    empty.appendChild(retry);
     fbListEl.appendChild(empty);
     setFbStatus(fbErrorMessage(err), true);
     return false;
@@ -1148,20 +1175,17 @@ async function submitFeedback(e){
   fbSubmit.disabled = true;
   setFbStatus(editing ? '保存中…' : '发布中…');
   try {
-    var sb = await getFeedbackClient();
     var payload = {
       p_token: getFeedbackToken(),
       p_nickname: nickname,
       p_content: content
     };
-    var res;
     if (editing) {
       payload.p_id = editing;
-      res = await sb.rpc('feedback_update', payload);
+      await fbRpc('feedback_update', payload);
     } else {
-      res = await sb.rpc('feedback_create', payload);
+      await fbRpc('feedback_create', payload);
     }
-    if (res.error) throw res.error;
     writeStored(FB_NICK_KEY, nickname);
     resetFeedbackForm();
     var ok = await loadFeedback();
@@ -1181,9 +1205,7 @@ async function deleteFeedback(id){
   fbBusy = true;
   setFbStatus('删除中…');
   try {
-    var sb = await getFeedbackClient();
-    var res = await sb.rpc('feedback_delete', { p_id: id, p_token: getFeedbackToken() });
-    if (res.error) throw res.error;
+    await fbRpc('feedback_delete', { p_id: id, p_token: getFeedbackToken() });
     if (fbEditingId && String(fbEditingId) === String(id)) resetFeedbackForm();
     var ok = await loadFeedback();
     if (ok) setFbStatus('已删除');
@@ -1199,10 +1221,8 @@ async function toggleFeedbackLike(id, btn){
   if (!btn || btn.disabled) return;
   btn.disabled = true;
   try {
-    var sb = await getFeedbackClient();
-    var res = await sb.rpc('feedback_toggle_like', { p_id: id, p_token: getFeedbackToken() });
-    if (res.error) throw res.error;
-    var data = res.data || {};
+    var data = await fbRpc('feedback_toggle_like', { p_id: id, p_token: getFeedbackToken() });
+    data = data || {};
     var liked = !!data.liked;
     var likes = Number(data.likes) || 0;
     for (var i = 0; i < fbMessages.length; i++) {
