@@ -5,7 +5,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
   var COLORS = ['blue', 'red', 'black'];
   var COLOR_NAME = { blue: '蓝', red: '红', black: '黑' };
   var COLOR_EN = { blue: 'Blue', red: 'Red', black: 'Black' };
@@ -14,7 +14,7 @@
   var ITEM_POOL = ['inuit', 'inuit', 'sled', 'sled', 'log', 'log'];
   var ITEM_NAME = { inuit: '因纽特智慧', sled: '狗拉雪橇', log: '航海日志' };
   var ITEM_DESC = {
-    inuit: '放置后，可在其旁边追加一张同数字手牌',
+    inuit: '本回合放置时，你可以在已放置的卡牌旁边放置数字相同的卡牌',
     sled: '将一张手牌放回抽牌堆底部，再从供应堆取一张',
     log: '用一张手牌替换一张已放置的卡牌'
   };
@@ -181,23 +181,36 @@
     var leftCard = left ? CARDS[left.cardId] : null;
     var rightCard = right ? CARDS[right.cardId] : null;
 
+    /*
+     * 因纽特智慧：本回合的这次放置，可以在同行已放置卡牌的紧邻位置
+     * 放下相同数字的牌。隔空的同数字不算“旁边”，仍按严格递增判定，
+     * 否则中间空位会永远无法填入。航海日志换牌不享受该放宽。
+     */
+    var wisdom = opts.wisdom != null ? !!opts.wisdom : !!state.wisdom;
+
     if (leftCard) {
-      if (opts.inuitPairWith === left.id) {
-        if (card.number !== leftCard.number) {
-          return { ok: false, code: 'pair', message: '因纽特配对必须是相同数字' };
-        }
-      } else if (card.number <= leftCard.number) {
-        return { ok: false, code: 'number-left', message: '需大于同行左侧最近的卡牌' };
+      var leftSame = wisdom && left.index === slot.index - 1 && card.number === leftCard.number;
+      if (!leftSame && card.number <= leftCard.number) {
+        return {
+          ok: false,
+          code: 'number-left',
+          message: wisdom
+            ? '需大于同行左侧卡牌，或与紧邻的卡牌同数字'
+            : '需大于同行左侧最近的卡牌'
+        };
       }
     }
 
     if (rightCard) {
-      if (opts.inuitPairWith === right.id) {
-        if (card.number !== rightCard.number) {
-          return { ok: false, code: 'pair', message: '因纽特配对必须是相同数字' };
-        }
-      } else if (card.number >= rightCard.number) {
-        return { ok: false, code: 'number-right', message: '需小于同行右侧最近的卡牌' };
+      var rightSame = wisdom && right.index === slot.index + 1 && card.number === rightCard.number;
+      if (!rightSame && card.number >= rightCard.number) {
+        return {
+          ok: false,
+          code: 'number-right',
+          message: wisdom
+            ? '需小于同行右侧卡牌，或与紧邻的卡牌同数字'
+            : '需小于同行右侧最近的卡牌'
+        };
       }
     }
 
@@ -262,10 +275,10 @@
     };
   }
 
-  function legalPlacements(state, cardId) {
+  function legalPlacements(state, cardId, opts) {
     var out = [];
     state.board.slots.forEach(function (slot) {
-      var r = canPlace(state, cardId, slot.id);
+      var r = canPlace(state, cardId, slot.id, opts);
       if (r.ok) {
         out.push({
           slotId: slot.id,
@@ -288,35 +301,30 @@
 
   /* ---------------- 物品选项 ---------------- */
 
-  function inuitOptions(state) {
-    var p = state.pendingInuit;
-    if (!p) return [];
-    var placedSlot = slotById(state, p.placedSlotId);
-    if (!placedSlot || !placedSlot.cardId) return [];
-    if (!hasUnusedItem(state, 'inuit')) return [];
-    var placedCard = CARDS[placedSlot.cardId];
+  /* 使用因纽特智慧后才会变为合法的落点（依赖紧邻同数字） */
+  function inuitPlacements(state) {
     var out = [];
+    if (!hasUnusedItem(state, 'inuit')) return out;
     state.hand.forEach(function (cardId) {
-      var card = CARDS[cardId];
-      if (!card || card.number !== placedCard.number) return;
-      [-1, 1].forEach(function (d) {
-        var idx = placedSlot.index + d;
-        if (idx < 1 || idx > placedSlot.row) return;
-        var target = slotByPos(state, placedSlot.row, idx);
-        if (!target || target.cardId) return;
-        var r = canPlace(state, cardId, target.id, { inuitPairWith: placedSlot.id });
-        if (r.ok) {
-          out.push({
-            cardId: cardId,
-            slotId: target.id,
-            row: target.row,
-            index: target.index,
-            newRoute: r.newRoute
-          });
-        }
+      legalPlacements(state, cardId, { wisdom: true }).forEach(function (p) {
+        if (canPlace(state, cardId, p.slotId, { wisdom: false }).ok) return;
+        out.push({
+          cardId: cardId,
+          slotId: p.slotId,
+          row: p.row,
+          index: p.index,
+          colorMatches: p.colorMatches,
+          newRoute: p.newRoute
+        });
       });
     });
     return out;
+  }
+
+  function canUseInuit(state) {
+    return (state.phase === 'place' || state.phase === 'stuck') &&
+      !state.wisdom && hasUnusedItem(state, 'inuit') &&
+      inuitPlacements(state).length > 0;
   }
 
   function logOptions(state) {
@@ -327,7 +335,8 @@
       state.hand.forEach(function (cardId) {
         var r = canPlace(state, cardId, slot.id, {
           ignoreOccupied: true,
-          requireUpperColor: true
+          requireUpperColor: true,
+          wisdom: false
         });
         if (r.ok) {
           out.push({
@@ -403,7 +412,6 @@
   }
 
   function toRefillOrNext(state) {
-    state.pendingInuit = null;
     if (state.supply.length > 0) {
       state.phase = 'refill';
     } else {
@@ -413,7 +421,7 @@
 
   function startNextTurn(state) {
     state.turn += 1;
-    state.pendingInuit = null;
+    state.wisdom = false;
     if (state.hand.length === 0) {
       state.phase = 'lost';
       state.lossReason = 'no-hand';
@@ -442,7 +450,7 @@
       supply: [],
       draw: [],
       items: [],
-      pendingInuit: null,
+      wisdom: false,
       log: [],
       lastAction: null,
       lossReason: null,
@@ -499,88 +507,55 @@
     var check = canPlace(state, cardId, slotId);
     if (!check.ok) return check;
 
+    var usedWisdom = !!state.wisdom;
     var next = clone(state);
     removeFromHand(next, cardId);
     slotById(next, slotId).cardId = cardId;
+    next.wisdom = false;
 
     next.lastAction = {
       type: 'place',
       cardId: cardId,
       slotId: slotId,
       turn: next.turn,
-      newRoute: check.newRoute
+      newRoute: check.newRoute,
+      wisdom: usedWisdom
     };
     next.log.push({
       turn: next.turn,
       type: 'place',
       cardId: cardId,
       slotId: slotId,
-      newRoute: check.newRoute
+      newRoute: check.newRoute,
+      wisdom: usedWisdom
     });
 
     if (isFull(next)) {
       next.phase = 'won';
-      next.pendingInuit = null;
       next.log.push({ turn: next.turn, type: 'won' });
       return { ok: true, state: next };
     }
 
-    next.pendingInuit = { placedSlotId: slotId, cardId: cardId };
-    if (inuitOptions(next).length > 0) {
-      next.phase = 'afterPlace';
-    } else {
-      toRefillOrNext(next);
-    }
-    return { ok: true, state: next };
-  }
-
-  function skipInuit(state) {
-    if (state.phase !== 'afterPlace') return fail('phase', '当前没有因纽特智慧的追加放置');
-    var next = clone(state);
-    next.log.push({ turn: next.turn, type: 'skip-inuit' });
     toRefillOrNext(next);
     return { ok: true, state: next };
   }
 
-  function useInuit(state, cardId, slotId) {
-    if (state.phase !== 'afterPlace') return fail('phase', '当前不能使用因纽特智慧');
-    if (!state.pendingInuit) return fail('phase', '没有刚放置的卡牌');
+  function useInuit(state) {
+    if (state.phase !== 'place' && state.phase !== 'stuck') {
+      return fail('phase', '因纽特智慧要在本回合放置前使用');
+    }
+    if (state.wisdom) return fail('item', '本回合已经使用了因纽特智慧');
     if (!hasUnusedItem(state, 'inuit')) return fail('item', '因纽特智慧已用完');
-    var placedSlot = slotById(state, state.pendingInuit.placedSlotId);
-    if (!placedSlot || !placedSlot.cardId) return fail('state', '刚放置的卡牌不存在');
-    var placedCard = CARDS[placedSlot.cardId];
-    var card = CARDS[cardId];
-    if (!card) return fail('card', '卡牌不存在');
-    if (state.hand.indexOf(cardId) < 0) return fail('hand', '手牌中没有这张卡牌');
-    if (card.number !== placedCard.number) return fail('pair', '必须使用与刚放置卡牌相同数字的手牌');
-    var target = slotById(state, slotId);
-    if (!target || target.row !== placedSlot.row || Math.abs(target.index - placedSlot.index) !== 1) {
-      return fail('adjacent', '必须放在刚放置卡牌同一行的左右相邻空位');
+    if (inuitPlacements(state).length === 0) {
+      return fail('target', '当前没有可与紧邻卡牌同数字的落点');
     }
-    var check = canPlace(state, cardId, slotId, { inuitPairWith: placedSlot.id });
-    if (!check.ok) return check;
 
     var next = clone(state);
-    removeFromHand(next, cardId);
-    slotById(next, slotId).cardId = cardId;
     markItemUsed(next, 'inuit');
-    next.log.push({
-      turn: next.turn,
-      type: 'inuit',
-      cardId: cardId,
-      slotId: slotId,
-      pairSlotId: placedSlot.id
-    });
-    next.lastAction = { type: 'inuit', cardId: cardId, slotId: slotId, turn: next.turn };
-
-    if (isFull(next)) {
-      next.phase = 'won';
-      next.pendingInuit = null;
-      next.log.push({ turn: next.turn, type: 'won' });
-      return { ok: true, state: next };
-    }
-
-    toRefillOrNext(next);
+    next.wisdom = true;
+    next.log.push({ turn: next.turn, type: 'inuit' });
+    next.lastAction = { type: 'inuit', turn: next.turn };
+    if (next.phase === 'stuck') next.phase = 'place';
     return { ok: true, state: next };
   }
 
@@ -638,7 +613,8 @@
     if (state.hand.indexOf(handCardId) < 0) return fail('hand', '手牌中没有这张卡牌');
     var check = canPlace(state, handCardId, slotId, {
       ignoreOccupied: true,
-      requireUpperColor: true
+      requireUpperColor: true,
+      wisdom: false
     });
     if (!check.ok) return check;
 
@@ -731,13 +707,13 @@
     canPlace: canPlace,
     legalPlacements: legalPlacements,
     hasAnyLegalPlacement: hasAnyLegalPlacement,
-    inuitOptions: inuitOptions,
+    inuitPlacements: inuitPlacements,
+    canUseInuit: canUseInuit,
     logOptions: logOptions,
     canUseSled: canUseSled,
     canUseLog: canUseLog,
     analyzeRoutes: analyzeRoutes,
     placeCard: placeCard,
-    skipInuit: skipInuit,
     useInuit: useInuit,
     chooseSupply: chooseSupply,
     useSled: useSled,

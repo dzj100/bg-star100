@@ -28,7 +28,7 @@ function fresh(difficulty, seed) {
 function clearBoard(s) {
   s.board.slots.forEach(function (slot) { slot.cardId = null; });
   s.phase = 'place';
-  s.pendingInuit = null;
+  s.wisdom = false;
   s.turn = 1;
   s.lossReason = null;
   s.lossHint = false;
@@ -334,30 +334,71 @@ test('不同行允许相同数字（斜向相邻）', function () {
   assert.ok(r.ok);
 });
 
-test('因纽特智慧允许配对同数字，其他邻接仍需递增', function () {
+test('因纽特智慧：左右紧邻 3/5 时中间 3、4、5 都可放', function () {
   var s = fresh('novice', 1);
   clearBoard(s);
   put(s, 1, 1, 'blue-4');
-  put(s, 2, 1, 'blue-5');
-  assert.strictEqual(FP.canPlace(s, 'red-5', 'r2-2').ok, false);
-  assert.ok(FP.canPlace(s, 'red-5', 'r2-2', { inuitPairWith: 'r2-1' }).ok);
+  put(s, 2, 1, 'blue-1');
+  put(s, 2, 2, 'red-9');
+  put(s, 3, 1, 'blue-3');
+  put(s, 3, 3, 'red-5');
+
+  assert.ok(FP.canPlace(s, 'black-4', 'r3-2').ok, '原本只有 4 合法');
+  assert.strictEqual(FP.canPlace(s, 'black-3', 'r3-2').ok, false);
+  assert.strictEqual(FP.canPlace(s, 'black-5', 'r3-2').ok, false);
+
+  assert.ok(FP.canPlace(s, 'black-3', 'r3-2', { wisdom: true }).ok);
+  assert.ok(FP.canPlace(s, 'black-4', 'r3-2', { wisdom: true }).ok);
+  assert.ok(FP.canPlace(s, 'black-5', 'r3-2', { wisdom: true }).ok);
+  assert.strictEqual(FP.canPlace(s, 'black-2', 'r3-2', { wisdom: true }).ok, false);
+  assert.strictEqual(FP.canPlace(s, 'black-6', 'r3-2', { wisdom: true }).ok, false);
 });
 
-test('因纽特配对另一侧仍须严格递增', function () {
+test('因纽特智慧不能跨越空位配对同数字', function () {
   var s = fresh('novice', 1);
   clearBoard(s);
-  put(s, 1, 1, 'red-4');
-  put(s, 2, 1, 'red-2');
-  put(s, 2, 2, 'red-8');
-  put(s, 3, 1, 'red-5');
-  put(s, 3, 3, 'red-4');
+  put(s, 1, 1, 'blue-8');
+  put(s, 2, 1, 'blue-4');
+  put(s, 2, 2, 'red-7');
+  put(s, 3, 1, 'black-1');
+  put(s, 3, 2, 'blue-2');
+  put(s, 3, 3, 'red-5');
+  put(s, 4, 1, 'blue-3');
+  put(s, 4, 4, 'red-6');
+
+  assert.strictEqual(FP.canPlace(s, 'black-3', 'r4-3').ok, false);
   assert.strictEqual(
-    FP.canPlace(s, 'red-5', 'r3-2', { inuitPairWith: 'r3-1' }).ok,
+    FP.canPlace(s, 'black-3', 'r4-3', { wisdom: true }).ok,
     false,
-    '右侧最近卡必须大于 5，配对的等值豁免不能扩散'
+    '左邻 3 隔着空位，不算“旁边”'
   );
-  put(s, 3, 3, 'red-7');
-  assert.ok(FP.canPlace(s, 'red-5', 'r3-2', { inuitPairWith: 'r3-1' }).ok);
+  assert.strictEqual(FP.canPlace(s, 'black-6', 'r4-3').ok, false);
+  assert.ok(
+    FP.canPlace(s, 'black-6', 'r4-3', { wisdom: true }).ok,
+    '右邻 6 紧邻时可以同数字'
+  );
+});
+
+test('因纽特智慧不适用于航海日志换牌', function () {
+  var s = fresh('novice', 1);
+  clearBoard(s);
+  setItems(s, ['log']);
+  put(s, 1, 1, 'blue-4');
+  put(s, 2, 1, 'blue-1');
+  put(s, 2, 2, 'red-9');
+  put(s, 3, 1, 'blue-3');
+  put(s, 3, 2, 'black-4');
+  put(s, 3, 3, 'red-5');
+  setHand(s, ['black-3', 'black-8']);
+  s.wisdom = true;
+
+  assert.strictEqual(
+    FP.logOptions(s).some(function (o) { return o.slotId === 'r3-2' && o.cardId === 'black-3'; }),
+    false
+  );
+  var r = FP.useLog(s, 'r3-2', 'black-3');
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'number-left');
 });
 
 /* ---------------- 6. 规则④ 目标卡 ---------------- */
@@ -549,45 +590,88 @@ test('狗拉雪橇可在 stuck 中解救', function () {
 
 console.log('\n[10] 物品');
 
-test('因纽特智慧：追加同数字牌，只补 1 张', function () {
+test('因纽特智慧：使用后本回合可与紧邻卡牌同数字，且只放 1 补 1', function () {
   var s = fresh('novice', 61);
   clearBoard(s);
   setItems(s, ['inuit']);
   put(s, 1, 1, 'blue-4');
-  setHand(s, ['blue-5', 'red-5', 'black-1', 'black-2']);
+  put(s, 2, 1, 'blue-5');
+  setHand(s, ['red-5', 'black-1', 'black-2', 'black-3']);
   s.phase = 'place';
   var drawBefore = s.draw.length;
 
-  var r = FP.placeCard(s, 'blue-5', 'r2-1');
-  assert.ok(r.ok);
-  s = r.state;
-  assert.strictEqual(s.phase, 'afterPlace');
-  var opts = FP.inuitOptions(s);
+  assert.strictEqual(FP.canPlace(s, 'red-5', 'r2-2').ok, false, '未使用时不能放同数字');
+  var opts = FP.inuitPlacements(s);
   assert.ok(opts.some(function (o) { return o.cardId === 'red-5' && o.slotId === 'r2-2'; }));
+  assert.strictEqual(FP.canUseInuit(s), true);
 
-  var u = FP.useInuit(s, 'red-5', 'r2-2');
+  var u = FP.useInuit(s);
   assert.ok(u.ok);
   s = u.state;
-  assert.strictEqual(s.phase, 'refill');
-  assert.strictEqual(s.hand.length, 2);
+  assert.strictEqual(s.wisdom, true);
   assert.strictEqual(s.items[0].used, true);
+  assert.strictEqual(s.phase, 'place');
+  assert.strictEqual(FP.canUseInuit(s), false, '同一回合不可重复使用');
+  assert.strictEqual(FP.useInuit(s).ok, false);
+
+  var r = FP.placeCard(s, 'red-5', 'r2-2');
+  assert.ok(r.ok);
+  s = r.state;
+  assert.strictEqual(s.wisdom, false, '放置后加成结束');
+  assert.strictEqual(s.phase, 'refill');
   assert.strictEqual(FP.slotByPos(s, 2, 2).cardId, 'red-5');
 
   s = FP.chooseSupply(s, s.supply[0]).state;
-  assert.strictEqual(s.hand.length, 3);
+  assert.strictEqual(s.phase, 'place');
+  assert.strictEqual(s.hand.length, 4);
   assert.strictEqual(s.draw.length, drawBefore - 1, '整回合只从抽牌堆补 1 张');
 });
 
-test('因纽特智慧不可用于不同数字/不相邻位置', function () {
+test('因纽特智慧：没有紧邻同数字落点时不可使用', function () {
   var s = fresh('novice', 62);
   clearBoard(s);
   setItems(s, ['inuit']);
   put(s, 1, 1, 'blue-4');
   setHand(s, ['blue-5', 'red-6', 'black-1', 'black-2']);
   s.phase = 'place';
-  s = FP.placeCard(s, 'blue-5', 'r2-1').state;
-  assert.strictEqual(s.phase, 'refill', '没有同数字可选时不进入 afterPlace');
-  assert.strictEqual(FP.useInuit(s, 'red-6', 'r2-2').ok, false);
+
+  assert.strictEqual(FP.inuitPlacements(s).length, 0);
+  assert.strictEqual(FP.canUseInuit(s), false);
+  var u = FP.useInuit(s);
+  assert.strictEqual(u.ok, false);
+  assert.strictEqual(u.code, 'target');
+  assert.strictEqual(s.items[0].used, false, '失败不消耗物品');
+  assert.strictEqual(FP.placeCard(s, 'blue-5', 'r2-1').ok, true, '普通放置不受影响');
+});
+
+test('因纽特智慧可在 stuck 中解救', function () {
+  var s = fresh('novice', 68);
+  clearBoard(s);
+  setItems(s, ['inuit']);
+  var ids = Object.keys(FP.CARDS).filter(function (id) {
+    return id !== 'blue-4' && id !== 'blue-5' && id !== 'red-5';
+  });
+  var cursor = 0;
+  s.board.slots.forEach(function (slot) {
+    if (slot.id === 'r1-1') { slot.cardId = 'blue-4'; return; }
+    if (slot.id === 'r2-1') { slot.cardId = 'blue-5'; return; }
+    if (slot.id === 'r2-2') return;
+    slot.cardId = ids[cursor++];
+  });
+  setHand(s, ['red-5']);
+  s.phase = 'stuck';
+  s.lossHint = true;
+
+  assert.strictEqual(FP.hasAnyLegalPlacement(s), false);
+  assert.strictEqual(FP.canUseInuit(s), true);
+  var u = FP.useInuit(s);
+  assert.ok(u.ok);
+  s = u.state;
+  assert.strictEqual(s.phase, 'place');
+  var r = FP.placeCard(s, 'red-5', 'r2-2');
+  assert.ok(r.ok);
+  assert.strictEqual(FP.slotByPos(r.state, 2, 2).cardId, 'red-5');
+  assert.strictEqual(r.state.phase, 'won');
 });
 
 test('狗拉雪橇：手牌回抽牌堆底部，取走供应堆并补足', function () {

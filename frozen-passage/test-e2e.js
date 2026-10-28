@@ -53,10 +53,6 @@ async function startViaSetup(page, diff) {
 
 async function drainTurnEnd(page) {
   await sleep(180);
-  if (await count(page, '#sheet [data-action="skip-inuit"]')) {
-    await page.click('#sheet [data-action="skip-inuit"]');
-    await sleep(160);
-  }
   if (await count(page, '#sheet [data-action="choose-supply"]')) {
     await page.click('#sheet [data-action="choose-supply"]');
     await sleep(160);
@@ -78,7 +74,6 @@ const buildWin14 = (page) => page.evaluate(() => {
     let s = F.createGame({ seed, difficulty: 'novice' });
     let guard = 0;
     while (guard++ < 200) {
-      if (s.phase === 'afterPlace') { s = F.skipInuit(s).state; continue; }
       if (s.phase === 'refill') { s = F.chooseSupply(s, s.supply[0]).state; continue; }
       if (s.phase !== 'place') break;
       const placed = s.board.slots.filter((x) => x.cardId).length;
@@ -104,7 +99,6 @@ const buildStuck = (page, wantRescue) => page.evaluate((wantRescue) => {
     let s = F.createGame({ seed, difficulty: 'novice' });
     let guard = 0;
     while (guard++ < 200) {
-      if (s.phase === 'afterPlace') { s = F.skipInuit(s).state; continue; }
       if (s.phase === 'refill') { s = F.chooseSupply(s, s.supply[0]).state; continue; }
       if (s.phase !== 'place') break;
       let move = null;
@@ -120,43 +114,36 @@ const buildStuck = (page, wantRescue) => page.evaluate((wantRescue) => {
     if (s.phase !== 'stuck') continue;
     const canSled = F.canUseSled(s);
     const canLog = F.canUseLog(s);
-    const rescue = canSled || canLog;
-    if (wantRescue === null || rescue === wantRescue) return { seed, state: s, rescue, canSled, canLog };
+    const canInuit = F.canUseInuit(s);
+    const rescue = canSled || canLog || canInuit;
+    if (wantRescue === null || rescue === wantRescue) return { seed, state: s, rescue, canSled, canLog, canInuit };
   }
   return null;
 }, wantRescue);
 
 const buildInuit = (page) => page.evaluate(() => {
   const F = window.FrozenPassage;
-  for (let seed = 1; seed <= 400; seed++) {
-    let s = F.createGame({ seed, difficulty: 'novice' });
-    if (!s.items.some((i) => i.type === 'inuit' && !i.used)) continue;
-    let guard = 0;
-    while (guard++ < 60) {
-      if (s.phase === 'afterPlace') { s = F.skipInuit(s).state; continue; }
-      if (s.phase === 'refill') { s = F.chooseSupply(s, s.supply[0]).state; continue; }
-      if (s.phase !== 'place') break;
-      for (const cardId of s.hand) {
-        for (const spot of F.legalPlacements(s, cardId)) {
-          const r = F.placeCard(s, cardId, spot.slotId);
-          if (r.ok && r.state.phase === 'afterPlace') {
-            const opts = F.inuitOptions(r.state);
-            if (opts.length) return { state: s, cardId, slotId: spot.slotId, option: opts[0] };
-          }
-        }
-      }
-      let move = null;
-      for (const cardId of s.hand) {
-        const spots = F.legalPlacements(s, cardId);
-        if (spots.length) { move = { cardId, slotId: spots[0].slotId }; break; }
-      }
-      if (!move) break;
-      const r = F.placeCard(s, move.cardId, move.slotId);
-      if (!r.ok) break;
-      s = r.state;
-    }
-  }
-  return null;
+  const s = F.createGame({ seed: 12345, difficulty: 'novice' });
+  s.board.slots.forEach((slot) => { slot.cardId = null; });
+  const put = (r, i, id) => { F.slotByPos(s, r, i).cardId = id; };
+  put(1, 1, 'blue-4');
+  put(2, 1, 'blue-1'); put(2, 2, 'black-7');
+  put(3, 1, 'blue-3'); put(3, 3, 'black-5');
+  const boardIds = ['blue-4', 'blue-1', 'black-7', 'blue-3', 'black-5'];
+  const hand = ['black-3', 'black-5', 'red-1', 'red-2'];
+  const rest = Object.keys(F.CARDS).filter((id) => boardIds.indexOf(id) < 0 && hand.indexOf(id) < 0);
+  s.hand = hand.slice();
+  s.supply = rest.slice(0, 3);
+  s.draw = rest.slice(3);
+  s.items = [
+    { id: 'item-1', type: 'inuit', used: false },
+    { id: 'item-2', type: 'sled', used: false },
+    { id: 'item-3', type: 'log', used: false }
+  ];
+  s.phase = 'place';
+  s.turn = 7;
+  s.wisdom = false;
+  return { state: s, cardId: 'black-3', slotId: 'r3-2' };
 });
 
 const buildLogScenario = (page) => page.evaluate(() => {
@@ -173,7 +160,6 @@ const buildLogScenario = (page) => page.evaluate(() => {
     let r = F.placeCard(s, move.cardId, move.slotId);
     if (!r.ok) continue;
     s = r.state;
-    if (s.phase === 'afterPlace') s = F.skipInuit(s).state;
     if (s.phase === 'refill') s = F.chooseSupply(s, s.supply[0]).state;
     if (s.phase !== 'place') continue;
     const opts = F.logOptions(s);
@@ -202,8 +188,35 @@ const buildLogStartCase = (page) => page.evaluate(() => {
   ];
   s.phase = 'place';
   s.turn = 7;
-  s.pendingInuit = null;
+  s.wisdom = false;
   return { state: s };
+});
+
+const buildInuitStuck = (page) => page.evaluate(() => {
+  const F = window.FrozenPassage;
+  const s = F.createGame({ seed: 12345, difficulty: 'novice' });
+  s.board.slots.forEach((slot) => { slot.cardId = null; });
+  const ids = Object.keys(F.CARDS).filter((id) => id !== 'blue-4' && id !== 'blue-5' && id !== 'red-5');
+  let cursor = 0;
+  s.board.slots.forEach((slot) => {
+    if (slot.id === 'r1-1') { slot.cardId = 'blue-4'; return; }
+    if (slot.id === 'r2-1') { slot.cardId = 'blue-5'; return; }
+    if (slot.id === 'r2-2') return;
+    slot.cardId = ids[cursor++];
+  });
+  s.hand = ['red-5'];
+  s.supply = ids.slice(cursor, cursor + 3);
+  s.draw = ids.slice(cursor + 3);
+  s.items = [
+    { id: 'item-1', type: 'inuit', used: false },
+    { id: 'item-2', type: 'sled', used: false },
+    { id: 'item-3', type: 'log', used: false }
+  ];
+  s.phase = 'stuck';
+  s.lossHint = true;
+  s.turn = 8;
+  s.wisdom = false;
+  return { state: s, cardId: 'red-5', slotId: 'r2-2' };
 });
 
 const buildSledScenario = (page) => page.evaluate(() => {
@@ -254,7 +267,7 @@ const buildColorBlockCase = (page) => page.evaluate(() => {
   s.draw = rest.slice(3);
   s.phase = 'place';
   s.turn = 9;
-  s.pendingInuit = null;
+  s.wisdom = false;
   return { state: s, cardId: 'black-9', slotId: 'r4-4' };
 });
 
@@ -453,29 +466,75 @@ async function testColorContinuityRule(browser) {
 }
 
 async function testInuitItem(browser) {
-  console.log('\n[6] 因纽特智慧：追加放置');
+  console.log('\n[6] 因纽特智慧：本回合紧邻同数字');
   const { context, page } = await newTestPage(browser);
   const sc = await buildInuit(page);
-  if (!sc) { ok(false, '构造因纽特场景'); await context.close(); return; }
   await page.evaluate((st) => window.FrozenPassageApp.restore(st), sc.state);
   await sleep(250);
   const before = await getState(page);
+  ok(before.phase === 'place' && before.wisdom === false, '残局处于放置阶段');
 
-  await placeViaUI(page, sc.cardId, sc.slotId);
-  await sleep(220);
-  ok(await count(page, '[data-action="inuit-option"]') > 0, '追加层列出配对选项');
-  const optionSel = `[data-action="inuit-option"][data-card="${sc.option.cardId}"][data-slot="${sc.option.slotId}"]`;
-  await page.click(optionSel);
+  await page.click(`.hand-card[data-card="${sc.cardId}"]`);
+  await page.click(`.slot[data-slot="${sc.slotId}"]`);
   await sleep(150);
-  ok(await count(page, '[data-action="use-inuit"]') === 1, '确认追加按钮出现');
+  let toast = await page.textContent('.toast.is-show').catch(() => '');
+  ok(toast.indexOf('大于') >= 0 || toast.indexOf('紧邻') >= 0, '未使用物品时同数字被拦截', toast);
+  ok(await page.locator('#overlay').isHidden(), '拦截时不弹出确认层');
+
+  await page.click('[data-action="item"][data-type="inuit"]');
+  await page.waitForSelector('[data-action="use-inuit"]');
+  ok((await page.textContent('#sheetBody')).indexOf('紧邻') >= 0, '使用层说明紧邻豁免');
+  ok(await count(page, '[data-action="inuit-option"]') > 0, '使用层列出豁免落点');
   await page.click('[data-action="use-inuit"]');
+  await sleep(220);
+
+  let s = await getState(page);
+  ok(s.wisdom === true, '因纽特智慧本回合生效');
+  ok(s.items.filter((i) => i.type === 'inuit')[0].used === true, '物品已翻面');
+  ok(await count(page, '.info-chip.is-wisdom') === 1, '信息条显示因纽特智慧标记');
+  ok(await count(page, `.hand-card[data-card="${sc.cardId}"].is-selected`) === 1, '激活后保留选牌');
+
+  await page.click(`.slot[data-slot="${sc.slotId}"]`);
+  await page.waitForSelector('[data-action="confirm-place"]');
+  const confirmText = await page.textContent('#sheetBody');
+  ok(confirmText.indexOf('因纽特智慧') >= 0, '确认层注明因纽特智慧生效', confirmText);
+  await page.click('[data-action="confirm-place"]');
   await drainTurnEnd(page);
 
-  const s = await getState(page);
-  ok(placedCount(s) === placedCount(before) + 2, '追加后共多放 1 张', '实际 ' + placedCount(s));
-  ok(s.items.filter((i) => i.type === 'inuit')[0].used === true, '因纽特智慧标记已用');
-  ok(s.hand.length === before.hand.length - 1, '追加后只补 1 张', '实际 ' + s.hand.length);
+  s = await getState(page);
+  ok(s.board.slots.find((x) => x.id === sc.slotId).cardId === sc.cardId, '紧邻同数字卡牌落下');
+  ok(placedCount(s) === placedCount(before) + 1, '本回合只多放 1 张', '实际 ' + placedCount(s));
+  ok(s.wisdom === false, '放置后效果结束');
   ok(s.turn === before.turn + 1, '进入下一回合');
+  ok(s.hand.length === 4, '仍然只补 1 张', '实际 ' + s.hand.length);
+  await context.close();
+}
+
+async function testInuitStuckRescue(browser) {
+  console.log('\n[6b] 因纽特智慧：卡住时解救');
+  const { context, page } = await newTestPage(browser);
+  const sc = await buildInuitStuck(page);
+  await page.evaluate((st) => window.FrozenPassageApp.restore(st), sc.state);
+  await sleep(250);
+  ok((await page.textContent('.sheet-title')).indexOf('无法放置') >= 0, '卡住时自动弹出救援层');
+  ok(await count(page, '#sheet [data-action="stuck-inuit"]') === 1, '救援层提供因纽特智慧');
+
+  await page.click('#sheet [data-action="stuck-inuit"]');
+  await page.waitForSelector('[data-action="use-inuit"]');
+  await page.click('[data-action="use-inuit"]');
+  await sleep(250);
+  let s = await getState(page);
+  ok(s.phase === 'place' && s.wisdom === true, '使用后解除卡住');
+  ok(s.items.filter((i) => i.type === 'inuit')[0].used === true, '因纽特智慧标记已用');
+
+  await page.click(`.hand-card[data-card="${sc.cardId}"]`);
+  await page.click(`.slot[data-slot="${sc.slotId}"]`);
+  await page.waitForSelector('[data-action="confirm-place"]');
+  await page.click('[data-action="confirm-place"]');
+  await sleep(350);
+  s = await getState(page);
+  ok(placedCount(s) === 15 && s.phase === 'won', '紧邻同数字完成填满', s.phase + ' ' + placedCount(s));
+  ok(await count(page, '.sheet-title') === 1, '胜利结算层打开');
   await context.close();
 }
 
@@ -611,7 +670,7 @@ async function testStuckAndLoss(browser) {
     await sleep(250);
     ok(await count(t1.page, '.sheet-title') === 1, '卡住时自动弹出救援层');
     ok((await t1.page.textContent('.sheet-title')).indexOf('无法放置') >= 0, '救援层标题正确');
-    const rescueBtn = await count(t1.page, '#sheet [data-action="stuck-sled"], #sheet [data-action="stuck-log"]');
+    const rescueBtn = await count(t1.page, '#sheet [data-action="stuck-sled"], #sheet [data-action="stuck-log"], #sheet [data-action="stuck-inuit"]');
     ok(rescueBtn > 0, '救援层提供物品选项');
     if (sc.canSled) {
       await t1.page.click('#sheet [data-action="stuck-sled"]');
@@ -635,6 +694,14 @@ async function testStuckAndLoss(browser) {
       const rescued = await getState(t1.page);
       ok(rescued.items.filter((i) => i.type === 'log')[0].used === true, '航海日志解救已使用');
       ok(rescued.phase === 'place' || rescued.phase === 'stuck', '解救后回到可继续状态', rescued.phase);
+    } else if (sc.canInuit) {
+      await t1.page.click('#sheet [data-action="stuck-inuit"]');
+      await t1.page.waitForSelector('#sheet [data-action="use-inuit"]');
+      await t1.page.click('#sheet [data-action="use-inuit"]');
+      await sleep(250);
+      const rescued = await getState(t1.page);
+      ok(rescued.items.filter((i) => i.type === 'inuit')[0].used === true, '因纽特智慧解救已使用');
+      ok(rescued.phase === 'place' && rescued.wisdom === true, '解救后回到可放置状态', rescued.phase);
     }
   } else {
     ok(false, '构造可解救的卡住场景');
@@ -792,6 +859,7 @@ async function testLayoutsAndConsole(browser) {
     await testGoalColorRule(browser);
     await testColorContinuityRule(browser);
     await testInuitItem(browser);
+    await testInuitStuckRescue(browser);
     await testSledItem(browser);
     await testLogItem(browser);
     await testLogStartUpperColor(browser);

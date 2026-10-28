@@ -14,9 +14,9 @@
 
   var DIFF_NAME = { novice: '新手', medium: '中等', expert: '专家' };
   var DIFF_DESC = {
-    novice: '目标卡全部背面 · 先熟悉航路',
-    medium: '翻开两端与中间的目标卡',
-    expert: '5 张目标卡全开 · 颜色全约束'
+    novice: '目标卡全部背面 · 终点没有约束',
+    medium: '翻开两端与中间的目标卡 · 需按照约束颜色航行',
+    expert: '5 张目标卡全开 · 终点颜色全约束'
   };
   var DIFF_REVEAL = { novice: 0, medium: 3, expert: 5 };
   var ROUTE_COLOR = { blue: '#1768b5', red: '#c22f3c', black: '#52677d' };
@@ -158,7 +158,6 @@
 
   function phaseHint() {
     if (!S) return '还没有开始对局。';
-    if (S.phase === 'afterPlace') return '先处理因纽特智慧，或跳过追加。';
     if (S.phase === 'refill') return '先从供应堆补 1 张手牌。';
     if (S.phase === 'stuck') return '没有可放置的卡牌，试试物品。';
     if (S.phase === 'won' || S.phase === 'lost') return '本局已经结束。';
@@ -193,14 +192,19 @@
     }
     if (check.code === 'number-left') {
       var left = F.nearestOccupiedInRow(S, slot.row, slot.index, -1);
-      return '需大于同行左侧最近的 ' + (left ? cardName(left.cardId) : '卡牌') + '。';
+      var leftName = left ? cardName(left.cardId) : '卡牌';
+      return S.wisdom
+        ? '需大于左侧的 ' + leftName + '，或与紧邻卡牌同数字。'
+        : '需大于同行左侧最近的 ' + leftName + '。';
     }
     if (check.code === 'number-right') {
       var right = F.nearestOccupiedInRow(S, slot.row, slot.index, 1);
-      return '需小于同行右侧最近的 ' + (right ? cardName(right.cardId) : '卡牌') + '。';
+      var rightName = right ? cardName(right.cardId) : '卡牌';
+      return S.wisdom
+        ? '需小于右侧的 ' + rightName + '，或与紧邻卡牌同数字。'
+        : '需小于同行右侧最近的 ' + rightName + '。';
     }
     if (check.code === 'occupied') return '这个位置已经有卡牌了。需要替换可用航海日志。';
-    if (check.code === 'pair') return '因纽特智慧必须配对相同数字。';
     return check.message || '不能放在这里。';
   }
 
@@ -487,7 +491,7 @@
           '<p class="setup-foot">启程时选择难度 · 进度自动保存在本机</p>' +
         '</div>' +
       '</div>' +
-      '<footer class="credit" aria-label="制作者 imStar100">' +
+      '<footer class="credit" aria-label="@imStar100">' +
         '<span class="credit-rule" aria-hidden="true"></span>' +
         '<svg class="credit-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/>' +
@@ -545,31 +549,32 @@
     var actions = '';
 
     if (S.phase === 'place') {
+      var wisdomChip = S.wisdom
+        ? '<span class="info-chip is-wisdom"><i></i>因纽特智慧</span>'
+        : '';
       if (view.selected) {
         var count = view.placements.length;
-        chip = cardChip(view.selected);
+        chip = wisdomChip + cardChip(view.selected);
         if (PREFS.hints) {
           text = count > 0
             ? '可放 <b>' + count + '</b> 个位置 · 点按闪烁空位'
             : '这张牌目前无处可放';
-          tone = count > 0 ? '' : 'is-warn';
+          tone = count > 0 ? (S.wisdom ? 'is-accent' : '') : 'is-warn';
         } else {
           text = '规则提示已关闭 · 直接点按空位尝试';
+          if (S.wisdom) tone = 'is-accent';
         }
         actions = '<button type="button" class="mini-btn" data-action="clear-select">取消</button>';
       } else {
-        text = PREFS.hints
-          ? '选择一张手牌，查看可放置的位置'
-          : '选择一张手牌，直接尝试放置';
+        chip = wisdomChip;
+        text = S.wisdom
+          ? '因纽特智慧生效 · 本回合可与紧邻卡牌同数字'
+          : (PREFS.hints
+            ? '选择一张手牌，查看可放置的位置'
+            : '选择一张手牌，直接尝试放置');
+        tone = S.wisdom ? 'is-accent' : '';
         side = PREFS.hints ? '手牌 ' + S.hand.length + ' · 供应 ' + S.supply.length : '提示已关';
       }
-    } else if (S.phase === 'afterPlace') {
-      tone = 'is-accent';
-      var placed = S.pendingInuit ? F.getCard(S.pendingInuit.cardId) : null;
-      if (placed) chip = cardChip(placed);
-      text = '因纽特智慧 · 可追加一张同数字手牌';
-      actions = '<button type="button" class="mini-btn" data-action="open-inuit">追加</button>' +
-        '<button type="button" class="mini-btn" data-action="skip-inuit">跳过</button>';
     } else if (S.phase === 'refill') {
       tone = 'is-accent';
       text = '补牌阶段 · 从供应堆选择 1 张';
@@ -666,9 +671,12 @@
   function itemAvailability(type) {
     if (!hasUnused(type)) return { available: false, why: '已使用' };
     if (type === 'inuit') {
+      if (S.wisdom) return { available: false, why: '本回合已生效' };
       return {
-        available: S.phase === 'afterPlace' && F.inuitOptions(S).length > 0,
-        why: '正常放置后可用'
+        available: F.canUseInuit(S),
+        why: S.phase === 'place' || S.phase === 'stuck'
+          ? '需要与紧邻卡牌同数字的落点'
+          : '放置前使用'
       };
     }
     if (type === 'sled') {
@@ -825,8 +833,7 @@
 
   /* ---------------- 规则检查渲染 ---------------- */
 
-  function ruleCheckRows(card, slot, check, opts) {
-    opts = opts || {};
+  function ruleCheckRows(card, slot, check) {
     var rows = [];
 
     var belowText;
@@ -850,38 +857,42 @@
     } else {
       colorWarn = true;
       colorText = '下方没有同色卡，将另起一条 <b>' + colorName(card.color) + '</b> 色航线。';
-      colorNote = '下方每张牌都需由上方两张之一接续；空位会在落牌时补验。';
+      colorNote = '下方每张牌都需由上方两张之一接续。';
     }
     rows.push(checkRow('颜色', colorText, colorNote, colorWarn));
 
+    var left = F.nearestOccupiedInRow(S, slot.row, slot.index, -1);
+    var right = F.nearestOccupiedInRow(S, slot.row, slot.index, 1);
+    var leftCard = left ? F.getCard(left.cardId) : null;
+    var rightCard = right ? F.getCard(right.cardId) : null;
+    var leftSame = !!(S.wisdom && leftCard && left.index === slot.index - 1 &&
+      card.number === leftCard.number);
+    var rightSame = !!(S.wisdom && rightCard && right.index === slot.index + 1 &&
+      card.number === rightCard.number);
     var numberText;
-    if (opts.pair) {
-      numberText = '与刚放下的 ' + shortCard(opts.pair.cardId) +
-        ' 同数字、同排相邻，规则③对这一对豁免。';
-      rows.push(checkRow('数字', numberText, '与这对之外的其他邻接仍严格递增。', false));
+    if (!leftCard && !rightCard) {
+      numberText = '本行暂无相邻卡牌，不受数字约束。';
     } else {
-      var left = F.nearestOccupiedInRow(S, slot.row, slot.index, -1);
-      var right = F.nearestOccupiedInRow(S, slot.row, slot.index, 1);
-      var leftCard = left ? F.getCard(left.cardId) : null;
-      var rightCard = right ? F.getCard(right.cardId) : null;
-      if (!leftCard && !rightCard) {
-        numberText = '本行暂无相邻卡牌，不受数字约束。';
-      } else {
-        var labels = [];
-        var chain = '';
-        if (leftCard) {
-          labels.push('左邻 ' + colorName(leftCard.color) + ' ' + leftCard.number);
-          chain += leftCard.number + ' &lt; ';
-        }
-        chain += '<b>' + card.number + '</b>';
-        if (rightCard) {
-          labels.push('右邻 ' + colorName(rightCard.color) + ' ' + rightCard.number);
-          chain += ' &lt; ' + rightCard.number;
-        }
-        numberText = labels.join('、') + '：' + chain + '。';
+      var labels = [];
+      var chain = '';
+      if (leftCard) {
+        labels.push('左邻 ' + colorName(leftCard.color) + ' ' + leftCard.number);
+        chain += leftCard.number + (leftSame ? ' ≤ ' : ' &lt; ');
       }
-      rows.push(checkRow('数字', numberText, '', false));
+      chain += '<b>' + card.number + '</b>';
+      if (rightCard) {
+        labels.push('右邻 ' + colorName(rightCard.color) + ' ' + rightCard.number);
+        chain += (rightSame ? ' ≤ ' : ' &lt; ') + rightCard.number;
+      }
+      numberText = labels.join('、') + '：' + chain + '。';
     }
+    var numberNote = '';
+    if (S.wisdom) {
+      numberNote = (leftSame || rightSame)
+        ? '因纽特智慧生效：与紧邻卡牌同数字，隔空仍不允许。'
+        : '因纽特智慧生效：本次放置也可与紧邻卡牌同数字。';
+    }
+    rows.push(checkRow('数字', numberText, numberNote, false));
 
     var goal = slot.row === 5 ? goalForSlot(slot.id) : null;
     var goalText;
@@ -944,6 +955,9 @@
       title: '确认放置',
       body: placementPreview(card, slot, subtitle) +
         '<div class="check-list">' + ruleCheckRows(card, slot, check) + '</div>' +
+        (S.wisdom
+          ? '<p class="sheet-note">因纽特智慧已生效：本次放置允许与紧邻卡牌同数字。</p>'
+          : '') +
         '<p class="sheet-note">放下后不可撤销；接着从供应堆补 1 张手牌。</p>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">再看看</button>' +
         '<button type="button" class="btn btn-primary" data-action="confirm-place">放下这张牌</button>'
@@ -963,74 +977,57 @@
       '</button>';
     }).join('');
     var legend = S.draw.length
-      ? '抽牌堆剩余 ' + S.draw.length + ' 张 · 取走后供应堆会补足。'
+      ? '抽牌堆剩余 ' + S.draw.length + ' 张 · 取走后供应堆会补足 3 张。'
       : '抽牌堆已空 · 供应堆取走后不再补足。';
     return {
       title: '补充手牌',
-      body: '<p class="sheet-lead">从供应堆选择 1 张加入手牌。牌背只显示颜色，数字要拿到手里才知道。</p>' +
+      body: '<p class="sheet-lead">从供应堆选择 1 张加入手牌。</p>' +
         '<div class="refill-row">' + cards + '</div>' +
         '<p class="refill-legend">' + legend + '</p>',
-      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">看看棋盘</button>'
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">查看航线</button>'
     };
   };
 
   SHEETS.inuit = function () {
-    if (S.phase !== 'afterPlace' || !S.pendingInuit) {
-      return invalidSheet('因纽特智慧', '现在没有可追加的放置。');
+    if (!hasUnused('inuit')) {
+      return invalidSheet('因纽特智慧', '这件物品已经用过了。');
     }
-    var placedCard = F.getCard(S.pendingInuit.cardId);
-    var options = F.inuitOptions(S);
-    var body = '<p class="sheet-lead">刚放下 ' + shortCard(placedCard.id) +
-      '。可以额外放一张同数字手牌到它旁边；规则③对这一对豁免，其他邻接仍严格递增。本回合仍只补 1 张。</p>';
+    if (S.wisdom) {
+      return invalidSheet('因纽特智慧', '本回合的因纽特智慧已经生效。');
+    }
+    if (S.phase !== 'place' && S.phase !== 'stuck') {
+      return invalidSheet('因纽特智慧', '要在本回合放置手牌之前使用。');
+    }
+    var options = F.inuitPlacements(S);
+    if (!options.length) {
+      return invalidSheet('因纽特智慧', '当前没有可与紧邻卡牌同数字的落点。');
+    }
 
-    if (options.length) {
-      body += options.map(function (option) {
-        var card = F.getCard(option.cardId);
-        var target = F.slotById(S, option.slotId);
-        return '<button type="button" class="option-row" data-action="inuit-option" data-card="' +
-          option.cardId + '" data-slot="' + option.slotId +
-          '" aria-label="用 ' + colorName(card.color) + ' ' + card.number + ' 追加到' + posLabel(target) + '">' +
-          '<span class="pick-card color-' + card.color + '" aria-hidden="true"><span class="pick-inner">' +
-            card.number + '</span></span>' +
-          '<span class="option-text"><b>' + colorName(card.color) + ' ' + card.number + ' → ' +
-            posLabel(target) + '</b><span>' +
-            (option.newRoute ? '另起一条' + colorName(card.color) + '色航线' : '接入同色航路') +
-            ' · 与刚放置的牌配对</span></span>' +
-          '<span class="tag">同数字</span>' +
-        '</button>';
-      }).join('');
-    } else {
-      body += '<div class="stuck-empty">没有可追加的同数字手牌，或旁边没有合法空位。</div>';
-    }
+    var body = '<p class="sheet-lead">使用后，本回合的这次放置可以把牌放到已放置卡牌的紧邻位置，即使数字相同。' +
+      '例如同一行左边 3、右边 5，中间原本只能放 4；使用后 3、4、5 都可以放。隔空的同数字仍然不行。</p>';
+
+    body += options.map(function (option) {
+      var card = F.getCard(option.cardId);
+      var target = F.slotById(S, option.slotId);
+      return '<button type="button" class="option-row" data-action="inuit-option" data-card="' +
+        option.cardId + '" data-slot="' + option.slotId +
+        '" aria-label="使用因纽特智慧，把 ' + colorName(card.color) + ' ' + card.number +
+        ' 放到' + posLabel(target) + '">' +
+        '<span class="pick-card color-' + card.color + '" aria-hidden="true"><span class="pick-inner">' +
+          card.number + '</span></span>' +
+        '<span class="option-text"><b>' + colorName(card.color) + ' ' + card.number + ' → ' +
+          posLabel(target) + '</b><span>与紧邻卡牌同数字 · 本回合放宽数字规则</span></span>' +
+        '<span class="tag">同数字</span>' +
+      '</button>';
+    }).join('');
 
     return {
       title: '因纽特智慧',
-      body: body + '<p class="sheet-note">关闭后再点“追加”可以回来；跳过则直接进入补牌。</p>',
-      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">看看棋盘</button>' +
-        '<button type="button" class="btn btn-ghost" data-action="skip-inuit">跳过追加</button>'
-    };
-  };
-
-  SHEETS.inuitConfirm = function (sheet) {
-    var card = F.getCard(sheet.cardId);
-    var target = F.slotById(S, sheet.slotId);
-    if (!card || !target || !S.pendingInuit || S.phase !== 'afterPlace') {
-      return invalidSheet('追加失败', '手牌或位置已经变化，请重新选择。');
-    }
-    var placedSlot = F.slotById(S, S.pendingInuit.placedSlotId);
-    if (!placedSlot) return invalidSheet('追加失败', '刚放置的卡牌不存在。');
-    var check = F.canPlace(S, card.id, target.id, { inuitPairWith: placedSlot.id });
-    if (!check.ok) return invalidSheet('追加失败', placementErrorText(check, target, card));
-
-    return {
-      title: '追加同数字卡牌',
-      body: placementPreview(card, target, '紧邻刚放下的 ' + cardName(placedSlot.cardId)) +
-        '<div class="check-list">' +
-          ruleCheckRows(card, target, check, { pair: { cardId: placedSlot.cardId } }) +
-        '</div>' +
-        '<p class="sheet-note">使用后因纽特智慧翻面，本回合不再额外补牌。</p>',
-      actions: '<button type="button" class="btn btn-ghost" data-action="inuit-back">重新选择</button>' +
-        '<button type="button" class="btn btn-primary" data-action="use-inuit">确认追加</button>'
+      body: body +
+        '<p class="sheet-note">点击落点会直接使用物品并进入放置确认；也可以直接使用，再自行选择手牌。' +
+        '本回合仍只放 1 张、补 1 张。</p>',
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">取消</button>' +
+        '<button type="button" class="btn btn-primary" data-action="use-inuit">直接使用</button>'
     };
   };
 
@@ -1168,7 +1165,7 @@
         shortCard(sheet.cardId) + '。' + routeText + '。' +
         '<br>换下的牌会回到手牌并重新排序。</p>';
     } else if (sheet.slotId) {
-      preview = '<p class="sheet-note">选择一张高亮的手牌，预览替换结果。</p>';
+      preview = '<p class="sheet-note">选择一张符合规则的手牌，预览替换结果。</p>';
     } else {
       preview = '<p class="sheet-note">先选择要替换的位置。</p>';
     }
@@ -1188,12 +1185,26 @@
   SHEETS.stuck = function () {
     if (S.phase !== 'stuck') return invalidSheet('无法放置', '当前不是卡住状态。');
     var rows = '';
-    ['sled', 'log'].forEach(function (type) {
+    ['inuit', 'sled', 'log'].forEach(function (type) {
       if (!hasUnused(type)) return;
-      var can = type === 'sled' ? F.canUseSled(S) : F.canUseLog(S);
-      var reason = type === 'sled'
-        ? (S.supply.length ? '把手牌放回牌堆底，从供应堆换一张。' : '供应堆为空，无法换牌。')
-        : (can ? '替换一张已放置的卡牌，重新寻找落点。' : '没有手牌能放进已放置的位置。');
+      var can;
+      var reason;
+      if (type === 'inuit') {
+        can = F.canUseInuit(S);
+        reason = can
+          ? '使用后本回合可与紧邻卡牌同数字。'
+          : '没有可与紧邻卡牌同数字的落点。';
+      } else if (type === 'sled') {
+        can = F.canUseSled(S);
+        reason = S.supply.length
+          ? '把手牌放回牌堆底，从供应堆换一张。'
+          : '供应堆为空，无法换牌。';
+      } else {
+        can = F.canUseLog(S);
+        reason = can
+          ? '替换一张已放置的卡牌。'
+          : '没有手牌能放进已放置的位置。';
+      }
       rows += '<div class="rescue-row">' +
         '<span class="rescue-icon" aria-hidden="true">' + itemIcon(type) + '</span>' +
         '<span class="rescue-text"><b>' + F.ITEM_NAME[type] + '</b><span>' + reason + '</span></span>' +
@@ -1207,14 +1218,10 @@
       rows = '<div class="stuck-empty">物品已经用尽，没有别的办法了。</div>';
     }
 
-    var note = hasUnused('inuit')
-      ? '<p class="sheet-note">因纽特智慧只能紧跟正常放置使用，本回合已无法使用。</p>'
-      : '';
-
     return {
       title: '无法放置',
       body: '<p class="sheet-lead">当前手牌没有任何合法落点。可以尝试尚未使用的物品，或宣告航路中断。</p>' +
-        '<div class="stuck-list">' + rows + '</div>' + note,
+        '<div class="stuck-list">' + rows + '</div>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">再看看</button>' +
         '<button type="button" class="btn btn-danger" data-action="declare-loss">宣告失败</button>'
     };
@@ -1241,8 +1248,8 @@
       sub = '第 ' + S.turn + ' 回合 · 主动宣告失败';
     }
     var flavor = won
-      ? '十五座冰山各就各位，颜色与数字在极夜里连成一条完整的航路。'
-      : '冰面在最后一格前合拢。换一种顺序，也许下一次就能通过。';
+      ? '十五座冰山各就各位，成功穿越了西北航线！'
+      : '冰面在最后一格前合拢，再接再厉，也许下一次就能通过！';
     return {
       title: '本局结算',
       body: '<div class="result-hero">' +
@@ -1293,8 +1300,9 @@
             '<span class="menu-icon" aria-hidden="true">' + ICONS.home + '</span>返回设置' +
             '<span class="menu-sub">自动保存</span></button>' +
         '</div>' +
-        '<div class="stats-table">' + miniStatsRows() + '</div>' +
-        '<p class="menu-seed">种子 ' + S.seed + ' · 版本 v' + S.version + '</p>',
+        '<div class="stats-table">' + miniStatsRows() + '</div>' 
+        //+ '<p class="menu-seed">种子 ' + S.seed + ' · 版本 v' + S.version + '</p>'
+        ,
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">继续航路</button>'
     };
   };
@@ -1312,39 +1320,38 @@
   }
 
   var RULE_TABS = [
-    { key: 'flow', label: '流程' },
-    { key: 'rules', label: '四条规则' },
-    { key: 'items', label: '物品' },
-    { key: 'ending', label: '胜负' }
+    { key: 'flow', label: '回合流程' },
+    { key: 'rules', label: '放置规则' },
+    { key: 'items', label: '物品介绍' },
+    { key: 'ending', label: '胜负判定' }
   ];
 
   function rulePanel(tab) {
     if (tab === 'rules') {
-      return '<p class="rule-lead">每次放牌都要同时满足四条规则。第 1 行在起始卡上，颜色任意。</p>' +
-        '<div class="rule-item"><h4><em>①</em>支撑</h4><p>第 2 行起，下面需要的卡牌必须已经放好：两端各看一张，中间看两张。不允许悬空。</p></div>' +
-        '<div class="rule-item"><h4><em>②</em>颜色 / 航线</h4><p>下方每张牌，其上方的两张牌中至少要有 1 张与它同色——两张里接上一张即可。若新牌与下方都不同色，可以另起新颜色，但这一色之后必须一路向上接续，直到第 5 行。</p><p class="rule-example">例：下方蓝 2 的上方已有蓝 5 接续，而下方黑 5 的上方只有红 8，此处就必须放黑色。颜色另用形状双重编码：蓝＝波浪，红＝三角，黑＝菱形。</p></div>' +
-        '<div class="rule-item"><h4><em>③</em>数字</h4><p>同一行从左到右严格递增。只比较同行最近的左右邻，空格不参与；不同行可以出现相同数字。</p><p class="rule-example">因纽特智慧允许刚放置的牌与旁边一张同数字手牌成对，仅这一对豁免。</p></div>' +
-        '<div class="rule-item"><h4><em>④</em>目标卡</h4><p>第 5 行若目标卡正面朝上，所放卡牌必须与目标卡同色。背面朝上时不约束。</p></div>';
+      return '<p class="rule-lead">每次放牌都要同时满足四条规则（除了第 1 行在起始卡上，颜色任意）</p>' +
+        '<div class="rule-item"><h4><em>①</em>支撑</h4><p>第 2 行起，下面需要的卡牌必须已经放好：两端各需一张，中间需两张。</p></div>' +
+        '<div class="rule-item"><h4><em>②</em>颜色 / 航线</h4><p>上方的 2 张牌中至少要有 1 张与它下方相邻牌同色</p><p class="rule-example">例：已知第二行的蓝 2 的上方已有蓝 5 接续，而第二行的黑 5 的上方只有红 8，则第三行空缺的那张必须放黑色。</p></div>' +
+        '<div class="rule-item"><h4><em>③</em>数字</h4><p>同一行从左到右严格递增。相同的数字不能相邻放置。</p><p class="rule-example">使用“因纽特智慧”后，本回合的这次放置可以在已放置卡牌的旁边放同数字的牌（例如左边 3、右边 5，中间 3、4、5 都行）；隔空的同数字仍不允许。</p></div>' +
+        '<div class="rule-item"><h4><em>④</em>目标卡</h4><p>第 5 行若目标卡正面朝上，所放卡牌必须与目标卡同色。目标卡未启用时不约束。</p></div>';
     }
     if (tab === 'items') {
       return '<p class="rule-lead">单人局从 6 个标记中随机抽 3 个，允许出现同类标记；每个标记只能用一次。</p>' +
-        '<div class="rule-item"><h4><em>❄</em>因纽特智慧</h4><p>正常放置后，可把一张同数字手牌放到刚放下的牌旁边。第二张不额外补牌。</p></div>' +
-        '<div class="rule-item"><h4><em>橇</em>狗拉雪橇</h4><p>把一张手牌放回抽牌堆底部，再从供应堆取一张。供应堆随后从抽牌堆补足。</p></div>' +
-        '<div class="rule-item"><h4><em>卷</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>' +
+        '<div class="rule-item"><h4><em>❄</em>因纽特智慧</h4><p>在本回合放置前使用。本回合的这次放置可以把牌放到已放置卡牌的紧邻位置，即使数字相同；隔空的同数字仍不允许。仍然只放 1 张、补 1 张。</p></div>' +
+        '<div class="rule-item"><h4><em>🐕</em>狗拉雪橇</h4><p>把一张手牌放回抽牌堆底部，再从供应堆取一张。供应堆随后从抽牌堆补足。</p></div>' +
+        '<div class="rule-item"><h4><em>📅</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>' +
         '<p class="sheet-note">卡住时可以先试试尚未使用的雪橇或日志；物品使用后不可撤销。</p>';
     }
     if (tab === 'ending') {
       return '<p class="rule-lead">胜负只看两件事：能否填满，以及是否还有合法落点。</p>' +
-        '<div class="rule-item"><h4>胜利</h4><p>15 个位置全部放满立即胜利，不再补牌。因纽特智慧追加的牌同样计入。</p></div>' +
-        '<div class="rule-item"><h4>失败</h4><p>轮到你时，手牌没有任何合法落点，且物品也无法解救，即航路中断。可以在卡住界面主动宣告失败。</p></div>' +
-        '<p class="rule-verse">没有平局。<b>提示：</b>颜色没连到第 5 行不是额外失败条件，但会让第 5 行的落子更难。</p>';
+        '<div class="rule-item"><h4>胜利</h4><p>15 个位置全部放满立即胜利。</p></div>' +
+        '<div class="rule-item"><h4>失败</h4><p>轮到你时，手牌没有任何合法落点，且物品也无法解救，即航路中断。可以在卡住界面主动宣告失败。</p></div>';
     }
     return '<p class="rule-lead">把 15 张冰山卡填满倒三角。每回合放置 1 张、补 1 张；当没有任何合法落点时，航路中断。</p>' +
       miniPyramid() +
       '<ol class="rule-steps">' +
-        '<li><b>设置</b><span>5 张目标卡在第 5 行下方，起始卡在第 1 行下方。新手 0 张目标卡正面，中等 1/3/5，专家 5 张全开。</span></li>' +
-        '<li><b>放置</b><span>从 4 张手牌中选 1 张放到合法空位，必须满足支撑、颜色、数字、目标卡四条规则。</span></li>' +
-        '<li><b>补牌</b><span>从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足。抽牌堆空后供应堆会减少。</span></li>' +
+        '<li><b>设置</b><span>5 张目标卡在第 5 行上方，起始卡在第 1 行下方。新手 0 张目标卡正面，中等 3 张（左中右），专家 5 张（全部）。</span></li>' +
+        '<li><b>放置</b><span>从手牌中选 1 张放到合法空位，必须满足支撑、颜色、数字、目标卡四条规则。</span></li>' +
+        '<li><b>补牌</b><span>从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足。</span></li>' +
         '<li><b>结束</b><span>填满 15 位立即胜利；无法放置且物品也无法解救，就是失败。</span></li>' +
       '</ol>' +
       '<p class="rule-verse"><b>起点提示：</b>第一张牌放在起始卡上，颜色任意。</p>';
@@ -1362,7 +1369,7 @@
       title: '流冰航路 · 规则',
       body: '<div class="rule-tabs" role="tablist" aria-label="规则分类">' + tabs + '</div>' +
         rulePanel(tab) +
-        '<p class="rules-foot">原创数字改编 · 单人模式 · 目标卡背面不会透露颜色</p>',
+        '<p class="rules-foot">流冰航路 · 单人模式</p>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">关闭</button>'
     };
   };
@@ -1379,7 +1386,7 @@
   SHEETS.voyage = function () {
     return {
       title: '启程',
-      body: '<p class="sheet-lead">选择难度后出发。难度只影响第 5 行目标卡的翻开数量，其余规则相同。</p>' +
+      body: '<p class="sheet-lead">选择难度后出发。难度只影响终点目标卡的翻开数量，其余规则相同。</p>' +
         '<div class="difficulty-list">' + difficultyCards() + '</div>' +
         '<div class="mini-stats" aria-live="polite">' + statsLine(PREFS.difficulty) + '</div>' +
         (S ? '<p class="sheet-note">开始新航路会覆盖当前存档，航行记录保留。</p>' : ''),
@@ -1456,15 +1463,16 @@
     if (!S) return;
     if (S.phase === 'won' || S.phase === 'lost') openSheet('result');
     else if (S.phase === 'refill') openSheet('refill');
-    else if (S.phase === 'afterPlace') openSheet('inuit');
     else if (S.phase === 'stuck') openSheet('stuck');
   }
 
   function commit(next, opts) {
     opts = opts || {};
     var previousPhase = S ? S.phase : null;
+    var keepSelection = opts.keepSelection && UI.selectedCardId &&
+      next.hand.indexOf(UI.selectedCardId) >= 0 ? UI.selectedCardId : null;
     S = next;
-    UI.selectedCardId = null;
+    UI.selectedCardId = keepSelection;
     UI.animateSlotId = opts.animateSlotId || null;
     UI.animateHandCardId = opts.animateHandCardId || null;
     if (animTimer) clearTimeout(animTimer);
@@ -1479,7 +1487,6 @@
     render();
 
     var willOpen = opts.prompt !== false && (
-      (S.phase === 'afterPlace' && previousPhase !== 'afterPlace') ||
       (S.phase === 'refill' && previousPhase !== 'refill') ||
       (S.phase === 'stuck' && previousPhase !== 'stuck') ||
       ((S.phase === 'won' || S.phase === 'lost') && previousPhase !== S.phase)
@@ -1488,9 +1495,7 @@
     if (opts.toast && !willOpen) toast(opts.toast, opts.tone);
 
     if (opts.prompt !== false) {
-      if (S.phase === 'afterPlace' && previousPhase !== 'afterPlace') {
-        openSheet('inuit');
-      } else if (S.phase === 'refill' && previousPhase !== 'refill') {
+      if (S.phase === 'refill' && previousPhase !== 'refill') {
         openSheet('refill');
       } else if (S.phase === 'stuck' && previousPhase !== 'stuck') {
         openSheet('stuck');
@@ -1552,6 +1557,7 @@
     if (!UI.sheet || UI.sheet.type !== 'confirm') return;
     var card = F.getCard(UI.sheet.cardId);
     var slot = F.slotById(S, UI.sheet.slotId);
+    var wasWisdom = !!S.wisdom;
     var result = F.placeCard(S, UI.sheet.cardId, UI.sheet.slotId);
     if (!result.ok) {
       toast(result.message || '无法放置。', 'warn');
@@ -1560,6 +1566,7 @@
     var newRoute = result.state.lastAction && result.state.lastAction.newRoute;
     var message = '放下 ' + cardName(card.id) + ' · ' +
       (slot.row === 1 ? '航路起点' : (newRoute ? '另起' + colorName(card.color) + '色航线' : '接入同色航路'));
+    if (wasWisdom) message += ' · 因纽特智慧';
     commit(result.state, { animateSlotId: slot.id, toast: message });
   }
 
@@ -1580,28 +1587,22 @@
     });
   }
 
-  function applyInuit() {
-    if (!UI.sheet || UI.sheet.type !== 'inuitConfirm') return;
-    var card = F.getCard(UI.sheet.cardId);
-    var slot = F.slotById(S, UI.sheet.slotId);
-    var result = F.useInuit(S, UI.sheet.cardId, UI.sheet.slotId);
+  function activateInuit() {
+    var result = F.useInuit(S);
     if (!result.ok) {
-      toast(result.message || '无法追加。', 'warn');
-      return;
+      toast(result.message || '无法使用因纽特智慧。', 'warn');
+      return false;
     }
     commit(result.state, {
-      animateSlotId: slot.id,
-      toast: '因纽特智慧：追加 ' + cardName(card.id)
+      keepSelection: true,
+      toast: '因纽特智慧生效 · 本回合可与紧邻卡牌同数字'
     });
+    return true;
   }
 
-  function skipInuit() {
-    var result = F.skipInuit(S);
-    if (!result.ok) {
-      toast(result.message || '无法跳过。', 'warn');
-      return;
-    }
-    commit(result.state, { toast: '跳过追加' });
+  function openInuitOption(cardId, slotId) {
+    if (!activateInuit()) return;
+    openSheet('confirm', { cardId: cardId, slotId: slotId });
   }
 
   function applySled() {
@@ -1672,8 +1673,19 @@
       return;
     }
     if (type === 'inuit') {
-      if (S.phase === 'afterPlace') openSheet('inuit');
-      else toast('因纽特智慧只能在正常放置后、补牌前使用。', 'warn');
+      if (S.wisdom) {
+        toast('本回合的因纽特智慧已经生效。');
+        return;
+      }
+      if (S.phase !== 'place' && S.phase !== 'stuck') {
+        toast(phaseHint(), 'warn');
+        return;
+      }
+      if (!F.canUseInuit(S)) {
+        toast('当前没有可与紧邻卡牌同数字的落点。', 'warn');
+        return;
+      }
+      openSheet('inuit');
       return;
     }
     if (S.phase !== 'place' && S.phase !== 'stuck') {
@@ -1791,20 +1803,12 @@
       else toast('现在不是补牌阶段。', 'warn');
     },
     'choose-supply': function (el) { chooseSupply(el.getAttribute('data-card')); },
-    'open-inuit': function () {
-      if (S.phase === 'afterPlace') openSheet('inuit');
-      else toast('现在没有可追加的放置。', 'warn');
-    },
     'inuit-option': function (el) {
-      openSheet('inuitConfirm', {
-        cardId: el.getAttribute('data-card'),
-        slotId: el.getAttribute('data-slot')
-      });
+      openInuitOption(el.getAttribute('data-card'), el.getAttribute('data-slot'));
     },
-    'inuit-back': function () { openSheet('inuit'); },
-    'use-inuit': function () { applyInuit(); },
-    'skip-inuit': function () { skipInuit(); },
+    'use-inuit': function () { activateInuit(); },
     item: function (el) { handleItem(el.getAttribute('data-type')); },
+    'stuck-inuit': function () { openSheet('inuit'); },
     'stuck-sled': function () { openSheet('sled', { handId: null, supplyId: null }); },
     'stuck-log': function () { openSheet('log', { slotId: null, cardId: null }); },
     'sled-hand': function (el) {

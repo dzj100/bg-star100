@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#f2f7fa">
-<meta name="description" content="流冰航路 The Frozen Passage — 单人合作解谜桌游的数字改编。铺满 15 张冰山卡，让颜色连成航路、数字依次递增。">
+<meta name="description" content="流冰航路 The Frozen Passage — 玩家将分别扮演一支航路探险队，通过共同打出航路板、执行行动来扩展航道，最终抵达目标卡牌所代表的彼岸。">
 <title>流冰航路 · The Frozen Passage</title>
-<link rel="stylesheet" href="style.css?v=20261027j">
+<link rel="stylesheet" href="style.css?v=20261028d">
 </head>
 <body>
 <div class="sky-glow" aria-hidden="true"></div>
@@ -31,25 +31,45 @@
       <path d="M18 24l7 7m0-7-7 7M236 90l6 6m0-6-6 6" stroke="#c43c34" stroke-width="1.2" opacity=".6"/>
     </g>
   </svg>
-  <svg class="deco deco-berg" viewBox="0 0 260 160" focusable="false">
-    <g stroke="#8fb6cf" stroke-width="1.3" stroke-linejoin="round">
-      <path d="M22 134 64 54l20-9 24 39 19-11 35 61Z" fill="#ffffff"/>
-      <path d="M64 54l20-9 24 39-26 50H66Z" fill="#e2f0f8"/>
-      <path d="M127 73l19-11 35 72h-48Z" fill="#f4fbfe"/>
-      <path d="M84 45l9-22 9 57-15 12Z" fill="#eaf5fb"/>
+  <svg class="deco deco-berg" viewBox="0 0 360 250" focusable="false">
+    <g stroke="#8fb6cf" stroke-width="1.4" stroke-linejoin="round">
+      <path d="M16 198 52 154 76 124 94 68 108 78 128 54 152 20 170 64 186 86 224 56 248 92 272 118 304 154 346 198Z" fill="#eef8fd"/>
+      <path d="M16 198 52 154 76 124 94 68 120 198Z" fill="#d7eaf6"/>
+      <path d="M94 68 128 54 152 20 170 64 186 86 170 198 120 198Z" fill="#f8fdff"/>
+      <path d="M186 86 224 56 248 92 272 118 304 154 346 198 170 198Z" fill="#e3f1fa"/>
+      <path d="M248 92 272 118 304 154 346 198 250 198Z" fill="#d1e7f4"/>
     </g>
-    <g stroke="#9fc3d8" stroke-width="1.1" stroke-linecap="round" opacity=".8" fill="none">
-      <path d="M22 134h216" stroke-dasharray="3 7"/>
-      <path d="M40 145h52M108 145h38M166 145h56" stroke-dasharray="2 8" opacity=".7"/>
+    <g fill="#ffffff" opacity=".92">
+      <path d="M152 20 170 64 160 56 150 70 140 58 128 54Z"/>
+      <path d="M94 68 108 78 100 90 88 82Z"/>
+      <path d="M224 56 248 92 236 82 222 90 214 70Z"/>
+    </g>
+    <g fill="none" stroke="#a6c8dc" stroke-width="1.1" stroke-linecap="round" opacity=".85">
+      <path d="M152 72 144 114 152 146 145 184"/>
+      <path d="M198 102 208 138 199 176"/>
+      <path d="M110 94 116 136 108 166"/>
+      <path d="M258 126 270 154 264 180"/>
+      <path d="M64 138 78 156 72 178"/>
+      <path d="M30 180 48 172M38 166 54 160"/>
+    </g>
+    <g fill="#cfe6f2" opacity=".45">
+      <path d="M52 202 76 206 84 218 38 218Z"/>
+      <path d="M152 202 178 206 186 222 128 222Z"/>
+      <path d="M304 202 328 206 338 220 286 220Z"/>
+    </g>
+    <g fill="none" stroke="#8fb6cf" stroke-width="1.2" stroke-linecap="round">
+      <path d="M8 198h344" stroke-dasharray="4 8"/>
+      <path d="M24 214h80M124 214h64M208 214h74M298 214h48" stroke-dasharray="2 9" opacity=".55"/>
+      <path d="M56 228h44M142 228h68M248 228h50" stroke-dasharray="2 9" opacity=".32"/>
     </g>
   </svg>
-  <svg class="deco deco-buoy" viewBox="0 0 64 92" focusable="false">
-    <path d="M32 10v50" stroke="#7f98aa" stroke-width="1.3"/>
-    <path d="M32 11l15 5-15 6Z" fill="#c43c34"/>
-    <path d="M22 60h20l-3-9H25Z" fill="#ffffff" stroke="#8f2028" stroke-width="1.2" stroke-linejoin="round"/>
-    <path d="M32 86c-8-11-11-18-11-26h22c0 8-3 15-11 26Z" fill="#e0262c" stroke="#8f2028" stroke-width="1.3" stroke-linejoin="round"/>
-    <path d="M25 74h14" stroke="#ffffff" stroke-width="2" opacity=".8"/>
-    <path d="M12 89h40" stroke="#9fc3d8" stroke-width="1.1" stroke-dasharray="2 6"/>
+  <svg class="deco deco-trail" viewBox="0 0 260 120" focusable="false">
+    <g fill="none" stroke-linecap="round">
+      <path d="M8 98C50 94 58 38 106 34s54 52 106 24" stroke="#5a93b8" stroke-width="1.3" stroke-dasharray="3 8" opacity=".85"/>
+      <circle cx="106" cy="34" r="3.2" stroke="#1768b5" stroke-width="1.2" opacity=".8"/>
+      <circle cx="160" cy="58" r="3.2" stroke="#1768b5" stroke-width="1.2" opacity=".8"/>
+      <path d="M18 24l7 7m0-7-7 7M236 90l6 6m0-6-6 6" stroke="#c43c34" stroke-width="1.2" opacity=".6"/>
+    </g>
   </svg>
   <svg class="deco deco-spark spark-a" viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>
   <svg class="deco deco-spark spark-b" viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>
