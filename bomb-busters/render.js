@@ -484,6 +484,7 @@ function render() {
 
   _applyAnimations(app);
   _fitCardRows(app);
+  if (S.fx) _fxAdopt(S.fx);             // 刷新/重进后捡回自己未结算的宣告
   _refreshSheet();
   if (typeof onlineAfterRender === 'function') onlineAfterRender();
 }
@@ -1122,7 +1123,10 @@ function _modeHintBar() {
 
 function _actionBarHTML() {
   if (S.phase !== 'play' || S.result) return '';
-  if (S.fx) return _waitHTML(S.fx.kind === 'solo' || S.fx.kind === 'red' ? '💬 公开结算中…' : '💬 猜测结算中…');
+  if (S.fx) {
+    const who = (typeof S.fx.by === 'number') ? `${_esc(_playerName(S.fx.by))} ` : '';
+    return _waitHTML(`💬 ${who}${S.fx.kind === 'solo' || S.fx.kind === 'red' ? '公开结算中…' : '猜测结算中…'}`);
+  }
   if (S.pending) return _pendingHTML();
 
   // 道具 1/4/12 跨回合操作锁：持有者提交/取消前，全场行动暂停
@@ -1946,7 +1950,19 @@ function _eqtagSelect(seat, cardId) {
    猜测对话气泡：宣告 → 回应 → 结算（各端同节奏）
    ============================================================ */
 
-const _fx = { seen: null, timers: [] };
+/** 宣告锁：气泡播放时长（到点结算）与失联兜底时长（超时由其他端清锁） */
+const FX_DECLARE_MS = 2000;
+const FX_WATCHDOG_MS = 8000;
+
+/** 宣告锁本端态：pending=本端持有的结算权；done=已结算的宣告；watch=发起端失联兜底 */
+const _fx = {
+  seenIds: new Set(),
+  done: new Set(),
+  timers: [],
+  pending: null,   // { id, by, kind, spec, dealStamp, timer }
+  watch: null,
+  watchId: null,
+};
 
 function _clearBubbles() {
   _fx.timers.forEach(t => clearTimeout(t));
@@ -2012,12 +2028,13 @@ function _playBubbles(fx) {
   _fx.timers.push(setTimeout(_clearBubbles, 1950));
 }
 
-/** 本端发起：写 S.fx 广播宣告（各端同节奏播放气泡），2s 后清 fx 并结算 */
+/** 本端发起：写 S.fx 广播宣告（各端同节奏播放气泡），到点按计划结算 */
 function _startFxSequence(kind, plan) {
   const ids = kind === 'scan' ? plan.targetCards.map(c => c.id)
     : kind === 'solo' ? plan.cards.map(c => c.id)
     : kind === 'red' ? plan.cards.map(c => c.id)
     : [plan.card.id];                     // pair / ray：单张目标
+  const spec = _fxPlanSpec(kind, plan);
   const fx = {
     id: 'fx' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     kind,
@@ -2028,29 +2045,248 @@ function _startFxSequence(kind, plan) {
     count: kind === 'scan' || kind === 'solo' || kind === 'red' ? plan.count : 0,
     superScan: kind === 'scan' && plan.src === 'eq5',
     ids,                                  // 被指认的牌：气泡期间聚光高亮
+    at: Date.now(),                       // 宣告端时钟：刷新重进后据此重排剩余结算时间
+    plan: spec,                           // 结算计划按牌 id 序列化：远端快照替换 S 后可重建
   };
-  _fx.seen = fx.id;
+  _fx.seenIds.add(fx.id);
+  if (_fx.pending && _fx.pending.timer) clearTimeout(_fx.pending.timer);
+  _fx.pending = { id: fx.id, by: fx.by, kind, spec, dealStamp: S && S.dealStamp, timer: null };
   if (S) S.fx = fx;
-  saveStateDirect();                    // 气泡宣告先行同步
+  saveStateDirect();                    // 气泡宣告先行同步（其他端收到即进入等待）
   render();                             // 立即进入等待态并点亮目标牌
   _playBubbles(fx);
-  setTimeout(() => {
-    if (!S || S.fx !== fx) { _clearBubbles(); return; }
+  _armSettleTimer(fx.id, FX_DECLARE_MS);
+}
+
+/** 排定结算（刷新重进后按已流逝时间缩短等待） */
+function _armSettleTimer(fxId, delay) {
+  const p = _fx.pending;
+  if (!p || p.id !== fxId) return;
+  if (p.timer) clearTimeout(p.timer);
+  p.timer = setTimeout(() => { p.timer = null; _settleFx(fxId); }, Math.max(0, delay));
+}
+
+/** 把结算计划压成可随状态快照传输的 id 序列（fx.plan） */
+function _fxPlanSpec(kind, plan) {
+  if (kind === 'pair') {
+    if (plan.src === 'eq10') {
+      return {
+        src: 'eq10', actor: plan.actor, toSeat: plan.toSeat,
+        cardId: plan.card.id, a: plan.a, b: plan.b,
+        ownAId: plan.ownA.id, ownBId: plan.ownB.id,
+        matchedOwnId: plan.matchedOwn ? plan.matchedOwn.id : null,
+        label: plan.label, hit: !!plan.hit,
+      };
+    }
+    return {
+      src: 'pair', actor: plan.actor, toSeat: plan.toSeat,
+      cardId: plan.card.id, ownCardId: plan.own.id, guess: plan.guess,
+      label: plan.label, hit: !!plan.hit,
+    };
+  }
+  if (kind === 'scan') {
+    return {
+      src: plan.src, actor: plan.actor, targetSeat: plan.targetSeat,
+      targetIds: plan.targetCards.map(c => c.id),
+      matchedIds: plan.matched.map(c => c.id),
+      count: plan.count, num: plan.num, ownCardId: plan.ownCardId,
+      label: plan.label, hit: !!plan.hit,
+    };
+  }
+  if (kind === 'solo') {
+    return {
+      src: 'solo', actor: plan.actor, kind: plan.kind, num: plan.num,
+      cardIds: plan.cards.map(c => c.id), count: plan.count, label: plan.label,
+    };
+  }
+  return {
+    src: 'red', actor: plan.actor, cardIds: plan.cards.map(c => c.id),
+    cardId: plan.card ? plan.card.id : (plan.cards[0] && plan.cards[0].id),
+    count: plan.count, label: plan.label,
+  };
+}
+
+/** 用当前 S 的牌对象重建计划（远端快照替换 S 后，宣告时的对象引用已失效） */
+function _fxPlanFromSpec(spec) {
+  if (!spec || !S) return null;
+  const find = id => (typeof _findCardById === 'function') ? _findCardById(id) : null;
+  const eq = no => (S.equipment || []).find(e => e.no === no) || null;
+  if (spec.src === 'eq10') {
+    const card = find(spec.cardId), ownA = find(spec.ownAId), ownB = find(spec.ownBId);
+    if (!card || !ownA || !ownB) return null;
+    return {
+      actor: spec.actor, toSeat: spec.toSeat, card, a: spec.a, b: spec.b,
+      ownA, ownB, matchedOwn: spec.matchedOwnId ? find(spec.matchedOwnId) : null,
+      eq10: eq(10), label: spec.label, hit: !!spec.hit, src: 'eq10',
+    };
+  }
+  if (spec.src === 'pair') {
+    const card = find(spec.cardId), own = find(spec.ownCardId);
+    if (!card || !own) return null;
+    return {
+      actor: spec.actor, toSeat: spec.toSeat, card, own, guess: spec.guess,
+      label: spec.label, hit: !!spec.hit,
+    };
+  }
+  if (spec.src === 'eq5' || spec.src === 'skill' || spec.src === 'eq3') {
+    const targetCards = (spec.targetIds || []).map(find);
+    const matched = (spec.matchedIds || []).map(find);
+    if (!targetCards.length || targetCards.some(c => !c) || matched.some(c => !c)) return null;
+    if (!find(spec.ownCardId)) return null;
+    return {
+      actor: spec.actor, targetSeat: spec.targetSeat, targetCards,
+      count: spec.count, num: spec.num, ownCardId: spec.ownCardId, src: spec.src,
+      eq5: spec.src === 'eq5' ? eq(5) : null,
+      eq3: spec.src === 'eq3' ? eq(3) : null,
+      matched, label: spec.label, hit: !!spec.hit,
+    };
+  }
+  if (spec.src === 'solo') {
+    const cards = (spec.cardIds || []).map(find);
+    if (!cards.length || cards.some(c => !c)) return null;
+    return { actor: spec.actor, kind: spec.kind, num: spec.num, cards, count: spec.count, label: spec.label };
+  }
+  if (spec.src === 'red') {
+    const cards = (spec.cardIds || []).map(find);
+    if (!cards.length || cards.some(c => !c)) return null;
+    return { actor: spec.actor, cards, card: cards[0], count: spec.count, label: spec.label };
+  }
+  return null;
+}
+
+/** 结算前校验牌面仍可执行（并发迟到快照可能已改变牌面） */
+function _fxPlanValid(kind, plan) {
+  if (!S || !S.players || !S.players[plan.actor]) return false;
+  const hidden = c => !!(c && c.id && !c.revealed);
+  if (kind === 'pair') {
+    if (plan.src === 'eq10') {
+      return hidden(plan.card) && hidden(plan.ownA) && hidden(plan.ownB)
+        && (!plan.hit || hidden(plan.matchedOwn));
+    }
+    return hidden(plan.card) && hidden(plan.own);
+  }
+  if (kind === 'scan') {
+    return plan.targetCards.every(hidden) && (!plan.hit || plan.matched.every(hidden));
+  }
+  return !!(plan.cards && plan.cards.length && plan.cards.every(hidden));
+}
+
+/** 记录已结算宣告（写入共享状态 fxDone）：携带同一 fx 的迟到快照据此识别并丢弃 */
+function _markFxDone(fxId) {
+  _fx.done.add(fxId);
+  if (_fx.done.size > 40) _fx.done.delete(_fx.done.values().next().value);
+  if (!S) return;
+  const arr = Array.isArray(S.fxDone) ? S.fxDone.filter(id => id !== fxId) : [];
+  arr.push(fxId);
+  S.fxDone = arr.slice(-12);
+}
+
+function _clearFxIf(fxId) {
+  if (S && S.fx && S.fx.id === fxId) S.fx = null;
+}
+
+/** 宣告到点结算：只认 fx.id，不再依赖 S.fx 对象身份（远端快照替换 S 也能继续） */
+function _settleFx(fxId) {
+  const p = _fx.pending;
+  if (!p || p.id !== fxId) return;
+  _fx.pending = null;
+  if (p.timer) { clearTimeout(p.timer); p.timer = null; }
+  _clearBubbles();
+  if (!S || S.phase !== 'play' || S.result) { _clearFxIf(fxId); render(); return; }
+  if (Array.isArray(S.fxDone) && S.fxDone.includes(fxId)) { _clearFxIf(fxId); render(); return; }
+  if (p.dealStamp && S.dealStamp && p.dealStamp !== S.dealStamp) { _clearFxIf(fxId); render(); return; }
+  // 同一时刻他人也宣告：按座位号定序，小座优先，避免两端互等看门狗
+  if (S.fx && S.fx.id !== fxId) {
+    const rival = (typeof S.fx.by === 'number') ? S.fx.by : 99;
+    if (!(typeof p.by === 'number' && p.by < rival)) {
+      showToast('⚠️ 其他玩家抢先行动，本次操作已取消');
+      render();
+      return;
+    }
+    _markFxDone(S.fx.id);
     S.fx = null;
-    _clearBubbles();
-    if (kind === 'pair') { if (plan.src === 'eq10') _applyRayCut(plan); else _applyPairCut(plan); }
-    else if (kind === 'scan') { if (plan.src === 'eq5') _applySuperScan(plan); else _applyScan(plan); }
-    else if (kind === 'solo') _applySoloCut(plan);
-    else _applyRevealRed(plan);
-  }, 2000);
+  }
+  const plan = _fxPlanFromSpec(p.spec);
+  if (!plan || !_fxPlanValid(p.kind, plan)) {
+    _markFxDone(fxId);
+    _clearFxIf(fxId);
+    showToast('⚠️ 牌面已变化，本次操作已取消');
+    saveStateDirect();
+    render();
+    return;
+  }
+  _markFxDone(fxId);
+  _clearFxIf(fxId);
+  if (p.kind === 'pair') { if (plan.src === 'eq10') _applyRayCut(plan); else _applyPairCut(plan); }
+  else if (p.kind === 'scan') { if (plan.src === 'eq5') _applySuperScan(plan); else _applyScan(plan); }
+  else if (p.kind === 'solo') _applySoloCut(plan);
+  else _applyRevealRed(plan);
+}
+
+/** 刷新/重进页面后捡回自己的宣告：按已流逝时间重排结算，避免失去结算权 */
+function _fxAdopt(fx) {
+  if (!fx || !fx.id || !S) return;
+  if (mySeat() === null || fx.by !== mySeat()) return;
+  if (_fx.done.has(fx.id) || (Array.isArray(S.fxDone) && S.fxDone.includes(fx.id))) return;
+  if (_fx.pending) return;
+  const spec = fx.plan || null;
+  if (!spec) { _armFxWatchdog(fx.id); return; }   // 旧格式宣告无计划可恢复
+  _fx.seenIds.add(fx.id);
+  _fx.pending = { id: fx.id, by: fx.by, kind: fx.kind, spec, dealStamp: S.dealStamp, timer: null };
+  const elapsed = (typeof fx.at === 'number') ? Math.max(0, Date.now() - fx.at) : FX_DECLARE_MS;
+  _armSettleTimer(fx.id, Math.max(0, FX_DECLARE_MS - elapsed));
+}
+
+function _armFxWatchdog(fxId) {
+  if (_fx.watchId === fxId) return;
+  if (_fx.watch) { clearTimeout(_fx.watch); _fx.watch = null; }
+  _fx.watchId = fxId;
+  _fx.watch = setTimeout(() => _watchdogFx(fxId), FX_WATCHDOG_MS);
+}
+
+/** 兜底：宣告端失联（刷新/掉线）时清掉悬挂宣告，否则全场永久卡在「结算中…」 */
+function _watchdogFx(fxId) {
+  _fx.watch = null;
+  _fx.watchId = null;
+  if (!S || !S.fx || S.fx.id !== fxId || S.phase !== 'play') return;
+  if (_fx.done.has(fxId) || (Array.isArray(S.fxDone) && S.fxDone.includes(fxId))) return;
+  if (_fx.pending && _fx.pending.id === fxId) return;   // 本端仍持有结算权，交给它
+  _markFxDone(fxId);
+  S.fx = null;
+  addLog('⏳ 一次宣言超时未结算，已自动取消', 'warn');
+  render();
+  saveStateDirect();
 }
 
 /** 联机层钩子：远端 fx 宣告 → 本地重放气泡；fx 清空 → 收尾 */
 window._fxReplay = function (fx) {
-  if (!fx) { _clearBubbles(); return; }
-  if (_fx.seen === fx.id) return;
-  _fx.seen = fx.id;
+  if (!fx) {
+    if (_fx.watch) { clearTimeout(_fx.watch); _fx.watch = null; _fx.watchId = null; }
+    _clearBubbles();
+    return;
+  }
+  if (_fx.done.has(fx.id) || (S && Array.isArray(S.fxDone) && S.fxDone.includes(fx.id))) {
+    // 已结算的宣告仍挂在本地状态：清掉并落盘，避免刷新后界面停在等待态
+    if (S && S.fx && S.fx.id === fx.id) { S.fx = null; saveStateDirect(); render(); }
+    return;
+  }
+  if (_fx.seenIds.has(fx.id)) {
+    // 同一宣告被旧快照反复送回且仍无结算权：补挂看门狗，避免无人清锁
+    if (!(_fx.pending && _fx.pending.id === fx.id) && _fx.watchId !== fx.id) _armFxWatchdog(fx.id);
+    return;
+  }
+  _fx.seenIds.add(fx.id);
+  if (_fx.seenIds.size > 40) _fx.seenIds.delete(_fx.seenIds.values().next().value);
+  if (mySeat() !== null && fx.by === mySeat()) { _fxAdopt(fx); return; }
+  _armFxWatchdog(fx.id);
+  // 他人宣告即互斥：中止本端半途操作，进入等待（与道具 1/4/12 操作锁同款语义）
+  if (typeof window._olCancelLocalFlow === 'function') window._olCancelLocalFlow();
   _playBubbles(fx);
+};
+
+/** 联机层判断某个宣告是否已被本端结算过（供 applyOnlineState 丢弃迟到快照） */
+window._fxSettled = function (fxId) {
+  return !!fxId && _fx.done.has(fxId);
 };
 
 /* ============================================================

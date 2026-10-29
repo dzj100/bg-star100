@@ -1945,6 +1945,21 @@ function applyOnlineState(state) {
     state.equipLock = Object.assign({}, state.equipLock, { at: sameToken ? pl.at : Date.now() });
   }
 
+  // 已结算宣告的迟到快照（宣告推送乱序/晚到）：整包丢弃并把本端已结算状态补播回房间，
+  // 否则 fx 会复活，全场永久卡在「猜测结算中…」（#10 自由剪线无行动者守卫时高发）
+  if (prev && state && state.fx) {
+    const sameRound = !state.dealStamp || !prev.dealStamp || state.dealStamp === prev.dealStamp;
+    const settled = sameRound && ((Array.isArray(prev.fxDone) && prev.fxDone.includes(state.fx.id))
+      || (typeof window._fxSettled === 'function' && window._fxSettled(state.fx.id)));
+    if (settled) {
+      console.log('[bomb] drop stale snapshot carrying settled fx', state.fx.id);
+      saveStateDirect();
+      return;
+    }
+  }
+  // 终局快照不允许残留宣告（防御旧快照把 fx 带回结算后的界面）
+  if (state && state.phase === 'over') state.fx = null;
+
   if (state && state.phase === 'mark' && prev && prev.phase === 'mark'
       && Array.isArray(state.players) && Array.isArray(prev.players)) {
     const seat = mySeat();

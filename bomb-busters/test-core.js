@@ -60,8 +60,16 @@ function makeEl() {
     textContent: '',
     innerHTML: '',
     style: {},
+    children: [],
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    appendChild() {}, removeChild() {}, remove() {},
+    appendChild(child) { this.children.push(child); return child; },
+    removeChild(child) {
+      const i = this.children.indexOf(child);
+      if (i >= 0) this.children.splice(i, 1);
+      return child;
+    },
+    get firstChild() { return this.children[0] || null; },
+    remove() {},
     setAttribute() {}, getAttribute() { return null; },
     addEventListener() {},
     querySelectorAll() { return []; },
@@ -75,6 +83,7 @@ function makeDoc() {
     createElement() { return makeEl(); },
     body: makeEl(),
     addEventListener() {},
+    querySelectorAll() { return []; },
   };
 }
 
@@ -95,6 +104,16 @@ function loadGame() {
 
 /** 在沙箱内求值（读取顶层 let/const 绑定） */
 function ev(ctx, expr) { return vm.runInContext(expr, ctx); }
+
+/** 装载 game.js + render.js（DOM 打桩），用于验证宣告锁/气泡结算链路 */
+const RENDER_SRC = fs.readFileSync(path.join(__dirname, 'render.js'), 'utf8');
+
+function loadGameWithRender() {
+  const ctx = loadGame();
+  ctx.addEventListener = () => {};
+  vm.runInContext(RENDER_SRC, ctx, { filename: 'render.js' });
+  return ctx;
+}
 
 /** 装载 online.js（net 层打桩，避免真实网络） */
 function loadOnline() {
@@ -2194,6 +2213,95 @@ await t('applyOnlineState：标记阶段合并保留本端标记 + 补推', () =
   const S3 = st(g);
   eq(S3.phase, 'play');
   eq(S3.currentSeat, S3.captainSeat);
+});
+
+await t('fx 宣告锁：远端快照替换 S 后仍按 fx.id 结算，迟到快照不得复活宣告', () => {
+  const g = loadGameWithRender();
+  g.dealGame(['A', 'B']);
+  const S = st(g);
+  S.phase = 'play';
+  S.ready = [true, true];
+  S.currentSeat = 0;
+
+  let num = null, own = null, target = null;
+  for (let n = 1; n <= 12 && num === null; n++) {
+    const a = S.players[0].shares.flat().find(c => c.kind === 'blue' && c.num === n && !c.revealed);
+    const b = S.players[1].shares.flat().find(c => c.kind === 'blue' && c.num === n && !c.revealed);
+    if (a && b) { num = n; own = a; target = b; }
+  }
+  assert(num !== null, '应能找到双方共有的蓝数字');
+
+  const plan = g._planPairCut(1, target.id, { kind: 'blue', num }, own.id);
+  assert(plan.ok, '计划应有效：' + (plan.msg || ''));
+
+  g._startFxSequence('pair', plan);
+  const fxId = st(g).fx && st(g).fx.id;
+  assert(fxId, '应写入宣告并持有结算权');
+
+  // 干扰：远端快照整包替换 S（#10 下任何端都可推送），但仍携带同一宣告
+  g.applyOnlineState(JSON.parse(JSON.stringify(st(g))));
+  eq(st(g).fx && st(g).fx.id, fxId, '替换后的 S 仍携带宣告');
+
+  // 到点结算：只认 fx.id，不再因对象身份不匹配而放弃
+  g._settleFx(fxId);
+  eq(st(g).fx, null, '结算后应清除宣告');
+  assert(g._findCardById(target.id).revealed, '目标牌应按计划结算');
+  assert(g._findCardById(own.id).revealed, '自选牌应按计划结算');
+
+  // 结算前捕获的迟到快照：携带同一 fx 且牌面更旧 → 整包丢弃
+  const stale = JSON.parse(JSON.stringify(st(g)));
+  delete stale.fxDone;
+  stale.turnNo = (st(g).turnNo || 0) - 1;
+  stale.fx = { id: fxId, by: 0, kind: 'pair', ids: [target.id] };
+  stale.players[0].shares.flat().forEach(c => { if (c.id === own.id) c.revealed = false; });
+  stale.players[1].shares.flat().forEach(c => { if (c.id === target.id) c.revealed = false; });
+  g.applyOnlineState(stale);
+  eq(st(g).fx, null, '迟到快照不得复活宣告');
+  assert(g._findCardById(target.id).revealed, '迟到快照不得回卷结算结果');
+});
+
+await t('fx 宣告锁：发起端失联时看门狗清锁，不再永久等待', () => {
+  const g = loadGameWithRender();
+  g.dealGame(['A', 'B']);
+  const S = st(g);
+  S.phase = 'play';
+  S.ready = [true, true];
+  S.currentSeat = 0;
+  const target = S.players[1].shares.flat().find(c => !c.revealed);
+  S.fx = { id: 'fxdead', by: 1, kind: 'pair', ids: [target.id] };
+  g._watchdogFx('fxdead');
+  eq(S.fx, null, '超时宣告应被清除');
+  assert(Array.isArray(S.fxDone) && S.fxDone.includes('fxdead'), '应记入已结算列表');
+});
+
+await t('fx 宣告锁：刷新重进后按 fx.plan 重建计划并结算', async () => {
+  const g = loadGameWithRender();
+  g.dealGame(['A', 'B']);
+  g._olSeatIndex = () => 0;
+  const S = st(g);
+  S.phase = 'play';
+  S.ready = [true, true];
+  S.currentSeat = 0;
+
+  let num = null, own = null, target = null;
+  for (let n = 1; n <= 12 && num === null; n++) {
+    const a = S.players[0].shares.flat().find(c => c.kind === 'blue' && c.num === n && !c.revealed);
+    const b = S.players[1].shares.flat().find(c => c.kind === 'blue' && c.num === n && !c.revealed);
+    if (a && b) { num = n; own = a; target = b; }
+  }
+  const plan = g._planPairCut(1, target.id, { kind: 'blue', num }, own.id);
+  assert(plan.ok);
+  const spec = g._fxPlanSpec('pair', plan);
+
+  // 模拟刷新：本地无 pending，只剩状态里的宣告（含计划）
+  S.fx = {
+    id: 'fxreload', by: 0, kind: 'pair', to: 1, label: plan.label, hit: true,
+    count: 0, ids: [target.id], at: Date.now() - 5000, plan: spec,
+  };
+  ev(g, 'render()');
+  await new Promise(r => setTimeout(r, 30));
+  assert(g._findCardById(target.id).revealed, '重进后应自动结算');
+  eq(st(g).fx, null, '结算后清除宣告');
 });
 
 await t('saveStateDirect：标记阶段走底推送通道（currentPlayer=-1 也送达）', () => {

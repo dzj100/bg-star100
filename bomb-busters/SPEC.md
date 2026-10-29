@@ -299,7 +299,7 @@ S = {
 - **成员离开**：仅对局中触发——对局无法继续，房主弹「解散房间」（强制；背景点击不可关闭），点击后房间关闭、所有人回到首页。不允许房主接管代操作（离席者手牌不再可见/可操作）。等候室阶段玩家退出只移除席位并刷新列表，不提示解散。
 - **选关同步**：新建房间默认 #4（`pendingChallenge` 为空时回退默认关卡）；房主在等候室点【切换】选择关卡后，本地卡片立即刷新并调用 `_olRefreshWaitingRoom()` 将 `{ missionId }` 写入 `room.state.pendingChallenge`（status=`waiting`）。成员端 `renderWaitingRoom()` 读取 `pendingChallenge` 展示只读关卡卡片；`_waitingSig` 包含选关，实时行/轮询均会触发重绘。对局中禁止切换关卡。
 - 等候室流程：创建/加入房间（默认 #4）→（房主可切换关卡）→ 2~5 人齐 → 房主「开始游戏」→ 随机队长、按选关发牌、进入标记阶段。
-- **#10 自由剪线同步**：`state.freeCut=true` 时 `currentSeat` 固定为 `-2`（无人锁定），`onlinePushState` 不做唯一行动者守卫，`_olIsActor` 对任一端返回 true；实际资格由引擎按本地座位 `_freeCutEligible(mySeat)` 判定。行动一旦确认（`S.fx` / `S.pending`），状态立即推送，其他端进入等待；极窄的同时确认窗口按最新快照合并（无服务端锁）。
+- **#10 自由剪线同步**：`state.freeCut=true` 时 `currentSeat` 固定为 `-2`（无人锁定），`onlinePushState` 不做唯一行动者守卫，`_olIsActor` 对任一端返回 true；实际资格由引擎按本地座位 `_freeCutEligible(mySeat)` 判定。行动一旦确认（`S.fx` 宣告锁 / `S.pending`），状态立即推送，其他端中止本地半途操作并进入等待；结算由发起端按 `fx.id` 在 2s 后执行（计划以牌 id 序列化在 `fx.plan`，远端快照替换 `S` 后可重建），已结算宣告写入 `S.fxDone`，携带同一 `fx` 的迟到快照会被丢弃并补播；发起端失联 8s 后任意端清锁广播。极窄的同时确认窗口按座位号定序（小座优先），仍无服务端锁。
 
 ## UI 布局（移动端）
 
