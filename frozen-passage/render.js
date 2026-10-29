@@ -36,7 +36,8 @@
     chart: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>',
     eye: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     iceberg: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 20 14H4z"/><path d="M4 18h16M7 21h10"/></svg>',
-    play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>'
+    play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>',
+    history: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 2"/></svg>'
   };
 
   var GLYPH = {
@@ -80,6 +81,7 @@
 
   /* ---------------- 基础工具 ---------------- */
 
+  /* 三个难度的空战绩 */
   function defaultStats() {
     return {
       novice: { plays: 0, wins: 0, best: null },
@@ -88,15 +90,19 @@
     };
   }
 
+  /* 安全读取 localStorage */
   function storageGet(key) {
     try { return window.localStorage.getItem(key); } catch (e) { return null; }
   }
+  /* 安全写入 localStorage */
   function storageSet(key, value) {
     try { window.localStorage.setItem(key, value); } catch (e) { /* 本地存储不可用时静默 */ }
   }
+  /* 安全删除 localStorage 键 */
   function storageRemove(key) {
     try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
   }
+  /* 读取并解析 JSON，失败时返回默认值 */
   function readJSON(key, fallback) {
     var raw = storageGet(key);
     if (!raw) return fallback;
@@ -108,33 +114,40 @@
     }
   }
 
+  /* 颜色的中文名 */
   function colorName(color) { return F.COLOR_NAME[color] || color; }
 
+  /* 物品对应的图标 */
   function itemIcon(type) {
     if (type === 'inuit') return ICONS.snowflake;
     if (type === 'sled') return ICONS.sled;
     return ICONS.scroll;
   }
 
+  /* 卡牌文本：颜色 + 数字 */
   function cardName(cardId) {
     var card = F.getCard(cardId);
     return card ? colorName(card.color) + ' ' + card.number : '未知卡牌';
   }
 
+  /* 行内使用的卡牌短语（加粗 HTML） */
   function shortCard(cardId) {
     var card = F.getCard(cardId);
     if (!card) return '';
     return '<b>' + colorName(card.color) + ' ' + card.number + '</b>';
   }
 
+  /* 位置文本：第 X 行第 Y 位 */
   function posLabel(slot) {
     return '第 ' + slot.row + ' 行第 ' + slot.index + ' 位';
   }
 
+  /* 按 id 取棋盘上的位置元素 */
   function slotEl(slotId) {
     return document.querySelector('.slot[data-slot="' + slotId + '"]');
   }
 
+  /* 查当前局某个位置上的目标卡 */
   function goalForSlot(slotId) {
     if (!S) return null;
     for (var i = 0; i < S.board.goals.length; i++) {
@@ -143,19 +156,23 @@
     return null;
   }
 
+  /* 已放置的卡牌数量 */
   function placedCount() {
     if (!S) return 0;
     return S.board.slots.filter(function (s) { return !!s.cardId; }).length;
   }
 
+  /* 对局是否已经结束 */
   function isTerminal() {
     return !!S && (S.phase === 'won' || S.phase === 'lost');
   }
 
+  /* 当前局某类物品是否还有未使用的 */
   function hasUnused(type) {
     return !!S && F.hasUnusedItem(S, type);
   }
 
+  /* 各阶段的一句话提示 */
   function phaseHint() {
     if (!S) return '还没有开始对局。';
     if (S.phase === 'refill') return '先从供应堆补 1 张手牌。';
@@ -164,15 +181,18 @@
     return '现在不能进行这个操作。';
   }
 
+  /* 生成一局新的随机种子 */
   function newSeed() {
     return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
   }
 
+  /* 信息栏里的卡牌小标签 */
   function cardChip(card) {
     return '<span class="info-chip color-' + card.color + '"><i></i>' +
       colorName(card.color) + ' ' + card.number + '</span>';
   }
 
+  /* 把放置失败原因翻译成中文提示 */
   function placementErrorText(check, slot, card) {
     if (!check || check.ok) return '';
     if (check.code === 'support') {
@@ -208,12 +228,14 @@
     return check.message || '不能放在这里。';
   }
 
+  /* 让位置闪一下，提示操作失败 */
   function flashSlot(el) {
     if (!el) return;
     el.classList.add('is-flash');
     setTimeout(function () { el.classList.remove('is-flash'); }, 900);
   }
 
+  /* 底部轻提示 */
   function toast(message, tone) {
     if (!toastEl) return;
     toastEl.textContent = message;
@@ -224,14 +246,17 @@
     }, 2800);
   }
 
+  /* 保存偏好 */
   function savePrefs() {
     storageSet(PREFS_KEY, JSON.stringify(PREFS));
   }
 
+  /* 保存战绩 */
   function saveStats() {
     storageSet(STATS_KEY, JSON.stringify(STATS));
   }
 
+  /* 保存当前对局与记录状态 */
   function saveGame() {
     if (!S) return;
     SAVE_META.savedAt = Date.now();
@@ -242,6 +267,7 @@
     }));
   }
 
+  /* 读取偏好 */
   function loadPrefs() {
     var value = readJSON(PREFS_KEY, null);
     if (!value) return;
@@ -249,6 +275,7 @@
     if (typeof value.hints === 'boolean') PREFS.hints = value.hints;
   }
 
+  /* 读取战绩，并清洗异常数据 */
   function loadStats() {
     var value = readJSON(STATS_KEY, null);
     STATS = defaultStats();
@@ -265,6 +292,7 @@
     });
   }
 
+  /* 读取并校验存档 */
   function loadSave() {
     var raw = storageGet(SAVE_KEY);
     if (!raw) return;
@@ -282,6 +310,7 @@
     }
   }
 
+  /* 对局结束且未记录时，记一次战绩 */
   function maybeRecordResult() {
     if (!S || !isTerminal() || SAVE_META.statsRecorded) return;
     var stat = STATS[S.difficulty];
@@ -297,6 +326,7 @@
 
   /* ---------------- 焦点与弹层 ---------------- */
 
+  /* 给当前焦点元素生成可复用的选择器 */
   function selectorFor(el) {
     if (!el || el === document.body || !el.getAttribute) return null;
     if (el.id) return '#' + el.id;
@@ -310,10 +340,12 @@
     return selector;
   }
 
+  /* 元素是否可见 */
   function isVisible(el) {
     return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
   }
 
+  /* 关闭弹层后恢复焦点 */
   function refocus() {
     var selector = UI.focusReturn;
     UI.focusReturn = null;
@@ -328,6 +360,7 @@
     }
   }
 
+  /* 打开底部弹层 */
   function openSheet(type, data) {
     var firstOpen = overlay.hidden;
     UI.sheet = Object.assign({ type: type }, data || {});
@@ -335,6 +368,7 @@
     renderSheet(null, firstOpen);
   }
 
+  /* 关闭底部弹层 */
   function closeSheet(restore) {
     if (overlay.hidden) return;
     UI.sheet = null;
@@ -346,6 +380,7 @@
     if (restore !== false) refocus();
   }
 
+  /* 用 SHEETS 模型渲染弹层内容与按钮 */
   function renderSheet(focusSelector, firstOpen) {
     if (!UI.sheet || !SHEETS[UI.sheet.type]) {
       closeSheet(false);
@@ -375,6 +410,7 @@
     });
   }
 
+  /* 弹层打开时让 Tab 焦点在内部循环 */
   function trapTab(ev) {
     var nodes = sheetEl.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
     var focusables = Array.prototype.filter.call(nodes, isVisible);
@@ -399,6 +435,7 @@
 
   /* ---------------- 设置页 ---------------- */
 
+  /* 某难度的战绩文案 */
   function statsLine(difficulty) {
     var stat = STATS[difficulty] || { plays: 0, wins: 0, best: null };
     if (!stat.plays) return DIFF_NAME[difficulty] + '：还没有完成的对局';
@@ -407,12 +444,14 @@
       stat.wins + '</b> 局' + best;
   }
 
+  /* 设置页上的存档摘要 */
   function saveSummary() {
     if (!S) return '';
     if (isTerminal()) return DIFF_NAME[S.difficulty] + ' · 已结束 · 查看结算';
     return DIFF_NAME[S.difficulty] + ' · 第 ' + S.turn + ' 回合 · ' + placedCount() + '/15';
   }
 
+  /* 难度选择卡片组 */
   function difficultyCards() {
     var active = PREFS.difficulty;
     return F.DIFFICULTIES.map(function (key) {
@@ -426,6 +465,7 @@
     }).join('');
   }
 
+  /* 渲染设置页 */
   function renderSetup() {
     var saveRow = S
       ? '<div class="save-row"><button type="button" class="btn btn-primary" data-action="continue" aria-label="继续存档：' +
@@ -503,6 +543,7 @@
 
   /* ---------------- 游戏页 ---------------- */
 
+  /* 汇总当前选中牌的可放置信息，供渲染使用 */
   function buildView() {
     var selected = null;
     if (S && S.phase === 'place' && UI.selectedCardId && S.hand.indexOf(UI.selectedCardId) >= 0) {
@@ -526,6 +567,7 @@
     return { selected: selected, placements: placements, legalMap: legalMap, supportMap: supportMap, counts: counts };
   }
 
+  /* 顶栏：菜单、回合信息、空位数、规则 */
   function renderTopbar() {
     var left = 15 - placedCount();
     return '<header class="topbar">' +
@@ -541,6 +583,7 @@
     '</header>';
   }
 
+  /* 信息栏：阶段提示，点击可查看操作记录 */
   function infoBar(view) {
     var tone = '';
     var chip = '';
@@ -594,13 +637,17 @@
       actions = '<button type="button" class="mini-btn is-danger" data-action="view-result">结算</button>';
     }
 
-    return '<div class="info-bar ' + tone + '" id="infoBar">' +
+    return '<div class="info-bar ' + tone + '" id="infoBar" data-action="open-history">' +
       '<div class="info-main">' + chip + '<span class="info-text">' + text + '</span></div>' +
       (side ? '<span class="info-side">' + side + '</span>' : '') +
       (actions ? '<div class="info-actions">' + actions + '</div>' : '') +
+      '<button type="button" class="info-log" data-action="open-history" aria-label="查看操作记录" aria-haspopup="dialog" title="操作记录">' +
+        ICONS.history +
+      '</button>' +
     '</div>';
   }
 
+  /* 第 5 行上方的目标卡标签 */
   function goalTab(slot) {
     if (slot.row !== 5) return '';
     var goal = goalForSlot(slot.id);
@@ -614,6 +661,7 @@
       '<span class="goal-q">?</span></span>';
   }
 
+  /* 单个棋盘位置（含目标卡与起始提示） */
   function renderSlot(slot, view) {
     var card = slot.cardId ? F.getCard(slot.cardId) : null;
     var classes = ['slot'];
@@ -653,6 +701,7 @@
     '</div>';
   }
 
+  /* 倒三角棋盘 */
   function renderBoard(view) {
     var rows = '';
     for (var row = 5; row >= 1; row--) {
@@ -668,6 +717,7 @@
     '</div>';
   }
 
+  /* 物品当前是否可用，以及不可用的原因 */
   function itemAvailability(type) {
     if (!hasUnused(type)) return { available: false, why: '已使用' };
     if (type === 'inuit') {
@@ -685,6 +735,7 @@
     return { available: F.canUseLog(S), why: '没有可替换的组合' };
   }
 
+  /* 供应堆面板 */
   function renderSupply() {
     var cards = S.supply.map(function (id) {
       var card = F.getCard(id);
@@ -707,6 +758,7 @@
     '</section>';
   }
 
+  /* 物品面板 */
   function renderItems() {
     var unused = S.items.filter(function (it) { return !it.used; }).length;
     var tokens = S.items.map(function (item) {
@@ -731,6 +783,7 @@
     '</section>';
   }
 
+  /* 手牌区 */
   function renderHand(view) {
     if (!S.hand.length) {
       return '<footer class="hand-dock"><div class="hand"><span class="tray-empty">手牌已空</span></div></footer>';
@@ -763,6 +816,7 @@
     return '<footer class="hand-dock"><div class="hand" role="group" aria-label="手牌">' + cards + '</div></footer>';
   }
 
+  /* 渲染整个对局页 */
   function renderGame() {
     var view = buildView();
     gameScreen.innerHTML =
@@ -776,6 +830,7 @@
     scheduleRoutes();
   }
 
+  /* 按当前屏幕渲染设置页或对局页 */
   function render() {
     var playing = !!(S && UI.screen === 'game');
     document.body.classList.toggle('is-playing', playing);
@@ -792,12 +847,14 @@
 
   /* ---------------- 航线连线 ---------------- */
 
+  /* 安排一次航线重绘（布局变化后调用） */
   function scheduleRoutes() {
     if (routeTimer) clearTimeout(routeTimer);
     requestAnimationFrame(drawRoutes);
     routeTimer = setTimeout(drawRoutes, 260);
   }
 
+  /* 用 SVG 连线画出同色航线 */
   function drawRoutes() {
     if (!S) return;
     var board = document.getElementById('board');
@@ -833,6 +890,7 @@
 
   /* ---------------- 规则检查渲染 ---------------- */
 
+  /* 放置确认弹层里的四条规则检查 */
   function ruleCheckRows(card, slot, check) {
     var rows = [];
 
@@ -908,6 +966,7 @@
     return rows.join('');
   }
 
+  /* 单条规则检查行 */
   function checkRow(label, value, note, warn) {
     return '<div class="check-row">' +
       '<span class="check-icon' + (warn ? ' is-warn' : '') + '" aria-hidden="true">' +
@@ -918,6 +977,7 @@
     '</div>';
   }
 
+  /* 放置预览：卡牌 → 位置 */
   function placementPreview(card, slot, subtitle) {
     return '<div class="confirm-preview">' +
       '<div class="pos-card color-' + card.color + '"><span class="pos-inner">' + card.number + '</span></div>' +
@@ -926,6 +986,7 @@
     '</div>';
   }
 
+  /* 统一的无效操作弹层 */
   function invalidSheet(title, message) {
     return {
       title: title,
@@ -938,6 +999,7 @@
 
   var SHEETS = {};
 
+  /* 放置确认弹层 */
   SHEETS.confirm = function (sheet) {
     var card = F.getCard(sheet.cardId);
     var slot = F.slotById(S, sheet.slotId);
@@ -964,6 +1026,7 @@
     };
   };
 
+  /* 补牌选择弹层 */
   SHEETS.refill = function () {
     if (S.phase !== 'refill') return invalidSheet('补牌阶段', '现在不需要补牌。');
     if (!S.supply.length) return invalidSheet('供应堆已空', '供应堆没有可补的卡牌。');
@@ -988,6 +1051,7 @@
     };
   };
 
+  /* 因纽特智慧弹层 */
   SHEETS.inuit = function () {
     if (!hasUnused('inuit')) {
       return invalidSheet('因纽特智慧', '这件物品已经用过了。');
@@ -1031,6 +1095,7 @@
     };
   };
 
+  /* 狗拉雪橇弹层 */
   SHEETS.sled = function (sheet) {
     if (!hasUnused('sled')) return invalidSheet('狗拉雪橇', '这件物品已经用过了。');
     if (!F.canUseSled(S)) return invalidSheet('狗拉雪橇', '需要同时有手牌和供应堆卡牌。');
@@ -1072,6 +1137,7 @@
     };
   };
 
+  /* 航海日志弹层 */
   SHEETS.log = function (sheet) {
     if (!hasUnused('log')) return invalidSheet('航海日志', '这件物品已经用过了。');
     if (!F.canUseLog(S)) return invalidSheet('航海日志', '当前没有可替换的组合。');
@@ -1182,6 +1248,7 @@
     };
   };
 
+  /* 卡住时的解救弹层 */
   SHEETS.stuck = function () {
     if (S.phase !== 'stuck') return invalidSheet('无法放置', '当前不是卡住状态。');
     var rows = '';
@@ -1227,6 +1294,7 @@
     };
   };
 
+  /* 宣告失败确认弹层 */
   SHEETS.declare = function () {
     return {
       title: '宣告失败？',
@@ -1236,6 +1304,7 @@
     };
   };
 
+  /* 结算弹层 */
   SHEETS.result = function () {
     var won = S.phase === 'won';
     var goalsUp = S.board.goals.filter(function (g) { return g.faceUp; }).length;
@@ -1270,6 +1339,7 @@
     };
   };
 
+  /* 三个难度的战绩行（菜单与记录页共用） */
   function miniStatsRows() {
     return F.DIFFICULTIES.map(function (key) {
       var stat = STATS[key];
@@ -1280,6 +1350,7 @@
     }).join('');
   }
 
+  /* 游戏内菜单弹层 */
   SHEETS.menu = function () {
     return {
       title: '菜单',
@@ -1299,14 +1370,15 @@
           '<button type="button" class="menu-row" data-action="menu-setup">' +
             '<span class="menu-icon" aria-hidden="true">' + ICONS.home + '</span>返回设置' +
             '<span class="menu-sub">自动保存</span></button>' +
-        '</div>' +
-        '<div class="stats-table">' + miniStatsRows() + '</div>' 
+        '</div>' 
+        //+ '<div class="stats-table">' + miniStatsRows() + '</div>' 
         //+ '<p class="menu-seed">种子 ' + S.seed + ' · 版本 v' + S.version + '</p>'
         ,
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">继续航路</button>'
     };
   };
 
+  /* 规则页的棋盘缩略示意 */
   function miniPyramid() {
     var rows = '';
     rows += '<div class="mini-row">' + new Array(6).join('<span class="mini-dot is-goal"></span>') + '</div>';
@@ -1319,6 +1391,7 @@
     return '<div class="mini-pyramid" aria-hidden="true">' + rows + '</div>';
   }
 
+  /* 规则页的四个标签 */
   var RULE_TABS = [
     { key: 'flow', label: '回合流程' },
     { key: 'rules', label: '放置规则' },
@@ -1326,12 +1399,13 @@
     { key: 'ending', label: '胜负判定' }
   ];
 
+  /* 规则页各标签的具体内容 */
   function rulePanel(tab) {
     if (tab === 'rules') {
       return '<p class="rule-lead">每次放牌都要同时满足四条规则（除了第 1 行在起始卡上，颜色任意）</p>' +
-        '<div class="rule-item"><h4><em>①</em>支撑</h4><p>第 2 行起，下面需要的卡牌必须已经放好：两端各需一张，中间需两张。</p></div>' +
-        '<div class="rule-item"><h4><em>②</em>颜色 / 航线</h4><p>上方的 2 张牌中至少要有 1 张与它下方相邻牌同色</p><p class="rule-example">例：已知第二行的蓝 2 的上方已有蓝 5 接续，而第二行的黑 5 的上方只有红 8，则第三行空缺的那张必须放黑色。</p></div>' +
-        '<div class="rule-item"><h4><em>③</em>数字</h4><p>同一行从左到右严格递增。相同的数字不能相邻放置。</p><p class="rule-example">使用“因纽特智慧”后，本回合的这次放置可以在已放置卡牌的旁边放同数字的牌（例如左边 3、右边 5，中间 3、4、5 都行）；隔空的同数字仍不允许。</p></div>' +
+        '<div class="rule-item"><h4><em>①</em>支撑</h4><p>第 2 行起，下方需要的卡牌必须已经放好才能向上接续：两端的卡需 1 张，中间的卡需 2 张。</p></div>' +
+        '<div class="rule-item"><h4><em>②</em>颜色 / 航线</h4><p>上方的 2 张牌中至少要有 1 张与它下方的相邻牌同色</p><p class="rule-example">例：已知第二行的蓝 2 的上方已有蓝 5 接续，而第二行的黑 5 的上方接续的是红 8，则第三行空缺的那张必须放黑色。</p></div>' +
+        '<div class="rule-item"><h4><em>③</em>数字</h4><p>同一行从左到右严格递增。相同的数字不能相邻放置。</p><p class="rule-example">使用“因纽特智慧”后，该回合可以在已放置卡牌的旁边放同数字的牌。</p></div>' +
         '<div class="rule-item"><h4><em>④</em>目标卡</h4><p>第 5 行若目标卡正面朝上，所放卡牌必须与目标卡同色。目标卡未启用时不约束。</p></div>';
     }
     if (tab === 'items') {
@@ -1339,24 +1413,25 @@
         '<div class="rule-item"><h4><em>❄</em>因纽特智慧</h4><p>在本回合放置前使用。本回合的这次放置可以把牌放到已放置卡牌的紧邻位置，即使数字相同；隔空的同数字仍不允许。仍然只放 1 张、补 1 张。</p></div>' +
         '<div class="rule-item"><h4><em>🐕</em>狗拉雪橇</h4><p>把一张手牌放回抽牌堆底部，再从供应堆取一张。供应堆随后从抽牌堆补足。</p></div>' +
         '<div class="rule-item"><h4><em>📅</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>' +
-        '<p class="sheet-note">卡住时可以先试试尚未使用的雪橇或日志；物品使用后不可撤销。</p>';
+        '<p class="sheet-note">一筹莫展时，可以先试试这些物品能力；物品使用后不可撤销。</p>';
     }
     if (tab === 'ending') {
-      return '<p class="rule-lead">胜负只看两件事：能否填满，以及是否还有合法落点。</p>' +
+      return '<p class="rule-lead">胜负只看 1 件事：能否放满。</p>' +
         '<div class="rule-item"><h4>胜利</h4><p>15 个位置全部放满立即胜利。</p></div>' +
         '<div class="rule-item"><h4>失败</h4><p>轮到你时，手牌没有任何合法落点，且物品也无法解救，即航路中断。可以在卡住界面主动宣告失败。</p></div>';
     }
     return '<p class="rule-lead">把 15 张冰山卡填满倒三角。每回合放置 1 张、补 1 张；当没有任何合法落点时，航路中断。</p>' +
       miniPyramid() +
       '<ol class="rule-steps">' +
-        '<li><b>设置</b><span>5 张目标卡在第 5 行上方，起始卡在第 1 行下方。新手 0 张目标卡正面，中等 3 张（左中右），专家 5 张（全部）。</span></li>' +
+        '<li><b>设置</b><span>5 张目标卡在第 5 行上方，起始卡在第 1 行下方。新手模式 0 张目标卡正面，中等模式 3 张（左中右），专家模式 5 张（全部）。</span></li>' +
         '<li><b>放置</b><span>从手牌中选 1 张放到合法空位，必须满足支撑、颜色、数字、目标卡四条规则。</span></li>' +
         '<li><b>补牌</b><span>从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足。</span></li>' +
-        '<li><b>结束</b><span>填满 15 位立即胜利；无法放置且物品也无法解救，就是失败。</span></li>' +
+        '<li><b>结束</b><span>填满 15 位立即胜利；无法放置且物品也无法解救，则失败。</span></li>' +
       '</ol>' +
       '<p class="rule-verse"><b>起点提示：</b>第一张牌放在起始卡上，颜色任意。</p>';
   }
 
+  /* 规则弹层 */
   SHEETS.rules = function (sheet) {
     var tab = sheet.tab || 'flow';
     var tabs = RULE_TABS.map(function (item) {
@@ -1374,6 +1449,7 @@
     };
   };
 
+  /* 航行记录弹层 */
   SHEETS.stats = function () {
     return {
       title: '航行记录',
@@ -1383,6 +1459,105 @@
     };
   };
 
+  /* 操作记录里的迷你卡牌 */
+  function miniLogCard(cardId) {
+    var card = F.getCard(cardId);
+    if (!card) return '';
+    return '<span class="log-card color-' + card.color + '" aria-hidden="true"><i>' +
+      card.number + '</i></span>';
+  }
+
+  /* 操作记录的一行 */
+  function historyRow(entry, isLatest) {
+    var mark = '';
+    var text = '';
+    var tags = '';
+
+    if (entry.type === 'place') {
+      mark = miniLogCard(entry.cardId);
+      var slot = F.slotById(S, entry.slotId);
+      text = '放置 <b>' + cardName(entry.cardId) + '</b>' + (slot ? ' → ' + posLabel(slot) : '');
+      if (entry.newRoute) tags += '<span class="log-tag is-route">新航线</span>';
+      if (entry.wisdom) tags += '<span class="log-tag">因纽特</span>';
+    } else if (entry.type === 'refill') {
+      mark = miniLogCard(entry.cardId);
+      text = '补牌 · <b>' + cardName(entry.cardId) + '</b> 加入手牌';
+    } else if (entry.type === 'inuit') {
+      mark = '<span class="log-item">' + ICONS.snowflake + '</span>';
+      text = '使用 <b>因纽特智慧</b> · 本回合可同数字相邻';
+    } else if (entry.type === 'sled') {
+      mark = '<span class="log-item">' + ICONS.sled + '</span>';
+      text = '使用 <b>狗拉雪橇</b> · ' + cardName(entry.handCardId) + ' 回牌堆，' +
+        cardName(entry.supplyCardId) + ' 入手';
+    } else if (entry.type === 'log') {
+      mark = '<span class="log-item">' + ICONS.scroll + '</span>';
+      var target = F.slotById(S, entry.slotId);
+      text = '使用 <b>航海日志</b> · ' + cardName(entry.inCardId) + ' 替换 ' +
+        cardName(entry.outCardId) + (target ? '（' + posLabel(target) + '）' : '');
+    } else if (entry.type === 'won') {
+      mark = '<span class="log-item is-win">' + ICONS.compass + '</span>';
+      text = '<b>航路贯通</b> · 15 个位置全部填满';
+    } else if (entry.type === 'lost') {
+      mark = '<span class="log-item is-loss">' + ICONS.x + '</span>';
+      text = '<b>航路中断</b> · ' + (S.lossReason === 'no-hand' ? '手牌耗尽' : '主动宣告失败');
+    } else {
+      return '';
+    }
+
+    return '<div class="log-row' + (isLatest ? ' is-latest' : '') + '">' +
+      '<span class="log-mark">' + mark + '</span>' +
+      '<p class="log-text">' + text + tags + '</p>' +
+      (isLatest ? '<span class="log-latest">最新</span>' : '') +
+    '</div>';
+  }
+
+  /* 取操作日志，手牌耗尽时补一条失败记录 */
+  function historyEntries() {
+    var entries = (S.log || []).slice();
+    if (S.phase === 'lost' && (!entries.length || entries[entries.length - 1].type !== 'lost')) {
+      entries.push({ turn: S.turn, type: 'lost' });
+    }
+    return entries;
+  }
+
+  /* 操作记录弹层：按回合倒序展示 */
+  SHEETS.history = function () {
+    var entries = historyEntries();
+    var close = '<button type="button" class="btn btn-ghost" data-action="close-sheet">关闭</button>';
+    if (!entries.length) {
+      return {
+        title: '操作记录',
+        body: '<div class="log-empty">' +
+            '<span class="log-empty-icon" aria-hidden="true">' + ICONS.compass + '</span>' +
+            '<p><b>本局还没有操作</b></p>' +
+            '<p class="sheet-note">放置、补牌和物品使用都会记录在这里。</p>' +
+          '</div>',
+        actions: close
+      };
+    }
+
+    var rows = '';
+    var lastTurn = null;
+    for (var i = entries.length - 1; i >= 0; i--) {
+      var entry = entries[i];
+      if (entry.turn !== lastTurn) {
+        rows += '<div class="log-turn"><span>第 ' + entry.turn + ' 回合</span></div>';
+        lastTurn = entry.turn;
+      }
+      rows += historyRow(entry, i === entries.length - 1);
+    }
+
+    var meta = '最近操作在前 · 共 <b>' + entries.length + '</b> 步 · ' +
+      (isTerminal() ? '对局已结束' : '当前第 ' + S.turn + ' 回合');
+    return {
+      title: '操作记录',
+      body: '<p class="log-meta">' + meta + '</p>' +
+        '<div class="log-list">' + rows + '</div>',
+      actions: close
+    };
+  };
+
+  /* 启程与难度选择弹层 */
   SHEETS.voyage = function () {
     return {
       title: '启程',
@@ -1396,6 +1571,7 @@
     };
   };
 
+  /* 覆盖存档确认弹层 */
   SHEETS.overwrite = function () {
     return {
       title: '开始新航程？',
@@ -1408,6 +1584,7 @@
     };
   };
 
+  /* 重新开始确认弹层 */
   SHEETS.restart = function () {
     return {
       title: '重新开始？',
@@ -1417,6 +1594,7 @@
     };
   };
 
+  /* 清除存档确认弹层 */
   SHEETS.clear = function () {
     return {
       title: '清除存档？',
@@ -1428,6 +1606,7 @@
 
   /* ---------------- 动作 ---------------- */
 
+  /* 开始新对局 */
   function startNewGame(opts) {
     opts = opts || {};
     var difficulty = opts.difficulty || PREFS.difficulty;
@@ -1445,6 +1624,7 @@
     toast('新航程 · ' + DIFF_NAME[difficulty] + ' · 先放第 1 行');
   }
 
+  /* 继续存档并回到对局页 */
   function continueGame() {
     if (!S) {
       toast('没有可继续的存档。', 'warn');
@@ -1459,6 +1639,7 @@
     promptCurrentPhase();
   }
 
+  /* 进入对局时按当前阶段自动弹层 */
   function promptCurrentPhase() {
     if (!S) return;
     if (S.phase === 'won' || S.phase === 'lost') openSheet('result');
@@ -1466,6 +1647,7 @@
     else if (S.phase === 'stuck') openSheet('stuck');
   }
 
+  /* 提交规则引擎的新状态，统一处理动画、存档与弹层 */
   function commit(next, opts) {
     opts = opts || {};
     var previousPhase = S ? S.phase : null;
@@ -1505,6 +1687,7 @@
     }
   }
 
+  /* 选中或取消选中一张手牌 */
   function selectHand(cardId) {
     if (!S) return;
     if (S.phase !== 'place') {
@@ -1522,6 +1705,7 @@
     }
   }
 
+  /* 点击棋盘位置的交互 */
   function handleSlot(slotId) {
     if (!S) return;
     if (S.phase !== 'place') {
@@ -1553,6 +1737,7 @@
     openSheet('confirm', { cardId: card.id, slotId: slot.id });
   }
 
+  /* 确认放置 */
   function confirmPlacement() {
     if (!UI.sheet || UI.sheet.type !== 'confirm') return;
     var card = F.getCard(UI.sheet.cardId);
@@ -1570,6 +1755,7 @@
     commit(result.state, { animateSlotId: slot.id, toast: message });
   }
 
+  /* 补牌阶段选择一张供应堆卡牌 */
   function chooseSupply(cardId) {
     if (S.phase !== 'refill') {
       toast(phaseHint(), 'warn');
@@ -1587,6 +1773,7 @@
     });
   }
 
+  /* 使用因纽特智慧 */
   function activateInuit() {
     var result = F.useInuit(S);
     if (!result.ok) {
@@ -1600,11 +1787,13 @@
     return true;
   }
 
+  /* 先使用因纽特智慧，再打开放置确认 */
   function openInuitOption(cardId, slotId) {
     if (!activateInuit()) return;
     openSheet('confirm', { cardId: cardId, slotId: slotId });
   }
 
+  /* 确认狗拉雪橇的交换 */
   function applySled() {
     if (!UI.sheet || UI.sheet.type !== 'sled') return;
     if (!UI.sheet.handId || !UI.sheet.supplyId) {
@@ -1630,6 +1819,7 @@
     }
   }
 
+  /* 确认航海日志的替换 */
   function applyLog() {
     if (!UI.sheet || UI.sheet.type !== 'log') return;
     if (!UI.sheet.slotId || !UI.sheet.cardId) {
@@ -1656,6 +1846,7 @@
     }
   }
 
+  /* 确认宣告失败 */
   function declareLoss() {
     var result = F.declareLoss(S);
     if (!result.ok) {
@@ -1665,6 +1856,7 @@
     commit(result.state, { toast: '已宣告航路中断', tone: 'danger' });
   }
 
+  /* 点击物品按钮：校验后打开对应弹层 */
   function handleItem(type) {
     if (!S) return;
     if (!F.ITEM_TYPES || F.ITEM_TYPES.indexOf(type) < 0) return;
@@ -1709,6 +1901,7 @@
     }
   }
 
+  /* 开关规则提示 */
   function toggleHints() {
     PREFS.hints = !PREFS.hints;
     savePrefs();
@@ -1719,6 +1912,7 @@
     toast(PREFS.hints ? '已开启合法位高亮与提示。' : '已关闭合法位高亮与提示。');
   }
 
+  /* 切换难度 */
   function updateDifficulty(key) {
     if (F.DIFFICULTIES.indexOf(key) < 0) return;
     PREFS.difficulty = key;
@@ -1734,6 +1928,7 @@
     }
   }
 
+  /* 清除本机存档 */
   function clearSave() {
     storageRemove(SAVE_KEY);
     S = null;
@@ -1745,6 +1940,7 @@
     toast('存档已清除，航行记录保留。');
   }
 
+  /* 返回设置页 */
   function goSetup() {
     UI.screen = 'setup';
     UI.selectedCardId = null;
@@ -1759,6 +1955,7 @@
 
   /* ---------------- 事件 ---------------- */
 
+  /* 所有 data-action 的点击处理入口 */
   var ACTIONS = {
     diff: function (el) { updateDifficulty(el.getAttribute('data-diff')); },
     start: function () { openSheet('voyage'); },
@@ -1837,6 +2034,11 @@
     'declare-loss': function () { openSheet('declare'); },
     'confirm-loss': function () { declareLoss(); },
     'view-result': function () { openSheet('result'); },
+    'open-history': function () {
+      if (!S) return;
+      openSheet('history');
+      UI.focusReturn = '#infoBar .info-log';
+    },
     'result-again': function () { startNewGame({ difficulty: S.difficulty }); },
     'result-setup': function () { goSetup(); }
   };
@@ -1884,6 +2086,7 @@
 
   /* ---------------- 启动 ---------------- */
 
+  /* 启动：读取本地数据并首次渲染 */
   function init() {
     loadPrefs();
     loadStats();

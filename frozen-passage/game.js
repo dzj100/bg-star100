@@ -37,6 +37,7 @@
 
   /* ---------------- 随机数 ---------------- */
 
+  /* 种子随机数：推进 rng 并返回 [0,1) */
   function nextFloat(state) {
     var t = (state.rng = (state.rng + 0x6d2b79f5) >>> 0);
     var r = Math.imul(t ^ (t >>> 15), t | 1);
@@ -44,6 +45,7 @@
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   }
 
+  /* 用种子随机数洗牌，返回新数组 */
   function shuffle(state, list) {
     var a = list.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -57,10 +59,12 @@
 
   /* ---------------- 查询 ---------------- */
 
+  /* 深拷贝对局状态，规则函数统一返回新状态 */
   function clone(state) {
     return JSON.parse(JSON.stringify(state));
   }
 
+  /* 按 id 查找棋盘位置 */
   function slotById(state, id) {
     for (var i = 0; i < state.board.slots.length; i++) {
       if (state.board.slots[i].id === id) return state.board.slots[i];
@@ -68,14 +72,17 @@
     return null;
   }
 
+  /* 按行、列查找棋盘位置 */
   function slotByPos(state, row, index) {
     return slotById(state, 'r' + row + '-' + index);
   }
 
+  /* 按 id 取卡牌定义 */
   function getCard(cardId) {
     return CARDS[cardId] || null;
   }
 
+  /* 查某个位置上的目标卡 */
   function goalForSlot(state, slot) {
     for (var i = 0; i < state.board.goals.length; i++) {
       if (state.board.goals[i].slotId === slot.id) return state.board.goals[i];
@@ -83,6 +90,7 @@
     return null;
   }
 
+  /* 该位置下方提供支撑的 1~2 个位置 */
   function supportSlots(state, slot) {
     if (slot.row === 1) return [];
     if (slot.index === 1) return [slotByPos(state, slot.row - 1, 1)];
@@ -102,6 +110,7 @@
     ].filter(Boolean);
   }
 
+  /* 同行最近的已放置卡牌；dir 为 -1 向左、1 向右 */
   function nearestOccupiedInRow(state, row, index, dir) {
     for (var i = index + dir; i >= 1 && i <= row; i += dir) {
       var slot = slotByPos(state, row, i);
@@ -110,10 +119,12 @@
     return null;
   }
 
+  /* 某类物品是否还有未使用的 */
   function hasUnusedItem(state, type) {
     return state.items.some(function (it) { return it.type === type && !it.used; });
   }
 
+  /* 把一张该类物品标记为已使用 */
   function markItemUsed(state, type) {
     for (var i = 0; i < state.items.length; i++) {
       if (state.items[i].type === type && !state.items[i].used) {
@@ -124,10 +135,12 @@
     return null;
   }
 
+  /* 15 个位置是否已经放满 */
   function isFull(state) {
     return state.board.slots.every(function (s) { return !!s.cardId; });
   }
 
+  /* 手牌按数字、再按颜色排序 */
   function sortHand(state) {
     state.hand.sort(function (a, b) {
       var ca = CARDS[a], cb = CARDS[b];
@@ -136,6 +149,7 @@
     });
   }
 
+  /* 从手牌移除一张卡 */
   function removeFromHand(state, cardId) {
     var i = state.hand.indexOf(cardId);
     if (i >= 0) state.hand.splice(i, 1);
@@ -143,6 +157,7 @@
 
   /* ---------------- 放置判定 ---------------- */
 
+  /* 核心判定：卡牌能否放到指定位置，返回结果与失败原因 */
   function canPlace(state, cardId, slotId, opts) {
     opts = opts || {};
     var card = CARDS[cardId];
@@ -275,6 +290,7 @@
     };
   }
 
+  /* 列出某张手牌的全部合法落点 */
   function legalPlacements(state, cardId, opts) {
     var out = [];
     state.board.slots.forEach(function (slot) {
@@ -292,6 +308,7 @@
     return out;
   }
 
+  /* 手牌中是否还存在任意合法落点 */
   function hasAnyLegalPlacement(state) {
     for (var i = 0; i < state.hand.length; i++) {
       if (legalPlacements(state, state.hand[i]).length > 0) return true;
@@ -321,12 +338,14 @@
     return out;
   }
 
+  /* 当前能否使用因纽特智慧 */
   function canUseInuit(state) {
     return (state.phase === 'place' || state.phase === 'stuck') &&
       !state.wisdom && hasUnusedItem(state, 'inuit') &&
       inuitPlacements(state).length > 0;
   }
 
+  /* 航海日志可用的「替换位置 × 手牌」组合 */
   function logOptions(state) {
     var out = [];
     if (state.hand.length === 0) return out;
@@ -351,11 +370,13 @@
     return out;
   }
 
+  /* 当前能否使用狗拉雪橇 */
   function canUseSled(state) {
     return (state.phase === 'place' || state.phase === 'stuck') &&
       hasUnusedItem(state, 'sled') && state.hand.length > 0 && state.supply.length > 0;
   }
 
+  /* 当前能否使用航海日志 */
   function canUseLog(state) {
     return (state.phase === 'place' || state.phase === 'stuck') &&
       hasUnusedItem(state, 'log') && logOptions(state).length > 0;
@@ -363,6 +384,7 @@
 
   /* ---------------- 航线分析（提示用，不参与胜负） ---------------- */
 
+  /* 按同色相连把已放置卡牌归并为航线（仅用于提示与调试） */
   function analyzeRoutes(state) {
     var placed = [];
     state.board.slots.forEach(function (s) {
@@ -370,6 +392,7 @@
     });
     var parent = {};
     placed.forEach(function (s) { parent[s.id] = s.id; });
+    /* 并查集：找根节点 */
     function find(x) {
       while (parent[x] !== x) {
         parent[x] = parent[parent[x]];
@@ -377,6 +400,7 @@
       }
       return x;
     }
+    /* 并查集：合并两个集合 */
     function union(a, b) {
       var ra = find(a), rb = find(b);
       if (ra !== rb) parent[rb] = ra;
@@ -407,10 +431,12 @@
 
   /* ---------------- 流程 ---------------- */
 
+  /* 统一的失败返回结构 */
   function fail(code, message) {
     return { ok: false, code: code, message: message };
   }
 
+  /* 放置后进入补牌；供应堆为空则直接进入下一回合 */
   function toRefillOrNext(state) {
     if (state.supply.length > 0) {
       state.phase = 'refill';
@@ -419,6 +445,7 @@
     }
   }
 
+  /* 回合数 +1，并根据手牌判断新阶段 */
   function startNextTurn(state) {
     state.turn += 1;
     state.wisdom = false;
@@ -431,6 +458,7 @@
     if (state.phase === 'stuck') state.lossHint = true;
   }
 
+  /* 开新局：发目标卡、手牌、供应堆与物品 */
   function createGame(opts) {
     opts = opts || {};
     var difficulty = opts.difficulty || 'novice';
@@ -501,6 +529,7 @@
     return state;
   }
 
+  /* 放置一张手牌，并推进胜负与补牌流程 */
   function placeCard(state, cardId, slotId) {
     if (state.phase !== 'place') return fail('phase', '当前不能放置卡牌');
     if (state.hand.indexOf(cardId) < 0) return fail('hand', '手牌中没有这张卡牌');
@@ -540,6 +569,7 @@
     return { ok: true, state: next };
   }
 
+  /* 使用因纽特智慧：本回合允许紧邻同数字 */
   function useInuit(state) {
     if (state.phase !== 'place' && state.phase !== 'stuck') {
       return fail('phase', '因纽特智慧要在本回合放置前使用');
@@ -559,6 +589,7 @@
     return { ok: true, state: next };
   }
 
+  /* 补牌阶段从供应堆取一张，然后开始下一回合 */
   function chooseSupply(state, cardId) {
     if (state.phase !== 'refill') return fail('phase', '当前不是补充手牌阶段');
     var i = state.supply.indexOf(cardId);
@@ -574,6 +605,7 @@
     return { ok: true, state: next };
   }
 
+  /* 狗拉雪橇：手牌与供应堆互换一张 */
   function useSled(state, handCardId, supplyCardId) {
     if (state.phase !== 'place' && state.phase !== 'stuck') {
       return fail('phase', '当前不能使用狗拉雪橇');
@@ -603,6 +635,7 @@
     return { ok: true, state: next };
   }
 
+  /* 航海日志：用手牌替换一张已放置的卡牌 */
   function useLog(state, slotId, handCardId) {
     if (state.phase !== 'place' && state.phase !== 'stuck') {
       return fail('phase', '当前不能使用航海日志');
@@ -645,6 +678,7 @@
     return { ok: true, state: next };
   }
 
+  /* 卡住时主动宣告失败 */
   function declareLoss(state) {
     if (state.phase !== 'stuck') return fail('phase', '当前不能宣告失败');
     var next = clone(state);
@@ -656,10 +690,12 @@
 
   /* ---------------- 序列化 ---------------- */
 
+  /* 状态序列化为 JSON 字符串 */
   function serialize(state) {
     return JSON.stringify(state);
   }
 
+  /* 校验并还原存档；失败返回 null */
   function deserialize(json) {
     try {
       var s = typeof json === 'string' ? JSON.parse(json) : json;
@@ -671,6 +707,7 @@
     }
   }
 
+  /* 键名排序的稳定序列化，保证哈希一致 */
   function stableStringify(value) {
     if (value === null || typeof value !== 'object') return JSON.stringify(value);
     if (Array.isArray(value)) {
@@ -682,6 +719,7 @@
     }).join(',') + '}';
   }
 
+  /* 对完整状态做 32 位哈希，便于调试比对 */
   function stateHash(state) {
     var str = stableStringify(state);
     var h = 0x811c9dc5;

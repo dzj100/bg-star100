@@ -808,11 +808,56 @@ async function testMenuRulesHints(browser) {
   await context.close();
 }
 
+async function testHistorySheet(browser) {
+  console.log('\n[13] 信息栏 → 操作记录（倒序）');
+  const { context, page } = await newTestPage(browser);
+  await page.evaluate(() => window.FrozenPassageApp.startNewGame({ seed: 12345, difficulty: 'novice' }));
+  await sleep(250);
+
+  await page.click('.info-bar .info-text');
+  await page.waitForSelector('.sheet-title');
+  ok((await page.textContent('.sheet-title')).indexOf('操作记录') >= 0, '点按信息栏打开操作记录');
+  ok((await page.textContent('#sheetBody')).indexOf('本局还没有操作') >= 0, '新局显示空记录');
+  await page.keyboard.press('Escape');
+  await sleep(150);
+
+  const s = await getState(page);
+  await placeViaUI(page, s.hand[0], 'r1-1');
+  await page.waitForSelector('#sheet [data-action="close-sheet"]');
+  await page.click('#sheet [data-action="close-sheet"]');
+  await sleep(150);
+  await page.click('.info-bar [data-action="open-refill"]');
+  await page.waitForSelector('.refill-card');
+  ok((await page.textContent('.sheet-title')).indexOf('补充手牌') >= 0, '信息栏「选牌」仍打开补牌层');
+  await page.click('#sheet [data-action="choose-supply"]');
+  await sleep(250);
+
+  await page.click('.info-log');
+  await page.waitForSelector('.log-row');
+  ok((await page.textContent('.sheet-title')).indexOf('操作记录') >= 0, '历史按钮打开操作记录');
+  const rows = await page.locator('.log-row').count();
+  ok(rows === 2, '记录包含放置与补牌', '实际 ' + rows);
+  const first = await page.locator('.log-row').first().textContent();
+  const second = await page.locator('.log-row').nth(1).textContent();
+  ok(first.indexOf('补牌') >= 0 && first.indexOf('最新') >= 0, '最新一条为补牌并标记', first);
+  ok(second.indexOf('放置') >= 0, '较早一条为放置', second);
+  const turns = await page.locator('.log-turn').allTextContents();
+  ok(turns.length === 1 && turns[0].indexOf('第 1 回合') >= 0, '按回合分组', turns.join(' / '));
+  ok(await page.locator('.log-row.is-latest').count() === 1, '仅最新一条高亮');
+  await page.screenshot({ path: path.join(SHOTS, 'e2e-history.png') });
+  await page.click('[data-action="close-sheet"]');
+  await sleep(150);
+  ok(await page.locator('#overlay').isHidden(), '关闭操作记录');
+  const focused = await page.evaluate(() => document.activeElement ? document.activeElement.className : '');
+  ok(String(focused).indexOf('info-log') >= 0, '关闭后焦点回到历史按钮', String(focused));
+  await context.close();
+}
+
 async function testLayoutsAndConsole(browser) {
-  console.log('\n[13] 响应式布局 / 控制台');
+  console.log('\n[14] 响应式布局 / 控制台');
   const sizes = [
-    { w: 320, h: 568 }, { w: 390, h: 844 }, { w: 768, h: 1024 },
-    { w: 844, h: 390 }, { w: 1280, h: 800 }
+    { w: 320, h: 568 }, { w: 390, h: 844 }, { w: 412, h: 732 }, { w: 412, h: 780 },
+    { w: 768, h: 1024 }, { w: 844, h: 390 }, { w: 1280, h: 800 }
   ];
   for (const size of sizes) {
     const { context, page } = await newTestPage(browser, { width: size.w, height: size.h });
@@ -828,6 +873,8 @@ async function testLayoutsAndConsole(browser) {
       return {
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         board: r('.board'), info: r('.info-bar'), tray: r('.tray'), hand: r('.hand-dock'),
+        wrap: r('.board-wrap'), goal: r('.goal-tab'), hint: r('.starter-hint'),
+        column: getComputedStyle(document.querySelector('.game-main')).flexDirection === 'column',
         slots: document.querySelectorAll('.slot').length
       };
     });
@@ -843,7 +890,18 @@ async function testLayoutsAndConsole(browser) {
         tag + ' 棋盘与托盘不重叠',
         'boardBottom=' + m.board.bottom.toFixed(1) + ' trayTop=' + m.tray.top.toFixed(1));
     }
+    if (m.wrap && m.goal) {
+      ok(m.goal.top >= m.wrap.top - 1, tag + ' 目标卡标签完整可见',
+        'goalTop=' + m.goal.top.toFixed(1) + ' wrapTop=' + m.wrap.top.toFixed(1));
+    }
+    if (m.wrap && m.hint && m.hint.bottom > m.hint.top) {
+      const clipped = m.hint.bottom > m.wrap.bottom + 1 ||
+        (m.column && m.tray && m.hint.bottom > m.tray.top + 1);
+      ok(!clipped, tag + ' 起始提示完整可见',
+        'hintBottom=' + m.hint.bottom.toFixed(1) + ' wrapBottom=' + m.wrap.bottom.toFixed(1));
+    }
     if (tag === '390x844') await page.screenshot({ path: path.join(SHOTS, 'e2e-390.png') });
+    if (tag === '412x732') await page.screenshot({ path: path.join(SHOTS, 'e2e-412x732.png') });
     if (tag === '1280x800') await page.screenshot({ path: path.join(SHOTS, 'e2e-1280.png') });
     await context.close();
   }
@@ -867,6 +925,7 @@ async function testLayoutsAndConsole(browser) {
     await testStuckAndLoss(browser);
     await testWinFlow(browser);
     await testMenuRulesHints(browser);
+    await testHistorySheet(browser);
     await testLayoutsAndConsole(browser);
   } finally {
     await browser.close();
