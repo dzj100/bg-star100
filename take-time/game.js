@@ -1694,6 +1694,43 @@ function closePlaySheet() {
   render();
 }
 
+/**
+ * 推进回合：跳过已无手牌的座位（第7章「摸1张」会让各人剩余手牌数失衡），
+ * 全部无手牌时进入可结算状态。
+ */
+function advanceTurn() {
+  const n = S.players.length;
+  if (S.players.every(p => p.hand.length === 0)) {
+    S.allPlaced = true;
+    addLog('所有手牌已放置，可以翻开结算');
+    return;
+  }
+  let next = S.currentSeat;
+  for (let i = 0; i < n; i++) {
+    next = (next + 1) % n;
+    if (S.players[next].hand.length > 0) break;
+  }
+  for (let seat = (S.currentSeat + 1) % n; seat !== next; seat = (seat + 1) % n) {
+    addLog(`${S.players[seat].name} 已无手牌，跳过回合`);
+  }
+  S.currentSeat = next;
+}
+
+/**
+ * 当前行动者已无手牌时手动跳过：用于修复旧逻辑下已卡住的房间。
+ * 正常流程由 advanceTurn 自动跳过空手牌座位。
+ */
+function skipEmptyTurn() {
+  if (S.phase !== 'play' || S.allPlaced) return;
+  if (!isMyTurn() || !isActor()) return;
+  const seat = actionSeat();
+  if (seat === null || S.players[seat].hand.length > 0) return;
+  addLog(`${S.players[seat].name} 已无手牌，跳过回合`);
+  advanceTurn();
+  saveState();
+  render();
+}
+
 /** 当前玩家放置选中的牌到区域（接管时放置被接管玩家的牌） */
 function placeCard() {
   if (!isMyTurn() || !isActor()) return;
@@ -1752,12 +1789,7 @@ function placeCard() {
     showToast(`摸到 ${drawn.color === 'sun' ? '☀' : '☾'}${drawn.v}`);
   }
 
-  if (S.players.every(p => p.hand.length === 0)) {
-    S.allPlaced = true;
-    addLog('所有手牌已放置，可以翻开结算');
-  } else {
-    S.currentSeat = (S.currentSeat + 1) % S.players.length;
-  }
+  advanceTurn();
   saveState();
   render();
 }

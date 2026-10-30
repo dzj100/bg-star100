@@ -341,7 +341,12 @@ function actionHTML() {
           : `<div class="wait-text">所有手牌已放置，等待房主翻开结算…</div>`;
       }
       if (isMyTurn()) {
-        const taking = actionSeat() !== mySeat();
+        const seat = actionSeat();
+        const taking = seat !== mySeat();
+        if (seat !== null && S.players[seat].hand.length === 0) {
+          return `<button class="btn-full btn-primary" onclick="skipEmptyTurn()">⏭ 跳过回合（无手牌）</button>
+            <div class="wait-text">${taking ? `⚑ 正在接管 ${esc(S.players[seat].name)}，其` : '👆 轮到你，但'}已无手牌，点击跳过回合</div>`;
+        }
         return `<div class="turn-tip">${taking ? `⚑ 已接管 ${esc(S.players[actionSeat()].name)}，代其` : '👆 轮到你出牌，'}拖拽上方手牌到钟面区域<br><span class="forbid">🔇 已看牌，禁止交流</span></div>`;
       }
       return `<div class="wait-text forbid">🔇 已看牌，禁止交流<br>等待 <b>${esc(S.players[S.currentSeat].name)}</b> 出牌…</div>`;

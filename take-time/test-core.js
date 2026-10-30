@@ -974,10 +974,11 @@ g.placeCard();
 assert(g.S.players[1].hand.length === depHand - 1, '离席玩家手牌减少1');
 assert(g.S.segments[2].cards.length === 1, '代打牌放入区域3');
 assert(g.S.segments[2].cards[0].by === 1, '牌归属记录为离席座位');
-assert(g.S.currentSeat === 0, '代打出牌后轮转回房主');
-assert(g.S.log[g.S.log.length - 1].msg.includes('小明'), '日志记录离席玩家名字');
+assert(g.S.currentSeat === 1, '代打出牌后跳过无手牌的房主，回合回到离席座位');
+assert(g.S.log.some(l => l.msg.includes('小明')), '日志记录离席玩家名字');
 
 // 轮到房主自己时仍正常操作自己的手牌
+g.S.currentSeat = 0;
 g.S.players[0].hand = [{ v: 9, color: 'sun' }];
 assert(g.isMyTurn() === true && g.actionSeat() === 0, '轮到自己 actionSeat=自己');
 g.selectCard(0);
@@ -1232,6 +1233,67 @@ g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false }; // 1号位（无限制
 g.placeCard();
 assert(g.S.reserve.length === 11, '第28关：1号位放牌不摸牌');
 assert(g.S.currentSeat === 1, '第28关：回合照常轮转');
+
+// 12a2. 回归：摸1张导致手牌数失衡时，空手牌座位自动跳过（不再卡死）
+console.log('\n[第七章·空手牌自动跳过]');
+g.dealGame(['A', 'B'], { chapter: 7, test: 1, id: 25 });
+g.chooseFirstCond(0); // 摸1张在1号位
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+for (let k = 0; k < 6; k++) {
+  g._olSeatIndex = () => 0;
+  g.S.currentSeat = 0;
+  g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false }; // 摸1张：手牌净不变
+  g.placeCard();
+  g._olSeatIndex = () => 1;
+  g.S.currentSeat = 1;
+  g._pendingPlay = { cardIndex: 0, seg: 4, useEye: false }; // 无限制：手牌-1
+  g.placeCard();
+}
+assert(g.S.players[1].hand.length === 0, 'B 已出完手牌');
+assert(g.S.players[0].hand.length === 6, 'A 因摸牌仍有6张手牌');
+// B 已空手，A 再出一张：回合应跳过 B 直接回到 A
+g._olSeatIndex = () => 0;
+g.S.currentSeat = 0;
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false };
+g.placeCard();
+assert(g.S.currentSeat === 0, 'B 空手后自动跳过，回合回到 A', g.S.currentSeat);
+assert(g.S.allPlaced === false, '仍有人有手牌，不进入可结算');
+assert(g.S.log.some(l => l.msg.includes('B 已无手牌，跳过回合')), '日志记录空手牌跳过');
+
+// 有手牌时不显示跳过按钮
+assert(!g.actionHTML().includes('skipEmptyTurn'), '有手牌的行动者不显示跳过按钮');
+
+// 旧版本卡死状态自救：回合被指到空手牌的 B，可手动跳过
+g._olSeatIndex = () => 1;
+g.S.currentSeat = 1;
+assert(g.isMyTurn() === true, '空手牌 B 仍是当前行动者（模拟旧状态）');
+assert(g.actionHTML().includes('skipEmptyTurn()'), '空手牌玩家操作区显示跳过按钮');
+assert(g.handHTML() === '', '空手牌不渲染手牌区');
+g.skipEmptyTurn();
+assert(g.S.currentSeat === 0, '手动跳过后回合推进到 A');
+assert(g.S.allPlaced === false, '手动跳过后仍有手牌，可继续对局');
+
+// 3人局：连续跳过两个空手牌座位
+g.dealGame(['A', 'B', 'C'], { chapter: 7, test: 4, id: 28 });
+g.chooseFirstCond(0);
+g.hostReveal(); g.hostStartSpin(); g.hostStopSpin();
+g.S.phase = 'play';
+g.S.currentSeat = 0;
+g._olSeatIndex = () => 0;
+g.S.players[1].hand = [];
+g.S.players[2].hand = [];
+g._pendingPlay = { cardIndex: 0, seg: 0, useEye: false }; // 第28关1号位无限制
+g.placeCard();
+assert(g.S.currentSeat === 0, '3人局：连续跳过两个空手牌座位回到 A', g.S.currentSeat);
+assert(g.S.allPlaced === false, '3人局：A 仍有手牌，不进入可结算');
+
+// 全员空手：跳过 → 进入可结算
+g.S.players[0].hand = [];
+g.S.currentSeat = 0;
+g.skipEmptyTurn();
+assert(g.S.allPlaced === true, '全员空手时跳过 → 进入可结算');
+g._olSeatIndex = () => 0;
 
 // ── 12b. 第八章「顺流/双锁/三旋/往复」：转盘选条件 + 旋转/无法放牌机制 ──
 console.log('\n[第八章·旋转与封区]');

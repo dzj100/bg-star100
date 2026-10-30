@@ -1,6 +1,6 @@
 /* 关于弹窗数据：发版时只需要改这个文件。supportQrs 填赞赏码图片路径即可展示。 */
 window.ABOUT_DATA = {
-  updated: '2026-10-23',
+  updated: '2026-10-30',
   authorUrl: 'https://xhslink.com/m/6v4n9vWAfvp',
   // 可放微信/支付宝两张，也可只放一张：{ label: '微信', src: 'support-wechat.png' }
   supportQrs: [
@@ -10,6 +10,7 @@ window.ABOUT_DATA = {
     {
       month: '2026 年 10 月',
       items: [
+        { d: '10.30', t: '修复《时序迷局》第七章无手牌卡死异常' },
         { d: '10.27', t: '新游戏《流冰航路》上线' },
         { d: '10.22', t: '《时序谜局》第八章上线' },
         { d: '10.20', t: '《炸弹克星》开放 10~12 关' },
