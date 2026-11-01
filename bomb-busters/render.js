@@ -22,7 +22,7 @@ let _ui = {
   mode: null,          // null | mark-confirm | pair-target | pair-guess | pair-own | solo | scan | scan-guess | scan-own
                        // | neq | walkie-card | walkie-target | log | sticky | eqtag
                        // | super | super-guess | super-own | ray-target | ray-guess | ray-own
-                       // | battery | radar | coffee
+                       // | battery | radar | coffee | alert
   targetSeat: null,
   targetCardId: null,
   guess: null,         // {kind:'blue',num} | {kind:'yellow'}
@@ -35,6 +35,7 @@ let _ui = {
   rayOwn: { a: null, b: null }, // X/Y射线：两选项对应自选牌 id
   batterySel: [],      // 备用电池：已选玩家座位
   markCardId: null,    // 开局标记：待确认的牌 id
+  alertSel: [],        // #13 剪所有红色导线：已选牌 id（全场任意未公开牌）
 };
 
 let _prevAnim = { first: true, dealStamp: null, failures: 0, revealed: new Set(), defused: null };
@@ -64,6 +65,7 @@ function _resetUiFlow() {
   _ui.rayOwn = { a: null, b: null };
   _ui.batterySel = [];
   _ui.markCardId = null;
+  _ui.alertSel = [];
 }
 
 /** 联机层收到他人道具锁时清理本端进行中的选择流程（不重绘，由调用方统一渲染） */
@@ -316,6 +318,27 @@ function _missionSpecialRulesHTML(mission, pCount) {
     blocks.push(`<h3>🔒 失踪的装备</h3>
       <p>每张道具都被锁上了${locks.length ? `（${locks.join('、 ')}）` : ''}。道具激活需同时满足：原编号蓝色导线公开 ≥2 张 + 🔒数字在场上公开 ≥2 张。</p>`);
   }
+  if (setup.equipChain) {
+    const ch = (S && S.equipChain) ? S.equipChain : null;
+    const target = ch && typeof ch.target === 'number' ? ch.target : null;
+    const hiddenLeft = (S && Array.isArray(S.equipment)) ? S.equipment.filter(e => e.hidden).length : 0;
+    blocks.push(`<h3>🔧 隐藏道具 · 链式解锁</h3>
+      <p>本局道具区的牌全部隐藏并锁上。开局随机选择 1 个蓝色数字${target ? `（本局当前目标：<b>蓝色 ${target}</b>）` : ''}；该数字的 4 根蓝色导线全部公开后，自动解锁并激活，再随机选择下一个目标，依此类推。</p>
+      <p>所有道具都已解锁并激活、或蓝色导线已全部公开时，不再选择数字；${hiddenLeft > 0 ? `剩余 ${hiddenLeft} 张` : '尚未解锁的'}道具保持隐藏、不再揭示。</p>`);
+  }
+  if (setup.redAlert) {
+    blocks.push(`<h3>🚨 红色警报</h3>
+      <p>本局 3 根红色导线从队长起按座位逐人发放 1 根（2 人局队长 2 根、两份手牌各 1 张；4~5 人局后置位可能没有红线），其余 48 根蓝导线均分；没有黄色导线。</p>
+      <p>本局跳过开局信息标记：${pCount === 2 ? '2 人局队长不进行任何标记，队友随机标记 1 张蓝色导线。' : '由系统随机标记每名玩家 1 张蓝色导线。'}</p>
+      <p>「公开红色导线」替换为「剪所有红色导线」：自己回合从全场未公开导线中恰好选择 3 张（可含自己），3 张全部为红色导线则一起公开；含任意非红线立即爆炸判负（不计失误次数，稳定剂无效）。</p>`);
+  }
+  if (setup.expert) {
+    const cap = (S && Array.isArray(S.players) && typeof S.captainSeat === 'number'
+      && S.players[S.captainSeat]) ? S.players[S.captainSeat].name : '';
+    blocks.push(`<h3>⚠️ 高危拆弹专家</h3>
+      <p>本局队长成为「高危拆弹专家」${cap ? `：<b>${_esc(cap)}</b>` : ''}。专家进行双人剪线时若失误，炸弹立即爆炸。</p>
+      <p>专家不能使用【稳定剂】；其他玩家与单人剪线、道具扫描等行动不受影响。</p>`);
+  }
   return blocks.join('');
 }
 
@@ -331,6 +354,12 @@ function showMissionRules() {
   const hidden = missionHasHiddenPick(mission)
     ? '<p>数轴板会标出全部候选导线；牌库只随机混入其中「用」的数量，具体哪几条进入本局保密。</p>'
     : '';
+  const actionLine = setup.redAlert
+    ? '双人剪线、单人剪线或「剪所有红色导线」'
+    : '双人剪线、单人剪线或公开红色导线';
+  const markLine = setup.redAlert
+    ? '本局跳过开局信息标记。'
+    : '开局每人必须公开标记 1 张自己的蓝色导线。';
   el.innerHTML = `
     <h2>📜 ${_esc(meta.code)} ${_esc(meta.name)}</h2>
     <div class="rules-scroll">
@@ -341,9 +370,9 @@ function showMissionRules() {
       <h3>🎯 胜利条件</h3>
       <p>全场所有导线全部公开即拆弹成功${setup.freeCut ? '；倒计时内未完成则失败' : ''}。</p>
       <h3>🔁 回合与行动</h3>
-      <p>每回合可使用已解锁道具（每张限 1 次），并执行 1 次行动：双人剪线、单人剪线或公开红色导线。开局每人必须公开标记 1 张自己的蓝色导线。</p>
+      <p>每回合可使用已解锁道具（每张限 1 次），并执行 1 次行动：${actionLine}。${markLine}</p>
       <h3>💥 失误</h3>
-      <p>${pCount} 人局允许 ${pCount - 1} 次失误，第 ${pCount} 次失误失败；指认到红色导线立即爆炸。</p>
+      <p>${pCount} 人局允许 ${pCount - 1} 次失误，第 ${pCount} 次失误失败；指认到红色导线立即爆炸。${setup.expert ? '高危拆弹专家的双人剪线失误立即爆炸。' : ''}</p>
     </div>
     <button class="btn-full btn-primary" data-testid="mission-rules-close" onclick="closeModal('modalOverlay')">知道了</button>
     <button class="btn-full btn-secondary" onclick="showRules()">📜 查看完整规则</button>`;
@@ -364,7 +393,7 @@ function showRules() {
       · 蓝线 1~12 <b>各 4 张</b>（共 48 张）<br>
       · 红线 1.5~11.5 按关卡随机抽取<br>
       · 黄线 1.1~11.1 按关卡随机抽取<br>
-      ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线</p>
+      ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线（关卡 #13 例外：跳过开局标记）</p>
       <table>
         <thead><tr><th>人数</th><th>手牌分配</th></tr></thead>
         <tbody>
@@ -382,14 +411,16 @@ function showRules() {
           <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」<br>
           ✔ 命中 → 该牌与你的同数字（或黄色）牌各公开 1 张<br>
           × 失误 → 该牌真实信息将被标记，并累计 1 次失误<br>
-          <b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
+          <b>💥若指认到红色导线 → 立即爆炸！</b><br>
+          <b>⚠️#14 高危拆弹专家双人剪线失误 → 立即爆炸！</b></td></tr>
           <tr><td>✂️ 单人剪线</td><td>仅以下场景可以进行：<br>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → 可全部公开（清收）；</td></tr>
           <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开自己剩余的全部红色导线。</td></tr>
+          <tr><td>🚨 剪所有红色导线</td><td>仅关卡 #13（替换「公开红线」）：自己回合从全场未公开导线中恰好选 3 张（可含自己）；3 张全红 → 一起公开，否则<b>立即爆炸判负</b>（不计失误，稳定剂无效）。</td></tr>
         </tbody>
       </table>
       <p>⏭️ 已公开全部手牌的玩家，轮到其回合时将<b>自动跳过</b></p>
       <h3>🔧 道具介绍</h3>
-      <p>开局随机抽「人数」张道具加入游戏；某编号蓝色导线公开 ≥2 张时，自动解锁对应编号道具，每张每局限用 1 次。道具 1、4、12 可在任意玩家回合使用，其余道具仅在自己回合使用</p>
+      <p>开局随机抽「人数」张道具加入游戏；某编号蓝色导线公开 ≥2 张时，自动解锁对应编号道具，每张每局限用 1 次。道具 1、4、12 可在任意玩家回合使用，其余道具仅在自己回合使用（关卡 #15 例外：道具身份隐藏并上锁，按随机目标数字链式解锁）</p>
       <table>
         <thead><tr><th>道具</th><th>效果</th></tr></thead>
         <tbody>
@@ -792,6 +823,7 @@ function _scanCount() {
 
 function _isSelected(cardId) {
   return _ui.scanSel.some(x => x.id === cardId)
+    || _ui.alertSel.indexOf(cardId) >= 0
     || _ui.targetCardId === cardId
     || _ui.fromCardId === cardId;
 }
@@ -841,7 +873,8 @@ function _isSuperShareSelected(card, seat, si) {
 
 /** 他人牌：未公开 = 牌背；已公开 = 亮面 */
 function _enemyCardHTML(card, share, idx, seat, si) {
-  const sel = _ui.scanSel.some(x => x.id === card.id) || _ui.targetCardId === card.id;
+  const sel = _ui.scanSel.some(x => x.id === card.id) || _ui.alertSel.indexOf(card.id) >= 0
+    || _ui.targetCardId === card.id;
   const superSel = _isSuperShareSelected(card, seat, si);
   const picked = S.pending && S.pending.type === 'walkie' && S.pending.fromCardId === card.id;
   const markers = _cardMarkersHTML(card, share, idx);
@@ -851,6 +884,7 @@ function _enemyCardHTML(card, share, idx, seat, si) {
   if (!_equipLockActive() && !card.revealed && !S.result && !byMePicker && !S.pending) {
     if ((_ui.mode === 'pair-target' || _ui.mode === 'ray-target') && _myTurn()) selectable = true;
     if (_ui.mode === 'scan' || _ui.mode === 'super') selectable = true;
+    if (_ui.mode === 'alert' && _myTurn()) selectable = true;
   }
 
   const cls = ['card'];
@@ -917,6 +951,7 @@ function _ownCardSelectable(seat, card) {
   }
   if (!_myTurn()) return false;
   if (seat !== _actorSeat()) return false;
+  if (_ui.mode === 'alert') return !card.revealed;         // #13 可选自己任意未公开牌
   if (_ui.mode === 'neq') return true;                    // ≠ 标签可含已公开牌
   if (_ui.mode === 'walkie-card') return !card.revealed;
   if (_ui.mode === 'sticky') return card.kind === 'blue' && !card.revealed && !card.info;
@@ -945,10 +980,11 @@ function _playerRowHTML(seat) {
   const lastBadge = lastCut
     ? `<span class="last-cut-badge">✂️ ${S.pCount > 2 ? '刚剪线' : '上一位'}</span>`
     : '';
+  const expertBadge = isExpertSeat(seat) ? '<span class="expert-badge">💣 高危专家</span>' : '';
   return `<div class="player-row${isCur ? ' current' : ''}" data-seat="${seat}">
     <div class="pr-head">
       <span class="p-chip${isCur ? ' active' : ''}" style="--pc:${color}">${_esc(p.name)}${seat === S.captainSeat ? ' 🎖' : ''}</span>
-      ${markBadge}${lastBadge}
+      ${markBadge}${lastBadge}${expertBadge}
       <span class="pr-meta">未公开 ${hiddenCards(seat).length}</span>
     </div>
     <div class="pr-shares">${shares}</div>
@@ -983,6 +1019,7 @@ function _ownHandHTML(seat) {
   return `<div class="own-hand${isCur ? ' current' : ''}" data-seat="${seat}" style="--pc:${color}">
     <div class="oh-head">
       <span class="p-chip${isCur ? ' active' : ''}">${mine ? '🙋 你' : _esc(p.name)}</span>
+      ${isExpertSeat(seat) ? '<span class="expert-badge">💣 高危专家</span>' : ''}
       ${status}
     </div>
     <div class="own-shares">${shares}</div>
@@ -1031,11 +1068,20 @@ function _equipRowHTML() {
   const stabActive = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
   const lock = _equipLockActive();
   const lockMine = !!lock && _equipLockOwnedBy(mySeat());
-  const btns = S.equipment.map(e => {
+  const chain = S.equipChain || null;
+  const btns = S.equipment.map((e, idx) => {
+    // #15：隐藏道具只显示牌背，不泄露编号/名称
+    if (e.hidden) {
+      return `<button class="equip-btn hidden" data-testid="equip-hidden" data-slot="${idx + 1}" disabled>
+        <span class="equip-no">?</span><span class="equip-name">🔒 ？？？</span><span class="equip-tip">待解锁</span>
+      </button>`;
+    }
     const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[e.no]) || null;
     const name = lib ? lib.name : '道具 ' + e.no;
     const lockNum = typeof e.lockNum === 'number' ? e.lockNum : null;
     const itLocked = !!lock && !(lockMine && lock.no === e.no);
+    // #14：高危拆弹专家不能使用稳定剂
+    const expertNoStab = e.no === 9 && isExpertSeat(_actorSeat());
     // 该道具已进入选择流程（尚未使用）：按钮呈激活态，再点可取消
     const active = !itLocked && !e.used && e.unlocked && (
       (e.no === 1 && _ui.mode === 'neq') ||
@@ -1050,6 +1096,7 @@ function _equipRowHTML() {
     let onclk = '';
     let disabled = '';
     if (e.used) { cls += ' used'; disabled = ' disabled'; }
+    else if (expertNoStab) { cls += ' locked expert-blocked'; disabled = ' disabled'; }
     else if (e.unlocked) {
       if (itLocked) { cls += ' locked'; disabled = ' disabled'; }
       else {
@@ -1062,20 +1109,29 @@ function _equipRowHTML() {
     const lockTip = lockNum !== null
       ? `解锁条件：蓝色 ${e.no} 公开 ≥2（${Math.min(blueRevealedCount(e.no), 2)}/2）+ 🔒${lockNum} 公开 ≥2（${Math.min(blueRevealedCount(lockNum), 2)}/2）`
       : '';
-    const tip = (tipText || lockTip)
-      ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : ''].filter(Boolean).join(' ｜ ')}</span>`
+    const expertTip = expertNoStab ? '高危拆弹专家不能使用稳定剂' : '';
+    const tip = (tipText || lockTip || expertTip)
+      ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : '', _esc(expertTip)].filter(Boolean).join(' ｜ ')}</span>`
       : '';
     const lockCleared = lockNum !== null && blueRevealedCount(lockNum) >= 2;
     const lockBadge = lockNum !== null
       ? `<span class="equip-lock${e.unlocked ? ' open' : ''}${lockCleared ? ' cleared' : ''}" data-testid="equip-lock-${e.no}" title="${_esc(lockTip)}">${lockCleared ? '🔓' : '🔒'}${lockNum}</span>`
       : '';
-    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${onclk}${disabled}>
+    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${expertNoStab ? ' data-expert-blocked="1"' : ''}${onclk}${disabled}>
       ${lockBadge}<span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
     </button>`;
   }).join('');
+  const hiddenLeft = chain ? S.equipment.filter(e => e.hidden).length : 0;
+  const chainLine = !chain ? ''
+    : (typeof chain.target === 'number'
+      ? `<div class="equip-chain" data-testid="equip-chain-target">🎯 解锁目标：蓝色 ${chain.target}（${blueRevealedCount(chain.target)}/4）</div>`
+      : (hiddenLeft > 0
+        ? `<div class="equip-chain stopped" data-testid="equip-chain-stopped">🔒 剩余 ${hiddenLeft} 张道具保持隐藏</div>`
+        : ''));
   return `<div class="equip-row" data-testid="equipment">
     <span class="equip-label">🔧 道具</span>
     <div class="equip-btns">${btns}</div>
+    ${chainLine}
   </div>`;
 }
 
@@ -1089,6 +1145,16 @@ function _cancelBtn() {
 
 function _modeHintBar() {
   if (!_ui.mode) return null;
+  if (_ui.mode === 'alert') {
+    const n = _ui.alertSel.length;
+    return `<div class="action-bar">
+      <div class="mode-hint">🚨 从全场点选恰好 3 张未公开导线（含自己，已选 ${n}/3）</div>
+      <div class="arm-row">
+        ${_cancelBtn()}
+        <button class="action-btn primary" data-testid="alert-confirm"${n === 3 ? '' : ' disabled'} onclick="onAlertConfirm()">确认剪线（${n}/3）</button>
+      </div>
+    </div>`;
+  }
   if (_ui.mode === 'pair-target') {
     return `<div class="action-bar"><div class="mode-hint">✂️ 点击其他玩家的一张未公开导线（牌背）</div>${_cancelBtn()}</div>`;
   }
@@ -1125,7 +1191,9 @@ function _actionBarHTML() {
   if (S.phase !== 'play' || S.result) return '';
   if (S.fx) {
     const who = (typeof S.fx.by === 'number') ? `${_esc(_playerName(S.fx.by))} ` : '';
-    return _waitHTML(`💬 ${who}${S.fx.kind === 'solo' || S.fx.kind === 'red' ? '公开结算中…' : '猜测结算中…'}`);
+    const what = S.fx.kind === 'alert' ? '剪红线结算中…'
+      : (S.fx.kind === 'solo' || S.fx.kind === 'red') ? '公开结算中…' : '猜测结算中…';
+    return _waitHTML(`💬 ${who}${what}`);
   }
   if (S.pending) return _pendingHTML();
 
@@ -1198,14 +1266,18 @@ function _actionBarHTML() {
   if (actor === null) return _waitHTML('⏳ 等待其他玩家行动…');
   const soloOK = soloOptions(actor).length > 0;
   const redOK = canRevealRed(actor);
+  const alertOK = canRedAlert(actor);
   const skillOK = !S.players[actor].skillUsed;
   return `<div class="action-bar">
     <div class="bar-title">${S.freeCut ? '🔓 自由剪线：选择 1 次行动' : '🎯 你的回合：选择 1 次行动'}（可选用道具）</div>
     ${stabSeat !== null ? '<div class="mode-hint stabilize-hint">🧪 稳定状态生效中：本回合剪线失误不计、红线不爆（点道具 9 可取消）</div>' : ''}
+    ${isExpertSeat(actor) ? '<div class="mode-hint expert-hint">⚠️ 高危拆弹专家：双人剪线失误立即爆炸；不能使用稳定剂</div>' : ''}
     <div class="bar-btns">
       <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线</button>
       <button class="action-btn" data-action="solo" data-testid="btn-solo"${soloOK ? '' : ' disabled'} onclick="startSoloCut()">🎯 单人剪线</button>
-      <button class="action-btn" data-action="red" data-testid="btn-red"${redOK ? '' : ' disabled'} onclick="startRevealRed()">🚨 公开红线</button>
+      ${S.redAlert
+        ? `<button class="action-btn" data-action="alert" data-testid="btn-red-alert"${alertOK ? '' : ' disabled'} onclick="startRedAlert()">🚨 剪所有红色导线</button>`
+        : `<button class="action-btn" data-action="red" data-testid="btn-red"${redOK ? '' : ' disabled'} onclick="startRevealRed()">🚨 公开红线</button>`}
       <button class="action-btn" data-action="skill" data-testid="btn-skill"${skillOK ? '' : ' disabled'} onclick="startSkill()">🔎 双重探测器</button>
     </div>
   </div>`;
@@ -1596,6 +1668,36 @@ function startRevealRed() {
   _startFxSequence('red', plan);
 }
 
+/** #13：进入「剪所有红色导线」3 张选牌流程（全场任意未公开牌，直接点牌选择） */
+function startRedAlert() {
+  if (!_myTurn() || !S.redAlert) return;
+  if (_hiddenAllCount() < 3) { showToast('未公开导线不足 3 张'); return; }
+  _ui.mode = 'alert';
+  _ui.alertSel = [];
+  render();
+}
+
+/** #13 选牌：点选/取消全场未公开牌，最多 3 张 */
+function _toggleAlertPick(cardId) {
+  if (_ui.mode !== 'alert') return;
+  const card = _findCardById(cardId);
+  if (!card || card.revealed) return;
+  const i = _ui.alertSel.indexOf(cardId);
+  if (i >= 0) _ui.alertSel.splice(i, 1);
+  else if (_ui.alertSel.length >= 3) { showToast('最多选择 3 张'); return; }
+  else _ui.alertSel.push(cardId);
+  render();
+}
+
+function onAlertConfirm() {
+  if (_ui.mode !== 'alert') return;
+  if (_ui.alertSel.length !== 3) { showToast('请恰好选择 3 张未公开导线'); return; }
+  const plan = _planRedAlert(_ui.alertSel.slice());
+  if (!plan.ok) { showToast(plan.msg || '无法执行'); return; }
+  _resetUiFlow();
+  _startFxSequence('alert', plan);
+}
+
 function startSkill() {
   if (!_myTurn()) return;
   const r = useSkill();
@@ -1738,6 +1840,10 @@ function cancelFlow() {
 
 function onEnemyCardClick(cardId) {
   if (_equipLockActive()) return;
+  if (_ui.mode === 'alert') {
+    _toggleAlertPick(cardId);
+    return;
+  }
   if (_ui.mode === 'pair-target') {
     const loc = _locateCardAnywhere(cardId);
     const card = _findCardById(cardId);
@@ -1820,6 +1926,10 @@ function onOwnCardClick(seat, si, cardId) {
     return;
   }
 
+  if (_ui.mode === 'alert') {
+    _toggleAlertPick(cardId);
+    return;
+  }
   if (_ui.mode === 'neq') {
     _neqSelect(seat, cardId);
     return;
@@ -1991,6 +2101,7 @@ function _bubbleText(fx, phase) {
     if (fx.kind === 'pair') return `${by}这张是「${fx.label}」！`;
     if (fx.kind === 'solo') return `${by}我公开我手上的 ${fx.count} 张「${fx.label}」！`;
     if (fx.kind === 'red') return `${by}我公开我手上最后${(fx.count || 1) > 1 ? ` ${fx.count} 张` : '一张'}红色导线！`;
+    if (fx.kind === 'alert') return `${by}剪掉这 3 张——全都是红色导线！`;
     if (fx.superScan) return `${by}超级探测器扫描你整份手牌——我猜有「${fx.label}」！`;
     return `${by}扫描这 ${fx.count} 张——我猜有「${fx.label}」！`;
   }
@@ -2019,7 +2130,7 @@ function _playBubbles(fx) {
   };
   put(fx.by, 'declare', _bubbleText(fx, 'declare'));
   _spotlight(fx, 'declare');
-  if (fx.kind !== 'solo' && fx.kind !== 'red') {   // 单人剪线 / 公开红线只有宣告，无回应气泡
+  if (fx.kind !== 'solo' && fx.kind !== 'red' && fx.kind !== 'alert') {   // 单人剪线 / 公开红线 / 剪所有红色导线只有宣告，无回应气泡
     _fx.timers.push(setTimeout(() => {
       put(fx.to, 'reply', _bubbleText(fx, 'reply'), fx.hit ? 'hit' : 'miss');
       _spotlight(fx, fx.hit ? 'hit' : 'miss');
@@ -2033,6 +2144,7 @@ function _startFxSequence(kind, plan) {
   const ids = kind === 'scan' ? plan.targetCards.map(c => c.id)
     : kind === 'solo' ? plan.cards.map(c => c.id)
     : kind === 'red' ? plan.cards.map(c => c.id)
+    : kind === 'alert' ? plan.cards.map(c => c.id)
     : [plan.card.id];                     // pair / ray：单张目标
   const spec = _fxPlanSpec(kind, plan);
   const fx = {
@@ -2042,7 +2154,7 @@ function _startFxSequence(kind, plan) {
     to: kind === 'pair' ? plan.toSeat : kind === 'scan' ? plan.targetSeat : plan.actor,
     label: plan.label,
     hit: !!plan.hit,
-    count: kind === 'scan' || kind === 'solo' || kind === 'red' ? plan.count : 0,
+    count: kind === 'scan' || kind === 'solo' || kind === 'red' || kind === 'alert' ? plan.count : 0,
     superScan: kind === 'scan' && plan.src === 'eq5',
     ids,                                  // 被指认的牌：气泡期间聚光高亮
     at: Date.now(),                       // 宣告端时钟：刷新重进后据此重排剩余结算时间
@@ -2099,6 +2211,12 @@ function _fxPlanSpec(kind, plan) {
       cardIds: plan.cards.map(c => c.id), count: plan.count, label: plan.label,
     };
   }
+  if (kind === 'alert') {
+    return {
+      src: 'alert', actor: plan.actor, cardIds: plan.cards.map(c => c.id),
+      count: plan.count, label: plan.label,
+    };
+  }
   return {
     src: 'red', actor: plan.actor, cardIds: plan.cards.map(c => c.id),
     cardId: plan.card ? plan.card.id : (plan.cards[0] && plan.cards[0].id),
@@ -2150,6 +2268,11 @@ function _fxPlanFromSpec(spec) {
     const cards = (spec.cardIds || []).map(find);
     if (!cards.length || cards.some(c => !c)) return null;
     return { actor: spec.actor, cards, card: cards[0], count: spec.count, label: spec.label };
+  }
+  if (spec.src === 'alert') {
+    const cards = (spec.cardIds || []).map(find);
+    if (!cards.length || cards.some(c => !c)) return null;
+    return { actor: spec.actor, cards, count: spec.count, label: spec.label };
   }
   return null;
 }
@@ -2220,6 +2343,7 @@ function _settleFx(fxId) {
   if (p.kind === 'pair') { if (plan.src === 'eq10') _applyRayCut(plan); else _applyPairCut(plan); }
   else if (p.kind === 'scan') { if (plan.src === 'eq5') _applySuperScan(plan); else _applyScan(plan); }
   else if (p.kind === 'solo') _applySoloCut(plan);
+  else if (p.kind === 'alert') _applyRedAlert(plan);
   else _applyRevealRed(plan);
 }
 
@@ -2515,11 +2639,15 @@ function showEndModal() {
     ? '全场导线全部公开，完美拆弹！'
     : reason === 'boom-red'
       ? '指认到了红色导线——炸弹起爆！'
-      : reason === 'boom-order'
-        ? '未按剪线顺序公开蓝色导线——炸弹起爆！'
-        : reason === 'boom-timeout'
-          ? '倒计时结束，仍有导线未公开——炸弹起爆！'
-          : '失误达到上限——炸弹起爆！';
+      : reason === 'boom-alert'
+        ? '剪开的 3 张导线中有非红线——炸弹起爆！'
+        : reason === 'boom-expert'
+          ? '高危拆弹专家双人剪线失误——炸弹立即起爆！'
+          : reason === 'boom-order'
+            ? '未按剪线顺序公开蓝色导线——炸弹起爆！'
+            : reason === 'boom-timeout'
+              ? '倒计时结束，仍有导线未公开——炸弹起爆！'
+              : '失误达到上限——炸弹起爆！';
   let hiddenTotal = 0;
   _eachCard(c => { if (!c.revealed) hiddenTotal++; });
   const defusedN = ((S.board && S.board.defused) || []).filter(Boolean).length;

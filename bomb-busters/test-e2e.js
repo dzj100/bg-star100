@@ -1,6 +1,6 @@
 /**
  * 炸弹克星 端到端测试（Playwright）
- * 覆盖：着陆页+规则（含 #9 顺序规则与 #10~#12 特殊关卡）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9/#10~#12）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
+ * 覆盖：着陆页+规则（含 #9 顺序规则与 #10~#15 特殊关卡）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9/#10~#15）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
@@ -64,16 +64,16 @@ const rules = await p1.evaluate(() => {
 });
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
 if (!rules.text.includes('#9 轻重缓急') || !rules.text.includes('违反顺序立即爆炸')) throw new Error('规则弹层缺少 #9 顺序剪线说明');
-for (const kw of ['#10 困境', '自由剪线', '#11 又蓝又红', '视为红色导线', '#12 失踪的装备', '🔒']) {
+for (const kw of ['#10 困境', '自由剪线', '#11 又蓝又红', '视为红色导线', '#12 失踪的装备', '🔒', '#13', '剪所有红色导线', '跳过开局标记', '#14 高危拆弹专家', '#15 例外', '链式解锁']) {
   if (!rules.text.includes(kw)) throw new Error('规则弹层缺少特殊关卡说明: ' + kw);
 }
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
-if (rules.rows.join(',') !== '4,3,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
+if (rules.rows.join(',') !== '4,4,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
 if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
 for (const kw of ['≠标签', '对讲机', '三重探测器', 'X/Y射线', '咖啡瓶', '＝标签']) {
   if (!rules.text.includes(kw)) throw new Error('道具表缺少: ' + kw);
 }
-console.log('规则弹层 OK（表格：开局分配 4 行 / 回合操作 3 行 / 道具介绍 12 行）');
+console.log('规则弹层 OK（表格：开局分配 4 行 / 回合操作 4 行 / 道具介绍 12 行）');
 await p1.screenshot({ path: SHOTS + '/e2e-1b-rules-tables.png' });
 await p1.evaluate(() => { const sc = document.querySelector('.rules-scroll'); sc.scrollTop = sc.scrollHeight; });
 await p1.waitForTimeout(200);
@@ -112,14 +112,14 @@ if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-swit
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
-if (missionCount !== 9) throw new Error('关卡抽屉应列出 9 关，得到 ' + missionCount);
-for (const id of [6, 7, 8, 9]) {
+if (missionCount !== 12) throw new Error('关卡抽屉应列出 12 关，得到 ' + missionCount);
+for (const id of [6, 7, 8, 9, 10, 11, 12]) {
   if (!(await p1.evaluate(n => !!document.querySelector(`[data-testid="mission-item-${n}"]`), id))) {
     throw new Error('关卡抽屉应包含 mission-item-' + id);
   }
 }
 const sheetText = await p1.textContent('#sheetContent');
-for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备']) {
+for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备', '#13 红色警报', '#14 高危拆弹专家', '#15 Новосибирск任务']) {
   if (!sheetText.includes(kw)) throw new Error('关卡抽屉缺少 ' + kw);
 }
 await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
@@ -152,11 +152,14 @@ await waitEval(p2, () => {
 }, '成员同步收到 #9 选关');
 console.log('成员同步 #9 OK');
 
-// #10~#12：追加规则文案与成员同步
+// #10~#15：追加规则文案与成员同步
 const specials = [
   { id: 7, name: '#10 困境', kws: ['15 分钟倒计时', '自由剪线', '咖啡瓶'] },
   { id: 8, name: '#11 又蓝又红', kws: ['视为红色导线', '队长不能进行蓝线信息标记'] },
   { id: 9, name: '#12 失踪的装备', kws: ['额外 🔒 一个数字', '锁数字公开 ≥2'] },
+  { id: 10, name: '#13 红色警报', kws: ['3 根红色导线', '系统随机标记每人 1 张蓝线', '剪所有红色导线', '否则立即爆炸判负'] },
+  { id: 11, name: '#14 高危拆弹专家', kws: ['双人剪线时若失误', '不能使用【稳定剂】', '3 条黄导线（3选2）'] },
+  { id: 12, name: '#15 Новосибирск任务', kws: ['3 条红导线（3选1）', '道具区的牌全部隐藏并锁上', '4 根蓝色导线全部公开', '剩余道具保持隐藏'] },
 ];
 for (const m of specials) {
   await p1.click('[data-testid="mission-switch"]');

@@ -36,7 +36,7 @@ const YELLOW_NUMS = Array.from({ length: 11 }, (_, i) => i + 1.1);        // 1.1
 /**
  * 关卡配置（默认 #4；房主可在等候室切换）。
  * draw = 随机抽出张数，use = 实际加入导线库张数（其余放回盒中不参与本局）；
- * note = 文字说明中的括号备注（如 3选2 / 2选1）；marks = 数轴标记样式（hollow = 空心黄色圆圈）。
+ * note = 文字说明中的括号备注（如 3选2 / 2选1）；marks = 数轴标记样式（hollow = 空心圆圈，仅 draw > use 时生效，候选全部入库时强制实心）。
  */
 const DEFAULT_MISSION_ID = 1;
 const MISSIONS = {
@@ -114,6 +114,32 @@ const MISSIONS = {
     },
     equipLocks: true,
   },
+  10: {
+    id: 10, name: '#13 红色警报！',
+    setup: {
+      standard: { red: { draw: 3, use: 3 }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 3, use: 3 }, yellow: { draw: 0, use: 0 } },
+    },
+    redAlert: true,
+  },
+  11: {
+    id: 11, name: '#14 高危拆弹专家',
+    setup: {
+      standard: { red: { draw: 2, use: 2 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+      two:      { red: { draw: 3, use: 3 }, yellow: { draw: 4, use: 4 } },
+    },
+    expert: true,
+    marks: { yellow: 'hollow' },
+  },
+  12: {
+    id: 12, name: '#15 Новосибирск任务',
+    setup: {
+      standard: { red: { draw: 3, use: 1, note: '3选1' }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 3, use: 2, note: '3选2' }, yellow: { draw: 0, use: 0 } },
+    },
+    equipChain: true,
+    marks: { red: 'hollow' },
+  },
 };
 
 /** 按人数展开关卡的开局参数 */
@@ -126,8 +152,9 @@ function missionSetup(mission, pCount) {
     yellowDraw: cfg.yellow.draw || 0,
     yellowUse: cfg.yellow.use || 0,
     yellowNote: cfg.yellow.note || '',
-    redMark: (mission.marks && mission.marks.red) || 'solid',
-    yellowMark: (mission.marks && mission.marks.yellow) || 'solid',
+    // 空心 = 抽 N 用 M 才有候选不确定性；draw === use 时全部入库，一律实心
+    redMark: (mission.marks && mission.marks.red && cfg.red.draw > cfg.red.use) ? 'hollow' : 'solid',
+    yellowMark: (mission.marks && mission.marks.yellow && cfg.yellow.draw > cfg.yellow.use) ? 'hollow' : 'solid',
     orderCount: mission.orderCount || 0,
     freeCut: !!mission.freeCut,
     timerSec: pCount === 2 ? (mission.timerSecTwo || mission.timerSec || 0) : (mission.timerSec || 0),
@@ -135,6 +162,9 @@ function missionSetup(mission, pCount) {
     redBlueCount: mission.redBlueCount || 0,
     twoCaptainNoMark: !!(pCount === 2 && mission.twoCaptainNoMark),
     equipLocks: !!mission.equipLocks,
+    redAlert: !!mission.redAlert,
+    expert: !!mission.expert,
+    equipChain: !!mission.equipChain,
   };
 }
 
@@ -279,6 +309,11 @@ function isRedLikeCard(card) {
   return !!card && (card.kind === 'red' || (card.kind === 'blue' && isRedBlueNum(card.num)));
 }
 
+/** #14：该座位是否为高危拆弹专家（本局队长） */
+function isExpertSeat(seat) {
+  return !!(S && S.expert && typeof seat === 'number' && seat === S.captainSeat);
+}
+
 /** 可猜测/可剪线的蓝线：排除视为红线的蓝线 */
 function hiddenBlueCards(seat, num) {
   return hiddenCards(seat).filter(c => c.kind === 'blue' && c.num === num && !isRedLikeCard(c));
@@ -336,6 +371,15 @@ function _hiddenYellowAll() {
   _eachCard(c => { if (c.kind === 'yellow' && !c.revealed) out.push(c); });
   return out;
 }
+
+/** 全场未公开牌（#13 剪所有红色导线的选牌范围） */
+function _hiddenAllCards() {
+  const out = [];
+  _eachCard(c => { if (!c.revealed) out.push(c); });
+  return out;
+}
+
+function _hiddenAllCount() { return _hiddenAllCards().length; }
 
 function _allRevealed() {
   let all = true;
@@ -533,8 +577,11 @@ function dealGame(names, missionId) {
   });
   let deck = [];
   for (const n of BLUE_NUMS) for (let k = 0; k < 4; k++) deck.push(mk('blue', n));
-  for (const n of redUseNums) deck.push(mk('red', n));
   for (const n of yellowUseNums) deck.push(mk('yellow', n));
+  // #13：红线不参与洗混，蓝线均分后再按座位定点放入
+  const redCards = [];
+  if (setup.redAlert) for (const n of redUseNums) redCards.push(mk('red', n));
+  else for (const n of redUseNums) deck.push(mk('red', n));
 
   // 分份（尽可能均分）：2 人局 4 份（每人 2 份）；3 人局 4 份（队长 2 份）；4/5 人局每人 1 份
   const shareCount = pCount <= 3 ? 4 : pCount;
@@ -565,6 +612,22 @@ function dealGame(names, missionId) {
     for (let i = 0; i < pCount; i++) players[i].shares = [shares[i]];
   }
 
+  // #13：红线从队长起按座位序逐人 1 根（2 人局循环 → 队长 2 根，各份 1 张；4/5 人局后置位可能没有）
+  if (setup.redAlert) {
+    const redShareUsed = new Map();
+    redCards.forEach((card, i) => {
+      const seat = (captainSeat + i) % pCount;
+      const pShares = players[seat].shares;
+      const used = redShareUsed.get(seat) || new Set();
+      const cands = pShares.map((_, si) => si).filter(si => !used.has(si));
+      const si = cands[Math.floor(Math.random() * cands.length)];
+      used.add(si);
+      redShareUsed.set(seat, used);
+      pShares[si].push(card);
+      pShares[si].sort(_numCmp);
+    });
+  }
+
   // 道具：12 张抽 N 张上桌（锁定）；#10 排除咖啡瓶、#11 排除与视红数字相同的道具
   let eqPool = Array.from({ length: 12 }, (_, i) => i + 1);
   if (setup.excludeEquip.length) eqPool = eqPool.filter(n => setup.excludeEquip.indexOf(n) < 0);
@@ -574,13 +637,29 @@ function dealGame(names, missionId) {
   const equipment = eqNos.map((no, i) => {
     const eq = { no, unlocked: false, used: false };
     if (setup.equipLocks) eq.lockNum = lockNums[i];   // #12：每张道具额外锁定一个数字
+    if (setup.equipChain) eq.hidden = true;           // #15：道具身份隐藏，按解锁顺序逐一揭示
     return eq;
   });
+  // #15：开局随机选 1 个蓝色数字作为第一张道具的解锁目标
+  const chainTarget = setup.equipChain ? shuffle(BLUE_NUMS)[0] : null;
 
   // #11 双人局：队长不能进行蓝线信息标记（视为已完成）
   const noMarkSeats = setup.twoCaptainNoMark ? [captainSeat] : [];
   const ready = Array(pCount).fill(false);
   noMarkSeats.forEach(s => { ready[s] = true; });
+
+  // #13：跳过手动标记——3~5 人局每人由系统随机标记自己 1 张未公开蓝线；2 人局仅队友随机标记 1 张
+  const autoMarks = [];
+  if (setup.redAlert) {
+    const markSeats = pCount >= 3 ? players.map((_, i) => i) : [1 - captainSeat];
+    markSeats.forEach(seat => {
+      const pool = [];
+      (players[seat].shares || []).forEach(sh => sh.forEach(c => {
+        if (c.kind === 'blue' && !c.revealed) pool.push(c);
+      }));
+      if (pool.length) autoMarks.push({ seat, card: pool[Math.floor(Math.random() * pool.length)] });
+    });
+  }
 
   // #10：发牌即开始倒计时（标准 15 分钟 / 2 人 12 分钟）
   const timeLimitSec = setup.timerSec || 0;
@@ -591,11 +670,11 @@ function dealGame(names, missionId) {
 
   S = {
     players,
-    phase: 'mark',
+    phase: setup.redAlert ? 'play' : 'mark',   // #13：无标记阶段，直接进入对局
     missionId: mission.id,
     dealStamp: Date.now(),           // 每局唯一（结算弹窗按此去重展示）
     captainSeat,
-    currentSeat: -1,                 // 标记阶段无行动者
+    currentSeat: setup.redAlert ? (setup.freeCut ? -2 : captainSeat) : -1,
     turnNo: prevTurnNo,
     equipRev: 0,                     // 道具锁版本（上锁/释放各 +1；远程端据此丢弃迟到旧锁）
     equipLock: null,
@@ -618,6 +697,9 @@ function dealGame(names, missionId) {
     equipment,
     freeCut: setup.freeCut,          // #10：自由剪线（currentSeat=-2 表示无人被锁定）
     lastCutterSeat: null,            // #10：上一位剪线者（>2 人时不能连续剪线）
+    redAlert: setup.redAlert,        // #13：红线定点分配 + 无手动标记 + 「剪所有红色导线」
+    expert: setup.expert,            // #14：队长为高危拆弹专家（双人剪线失误即爆、禁用稳定剂）
+    equipChain: setup.equipChain ? { target: chainTarget, stopped: false } : null,  // #15：道具隐藏 + 链式解锁目标
     noMarkSeats,                     // #11 双人局：不能进行蓝线信息标记的座位
     pending: null,
     scanMode: null,
@@ -630,6 +712,12 @@ function dealGame(names, missionId) {
     log: [],
     gameOver: false,
   };
+
+  autoMarks.forEach(({ seat, card }) => {
+    card.info = { num: card.num };
+    S.markAt[seat] = card.id;
+    S.ready[seat] = true;
+  });
 
   addLog(`🧨 ${mission.name} 开始！${pCount} 人局：${missionWiresText(setup)} 已标记到板上`);
   if (orderNums.length) {
@@ -648,14 +736,36 @@ function dealGame(names, missionId) {
     addLog(`🔒 本关道具额外上锁：${equipment.map(e =>
       `【${(EQUIPMENT_LIB[e.no] || {}).name || e.no}】需蓝色 ${e.lockNum} 公开 ≥2`).join('；')}`, 'warn');
   }
-  if (noMarkSeats.length) {
+  if (setup.redAlert) {
+    const counts = {};
+    for (let i = 0; i < redUseNums.length; i++) {
+      const seat = (captainSeat + i) % pCount;
+      counts[seat] = (counts[seat] || 0) + 1;
+    }
+    const desc = Object.keys(counts).map(s => `${names[s]} ${counts[s]} 根`).join('、');
+    addLog(`🎯 红色警报：3 根红色导线从队长起按座位发放（${desc}）；本局没有黄色导线`, 'warn');
+    if (pCount >= 3) addLog('📌 本局无法自行标记：系统已为每位玩家随机标记 1 张蓝色导线', 'warn');
+    else addLog(`📌 2 人局：队长不进行任何标记，${names[1 - captainSeat]} 已随机标记 1 张蓝色导线`, 'warn');
+    addLog(`🎖 随机队长：${names[captainSeat]}（由队长先行动）`, 'warn');
+  } else if (noMarkSeats.length) {
     addLog(`🎖 随机队长：${names[captainSeat]}（本关不能进行蓝线信息标记）。请其余玩家放置信息标记`, 'warn');
   } else {
     addLog(`🎖 随机队长：${names[captainSeat]}。请所有人放置信息标记（标记 1 张自己的蓝色导线）`);
   }
+  if (setup.expert) {
+    addLog(`⚠️ 高危拆弹专家：${names[captainSeat]}（队长）——双人剪线失误立即爆炸，且不能使用【稳定剂】`, 'warn');
+  }
+  if (setup.equipChain) {
+    addLog(`🃏 道具区隐藏并上锁：共 ${equipment.length} 张道具，看不到具体道具`, 'warn');
+    addLog(`🎯 首张道具解锁目标：蓝色 ${chainTarget}（公开全部 4 根后自动解锁并激活）`, 'warn');
+  }
   saveStateDirect();
   _seenEquipRev = 0;                    // 新一局：道具锁版本重新计数
   _render();
+  if (autoMarks.length) {
+    _alertToastStamp = S.dealStamp;      // 房主已在本端提示，避免应用远端快照时重复
+    showToast('本局无法自行标记，已随机标记');
+  }
 }
 
 /** 房主：再来一局（结算后；沿用本局关卡，避免刷新后选关丢失回退默认关） */
@@ -781,6 +891,13 @@ function _applyPairCut(plan) {
     if (_checkVictory()) return { ok: true, hit: true };
     endTurn(actor);
   } else {
+    // #14：高危拆弹专家双人剪线失误 → 立即爆炸（不计失误、稳定剂无效）
+    if (isExpertSeat(actor)) {
+      S.cutMods = { stabilize: null };
+      addLog(`💥 高危拆弹专家 ${aName} 双人剪线失误——炸弹立刻起爆！`, 'bad');
+      _boom('boom-expert');
+      return { ok: true, hit: false };
+    }
     const stable = _consumeStabilize(true, actor);
     if (!stable) {
       S.failures++;
@@ -903,6 +1020,59 @@ function _applyRevealRed(plan) {
   addLog(`🚨 ${S.players[plan.actor].name} 公开了${cards.length > 1 ? ` ${cards.length} 张` : ''}红色导线${redlike ? `（含 ${redlike} 张视为红线的蓝色导线）` : ''}！`, 'warn');
   if (_checkVictory()) return { ok: true };
   endTurn(plan.actor);
+  return { ok: true };
+}
+
+// ════════════════════════════════════════════════════════════════
+//  行动 4（#13）：剪所有红色导线
+// ════════════════════════════════════════════════════════════════
+
+/** #13：全场未公开牌 ≥3 且当前可行动 */
+function canRedAlert(seat) {
+  if (!S || !S.redAlert) return false;
+  if (S.phase !== 'play' || S.pending || S.scanMode || S.result || S.fx) return false;
+  return _hiddenAllCount() >= 3;
+}
+
+function doRedAlert(cardIds) {
+  const plan = _planRedAlert(cardIds);
+  if (!plan.ok) return { ok: false, msg: plan.msg };
+  return _applyRedAlert(plan);
+}
+
+/** 校验并生成【剪所有红色导线】计划：恰好 3 张互不重复的全场未公开牌（可含自己） */
+function _planRedAlert(cardIds) {
+  if (!_canAct()) return { ok: false, msg: '现在不能行动' };
+  if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
+  const actor = _actionSeat();
+  if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (!S.redAlert) return { ok: false, msg: '本关没有该行动' };
+  if (!Array.isArray(cardIds) || cardIds.length !== 3) return { ok: false, msg: '须恰好选择 3 张未公开导线' };
+  if (new Set(cardIds).size !== 3) return { ok: false, msg: '不能重复选择同一张牌' };
+  const cards = [];
+  for (const id of cardIds) {
+    const found = _findCardOwner(id);
+    if (!found) return { ok: false, msg: '无效的牌' };
+    if (found.card.revealed) return { ok: false, msg: '只能选择未公开的导线' };
+    cards.push(found.card);
+  }
+  return { ok: true, actor, cards, count: 3, label: '红色导线' };
+}
+
+/** 执行【剪所有红色导线】：3 张全红则一起公开；含非红线立即爆炸（不计失误、稳定剂无效） */
+function _applyRedAlert(plan) {
+  const { actor, cards } = plan;
+  const name = S.players[actor].name;
+  if (!cards.every(isRedLikeCard)) {
+    const bad = cards.filter(c => !isRedLikeCard(c)).length;
+    addLog(`💥 ${name} 剪所有红色导线：选中的 3 张中有 ${bad} 张不是红色导线`, 'bad');
+    _boom('boom-alert');
+    return { ok: true, boom: true };
+  }
+  cards.forEach(c => { c.revealed = true; });
+  addLog(`🚨 ${name} 剪所有红色导线：3 张全部为红色导线，已一起公开！`, 'good');
+  if (_checkVictory()) return { ok: true };
+  endTurn(actor);
   return { ok: true };
 }
 
@@ -1274,6 +1444,10 @@ function _equipBasic(no) {
   const eq = S.equipment.find(e => e.no === no);
   const name = (EQUIPMENT_LIB[no] || {}).name || ('道具 ' + no);
   if (!eq) return { ok: false, msg: `【${name}】不可用` };
+  if (eq.hidden) return { ok: false, msg: '该道具尚未揭示' };   // #15：隐藏道具不可用
+  if (no === 9 && isExpertSeat(_actionSeat())) {
+    return { ok: false, msg: '【稳定剂】不可用：高危拆弹专家不能使用' };
+  }
   if (eq.used) return { ok: false, msg: `【${name}】已使用过` };
   if (!eq.unlocked) {
     const lock = (typeof eq.lockNum === 'number')
@@ -1742,6 +1916,7 @@ function _updateDefused(num) {
 /** 道具解锁：对应编号蓝线公开 ≥2；#12 还需锁数字公开 ≥2。每次蓝线公开后都要尝试（原数字可能早已达标） */
 function _checkEquipUnlocks() {
   if (!S || !S.equipment) return;
+  if (S.equipChain) { _checkChainUnlock(); return; }
   for (const eq of S.equipment) {
     if (eq.unlocked) continue;
     if (blueRevealedCount(eq.no) < 2) continue;
@@ -1749,6 +1924,43 @@ function _checkEquipUnlocks() {
     eq.unlocked = true;
     const lockNote = (typeof eq.lockNum === 'number') ? `（锁数字 ${eq.lockNum} 已公开 ≥2）` : '';
     addLog(`🔧 道具解锁：【${(EQUIPMENT_LIB[eq.no] || {}).name || eq.no}】${lockNote}`, 'good');
+  }
+}
+
+/**
+ * #15：目标蓝色数字 4 根全部公开 → 按道具槽顺序揭示并激活下一张，
+ * 再从所有尚未全部公开的蓝色数字中随机选择下一个目标；
+ * 道具全部解锁或蓝线全部公开时停止选择，剩余道具保持隐藏。
+ */
+function _checkChainUnlock() {
+  const ch = S.equipChain;
+  if (!ch || ch.stopped || typeof ch.target !== 'number') return;
+  if (blueRevealedCount(ch.target) < 4) return;
+
+  const slotIdx = S.equipment.findIndex(e => e.hidden);
+  if (slotIdx < 0) {
+    ch.target = null;
+    ch.stopped = true;
+    return;
+  }
+  const slot = S.equipment[slotIdx];
+  slot.hidden = false;
+  slot.unlocked = true;
+  addLog(`🔧 蓝色 ${ch.target} 已全部公开——第 ${slotIdx + 1} 张道具解锁并激活：【${(EQUIPMENT_LIB[slot.no] || {}).name || slot.no}】`, 'good');
+
+  const hasHidden = S.equipment.some(e => e.hidden);
+  const pool = BLUE_NUMS.filter(n => blueRevealedCount(n) < 4);
+  if (!hasHidden) {
+    ch.target = null;
+    ch.stopped = true;
+    addLog('🗝 道具已全部解锁并激活，不再选择解锁目标', 'warn');
+  } else if (!pool.length) {
+    ch.target = null;
+    ch.stopped = true;
+    addLog('🗝 蓝色导线已全部公开，不再选择解锁目标；剩余道具保持隐藏', 'warn');
+  } else {
+    ch.target = pool[Math.floor(Math.random() * pool.length)];
+    addLog(`🎯 下一张道具解锁目标：蓝色 ${ch.target}（公开全部 4 根后解锁）`, 'warn');
   }
 }
 
@@ -1782,6 +1994,10 @@ function _finish(win, reason) {
     addLog('🎉 全场导线全部公开——拆弹成功！', 'good');
   } else if (reason === 'boom-red') {
     addLog('💥 指向了红色导线——炸弹起爆！', 'bad');
+  } else if (reason === 'boom-alert') {
+    addLog('💥 剪所有红色导线选到了非红线——炸弹起爆！', 'bad');
+  } else if (reason === 'boom-expert') {
+    addLog('💥 高危拆弹专家双人剪线失误——炸弹立刻起爆！', 'bad');
   } else if (reason === 'boom-order') {
     addLog('💥 未按剪线顺序公开蓝色导线——炸弹起爆！', 'bad');
   } else if (reason === 'boom-timeout') {
@@ -1881,6 +2097,9 @@ window._olResetProgress = function () {
 /** 当前行动者端已处理到的道具锁版本（所有锁相关快照共用一个单调水位） */
 let _seenEquipRev = 0;
 
+/** #13 系统随机标记 toast 的已提示局（按 dealStamp 去重，含重进/中途加入只提示一次） */
+let _alertToastStamp = 0;
+
 /**
  * 当前行动者端对道具锁的定向处理（online.js 在“我是行动者”早退前调用）：
  *  - 他人上锁：只合并锁字段，避免整包远端状态覆盖本端尚未推送的行动；
@@ -1932,6 +2151,12 @@ function applyOnlineState(state) {
   if (prev && state && prev.dealStamp && state.dealStamp
       && prev.dealStamp !== state.dealStamp) {
     _seenEquipRev = 0;               // 新一局：道具锁版本重新计数
+  }
+  // #13 系统代为随机标记（3~5 人局每人 1 张 / 2 人局队友 1 张）：每位玩家进入本局后提示一次
+  if (state && state.phase === 'play' && state.redAlert
+      && state.dealStamp && state.dealStamp !== _alertToastStamp) {
+    _alertToastStamp = state.dealStamp;
+    showToast('本局无法自行标记，已随机标记');
   }
   // 迟到重放的旧锁快照：版本低于本地已应用的版本时不得重新上锁
   if (prev && state && state.equipLock
@@ -2035,6 +2260,9 @@ function openMissionSheet() {
     if (m.freeCut) extras.push(`⌛ ${Math.round((m.timerSec || 0) / 60)} 分钟倒计时（2 人 ${Math.round((m.timerSecTwo || m.timerSec || 0) / 60)} 分钟）+ 自由剪线`);
     if (m.redBlueCount) extras.push(`🎲 ${m.redBlueCount} 个数字的蓝线视为红线`);
     if (m.equipLocks) extras.push('🔒 道具额外上锁');
+    if (m.redAlert) extras.push('🚨 红线定点分配 + 随机标记 + 剪所有红色导线');
+    if (m.expert) extras.push('⚠️ 队长为高危拆弹专家（双人剪线失误即爆炸、禁用稳定剂）');
+    if (m.equipChain) extras.push('🔧 道具隐藏并上锁，目标数字 4 根蓝线全公开自动解锁');
     return `<button type="button" class="mission-item${selected ? ' selected' : ''}"
         data-mission-id="${m.id}" data-testid="mission-item-${m.id}"
         onclick="selectMission(${m.id})">
@@ -2091,6 +2319,9 @@ function waitingExtrasHTML() {
       ${mission.excludeEquip && mission.excludeEquip.length ? `<div class="we-line">本局不出现的道具：${mission.excludeEquip.map(n => (EQUIPMENT_LIB[n] || {}).name || ('道具 ' + n)).join('、')}</div>` : ''}
       ${mission.redBlueCount ? `<div class="we-line">本关追加：随机 ${mission.redBlueCount} 个数字的蓝导线视为红色导线，只能在手中只剩这些牌时通过「公开红线」公开；对应数字道具不会出现${mission.twoCaptainNoMark ? '；2 人局队长不能进行蓝线信息标记' : ''}</div>` : ''}
       ${mission.equipLocks ? '<div class="we-line">本关追加：每张道具额外 🔒 一个数字，需原数字导线公开 ≥2 且锁数字公开 ≥2 才解锁</div>' : ''}
+      ${mission.redAlert ? '<div class="we-line">本关追加：3 根红色导线从队长起按座位逐人发放（2 人局队长 2 根、每份 1 张；4~5 人局后置位可能没有红线）；跳过开局信息标记（3~5 人局系统随机标记每人 1 张蓝线，2 人局队长不标记、队友随机标记 1 张）；「公开红色导线」替换为「剪所有红色导线」：自己回合选全场恰好 3 张未公开导线，全部为红色才成功，否则立即爆炸判负</div>' : ''}
+      ${mission.expert ? '<div class="we-line">本关追加：队长成为「高危拆弹专家」——专家进行双人剪线时若失误，炸弹立即爆炸；专家不能使用【稳定剂】</div>' : ''}
+      ${mission.equipChain ? '<div class="we-line">本关追加：道具区的牌全部隐藏并锁上；随机选 1 个蓝色数字，该数字 4 根蓝色导线全部公开后解锁并激活道具，再随机选下一个蓝线目标……道具全部解锁或蓝线全部公开时停止</div>' : ''}
       <div class="we-line">失误上限：人数 − 1 次（第 N 次失误，N = 人数，即爆炸）</div>
       <div class="we-line">本关进度：${prog.passed ? '已通关 ✓' : '未通关'}</div>
     </div>`;

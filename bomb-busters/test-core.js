@@ -447,7 +447,8 @@ await t('#8 双人局：3 红 + 4 黄候选全标板，牌库 3选1 + 4 黄（53
   assert(subsetOf(hand.red, S.board.redNums));
   eq(S.board.redNote, '3选1');
   eq(S.board.yellowNote, '');
-  eq(S.board.yellowMark, 'hollow');
+  eq(S.board.redMark, 'hollow');
+  eq(S.board.yellowMark, 'solid', '4 根黄线全部入库，应实心');
 });
 
 await t('#9 三人局：1 红 + 2 黄（51 张），公开 3 个不重复的蓝线顺序', () => {
@@ -630,10 +631,14 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   g.openMissionSheet();
   const sheet = g.document.getElementById('sheetContent').innerHTML;
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 9 关');
+  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 12 关');
   includes(sheet, 'data-mission-id="7"', '抽屉应包含 #10');
   includes(sheet, 'data-mission-id="8"', '抽屉应包含 #11');
   includes(sheet, 'data-mission-id="9"', '抽屉应包含 #12');
+  includes(sheet, 'data-mission-id="10"', '抽屉应包含 #13');
+  includes(sheet, 'data-mission-id="11"', '抽屉应包含 #14');
+  includes(sheet, 'data-mission-id="12"', '抽屉应包含 #15');
+  includes(sheet, 'Новосибирск', '抽屉应包含 #15 名称');
   includes(sheet, 'mi-tag current', '当前关卡应有标记');
   includes(sheet, '>#8<');
   includes(sheet, '最终测试');
@@ -946,6 +951,557 @@ await t('#10~#12 选关卡片：追加规则文案与同步', () => {
   includes(html, '额外 🔒 一个数字');
   includes(html, '锁数字公开 ≥2');
   eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 9 }));
+});
+
+await t('#13 红色警报：3 人局 51 张 / 3 红无黄 / 直接进入对局 / 每人 1 根红 / 系统随机标记每人 1 蓝', () => {
+  const g = dealMission(10, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 10);
+  eq(S.redAlert, true, '应标记红线警报关');
+  eq(S.phase, 'play', '应跳过标记阶段直接进入对局');
+  eq(S.currentSeat, S.captainSeat, '应由队长先行动');
+  eq(boardTotals(g), 51, '48 蓝 + 3 红 + 无黄');
+  eq(S.board.yellowNums.length, 0);
+  eq(S.board.redNums.length, 3);
+  let reds = 0, yellows = 0, marks = 0;
+  const redBySeat = Array(3).fill(0);
+  const marksBySeat = Array(3).fill(0);
+  S.players.forEach((p, seat) => p.shares.forEach(sh => sh.forEach(c => {
+    if (c.kind === 'red') { reds++; redBySeat[seat]++; }
+    if (c.kind === 'yellow') yellows++;
+    if (c.info) { marks++; marksBySeat[seat]++; eq(c.kind, 'blue', '随机标记只能落在蓝线上'); }
+  })));
+  eq(reds, 3);
+  eq(yellows, 0);
+  assert(redBySeat.every(n => n === 1), '3 人局每人 1 根红线');
+  eq(marks, 3, '3 人局每人随机标记 1 张蓝线');
+  assert(marksBySeat.every(n => n === 1), '每名玩家各 1 张随机标记');
+  assert([0, 1, 2].every(s => S.markAt[s] && S.ready[s]), 'markAt/ready 逐座位记录');
+  assert(S.log.some(l => l.msg.includes('每位玩家随机标记')), '应记录逐人随机标记提示');
+  assert(S.log.some(l => l.msg.includes('红色警报')), '应记录红线分配');
+  eq(S.equipment.length, 3, '道具照常随机 3 张');
+  assert(S.equipment.every(e => typeof e.lockNum !== 'number'), '本关道具无额外锁定');
+  const anyBlue = S.players[0].shares[0].find(c => c.kind === 'blue');
+  includes(g.placeInfoToken(anyBlue.id).msg, '当前不是标记阶段', '对局中不能手动标记');
+});
+
+await t('#13 红色警报：4/5 人局从队长起前 3 位各 1 根红，后置位无红', () => {
+  for (const [pCount, names] of [[4, ['A', 'B', 'C', 'D']], [5, ['A', 'B', 'C', 'D', 'E']]]) {
+    const g = dealMission(10, names);
+    const S = st(g);
+    eq(S.pCount, pCount);
+    eq(boardTotals(g), 51);
+    const redBySeat = Array(pCount).fill(0);
+    S.players.forEach((p, seat) => p.shares.forEach(sh => sh.forEach(c => {
+      if (c.kind === 'red') redBySeat[seat]++;
+    })));
+    for (let i = 0; i < pCount; i++) {
+      const expect = ((i - S.captainSeat + pCount) % pCount) < 3 ? 1 : 0;
+      eq(redBySeat[i], expect, `${pCount} 人局座位 ${i}（队长 ${S.captainSeat}）红线数`);
+    }
+    const markBySeat = Array(pCount).fill(0);
+    let marks = 0;
+    S.players.forEach((p, seat) => p.shares.forEach(sh => sh.forEach(c => {
+      if (c.info) { marks++; markBySeat[seat]++; }
+    })));
+    eq(marks, pCount, `${pCount} 人局每人随机标记 1 张蓝线`);
+    assert(markBySeat.every(n => n === 1), `${pCount} 人局每个座位各 1 张标记`);
+    eq(S.equipment.length, pCount, '道具照常随机 pCount 张');
+    assert(S.equipment.every(e => typeof e.lockNum !== 'number'), '本关道具无额外锁定');
+  }
+});
+
+await t('#13 红色警报：2 人局队长 2 根红（每份 1 张）/ 对方 1 根 / 队长无标记、队友随机标记 1 张', () => {
+  const g = dealMission(10, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 51);
+  eq(S.phase, 'play');
+  eq(S.currentSeat, S.captainSeat);
+  const cap = S.captainSeat, other = 1 - cap;
+  eq(S.players[cap].shares.length, 2);
+  S.players[cap].shares.forEach(sh => eq(sh.filter(c => c.kind === 'red').length, 1, '队长每份各 1 根红'));
+  eq(S.players[other].shares.reduce((n, sh) => n + sh.filter(c => c.kind === 'red').length, 0), 1);
+  let marks = 0, yellow = 0;
+  const markSeats = [];
+  S.players.forEach((p, seat) => p.shares.forEach(sh => sh.forEach(c => {
+    if (c.info) { marks++; markSeats.push(seat); eq(c.kind, 'blue', '随机标记只能落在蓝线上'); }
+    if (c.kind === 'yellow') yellow++;
+  })));
+  eq(marks, 1, '2 人局仅队友随机标记 1 张蓝线');
+  eq(markSeats[0], other, '标记应落在非队长一侧');
+  eq(S.markAt[cap], undefined, '队长不应有标记记录');
+  assert(S.markAt[other], '队友应记录标记');
+  eq(S.ready[other], true);
+  eq(yellow, 0);
+  assert(S.log.some(l => l.msg.includes('队长不进行任何标记')), '应说明队长不标记');
+  assert(S.log.some(l => l.msg.includes('已随机标记 1 张')), '应说明队友随机标记');
+});
+
+await t('#13 剪所有红色导线：3 张全红一起公开，结算后回合结束', () => {
+  const g = loadGame();
+  const r1 = C('red', 2.5), r2 = C('red', 5.5), r3 = C('red', 9.5), b = C('blue', 4);
+  const S = use(g, sc(2, [[[r1], [r2]], [[r3, b]]]));
+  S.redAlert = true;
+  const plan = g._planRedAlert([r1.id, r2.id, r3.id]);
+  assert(plan.ok, plan.msg);
+  eq(plan.count, 3);
+  const r = g._applyRedAlert(plan);
+  assert(r.ok && !r.boom);
+  assert(r1.revealed && r2.revealed && r3.revealed, '3 张红线应一起公开');
+  eq(S.phase, 'play');
+  eq(S.currentSeat, 1, '结算后应轮到下家');
+  assert(!b.revealed);
+  assert(S.log.some(l => l.msg.includes('3 张全部为红色导线')));
+});
+
+await t('#13 剪所有红色导线：含非红线立即爆炸（boom-alert，不计失误），稳定剂无效', () => {
+  const g = loadGame();
+  const r1 = C('red', 2.5), r2 = C('red', 5.5), b = C('blue', 4);
+  const S = use(g, sc(2, [[[r1], [r2]], [[b]]]));
+  S.redAlert = true;
+  S.failures = 1;
+  S.cutMods = { stabilize: 0 };
+  const r = g.doRedAlert([r1.id, b.id, r2.id]);
+  assert(r.ok && r.boom);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-alert');
+  eq(S.failures, 1, '不计入失误次数');
+  assert(!r1.revealed && !r2.revealed && !b.revealed, '失败时 3 张均不公开');
+  assert(S.log.some(l => l.msg.includes('不是红色导线')));
+  assert(S.log.some(l => l.msg.includes('剪所有红色导线选到了非红线')));
+});
+
+await t('#13 剪所有红色导线：全场公开完毕即胜利', () => {
+  const g = loadGame();
+  const r1 = C('red', 2.5), r2 = C('red', 5.5), r3 = C('red', 9.5);
+  const S = use(g, sc(2, [[[r1], [r2]], [[r3]]]));
+  S.redAlert = true;
+  const r = g.doRedAlert([r1.id, r2.id, r3.id]);
+  assert(r.ok && !r.boom);
+  eq(S.phase, 'over');
+  eq(S.result.win, true);
+});
+
+await t('#13 剪所有红色导线：校验恰好 3 张 / 不重复 / 未公开 / 关卡开关', () => {
+  const g = loadGame();
+  const r1 = C('red', 2.5), r2 = C('red', 5.5), r3 = C('red', 9.5), rev = C('red', 7.5, { revealed: true });
+  const S = use(g, sc(2, [[[r1, rev], [r2]], [[r3]]]));
+  S.redAlert = true;
+  includes(g._planRedAlert([r1.id, r2.id]).msg, '须恰好选择 3 张');
+  includes(g._planRedAlert([r1.id, r1.id, r2.id]).msg, '不能重复');
+  includes(g._planRedAlert([r1.id, r2.id, rev.id]).msg, '只能选择未公开');
+  includes(g._planRedAlert([r1.id, r2.id, 'nope']).msg, '无效的牌');
+  S.redAlert = false;
+  includes(g._planRedAlert([r1.id, r2.id, r3.id]).msg, '本关没有该行动');
+  S.redAlert = true;
+  const plan = g._planRedAlert([r1.id, r2.id, r3.id]);
+  assert(plan.ok, plan.msg);
+  assert(plan.cards.every(c => !c.revealed));
+  eq(g._hiddenAllCount(), 3);
+});
+
+await t('#13 界面：行动栏改为剪红线按钮，底部提示条恰好 3 张才能确认', () => {
+  const g = loadGameWithRender();
+  g.window._olPendingChallenge = { missionId: 10 };
+  g.dealGame(['A', 'B', 'C']);
+  const S = st(g);
+  const html = g.document.getElementById('app').innerHTML;
+  includes(html, 'data-testid="btn-red-alert"');
+  includes(html, '剪所有红色导线');
+  assert(html.indexOf('data-testid="btn-red"') < 0, '不应再出现「公开红线」按钮');
+  assert(g.canRedAlert(S.currentSeat), '开局未公开牌充足，应可发起');
+  g.startRedAlert();
+  eq(ev(g, '_ui.mode'), 'alert');
+  assert(!g.document.getElementById('sheetOverlay').classList.contains('show'), '剪红线流程应直接点牌，不打开遮罩弹层');
+  const ids = g._hiddenAllCards().slice(0, 3).map(c => c.id);
+  ids.slice(0, 2).forEach(id => g._toggleAlertPick(id));
+  let bar = g.document.getElementById('app').innerHTML;
+  includes(bar, '已选 2/3');
+  assert(/data-testid="alert-confirm"[^>]*disabled/.test(bar), '不足 3 张时确认按钮应禁用');
+  g._toggleAlertPick(ids[2]);
+  bar = g.document.getElementById('app').innerHTML;
+  includes(bar, '确认剪线（3/3）');
+  eq(ev(g, '_ui.alertSel.length'), 3);
+  const extra = g._hiddenAllCards().find(c => ids.indexOf(c.id) < 0);
+  g._toggleAlertPick(extra.id);
+  eq(ev(g, '_ui.alertSel.length'), 3, '最多只能选 3 张');
+  g.onAlertConfirm();
+  eq(S.fx && S.fx.kind, 'alert', '确认后应进入宣告结算');
+  eq(ev(g, '_ui.mode'), null);
+});
+
+await t('#13 选关卡片：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(10).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#13 红色警报');
+  includes(html, '3 条红导线');
+  includes(html, '剪所有红色导线');
+  includes(html, '系统随机标记每人 1 张蓝线');
+  includes(html, '队友随机标记 1 张');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 10 }));
+});
+
+/* ──────────────────────────── #14 高危拆弹专家 ──────────────────────────── */
+
+await t('#14 高危拆弹专家：3 人局 52 张 / 2 红 + 黄 3选2 / 正常标记 / 专家=队长', () => {
+  const g = dealMission(11, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 11);
+  eq(S.expert, true, '应标记专家关');
+  eq(S.phase, 'mark', '本关正常进行开局标记');
+  eq(S.currentSeat, -1);
+  eq(boardTotals(g), 52, '48 蓝 + 2 红 + 2 黄（实际入库）');
+  eq(S.board.redNums.length, 2);
+  eq(S.board.yellowNums.length, 3, '抽出的 3 根黄线全部标到数轴');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 2);
+  eq(hand.yellow.length, 2, '黄线只随机入库 2 根');
+  assert(subsetOf(hand.yellow, S.board.yellowNums), '入库黄线应来自候选');
+  eq(S.board.redMark, 'solid');
+  eq(S.board.yellowMark, 'hollow', '3选2 黄线空心');
+  eq(S.board.redNote, '');
+  eq(S.board.yellowNote, '3选2');
+  assert(S.log.some(l => l.msg.includes('高危拆弹专家') && l.msg.includes(S.players[S.captainSeat].name)), '应记录专家=队长的身份');
+  eq(S.equipment.length, 3, '道具照常随机 3 张');
+  assert(S.equipment.every(e => typeof e.lockNum !== 'number'), '本关道具无额外锁定');
+});
+
+await t('#14 高危拆弹专家：2 人局 55 张 / 3 红 + 4 黄全部入库', () => {
+  const g = dealMission(11, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 55, '48 蓝 + 3 红 + 4 黄');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 3);
+  eq(hand.yellow.length, 4);
+  eq(S.board.redNums.length, 3);
+  eq(S.board.yellowNums.length, 4);
+  eq(S.board.yellowNote, '', '2 人局无 3选2 备注');
+  eq(S.board.yellowMark, 'solid', '4 根黄线全部入库，应实心');
+  eq(S.expert, true);
+});
+
+await t('#14 专家双人剪线失误：立即爆炸（boom-expert），不计失误、稳定剂无效', () => {
+  const g = loadGame();
+  const own = C('blue', 5);
+  const t7 = C('blue', 7);
+  const S = use(g, sc(3, [[[own, C('blue', 12)]], [[t7]], [[C('blue', 9)]]]));
+  S.expert = true;
+  S.cutMods = { stabilize: 0 };          // 即使有稳定状态也不能保护
+  const r = g.doPairCut(1, t7.id, { kind: 'blue', num: 5 }, own.id);
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-expert');
+  eq(S.failures, 0, '不计入失误次数');
+  eq(S.cutMods.stabilize, null, '稳定剂被清除');
+  assert(S.log.some(l => l.msg.includes('高危拆弹专家') && l.msg.includes('立刻起爆')));
+});
+
+await t('#14 非专家双人剪线失误：按常规累计失误，不爆炸', () => {
+  const g = loadGame();
+  const own = C('blue', 5);
+  const t7 = C('blue', 7);
+  const S = use(g, sc(3, [[[own]], [[t7]], [[C('blue', 9)]]], { captain: 1 }));
+  S.expert = true;
+  const r = g.doPairCut(1, t7.id, { kind: 'blue', num: 5 }, own.id);
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'play');
+  eq(S.failures, 1);
+  assert(t7.fail && t7.fail.type === 'blue' && t7.fail.num === 7, '常规失败标记');
+  eq(S.currentSeat, 1);
+});
+
+await t('#14 专家双人剪线命中：正常公开，不爆炸', () => {
+  const g = loadGame();
+  const own = C('blue', 5);
+  const target = C('blue', 5);
+  const S = use(g, sc(2, [[[own, C('blue', 12)]], [[target, C('blue', 9)]]]));
+  S.expert = true;
+  const r = g.doPairCut(1, target.id, { kind: 'blue', num: 5 }, own.id);
+  assert(r.ok && r.hit);
+  eq(S.phase, 'play');
+  assert(own.revealed && target.revealed);
+  eq(S.currentSeat, 1);
+});
+
+await t('#14 专家禁用稳定剂：引擎拒绝；其他玩家不受影响', () => {
+  const g = loadGame();
+  const own = C('blue', 5);
+  const S = use(g, sc(2, [[[own]], [[C('blue', 9)]]],
+    { equipment: [{ no: 9, unlocked: true, used: false }] }));
+  S.expert = true;
+  const r = g.useStabilizer();
+  assert(!r.ok);
+  includes(r.msg, '高危拆弹专家不能使用');
+  assert(!S.cutMods || S.cutMods.stabilize === null, '不应启动稳定状态');
+  eq(S.equipment[0].used, false, '拒绝时不消耗道具');
+
+  const g2 = loadGame();
+  const S2 = use(g2, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]],
+    { equipment: [{ no: 9, unlocked: true, used: false }], captain: 1 }));
+  S2.expert = true;
+  assert(g2.useStabilizer().ok, '非专家玩家可正常使用');
+  eq(S2.cutMods.stabilize, 0);
+});
+
+await t('#14 专家扫描未命中：按常规结算（本关只限制双人剪线）', () => {
+  const g = loadGame();
+  const own11 = C('blue', 11);
+  const a = C('blue', 4), b = C('blue', 9);
+  const S = use(g, sc(2, [[[own11, C('blue', 12)]], [[a, b]]]));
+  S.expert = true;
+  assert(g.useSkill().ok);
+  const r = g.doScan([a.id, b.id], 11, own11.id, 'skill');
+  assert(r.ok && !r.hit);
+  eq(S.phase, 'play', '扫描未命中不触发专家爆炸');
+  eq(S.failures, 1);
+});
+
+await t('#14 界面：专家徽章 / 行动条提示 / 道具 9 置灰禁用', () => {
+  const g = loadGameWithRender();
+  g.window._olPendingChallenge = { missionId: 11 };
+  g.dealGame(['A', 'B', 'C']);
+  const S = st(g);
+  S.phase = 'play';
+  S.currentSeat = S.captainSeat;
+  S.ready = [true, true, true];
+  S.equipment = [{ no: 9, unlocked: true, used: false }];
+  g.render();
+  const html = g.document.getElementById('app').innerHTML;
+  includes(html, '💣 高危专家', '应显示专家徽章');
+  includes(html, '高危拆弹专家：双人剪线失误立即爆炸', '行动条应提示专家规则');
+  includes(html, 'data-expert-blocked="1"', '道具 9 应标记专家禁用');
+  includes(html, 'expert-blocked', '道具 9 应带禁用样式');
+  assert(/data-testid="equip-9"[^>]*disabled/.test(html), '道具 9 按钮应禁用');
+});
+
+await t('#14 选关卡片：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(11).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#14 高危拆弹专家');
+  includes(html, '双人剪线时若失误');
+  includes(html, '不能使用【稳定剂】');
+  includes(html, '3 条黄导线（3选2）');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 11 }));
+  g.openMissionSheet();
+  const sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-mission-id="11"');
+  includes(sheet, '队长为高危拆弹专家');
+});
+
+/* ──────────────────────────── #15 Новосибирск任务 ──────────────────────────── */
+
+await t('#15 3 人局：49 张 / 抽 3 红用 1 / 红线空心 / 无黄 / 道具全部隐藏并锁定', () => {
+  const g = dealMission(12, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 12);
+  eq(boardTotals(g), 49, '48 蓝 + 1 红（实际入库）');
+  eq(S.board.redNums.length, 3, '抽出的 3 根红线全部标板');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1, '牌库只混入 3选1 的 1 根');
+  eq(hand.yellow.length, 0, '本关无黄线');
+  assert(subsetOf(hand.red, S.board.redNums), '入库红线应来自板上候选');
+  eq(S.board.redMark, 'hollow', '红线空心标记');
+  eq(S.board.redNote, '3选1');
+  eq(S.board.yellowNums.length, 0);
+  eq(S.equipment.length, 3);
+  assert(S.equipment.every(e => e.hidden === true && !e.unlocked && !e.used), '道具全部隐藏并锁定');
+  assert(S.equipChain && S.equipChain.stopped === false, '应存在链式解锁状态');
+  assert(Number.isInteger(S.equipChain.target) && S.equipChain.target >= 1 && S.equipChain.target <= 12, '首个目标应为 1~12');
+  assert(S.log.some(l => l.msg.includes('道具区隐藏并上锁')), '日志应提示道具隐藏');
+  assert(S.log.some(l => l.msg.includes(`首张道具解锁目标：蓝色 ${S.equipChain.target}`)), '日志应提示首目标');
+  eq(S.phase, 'mark', '本关正常进行开局标记');
+});
+
+await t('#15 2 人局：50 张 / 抽 3 红用 2；普通关卡无隐藏道具', () => {
+  const g = dealMission(12, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 50, '48 蓝 + 2 红');
+  eq(S.board.redNums.length, 3);
+  eq(handWireNums(g).red.length, 2);
+  eq(S.board.redNote, '3选2');
+  eq(S.equipment.length, 2);
+  assert(S.equipment.every(e => e.hidden === true), '2 人局道具同样隐藏');
+  eq(S.equipChain.stopped, false);
+
+  const g2 = dealMission(1, ['A', 'B']);
+  const S2 = st(g2);
+  eq(S2.equipChain, null, '普通关卡无链式解锁状态');
+  assert(S2.equipment.every(e => !e.hidden), '普通关卡道具不隐藏');
+});
+
+await t('#15 目标 3/4 不解锁；4/4 时揭示第一张并随机选下一个未完成数字', () => {
+  const g = loadGame();
+  const t5 = [C('blue', 5), C('blue', 5), C('blue', 5), C('blue', 5)];
+  const S = use(g, sc(2, [
+    [[t5[0], t5[1], C('blue', 9)]],
+    [[t5[2], t5[3], C('blue', 9)]],
+  ], {
+    equipment: [
+      { no: 1, unlocked: false, used: false, hidden: true },
+      { no: 7, unlocked: false, used: false, hidden: true },
+    ],
+  }));
+  S.equipChain = { target: 5, stopped: false };
+
+  t5.slice(0, 3).forEach(c => { c.revealed = true; });
+  g._updateDefused(5);
+  eq(S.equipment[0].hidden, true, '3/4 不解锁');
+  eq(S.equipment[0].unlocked, false);
+  eq(S.equipChain.target, 5, '目标未完成时保持不变');
+
+  t5[3].revealed = true;
+  g._updateDefused(5);
+  eq(S.equipment[0].hidden, false, '第一张道具应揭示');
+  eq(S.equipment[0].unlocked, true, '第一张道具应激活');
+  eq(S.equipment[1].hidden, true, '一次只揭示一张');
+  assert(S.log.some(l => l.msg.includes(`蓝色 5 已全部公开`) && l.msg.includes('第 1 张道具解锁并激活')), '应记录解锁');
+  assert(typeof S.equipChain.target === 'number' && S.equipChain.target !== 5, '应重新选择下一个目标');
+  assert(S.equipChain.target >= 1 && S.equipChain.target <= 12);
+  assert(g.blueRevealedCount(S.equipChain.target) < 4, '下一个目标必须尚未全部公开');
+  eq(S.equipChain.stopped, false, '还有隐藏道具与可选数字时继续');
+});
+
+await t('#15 道具全部解锁 → 停止选择目标', () => {
+  const g = loadGame();
+  const t5 = [C('blue', 5), C('blue', 5), C('blue', 5), C('blue', 5)];
+  const S = use(g, sc(2, [[[t5[0], t5[1]]], [[t5[2], t5[3]]]], {
+    equipment: [{ no: 2, unlocked: false, used: false, hidden: true }],
+  }));
+  S.equipChain = { target: 5, stopped: false };
+  t5.forEach(c => { c.revealed = true; });
+  g._updateDefused(5);
+  eq(S.equipment[0].hidden, false);
+  eq(S.equipment[0].unlocked, true);
+  eq(S.equipChain.target, null);
+  eq(S.equipChain.stopped, true, '没有剩余道具时停止选择');
+  assert(S.log.some(l => l.msg.includes('道具已全部解锁并激活，不再选择解锁目标')));
+});
+
+await t('#15 所有蓝色导线公开 → 停止选择，剩余道具保持隐藏', () => {
+  const g = loadGame();
+  const all = [];
+  let last = null;
+  for (let n = 1; n <= 12; n++) {
+    for (let k = 0; k < 4; k++) {
+      const c = C('blue', n);
+      if (n === 5 && k === 3) last = c;
+      else c.revealed = true;
+      all.push(c);
+    }
+  }
+  const S = use(g, sc(2, [[all.slice(0, 24)], [all.slice(24)]], {
+    equipment: [
+      { no: 1, unlocked: false, used: false, hidden: true },
+      { no: 7, unlocked: false, used: false, hidden: true },
+      { no: 11, unlocked: false, used: false, hidden: true },
+    ],
+  }));
+  S.equipChain = { target: 5, stopped: false };
+  last.revealed = true;                     // 公开最后一张：全场蓝线 4/4
+  g._updateDefused(5);
+  eq(S.equipment[0].hidden, false, '目标 4/4 仍会解锁当前这一张');
+  eq(S.equipment[0].unlocked, true);
+  eq(S.equipment[1].hidden, true, '剩余道具不揭示');
+  eq(S.equipment[2].hidden, true);
+  eq(S.equipChain.target, null);
+  eq(S.equipChain.stopped, true);
+  assert(S.log.some(l => l.msg.includes('蓝色导线已全部公开，不再选择解锁目标')), '应记录蓝线全公开停止');
+});
+
+await t('#15 隐藏道具不可使用；揭示后可正常使用', () => {
+  const g = loadGame();
+  const S = use(g, sc(2, [[[C('blue', 5)]], [[C('blue', 9)]]], {
+    equipment: [{ no: 3, unlocked: false, used: false, hidden: true }],
+  }));
+  S.equipChain = { target: 5, stopped: false };
+  const r = g._equipBasic(3);
+  assert(!r.ok);
+  includes(r.msg, '尚未揭示');
+
+  S.equipment[0].hidden = false;
+  S.equipment[0].unlocked = true;
+  assert(g._equipBasic(3).ok, '揭示并激活后应可用');
+});
+
+await t('#15 界面：隐藏牌背 / 目标进度条 / 停止后剩余隐藏提示 / 本关规则', () => {
+  const g = loadGameWithRender();
+  g.window._olPendingChallenge = { missionId: 12 };
+  g.dealGame(['A', 'B', 'C']);
+  const S = st(g);
+  S.phase = 'play';
+  S.currentSeat = S.captainSeat;
+  S.ready = [true, true, true];
+  S.equipment = [
+    { no: 3, unlocked: true, used: false },
+    { no: 7, unlocked: false, used: false, hidden: true },
+    { no: 9, unlocked: false, used: false, hidden: true },
+  ];
+  S.equipChain = { target: 5, stopped: false };
+  g.render();
+  let html = g.document.getElementById('app').innerHTML;
+  includes(html, 'data-testid="equip-hidden"', '应渲染隐藏道具牌背');
+  includes(html, '🔒 ？？？', '隐藏道具不泄露名称');
+  includes(html, 'data-testid="equip-chain-target"', '应显示解锁目标条');
+  includes(html, '蓝色 5', '目标条应显示当前目标');
+  assert(!html.includes('data-testid="equip-7"'), '隐藏道具 7 不应出现在 DOM');
+  assert(!html.includes('data-testid="equip-9"'), '隐藏道具 9 不应出现在 DOM');
+  includes(html, 'data-testid="equip-3"', '已解锁道具正常显示');
+
+  S.equipChain = { target: null, stopped: true };
+  g.render();
+  html = g.document.getElementById('app').innerHTML;
+  includes(html, 'data-testid="equip-chain-stopped"', '停止后应显示剩余隐藏提示');
+  includes(html, '剩余 2 张道具保持隐藏');
+
+  S.equipChain = { target: 5, stopped: false };
+  g.showMissionRules();
+  const rules = g.document.getElementById('modalContent').innerHTML;
+  includes(rules, '隐藏道具 · 链式解锁');
+  includes(rules, '本局当前目标');
+  includes(rules, '蓝色 5');
+  includes(rules, '剩余 2 张');
+});
+
+await t('#15 选关卡片与抽屉：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(12).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#15 Новосибирск任务');
+  includes(html, '3 条红导线（3选1）');
+  includes(html, '道具区的牌全部隐藏并锁上');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 12 }));
+  g.openMissionSheet();
+  const sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-mission-id="12"');
+  includes(sheet, '道具隐藏并上锁');
+});
+
+await t('标记样式不变量：抽 N 用 M（draw>use）才空心并带备注，否则实心无备注', () => {
+  const g0 = loadGame();
+  const MISSIONS = ev(g0, 'MISSIONS');
+  for (const id of Object.keys(MISSIONS)) {
+    for (const pCount of [3, 2]) {
+      const mission = MISSIONS[id];
+      const cfg = pCount === 2 ? mission.setup.two : mission.setup.standard;
+      const g = dealMission(Number(id), pCount === 2 ? ['A', 'B'] : ['A', 'B', 'C']);
+      const S = st(g);
+      for (const kind of ['red', 'yellow']) {
+        const draw = cfg[kind].draw || 0;
+        const use = cfg[kind].use || 0;
+        const hollow = draw > use;
+        eq(S.board[kind + 'Mark'], hollow ? 'hollow' : 'solid',
+          `#${id} ${pCount} 人局 ${kind}（draw ${draw}/use ${use}）`);
+        eq(S.board[kind + 'Note'], cfg[kind].note || '', `#${id} ${pCount} 人局 ${kind} 备注`);
+        eq(S.board[kind + 'Note'] !== '', hollow,
+          `#${id} ${pCount} 人局 ${kind} 备注应仅在有候选选择时出现`);
+      }
+    }
+  }
 });
 
 await t('选关守卫：非房主 / 对局中 / 无效关卡均被拒绝', () => {

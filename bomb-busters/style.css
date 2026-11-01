@@ -762,6 +762,24 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   color: #a33a2c;
   font-weight: 800;
 }
+/* #14：高危拆弹专家徽章与提醒 */
+.expert-badge {
+  font-size: .66rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ffe9d6;
+  border: 1px solid #e8a15d;
+  color: #9a4d0b;
+  font-weight: 800;
+}
+.expert-hint {
+  color: #9a4d0b;
+  background: #fff3e4;
+  border: 1.5px dashed #e8a15d;
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-weight: 800;
+}
 
 /* 手牌：一份手牌占一行；一人多份时上下分行，行间虚线分隔 */
 .pr-shares, .own-shares { display: flex; flex-direction: column; }
@@ -928,6 +946,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 
 .equip-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   background: var(--surface);
@@ -1002,6 +1021,23 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .equip-lock.open { background: #8a6a06; opacity: .72; }
 .equip-lock.cleared:not(.open) { background: #0f766e; opacity: .9; }
+/* #15：隐藏道具槽（牌背）与链式解锁目标 */
+.equip-btn.hidden {
+  background: repeating-linear-gradient(135deg, #e9e2d0, #e9e2d0 7px, #ded5bf 7px, #ded5bf 14px);
+  border-style: dashed;
+  color: var(--text-dim);
+}
+.equip-chain {
+  flex-basis: 100%;
+  font-size: .7rem;
+  font-weight: 800;
+  color: #8a6a06;
+  background: #fff8e3;
+  border: 1.5px dashed #d9b44a;
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+.equip-chain.stopped { color: var(--text-dim); background: #f2ecdd; border-color: #cfc3a8; }
 
 /* ============================================================
    行动条 / 被动选择
