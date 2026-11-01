@@ -51,6 +51,91 @@ body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg);
 .count-btn.active { border-color: var(--accent); background: var(--card-bg); }
 .count-btn:active { opacity: .8; }
 
+/* 闯关配置 · 折叠卡片 */
+#configOptions { margin-bottom: 16px; }
+.config-panel {
+  background: linear-gradient(180deg, #1d1d26 0%, #171720 100%);
+  border: 1px solid #2a2a34; border-radius: 14px;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+.config-panel.open {
+  border-color: rgba(184, 148, 62, .45);
+  box-shadow: 0 0 0 1px rgba(184, 148, 62, .08), 0 10px 24px rgba(0, 0, 0, .28);
+}
+.config-head {
+  width: 100%; display: flex; align-items: center; gap: 11px;
+  padding: 12px 14px; background: none; border: 0; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; border-radius: 13px;
+}
+.config-head:active { background: rgba(255, 255, 255, .035); }
+.config-head:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.config-icon {
+  flex: 0 0 auto; width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 10px; color: var(--gold);
+  background: radial-gradient(circle at 30% 25%, rgba(184, 148, 62, .28), rgba(184, 148, 62, .05) 72%);
+  border: 1px solid rgba(184, 148, 62, .35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.config-icon svg { width: 18px; height: 18px; }
+.config-headtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.config-title { font-size: .92rem; font-weight: 600; letter-spacing: .05em; }
+.config-tag {
+  font-style: normal; font-size: .66rem; font-weight: 400; letter-spacing: 0;
+  color: var(--gold); border: 1px solid rgba(184, 148, 62, .4);
+  border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px;
+  white-space: nowrap;
+}
+.config-sub { display: flex; flex-wrap: wrap; gap: 4px; }
+.cfg-chip {
+  font-size: .68rem; color: var(--text-dim); line-height: 1.55;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 999px; padding: 0 7px;
+}
+.cfg-chip-custom {
+  color: var(--gold); border-color: rgba(184, 148, 62, .45);
+  background: rgba(184, 148, 62, .1);
+}
+.config-caret {
+  flex: 0 0 auto; display: grid; place-items: center;
+  color: var(--text-dim); transition: transform .3s cubic-bezier(.2, .7, .3, 1), color .25s ease;
+}
+.config-caret svg { width: 16px; height: 16px; }
+.config-panel.open .config-caret { transform: rotate(180deg); color: var(--gold); }
+.config-body {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows .3s cubic-bezier(.2, .7, .3, 1);
+}
+.config-panel.open .config-body { grid-template-rows: 1fr; }
+.config-body-inner { overflow: hidden; min-height: 0; }
+.config-body-pad { padding: 2px 14px 14px; border-top: 1px solid transparent; }
+.config-panel.open .config-body-pad { border-top-color: rgba(255, 255, 255, .05); }
+.config-group { margin-top: 12px; }
+.config-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .78rem; color: var(--text-dim); margin-bottom: 2px;
+}
+.config-label::before {
+  content: ''; width: 3px; height: 10px; border-radius: 2px;
+  background: rgba(184, 148, 62, .55);
+}
+.config-count { margin: 6px 0 0; gap: 8px; }
+.config-count .count-btn {
+  height: 42px; font-size: .95rem; background: #14141a;
+  border-color: #262630; border-radius: 10px;
+}
+.config-count .count-btn.active {
+  border-color: rgba(184, 148, 62, .8); background: rgba(184, 148, 62, .12);
+  color: var(--gold);
+}
+.config-count .count-btn:disabled { opacity: .55; cursor: default; }
+.config-count .count-btn:disabled:active { opacity: .55; }
+@media (prefers-reduced-motion: reduce) {
+  .config-body, .config-caret, .config-panel { transition: none; }
+}
+
+/* 联机等候室配置面板 */
+.config-slot { margin-top: 16px; }
+
 /* 玩家输入框 */
 .player-inputs { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
 .player-input { display: flex; align-items: center; gap: 10px; }

@@ -23,6 +23,10 @@ let _isReceiving   = false;  // 正在接收远端更新（防止 saveState 回�
 let _knownSeatCount  = 0;    // 上次已知的座位数（用于检测成员离开）
 let _departedHandled = false; // 当前离开事件是否已处理
 let _myBossAnimVersion = 0;   // 本地已播放的 Boss 动画阶段版本号，用于抑制 Realtime 动画回声
+let _roomConfig      = loadConfig(); // 当前房间闯关配置（房主可改，其他人只读）
+let _roomConfigOpen  = false; // 等候室配置面板是否展开（默认收起）
+let _waitingSeats    = [];   // 等候室座位快照，用于原位刷新
+let _configSyncTimer = null; // 房主配置推送防抖计时器
 
 // Realtime 回声识别：每次推送生成唯一 pushId = "{座位号}-{本座位自增序号}"，
 // 把自己推过的 pushId 记入 _myPushedIds。接收时若 pushId 属于自己的集合（含 host 转发），视为回声跳过。
@@ -98,12 +102,15 @@ async function onlineBackToLanding() {
 }
 
 function _cleanupOnline() {
+  _cancelRoomConfigSync();
   if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
   _onlineRoomId = null;
   _mySeatIndex  = null;
   _isHost       = false;
   _knownSeatCount = 0;
   _departedHandled = false;
+  _waitingSeats = [];
+  _roomConfigOpen = false;
   _myBossAnimVersion = 0;
   _prevBossAnimState = null;
   _bossAnimVersion = 0;
@@ -189,11 +196,14 @@ async function onCreateRoom() {
     _onlineRoomId = roomId;
     _mySeatIndex  = 0;
     _isHost       = true;
+    _roomConfig   = loadConfig();
+    _roomConfigOpen = false;
     _saveSession();
     _knownSeatCount = 1;
     _departedHandled = false;
     _subscribeToRoom(roomId);
-    renderWaitingRoom({ seats: [{ name: _myPlayerName, seatIndex: 0 }] });
+    await netUpdateGameState(roomId, { config: _roomConfig }, 'waiting');
+    renderWaitingRoom({ seats: [{ name: _myPlayerName, seatIndex: 0 }], state: { config: _roomConfig } });
   } catch (e) {
     alert('创建房间失败: ' + e.message);
   } finally {
@@ -214,6 +224,7 @@ async function onJoinRoom() {
     _onlineRoomId = roomId;
     _mySeatIndex  = seatIndex;
     _isHost       = false;
+    _roomConfigOpen = false;
     _saveSession();
     _departedHandled = false;
     _subscribeToRoom(roomId);
@@ -222,10 +233,12 @@ async function onJoinRoom() {
     _knownSeatCount = seats.length;
     if (room.status === 'playing' && room.state) {
       state = room.state;
+      state.config = normalizeConfig(state.config);
       document.getElementById('online').style.display = 'none';
       showGame();
     } else {
-      renderWaitingRoom({ seats });
+      if (room.state && room.state.config) _roomConfig = normalizeConfig(room.state.config);
+      renderWaitingRoom({ seats, state: room.state });
     }
   } catch (e) {
     alert(e.message || '加入失败');
@@ -238,8 +251,13 @@ async function onJoinRoom() {
    等候室
    ============================================================ */
 
-function renderWaitingRoom(room) {
+function renderWaitingRoom(room, opts) {
   const seats = room.seats || [];
+  _waitingSeats = seats;
+  if ((!opts || !opts.keepConfig) && room.state && room.state.config) {
+    _roomConfig = normalizeConfig(room.state.config);
+  }
+
   const seatsHTML = seats.map(s =>
     `<div class="player-input" style="margin-bottom:8px;">
        <label>座位 ${s.seatIndex + 1}</label>
@@ -271,8 +289,76 @@ function renderWaitingRoom(room) {
         ${_onlineRoomId}
       </div>
       ${seatsHTML}
+      <div class="config-slot">
+        ${renderConfigPanelHTML(_roomConfig, {
+          open: _roomConfigOpen,
+          interactive: _isHost,
+          handler: 'selectOnlineConfig',
+          toggleHandler: 'toggleOnlineConfigPanel',
+          tag: _isHost ? '' : '房主设置',
+        })}
+      </div>
       <div style="margin-top:16px;">${startBtnHTML}</div>
     </div>`;
+}
+
+/**
+ * 等候室增量刷新：座位不变时只更新配置区，避免整块重建引起抖动
+ * 房主本地配置即权威，忽略自己推送的 Realtime 回显
+ */
+function updateWaitingRoom(room) {
+  const seats = room.seats || [];
+  const panel = document.querySelector('#online .config-panel');
+  const sameSeats = panel && seats.length === _waitingSeats.length
+    && seats.every((s, i) => s.seatIndex === _waitingSeats[i].seatIndex && s.name === _waitingSeats[i].name);
+  if (!sameSeats) {
+    renderWaitingRoom(room, _isHost ? { keepConfig: true } : null);
+    return;
+  }
+  _waitingSeats = seats;
+  const incoming = room.state && room.state.config;
+  if (incoming && !_isHost) {
+    _roomConfig = normalizeConfig(incoming);
+    updateConfigPanelDOM(_roomConfig, document.getElementById('online'));
+  }
+}
+
+/**
+ * 房主在等候室修改闯关配置：本地立即原位更新，推送做防抖合并
+ * @param {string} key - 配置项
+ * @param {number|string} value - 配置值
+ */
+function selectOnlineConfig(key, value) {
+  if (!_isHost) return;
+  _roomConfig = normalizeConfig({ ..._roomConfig, [key]: value });
+  saveConfig(_roomConfig);
+  _roomConfigOpen = true;
+  updateConfigPanelDOM(_roomConfig, document.getElementById('online'));
+  _scheduleRoomConfigSync();
+}
+
+/** 防抖推送：连续点选只在停止 300ms 后同步一次，避免请求风暴与回显乱序 */
+function _scheduleRoomConfigSync() {
+  if (_configSyncTimer) clearTimeout(_configSyncTimer);
+  _configSyncTimer = setTimeout(() => {
+    _configSyncTimer = null;
+    if (!_onlineRoomId || !_isHost) return;
+    netUpdateGameState(_onlineRoomId, { config: _roomConfig }, 'waiting')
+      .catch(e => console.warn('[config] sync failed:', e));
+  }, 300);
+}
+
+function _cancelRoomConfigSync() {
+  if (_configSyncTimer) { clearTimeout(_configSyncTimer); _configSyncTimer = null; }
+}
+
+/** 展开/折叠等候室的闯关配置面板（房主与客人都可查看） */
+function toggleOnlineConfigPanel() {
+  _roomConfigOpen = !_roomConfigOpen;
+  const panel = document.querySelector('#online .config-panel');
+  if (!panel) return;
+  panel.classList.toggle('open', _roomConfigOpen);
+  panel.querySelector('.config-head').setAttribute('aria-expanded', String(_roomConfigOpen));
 }
 
 /* ============================================================
@@ -313,7 +399,7 @@ function _subscribeToRoom(roomId) {
 
     // 等候室阶段：座位变化 → 刷新大厅
     if (row.status === 'waiting' && row.seats) {
-      renderWaitingRoom(row);
+      updateWaitingRoom(row);
       return;
     }
 
@@ -337,6 +423,7 @@ function _subscribeToRoom(roomId) {
       _isReceiving = true;
 
       const newState = row.state;
+      newState.config = normalizeConfig(newState.config);
       const changed = JSON.stringify(state) !== JSON.stringify(newState);
 
       // 推送权接棒：始终记住当前操作座位，当其回合结束 nextTurn() 后仍可接棒推送"切回合"状态
@@ -363,18 +450,21 @@ function _subscribeToRoom(roomId) {
 
 async function startOnlineGame() {
   if (!_isHost) return;
+  _cancelRoomConfigSync();
   _showNetLoading('正在开始游戏...');
   try {
     const room = await netGetRoom(_onlineRoomId);
     const seats = room.seats || [];
     _knownSeatCount = seats.length;
     _departedHandled = false;
+    const roomCfg = normalizeConfig(_roomConfig);
+    _roomConfig = roomCfg;
     const players = seats.map(s => ({
       name: s.name,
       hand: [],
-      handLimit: HAND_LIMIT[seats.length],
+      handLimit: HAND_LIMIT[seats.length] + roomCfg.handBonus,
     }));
-    initState(players, players.length);
+    initState(players, players.length, roomCfg);
     document.getElementById('online').style.display = 'none';
     showGame();
     await netUpdateGameState(_onlineRoomId, state, 'playing');
@@ -798,7 +888,7 @@ _subscribeToRoom = function(roomId) {
     }
 
     if (row.status === 'waiting' && row.seats) {
-      renderWaitingRoom(row);
+      updateWaitingRoom(row);
       return;
     }
 
@@ -858,6 +948,7 @@ _subscribeToRoom = function(roomId) {
       _isReceiving = true;
 
       const newState = row.state;
+      newState.config = normalizeConfig(newState.config);
       const changed = JSON.stringify(state) !== JSON.stringify(newState);
 
       // 推送权接棒：始终记住当前操作座位，当其回合结束 nextTurn() 后仍可接棒推送"切回合"状态
@@ -929,6 +1020,7 @@ async function _tryReconnect() {
     _lastCinematicBossId = null;
 
     state = room.state;
+    state.config = normalizeConfig(state.config);
     _subscribeToRoom(saved.roomId);
     document.getElementById('online').style.display = 'none';
     showGame();

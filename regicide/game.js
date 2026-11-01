@@ -36,8 +36,14 @@ const RANK_NAMES = {
   J: 'J', Q: 'Q', K: 'K', joker: '🃏'
 };
 
-/** 各人数对应的手牌上限 */
+/** 各人数对应的手牌基础上限 */
 const HAND_LIMIT = { 1: 8, 2: 7, 3: 6, 4: 5 };
+
+/** 闯关配置默认值 */
+const DEFAULT_CONFIG = { handBonus: 0, defeatMode: 'kill', groupLimit: 10 };
+
+/** 闯关配置存储键名 */
+const CONFIG_KEY = 'regicide-config';
 
 /** Boss属性配置：J骑士/Q王后/K国王 */
 const BOSS_STATS = {
@@ -55,6 +61,12 @@ let state = null;
 
 /** 设置页当前选择的人数 */
 let selectedCount = 2;
+
+/** 上次选择的闯关配置（设置页 / 联机大厅共用） */
+let setupConfig = loadConfig();
+
+/** 设置页闯关配置面板是否展开（默认收起，仅影响界面） */
+let configPanelOpen = false;
 
 /* ============================================================
    工具函数
@@ -129,7 +141,10 @@ function saveState() {
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (s && s.phase && s.players) return s;
+    if (s && s.phase && s.players) {
+      s.config = normalizeConfig(s.config);
+      return s;
+    }
   } catch (e) {}
   return null;
 }
@@ -181,7 +196,176 @@ function showGame() {
    ============================================================ */
 
 /**
- * 渲染设置页：人数选择按钮和玩家名字输入框
+ * 将任意配置对象归一化为合法值
+ * @param {Object} cfg - 待校验配置
+ * @returns {Object} 合法配置
+ */
+function normalizeConfig(cfg) {
+  const c = cfg || {};
+  return {
+    handBonus: [0, 1, 2].includes(c.handBonus) ? c.handBonus : DEFAULT_CONFIG.handBonus,
+    defeatMode: c.defeatMode === 'discard' ? 'discard' : 'kill',
+    groupLimit: [10, 12, 14].includes(c.groupLimit) ? c.groupLimit : DEFAULT_CONFIG.groupLimit,
+  };
+}
+
+/**
+ * 读取上次选择的闯关配置
+ * @returns {Object} 闯关配置
+ */
+function loadConfig() {
+  try {
+    return normalizeConfig(JSON.parse(localStorage.getItem(CONFIG_KEY)));
+  } catch (e) {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+/**
+ * 保存闯关配置
+ * @param {Object} cfg - 闯关配置
+ */
+function saveConfig(cfg) {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(normalizeConfig(cfg)));
+  } catch (e) { /* 忽略存储失败 */ }
+}
+
+/**
+ * 生成三项闯关配置的选择控件（不含外层折叠面板）
+ * @param {Object} cfg - 当前配置
+ * @param {boolean} interactive - 是否可点击（联机非房主为只读）
+ * @param {string} handler - 点击回调函数名，签名 (key, value)
+ * @returns {string} HTML字符串
+ */
+function renderConfigGroupsHTML(cfg, interactive, handler) {
+  const c = normalizeConfig(cfg);
+  const h = handler || 'selectConfig';
+  const btn = (key, value, label, active) => {
+    const jsValue = typeof value === 'string' ? `'${value}'` : value;
+    return `<button type="button" class="count-btn${active ? ' active' : ''}" data-value="${value}" ${interactive ? `onclick="${h}('${key}',${jsValue})"` : 'disabled'}>${label}</button>`;
+  };
+  return `
+    <div class="config-group" data-key="handBonus">
+      <div class="config-label">手牌上限提升</div>
+      <div class="count-select config-count">${btn('handBonus', 0, '+0', c.handBonus === 0)}${btn('handBonus', 1, '+1', c.handBonus === 1)}${btn('handBonus', 2, '+2', c.handBonus === 2)}</div>
+    </div>
+    <div class="config-group" data-key="defeatMode">
+      <div class="config-label">Boss击败处置</div>
+      <div class="count-select config-count">${btn('defeatMode', 'kill', '击杀', c.defeatMode === 'kill')}${btn('defeatMode', 'discard', '弃牌', c.defeatMode === 'discard')}</div>
+    </div>
+    <div class="config-group" data-key="groupLimit">
+      <div class="config-label">组合总和上限</div>
+      <div class="count-select config-count">${btn('groupLimit', 10, '≤10', c.groupLimit === 10)}${btn('groupLimit', 12, '≤12', c.groupLimit === 12)}${btn('groupLimit', 14, '≤14', c.groupLimit === 14)}</div>
+    </div>`;
+}
+
+/** 生成配置摘要胶囊（头部展示） */
+function configSummaryHTML(cfg) {
+  const c = normalizeConfig(cfg);
+  const custom = c.handBonus !== DEFAULT_CONFIG.handBonus
+    || c.defeatMode !== DEFAULT_CONFIG.defeatMode
+    || c.groupLimit !== DEFAULT_CONFIG.groupLimit;
+  const chips = [
+    `手牌 +${c.handBonus}`,
+    c.defeatMode === 'discard' ? '弃牌' : '击杀',
+    `总和 ≤${c.groupLimit}`,
+  ].map(t => `<span class="cfg-chip">${t}</span>`).join('');
+  return chips + (custom ? '<span class="cfg-chip cfg-chip-custom">自定义</span>' : '');
+}
+
+/**
+ * 生成可折叠的闯关配置面板
+ * @param {Object} cfg - 当前配置
+ * @param {Object} opts - { open, interactive, handler, toggleHandler, tag }
+ * @returns {string} HTML字符串
+ */
+function renderConfigPanelHTML(cfg, opts) {
+  const c = normalizeConfig(cfg);
+  const o = opts || {};
+  const open = !!o.open;
+  const toggle = o.toggleHandler || 'toggleConfigPanel';
+  const tag = o.tag ? `<em class="config-tag">${o.tag}</em>` : '';
+  return `
+    <div class="config-panel${open ? ' open' : ''}">
+      <button type="button" class="config-head" onclick="${toggle}()" aria-expanded="${open}">
+        <span class="config-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h9M17 17h3"/>
+            <circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="17" r="2"/>
+          </svg>
+        </span>
+        <span class="config-headtext">
+          <span class="config-title">闯关配置${tag}</span>
+          <span class="config-sub">${configSummaryHTML(c)}</span>
+        </span>
+        <span class="config-caret" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </span>
+      </button>
+      <div class="config-body">
+        <div class="config-body-inner">
+          <div class="config-body-pad">
+            ${renderConfigGroupsHTML(c, o.interactive !== false, o.handler || 'selectConfig')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * 原位刷新配置面板（只切换高亮与摘要，不重建 DOM，避免连续点击时闪烁）
+ * @param {Object} cfg - 新配置
+ * @param {Element} root - 面板所在容器，默认整页
+ */
+function updateConfigPanelDOM(cfg, root) {
+  const scope = (root && root.querySelector) ? root : document;
+  const panel = scope.querySelector('.config-panel');
+  if (!panel) return;
+  const c = normalizeConfig(cfg);
+  panel.querySelectorAll('.config-group').forEach(g => {
+    const key = g.dataset.key;
+    g.querySelectorAll('.count-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === String(c[key]));
+    });
+  });
+  const sub = panel.querySelector('.config-sub');
+  if (sub) sub.innerHTML = configSummaryHTML(c);
+}
+
+/** 渲染设置页的闯关配置区域 */
+function renderConfigOptions() {
+  const el = document.getElementById('configOptions');
+  if (!el) return;
+  el.innerHTML = renderConfigPanelHTML(setupConfig, {
+    open: configPanelOpen,
+    interactive: true,
+    handler: 'selectConfig',
+  });
+}
+
+/** 展开/折叠设置页的闯关配置面板 */
+function toggleConfigPanel() {
+  configPanelOpen = !configPanelOpen;
+  const panel = document.querySelector('#configOptions .config-panel');
+  if (!panel) { renderConfigOptions(); return; }
+  panel.classList.toggle('open', configPanelOpen);
+  panel.querySelector('.config-head').setAttribute('aria-expanded', String(configPanelOpen));
+}
+
+/**
+ * 设置页选择闯关配置
+ * @param {string} key - 配置项
+ * @param {number|string} value - 配置值
+ */
+function selectConfig(key, value) {
+  setupConfig = normalizeConfig({ ...setupConfig, [key]: value });
+  saveConfig(setupConfig);
+  updateConfigPanelDOM(setupConfig, document.getElementById('configOptions'));
+}
+
+/**
+ * 渲染设置页：人数选择按钮、闯关配置和玩家名字输入框
  * 根据 selectedCount 动态生成对应数量的输入框
  */
 function renderSetup() {
@@ -189,6 +373,8 @@ function renderSetup() {
   countSelect.innerHTML = [1, 2, 3, 4].map(n =>
     `<button class="count-btn${n === selectedCount ? ' active' : ''}" onclick="selectCount(${n})">${n}人</button>`
   ).join('');
+
+  renderConfigOptions();
 
   const inputs = document.getElementById('playerInputs');
   inputs.innerHTML = '';
@@ -215,13 +401,14 @@ function selectCount(n) {
  * 如果未输入名字则使用默认名"玩家N"
  */
 function startGame() {
+  const config = normalizeConfig(setupConfig);
   const players = [];
   for (let i = 0; i < selectedCount; i++) {
     const input = document.getElementById('pname' + i);
     const name = (input && input.value.trim()) || ('玩家' + (i + 1));
-    players.push({ name, hand: [], handLimit: HAND_LIMIT[selectedCount] });
+    players.push({ name, hand: [], handLimit: HAND_LIMIT[selectedCount] + config.handBonus });
   }
-  initState(players, selectedCount);
+  initState(players, selectedCount, config);
   saveState();
   showGame();
 }
@@ -235,12 +422,14 @@ function startGame() {
  * 创建城堡队列（J→Q→K）、洗牌酒馆、发牌（含方片保底）、翻开首个Boss
  * @param {Array} players - 玩家数组
  * @param {number} playerCount - 玩家人数
+ * @param {Object} config - 闯关配置
  */
-function initState(players, playerCount) {
+function initState(players, playerCount, config) {
   state = {
     phase: 'playing',          // 游戏阶段: playing | game-over
     subPhase: 'play',          // 回合子阶段: play | skill | damage | boss-attack | defense | joker-pick
     playerCount,
+    config: normalizeConfig(config),
     players,
     currentPlayerIndex: 0,     // 当前行动玩家索引
     castle: [],                // 城堡Boss队列（索引0为即将出场的Boss）
@@ -285,7 +474,7 @@ function initState(players, playerCount) {
  * 同时根据人数决定是否加入小丑牌到酒馆
  */
 function dealCards() {
-  const limit = HAND_LIMIT[state.playerCount];
+  const limit = HAND_LIMIT[state.playerCount] + (state.config ? state.config.handBonus : 0);
   let attempts = 0;
   do {
     // 重置所有玩家手牌
@@ -713,9 +902,7 @@ function clearSelection() {
  * 校验当前选中的手牌是否构成合法出牌组合
  * 合法组合：
  *   - 单张 1~10 或 J/Q/K（感化的Boss牌）
- *   - 对子 1~5（同数字）
- *   - 三条 1~3（同数字）
- *   - 四个1或四个2
+ *   - 同点数多张（对子/三条/四条）：点数 × 张数 ≤ 组合总和上限（默认10）
  *   - 1+X（1张1 + 1张2~10或J/Q/K）
  *   - 小丑牌（单独打出）
  * J/Q/K（感化的Boss牌）可单独打出，也可作为X参与1+X组合
@@ -756,23 +943,23 @@ function validatePlay() {
     if (c.rank === 'J' || c.rank === 'Q' || c.rank === 'K') return true;
     return false;
   };
-  // 辅助函数：判断数字是否可作为对子（2~5）
-  const isPairRank = (r) => typeof r === 'number' && r >= 2 && r <= 5;
-  // 辅助函数：判断数字是否可作为三条（2~3）
-  const isTripleRank = (r) => r === 2 || r === 3;
+  // 辅助函数：同点数多张组合是否合法（点数 × 张数 ≤ 总和上限）
+  const groupLimit = (state.config && state.config.groupLimit) || 10;
+  const canFormGroup = (r, count) =>
+    typeof r === 'number' && r >= 1 && r * count <= groupLimit;
 
-  // 2张组合：对子(1~5) 或 1+X
+  // 2张组合：对子 或 1+X
   if (n === 2) {
-    if (!hasFaceCard && allSame && (firstRank === 1 || isPairRank(firstRank))) return { valid: true, type: 'pair' };
+    if (!hasFaceCard && allSame && canFormGroup(firstRank, 2)) return { valid: true, type: 'pair' };
     const ones = cards.filter(c => c.rank === 1);
     const xs = cards.filter(c => c.rank !== 1);
     if (ones.length === 1 && xs.length === 1 && isXCard(xs[0])) return { valid: true, type: '1plus' };
     return { valid: false, reason: '无效的2张组合' };
   }
 
-  // 3张组合：三条(1~3)
+  // 3张组合：三条
   if (n === 3) {
-    if (!hasFaceCard && allSame && (firstRank === 1 || isTripleRank(firstRank))) return { valid: true, type: 'three' };
+    if (!hasFaceCard && allSame && canFormGroup(firstRank, 3)) return { valid: true, type: 'three' };
     // [已禁用] 1+对子（1张1 + 2张同数字2~5）
     // const ones = cards.filter(c => c.rank === 1);
     // const others = cards.filter(c => c.rank !== 1);
@@ -783,9 +970,9 @@ function validatePlay() {
     return { valid: false, reason: '无效的3张组合' };
   }
 
-  // 4张组合：四个1或四个2
+  // 4张组合：四条
   if (n === 4) {
-    if (!hasFaceCard && allSame && (firstRank === 1 || firstRank === 2)) return { valid: true, type: 'four' };
+    if (!hasFaceCard && allSame && canFormGroup(firstRank, 4)) return { valid: true, type: 'four' };
     // [已禁用] 1+三条（1张1 + 3张同数字2~3）
     // const ones = cards.filter(c => c.rank === 1);
     // const others = cards.filter(c => c.rank !== 1);
@@ -1123,7 +1310,7 @@ function renderDamagePhase() {
 
 /**
  * 处理Boss伤害结果
- * - 血量<0：击杀，Boss进入击杀牌堆，翻开下一个Boss
+ * - 血量<0：击杀，按击败处置配置进入击杀牌堆或弃牌堆，翻开下一个Boss
  * - 血量=0：感化，Boss牌放回酒馆顶部，翻开下一个Boss
  * - 血量>0：Boss存活，进入Boss攻击阶段
  * 击杀/感化后当前玩家继续行动（跳过阶段5）
@@ -1160,9 +1347,15 @@ function resolveBossDamage() {
   setTimeout(() => {
     // 处理Boss变更
     if (isKill) {
-      state.killPile.push(boss.card);
+      if (state.config && state.config.defeatMode === 'discard') {
+        state.discardPile.push(boss.card);
+        state.killPile.push(boss.card);   // 击杀记录仍保留在击杀堆，供城堡信息展示
+        addLog(`${SUIT_NAMES[boss.suit]}${boss.card.rank} ${boss.name} 被击杀! (放入弃牌堆)`);
+      } else {
+        state.killPile.push(boss.card);
+        addLog(`${SUIT_NAMES[boss.suit]}${boss.card.rank} ${boss.name} 被击杀!`);
+      }
       state.killedCount = (state.killedCount || 0) + 1;
-      addLog(`${SUIT_NAMES[boss.suit]}${boss.card.rank} ${boss.name} 被击杀!`);
     } else {
       state.convertedPile = state.convertedPile || [];
       state.convertedPile.push(boss.card);
@@ -1486,16 +1679,16 @@ function pickJokerPlayer(index) {
 
 /**
  * 单人模式使用小丑牌换牌
- * 效果：弃掉所有手牌 → 从酒馆摸8张新牌
+ * 效果：弃掉所有手牌 → 从酒馆摸「当前手牌上限」张新牌（默认8张）
  * 不受震慑影响，一局最多使用2次
- * 如果酒馆不足以摸8张则游戏失败
+ * 如果酒馆不足以摸满则摸光为止
  */
 function useSoloJoker() {
   if (state.soloJokers <= 0) return;
   const player = state.players[0];
   const content = `
     <h2>🃏 小丑换牌</h2>
-    <p style="text-align:center;color:var(--text-dim);margin:12px 0;">弃掉当前 ${player.hand.length} 张手牌，从酒馆摸 8 张新牌<br>（剩余 ${state.soloJokers} 次）</p>
+    <p style="text-align:center;color:var(--text-dim);margin:12px 0;">弃掉当前 ${player.hand.length} 张手牌，从酒馆摸 ${player.handLimit} 张新牌<br>（剩余 ${state.soloJokers} 次）</p>
     <button class="modal-btn primary" onclick="confirmSoloJoker()">确认换牌</button>
     <button class="modal-btn secondary" onclick="closeModal()">取消</button>`;
   openModal(content);
@@ -1505,7 +1698,7 @@ function confirmSoloJoker() {
   closeModal();
   if (state.soloJokers <= 0) return;
   const player = state.players[0];
-  addLog(`${player.name} 🃏 使用小丑牌换牌! 弃掉${player.hand.length}张手牌，摸8张新牌`);
+  addLog(`${player.name} 🃏 使用小丑牌换牌! 弃掉${player.hand.length}张手牌，摸${player.handLimit}张新牌`);
 
   // 弃掉所有手牌
   for (const c of player.hand) {
@@ -1513,12 +1706,12 @@ function confirmSoloJoker() {
   }
   player.hand = [];
 
-  // 摸8张新牌（酒馆不足则摸光，不判输）
-  const drawCount = Math.min(8, state.tavern.length);
+  // 摸满当前手牌上限（酒馆不足则摸光，不判输）
+  const drawCount = Math.min(player.handLimit, state.tavern.length);
   for (let i = 0; i < drawCount; i++) {
     player.hand.push(state.tavern.shift());
   }
-  if (drawCount < 8) {
+  if (drawCount < player.handLimit) {
     addLog(`酒馆仅余${drawCount}张，换牌摸${drawCount}张`);
   }
 
@@ -1684,6 +1877,14 @@ function showPlayerHand(index) {
  * 显示规则弹窗：展示游戏核心规则摘要
  */
 function showRules() {
+  const cfg = normalizeConfig(state ? state.config : setupConfig);
+  const handLimits = [1, 2, 3, 4].map(n => HAND_LIMIT[n] + cfg.handBonus);
+  const pairMax = Math.min(10, Math.floor(cfg.groupLimit / 2));
+  const tripleMax = Math.min(10, Math.floor(cfg.groupLimit / 3));
+  const fourMax = Math.min(10, Math.floor(cfg.groupLimit / 4));
+  const defeatText = cfg.defeatMode === 'discard'
+    ? '血量&lt;0击杀(放入弃牌堆，可被♥增援回收)'
+    : '血量&lt;0击杀(从游戏中除外)';
   const content = `
     <h2>📖 游戏规则</h2>
     <div class="rules-content">
@@ -1693,7 +1894,7 @@ function showRules() {
       <h3>手牌上限</h3>
       <table style="width:100%;text-align:center;font-size:.85rem;margin:4px 0;">
         <tr style="color:var(--gold)"><td>1人</td><td>2人</td><td>3人</td><td>4人</td></tr>
-        <tr><td>8张</td><td>7张</td><td>6张</td><td>5张</td></tr>
+        <tr><td>${handLimits[0]}张</td><td>${handLimits[1]}张</td><td>${handLimits[2]}张</td><td>${handLimits[3]}张</td></tr>
       </table>
 
       <h3>Boss属性</h3>
@@ -1709,7 +1910,7 @@ function showRules() {
       <p><strong>① 出牌</strong>：选择合法卡牌组合打出（可跳过，单人限1次、多人至多连续「人数-1」人次）</p>
       <p><strong>② 技能结算</strong>：按花色触发技能效果</p>
       <p><strong>③ 造成伤害</strong>：牌面数字之和扣减Boss血量（梅花×2）</p>
-      <p><strong>④ Boss处理</strong>：血量&lt;0击杀 / 恰好=0感化(放入酒馆) / &gt;0进入攻击</p>
+      <p><strong>④ Boss处理</strong>：${defeatText} / 恰好=0感化(放入酒馆) / &gt;0进入攻击</p>
       <p><strong>⑤ Boss攻击</strong>：玩家打出手牌≥Boss攻击力进行防御</p>
       <p style="font-size:.75rem;color:var(--text-dim)">Boss被击杀/感化后跳过⑤，下一位Boss登场，当前玩家继续新一回合</p>
 
@@ -1724,13 +1925,14 @@ function showRules() {
       <p style="font-size:.75rem;color:var(--text-dim)">♥无法回收弃牌 / ♦无法抽牌 / ♠无法降攻 / ♣伤害不翻倍</p>
 
       <h3>出牌规则</h3>
-      <p>单张1~10/J/Q/K / 对子1~5 / 三条1~3 / 四个1或2</p>
+      <p>单张1~10/J/Q/K / 对子1~${pairMax} / 三条1~${tripleMax} / 四条1~${fourMax}</p>
+      <p style="font-size:.75rem;color:var(--text-dim)">同点数多张组合需满足：点数 × 张数 ≤ ${cfg.groupLimit}</p>
       <p>数字1也可搭配其他牌（1+X）打出</p>
       <p>多张结算：数字求和，每种花色按分别触发一次（同花色组合不重复触发）</p>
 
       <h3>小丑牌</h3>
       <p>多人：数值视为0，打出后Boss永久失去震慑，指定一名玩家额外回合（2人游戏没有小丑牌; 3人游戏加入1张; 4人游戏加入2张）</p>
-      <p>单人：点击顶部🃏换牌按钮，弃掉所有手牌摸8张新牌（限2次）</p>
+      <p>单人：点击顶部🃏换牌按钮，弃掉所有手牌摸${handLimits[0]}张新牌（限2次）</p>
 
       <h3>失败条件</h3>
       <p>无法防御Boss攻击 / 既无手牌也无法跳过</p>
@@ -1767,14 +1969,25 @@ function confirmReset() {
 function showCastleInfo() {
   const killPile = state.killPile || [];
   const convertedPile = state.convertedPile || [];
+  const discardMode = state.config && state.config.defeatMode === 'discard';
+  const killedCount = state.killedCount || 0;
   let html = '<h2>城堡</h2>';
   html += `<div style="text-align:center;font-size:.85rem;color:var(--text-dim);margin:8px 0;">剩余 ${state.castle.length} 张</div>`;
 
   if (killPile.length > 0) {
-    html += `<div style="margin-top:12px;"><div style="font-size:.8rem;color:var(--danger);margin-bottom:6px;">击杀 (${killPile.length})</div>`;
+    html += `<div style="margin-top:12px;"><div style="font-size:.8rem;color:var(--danger);margin-bottom:6px;">击杀 (${killPile.length})`;
+    if (discardMode) {
+      html += '<span style="color:var(--text-dim);font-size:.75rem;font-weight:normal;"> · 击杀后放入弃牌堆，可被♥治愈回收</span>';
+    }
+    html += '</div>';
     html += '<div class="hand-cards" style="flex-wrap:wrap;gap:6px;">';
     killPile.forEach(c => { html += renderCardHTML(c); });
     html += '</div></div>';
+  }
+
+  // 旧存档兼容：弃牌模式下已有击杀但未记录具体牌面时，至少展示数量
+  if (discardMode && killedCount > killPile.length) {
+    html += `<div style="margin-top:12px;font-size:.8rem;color:var(--danger);">另击杀 ${killedCount - killPile.length} 个Boss（已放入弃牌堆，可被♥治愈回收）</div>`;
   }
 
   if (convertedPile.length > 0) {
@@ -1784,7 +1997,7 @@ function showCastleInfo() {
     html += '</div></div>';
   }
 
-  if (killPile.length === 0 && convertedPile.length === 0) {
+  if (killPile.length === 0 && convertedPile.length === 0 && !(discardMode && killedCount > 0)) {
     html += '<p style="text-align:center;color:var(--text-dim);padding:20px;">尚未击败任何Boss</p>';
   }
 
