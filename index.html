@@ -75,6 +75,8 @@ button { font-family:inherit; }
 .section-head { display:flex; align-items:center; gap:8px; margin:0 2px 12px; }
 .section-head h2 { font-size:.92rem; letter-spacing:.14em; color:#f3e7d0; text-shadow:0 1px 2px rgba(0,0,0,.40); }
 .section-count { font-size:.66rem; font-weight:700; color:var(--text-dim); background:rgba(253,249,238,.95); border:1px solid var(--line); border-radius:999px; padding:2px 8px; box-shadow:0 1px 3px rgba(0,0,0,.20); }
+.section-link { margin-left:auto; padding:2px 2px 2px 8px; font-size:.7rem; font-weight:800; color:var(--gold-l); text-shadow:0 1px 2px rgba(0,0,0,.4); }
+.section-link:hover { color:#fff; }
 
 .game-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
 .game-card { display:flex; flex-direction:column; align-items:center; gap:7px; padding:14px 8px 12px; background:var(--card-bg); border:1px solid rgba(43,38,32,.09); border-radius:var(--radius); box-shadow:0 3px 10px rgba(0,0,0,.35); text-align:center; min-width:0; transition:transform .15s, box-shadow .15s; }
@@ -249,7 +251,7 @@ button { font-family:inherit; }
       <div class="game-grid" id="grid-solo"></div>
     </section>
     <section class="section" id="sec-online">
-      <div class="section-head"><h2>联机对战</h2><span class="section-count" id="count-online"></span></div>
+      <div class="section-head"><h2>联机对战</h2><span class="section-count" id="count-online"></span><a class="section-link" href="rooms.html">找房间 ›</a></div>
       <div class="game-grid" id="grid-online"></div>
     </section>
   </main>

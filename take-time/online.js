@@ -259,6 +259,8 @@ function renderOnlineLobby() {
         <button class="start-btn" onclick="onJoinRoom()" style="background:transparent;border:2px solid var(--gold);color:var(--gold);">加入房间</button>
       </div>
     </div>`;
+  var pref = /[?&]room=(\d{4})(?:&|$)/.exec(location.search);
+  if (pref) document.getElementById('joinRoomInput').value = pref[1];
 }
 
 /* ============================================================

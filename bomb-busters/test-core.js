@@ -112,6 +112,11 @@ function loadGameWithRender() {
   const ctx = loadGame();
   ctx.addEventListener = () => {};
   vm.runInContext(RENDER_SRC, ctx, { filename: 'render.js' });
+  // 打桩 DOM 没有 HTML 解析：_esc 改用等价的最小转义，便于断言弹窗文案
+  vm.runInContext(`_esc = function (str) {
+    return (str == null ? '' : String(str)).replace(/[&<>"]/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  };`, ctx);
   return ctx;
 }
 
@@ -1258,7 +1263,7 @@ await t('#14 专家扫描未命中：按常规结算（本关只限制双人剪�
   eq(S.failures, 1);
 });
 
-await t('#14 界面：专家徽章 / 行动条提示 / 道具 9 置灰禁用', () => {
+await t('#14 界面：专家徽章 / 行动条提示 / 道具 9 专家禁用（说明窗内按钮置灰）', () => {
   const g = loadGameWithRender();
   g.window._olPendingChallenge = { missionId: 11 };
   g.dealGame(['A', 'B', 'C']);
@@ -1273,7 +1278,12 @@ await t('#14 界面：专家徽章 / 行动条提示 / 道具 9 置灰禁用', (
   includes(html, '高危拆弹专家：双人剪线失误立即爆炸', '行动条应提示专家规则');
   includes(html, 'data-expert-blocked="1"', '道具 9 应标记专家禁用');
   includes(html, 'expert-blocked', '道具 9 应带禁用样式');
-  assert(/data-testid="equip-9"[^>]*disabled/.test(html), '道具 9 按钮应禁用');
+  assert(!/data-testid="equip-9"[^>]*disabled/.test(html), '道具行按钮仍可点开说明窗');
+  g.onEquipRowClick(9);
+  const modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '稳定剂');
+  includes(modal, '高危拆弹专家不能使用稳定剂', '说明窗应给出专家禁用原因');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '说明窗使用按钮应禁用');
 });
 
 await t('#14 选关卡片：追加规则文案与同步', () => {
@@ -1464,6 +1474,123 @@ await t('#15 界面：隐藏牌背 / 目标进度条 / 停止后剩余隐藏提�
   includes(rules, '本局当前目标');
   includes(rules, '蓝色 5');
   includes(rules, '剩余 2 张');
+});
+
+/* ──────────────────────────── 道具说明弹窗 ──────────────────────────── */
+
+console.log('── 道具说明弹窗 ──');
+
+/** 标准 3 人局 + 指定道具区（play 阶段、默认当前座位 = 队长） */
+function equipModalGame(equipment, opts) {
+  opts = opts || {};
+  const g = loadGameWithRender();
+  g.dealGame(['A', 'B', 'C']);
+  const S = st(g);
+  S.phase = 'play';
+  S.currentSeat = opts.current !== undefined ? opts.current : S.captainSeat;
+  S.ready = [true, true, true];
+  S.equipment = equipment;
+  g.render();
+  return g;
+}
+
+await t('道具说明弹窗：未隐藏道具均可点开（含未解锁/已使用），隐藏道具不可点', () => {
+  const g = equipModalGame([
+    { no: 1, unlocked: false, used: false },
+    { no: 6, unlocked: true, used: true },
+    { no: 9, unlocked: false, used: false, hidden: true },
+  ]);
+  const html = g.document.getElementById('app').innerHTML;
+  assert(!/data-testid="equip-1"[^>]*disabled/.test(html), '未解锁道具行按钮不应禁用');
+  assert(!/data-testid="equip-6"[^>]*disabled/.test(html), '已使用道具行按钮不应禁用');
+  includes(html, 'onclick="onEquipRowClick(1)"', '道具行应打开说明窗');
+  assert(!html.includes('data-testid="equip-9"'), '隐藏道具仍只显示牌背');
+
+  g.showEquipInfo(9);
+  eq(ev(g, '_ui.equipInfoNo'), null, '隐藏道具不应打开说明窗');
+
+  g.onEquipRowClick(1);
+  eq(ev(g, '_ui.equipInfoNo'), 1);
+  let modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '道具 1 · ≠标签');
+  includes(modal, ev(g, 'EQUIPMENT_LIB[1].desc'), '说明窗应展示道具作用');
+  includes(modal, '尚未解锁：蓝色 1 公开 0/2', '应显示解锁进度');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '未解锁时使用按钮应置灰');
+
+  g.onEquipRowClick(6);
+  modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '该道具本局已使用');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '已使用时使用按钮应置灰');
+});
+
+await t('道具说明弹窗：#15 额外锁显示双解锁进度', () => {
+  const g = equipModalGame([
+    { no: 7, unlocked: false, used: false, lockNum: 5 },
+  ]);
+  g.showEquipInfo(7);
+  const modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '尚未解锁：蓝色 7 公开 0/2，且 🔒5 公开 0/2');
+  includes(modal, 'data-testid="equip-info-lock"', '应渲染额外锁进度条');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '额外锁未满足时使用按钮应置灰');
+});
+
+await t('道具说明弹窗：可用时点击「使用道具」关闭弹窗并进入道具流程', () => {
+  const g = equipModalGame([{ no: 3, unlocked: true, used: false }]);
+  g.onEquipRowClick(3);
+  let modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '✅ 已解锁，可以使用');
+  assert(!/data-testid="equip-info-use"[^>]*disabled/.test(modal), '可用时使用按钮应可点');
+  g.useEquipFromInfo();
+  eq(ev(g, '_ui.equipInfoNo'), null, '使用后应关闭说明窗');
+  eq(ev(g, '_ui.mode'), 'scan', '应进入三重探测器选择流程');
+  eq(ev(g, '_ui.scanSrc'), 'eq3');
+});
+
+await t('道具说明弹窗：非自己回合仅 1/4/12 可用', () => {
+  const g = equipModalGame([
+    { no: 1, unlocked: true, used: false },
+    { no: 2, unlocked: true, used: false },
+  ], { current: 1 });
+  g.window._olSeatIndex = () => 0;
+  g.showEquipInfo(2);
+  let modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '只能在自己回合使用');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '非自己回合道具 2 应置灰');
+  g.showEquipInfo(1);
+  modal = g.document.getElementById('modalContent').innerHTML;
+  assert(!/data-testid="equip-info-use"[^>]*disabled/.test(modal), '道具 1 任意回合可用');
+});
+
+await t('道具说明弹窗：使用中再点道具直接取消，不弹说明窗', () => {
+  const g = equipModalGame([{ no: 3, unlocked: true, used: false }]);
+  g.onEquipRowClick(3);
+  g.useEquipFromInfo();
+  eq(ev(g, '_ui.mode'), 'scan');
+  g.onEquipRowClick(3);
+  eq(ev(g, '_ui.mode'), null, '再次点击应取消流程');
+  eq(ev(g, '_ui.equipInfoNo'), null, '取消走原有流程，不打开说明窗');
+});
+
+await t('道具说明弹窗：状态变化自动刷新，道具消失/对局结束时自动关闭', () => {
+  const g = equipModalGame([{ no: 3, unlocked: true, used: false }]);
+  g.showEquipInfo(3);
+  const S = st(g);
+  S.equipment[0].used = true;
+  g.render();
+  let modal = g.document.getElementById('modalContent').innerHTML;
+  includes(modal, '该道具本局已使用', '已使用状态应实时刷新');
+  assert(/data-testid="equip-info-use"[^>]*disabled/.test(modal), '刷新后按钮应置灰');
+
+  S.equipment = [];
+  g.render();
+  eq(ev(g, '_ui.equipInfoNo'), null, '道具消失后应关闭说明窗');
+
+  S.equipment = [{ no: 9, unlocked: true, used: false }];
+  g.showEquipInfo(9);
+  eq(ev(g, '_ui.equipInfoNo'), 9);
+  S.phase = 'over';
+  g.render();
+  eq(ev(g, '_ui.equipInfoNo'), null, '对局结束后应关闭说明窗');
 });
 
 await t('#15 选关卡片与抽屉：追加规则文案与同步', () => {
@@ -2515,7 +2642,8 @@ await t('＝标签：蓝蓝同数字相邻 → 成对标记（可含已公开）
   assert(r.ok);
   assert(b1.eqp && b1.eqp === b2.eqp, '两张牌共享 pairId');
   eq(S.equipment[0].used, true);
-  assert(S.log.some(l => l.msg.includes('两张均为蓝色 5')));
+  assert(S.log.some(l => l.msg.includes('标记了两张相邻导线【＝】')));
+  assert(!S.log.some(l => l.msg.includes('蓝色 5')), '日志不得泄露牌面数字');
 });
 
 await t('＝标签：黄黄 / 红红 → 成对标记', () => {
@@ -2525,14 +2653,16 @@ await t('＝标签：黄黄 / 红红 → 成对标记', () => {
     { equipment: [{ no: 12, unlocked: true, used: false }] }));
   assert(g1.useEqTag(0, y1.id, y2.id).ok);
   assert(y1.eqp && y1.eqp === y2.eqp);
-  assert(S1.log.some(l => l.msg.includes('均为黄色')));
+  assert(S1.log.some(l => l.msg.includes('标记了两张相邻导线【＝】')));
+  assert(!S1.log.some(l => l.msg.includes('黄色')), '日志不得泄露黄色牌面');
 
   const g2 = loadGame();
   const r1 = C('red', 6.5), r2 = C('red', 6.5);
   const S2 = use(g2, sc(2, [[[r1, r2]], [[C('blue', 9)]]],
     { equipment: [{ no: 12, unlocked: true, used: false }] }));
   assert(g2.useEqTag(0, r1.id, r2.id).ok);
-  assert(S2.log.some(l => l.msg.includes('均为红色')));
+  assert(S2.log.some(l => l.msg.includes('标记了两张相邻导线【＝】')));
+  assert(!S2.log.some(l => l.msg.includes('红色')), '日志不得泄露红色牌面');
 });
 
 await t('＝标签拒绝：蓝不同数字 / 异色 / 非相邻 / 双已公开', () => {

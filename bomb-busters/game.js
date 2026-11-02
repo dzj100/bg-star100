@@ -1877,24 +1877,18 @@ function useEqTag(shareIdx, cardId1, cardId2) {
   if (c1.eqp || c2.eqp) return { ok: false, msg: '该牌已有【＝】标签' };
   if (c1.revealed && c2.revealed) return { ok: false, msg: '至少需含 1 张未公开导线' };
 
-  let desc;
-  if (c1.kind === 'blue' && c2.kind === 'blue') {
-    if (c1.num !== c2.num) return { ok: false, msg: '蓝+蓝须为同一数字' };
-    desc = `两张均为蓝色 ${c1.num}`;
-  } else if (c1.kind === 'yellow' && c2.kind === 'yellow') {
-    desc = '两张均为黄色';
-  } else if (c1.kind === 'red' && c2.kind === 'red') {
-    desc = '两张均为红色';
-  } else {
+  if (c1.kind !== c2.kind || !['blue', 'yellow', 'red'].includes(c1.kind)) {
     return { ok: false, msg: '须为同色导线（蓝蓝同数字 / 黄黄 / 红红）' };
   }
+  if (c1.kind === 'blue' && c1.num !== c2.num) return { ok: false, msg: '蓝+蓝须为同一数字' };
 
   const pairId = 'eq' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36);
   c1.eqp = pairId;
   c2.eqp = pairId;
   g.eq.used = true;
   _releaseEquipLock();
-  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】${desc ? `（${desc}）` : ''}`, 'good');
+  // 【＝】只公开「编号相同」；日志不得展示颜色/数字等牌面信息
+  addLog(`＝ ${p.name} 标记了两张相邻导线【＝】`, 'good');
   saveStateDirect();
   _render();
   return { ok: true };

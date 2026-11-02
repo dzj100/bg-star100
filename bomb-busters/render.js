@@ -36,6 +36,7 @@ let _ui = {
   batterySel: [],      // 备用电池：已选玩家座位
   markCardId: null,    // 开局标记：待确认的牌 id
   alertSel: [],        // #13 剪所有红色导线：已选牌 id（全场任意未公开牌）
+  equipInfoNo: null,   // 正在查看说明的道具编号（中央弹窗）
 };
 
 let _prevAnim = { first: true, dealStamp: null, failures: 0, revealed: new Set(), defused: null };
@@ -47,6 +48,7 @@ let _prevAnim = { first: true, dealStamp: null, failures: 0, revealed: new Set()
 function closeModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.remove('show');
+  if (id === 'modalOverlay') _ui.equipInfoNo = null;
 }
 
 function _resetUiFlow() {
@@ -352,7 +354,7 @@ function showMissionRules() {
   if (!el) return;
   const setup = missionSetup(mission, pCount);
   const hidden = missionHasHiddenPick(mission)
-    ? '<p>数轴板会标出全部候选导线；牌库只随机混入其中「用」的数量，具体哪几条进入本局保密。</p>'
+    ? '<p>数轴板会标出全部候选导线，同时牌库只随机混入其中使用的导线。</p>'
     : '';
   const actionLine = setup.redAlert
     ? '双人剪线、单人剪线或「剪所有红色导线」'
@@ -411,8 +413,7 @@ function showRules() {
           <tr><td>✂️ 双人剪线</td><td>指认其他玩家 1 张未公开牌，猜「蓝色 N」或「黄色」<br>
           ✔ 命中 → 该牌与你的同数字（或黄色）牌各公开 1 张<br>
           × 失误 → 该牌真实信息将被标记，并累计 1 次失误<br>
-          <b>💥若指认到红色导线 → 立即爆炸！</b><br>
-          <b>⚠️#14 高危拆弹专家双人剪线失误 → 立即爆炸！</b></td></tr>
+          <b>💥若指认到红色导线 → 立即爆炸！</b></td></tr>
           <tr><td>✂️ 单人剪线</td><td>仅以下场景可以进行：<br>① 某数字已公开 2 张且剩余 2 张都在你手上 → 可公开这 2 张；<br>② 你持有某数字全部 4 张 → 可全部公开；<br>③ 全部未公开黄线都在你手上 → 可全部公开（清收）；</td></tr>
           <tr><td>🚨 公开红线</td><td>持红色导线玩家在自己其他导线全部公开后，可在回合中公开自己剩余的全部红色导线。</td></tr>
           <tr><td>🚨 剪所有红色导线</td><td>仅关卡 #13（替换「公开红线」）：自己回合从全场未公开导线中恰好选 3 张（可含自己）；3 张全红 → 一起公开，否则<b>立即爆炸判负</b>（不计失误，稳定剂无效）。</td></tr>
@@ -487,6 +488,7 @@ function render() {
     app.innerHTML = (typeof window.renderLanding === 'function')
       ? window.renderLanding() : renderLandingHTML();
     _refreshSheet();
+    _refreshEquipInfo();
     if (typeof onlineAfterRender === 'function') onlineAfterRender();
     return;
   }
@@ -517,6 +519,7 @@ function render() {
   _fitCardRows(app);
   if (S.fx) _fxAdopt(S.fx);             // 刷新/重进后捡回自己未结算的宣告
   _refreshSheet();
+  _refreshEquipInfo();
   if (typeof onlineAfterRender === 'function') onlineAfterRender();
 }
 
@@ -1063,6 +1066,121 @@ function _equipLabel(no) {
   return lib ? lib.name : ('道具 ' + no);
 }
 
+/** 该道具是否已进入选择流程（尚未真正使用；再点 = 取消） */
+function _equipModeActive(no) {
+  return (no === 1 && _ui.mode === 'neq')
+    || (no === 2 && _ui.mode === 'walkie-card')
+    || (no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3')
+    || (no === 4 && _ui.mode === 'sticky')
+    || (no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own'))
+    || (no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own'))
+    || (no === 12 && _ui.mode === 'eqtag');
+}
+
+/** 道具处于「使用中」：再次点击道具即为取消，不弹说明窗 */
+function _equipInUse(no) {
+  const lock = _equipLockActive();
+  if (lock && lock.no === no && _equipLockOwnedBy(mySeat())) return true;
+  if (_equipModeActive(no)) return true;
+  if (no === 9 && S && S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined) return true;
+  return false;
+}
+
+/**
+ * 道具说明窗的按钮状态预览（无副作用，渲染期可安全调用）。
+ * 只判断「解锁 + 未使用 + 通用条件」；动作性前置（如抑制器失败数为 0）留到点击时提示。
+ */
+function _equipInfoState(no) {
+  const eq = (S && S.equipment || []).find(e => e.no === no);
+  if (!eq) return { ok: false, reason: '该道具不在本局道具区中' };
+  if (eq.hidden) return { ok: false, reason: '该道具仍处于隐藏状态，暂不可用' };
+  if (eq.used) return { ok: false, reason: '该道具本局已使用' };
+  if (!eq.unlocked) {
+    const p = Math.min(blueRevealedCount(no), 2);
+    if (typeof eq.lockNum === 'number') {
+      const pl = Math.min(blueRevealedCount(eq.lockNum), 2);
+      return { ok: false, reason: `尚未解锁：蓝色 ${no} 公开 ${p}/2，且 🔒${eq.lockNum} 公开 ${pl}/2` };
+    }
+    return { ok: false, reason: `尚未解锁：蓝色 ${no} 公开 ${p}/2` };
+  }
+  if (!(typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[no])) return { ok: false, reason: '该道具规则后续开放' };
+  if (!S || S.phase !== 'play') return { ok: false, reason: '当前不在对局中' };
+  if (S.result) return { ok: false, reason: '本局已结束' };
+  if (S.pending || S.fx) return { ok: false, reason: '请先完成当前操作' };
+  if (S.scanMode) return { ok: false, reason: '已启动探测器，本回合只能扫描' };
+  if (no === 9 && isExpertSeat(_actionSeat())) return { ok: false, reason: '高危拆弹专家不能使用稳定剂' };
+  const lock = _equipLockActive();
+  if (lock) {
+    return _equipLockOwnedBy(mySeat())
+      ? { ok: false, reason: `你正在使用【${_equipLabel(lock.no)}】，请先完成或取消` }
+      : { ok: false, reason: `${_playerName(lock.seat)} 正在使用【${_equipLabel(lock.no)}】，请稍候` };
+  }
+  if (!_canUseEquipAnytime(no) && !_myTurn()) return { ok: false, reason: '只能在自己回合使用' };
+  if (_canUseEquipAnytime(no) && mySeat() === null && !_myTurn()) return { ok: false, reason: '现在不能行动' };
+  return { ok: true, reason: '' };
+}
+
+function _renderEquipInfo() {
+  const el = document.getElementById('modalContent');
+  const ov = document.getElementById('modalOverlay');
+  const no = _ui.equipInfoNo;
+  if (!el || !ov || no === null) return;
+  const eq = (S && S.equipment || []).find(e => e.no === no);
+  const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[no]) || null;
+  if (!eq || !lib) return;
+  const st = _equipInfoState(no);
+  const lockNum = typeof eq.lockNum === 'number' ? eq.lockNum : null;
+  const lockLine = lockNum !== null && !eq.unlocked
+    ? `<div class="equip-info-lock" data-testid="equip-info-lock">🔒 额外条件：蓝色 ${lockNum} 公开 ≥2（${Math.min(blueRevealedCount(lockNum), 2)}/2）</div>`
+    : '';
+  const stateText = st.ok ? '✅ 已解锁，可以使用' : '⛔ ' + st.reason;
+  el.innerHTML = `
+    <h2>${lib.icon || '🔧'} 道具 ${no} · ${_esc(lib.name)}</h2>
+    <div class="equip-info-desc" data-testid="equip-info-desc">${_esc(lib.desc)}</div>
+    <div class="equip-info-status ${st.ok ? 'ok' : 'bad'}" data-testid="equip-info-status">${_esc(stateText)}</div>
+    ${lockLine}
+    <button class="btn-full btn-primary" data-testid="equip-info-use"${st.ok ? '' : ' disabled'} onclick="useEquipFromInfo()">使用道具</button>
+    <button class="btn-full btn-secondary" onclick="closeModal('modalOverlay')">关闭</button>`;
+  ov.classList.add('show');
+}
+
+function showEquipInfo(no) {
+  if (!S || !S.players) return;
+  const eq = (S.equipment || []).find(e => e.no === no);
+  if (!eq || eq.hidden) return;
+  _ui.equipInfoNo = no;
+  _renderEquipInfo();
+}
+
+/** 状态变化后同步弹窗；弹窗已失效（道具消失/进入使用中/对局结束）时自动关闭 */
+function _refreshEquipInfo() {
+  if (_ui.equipInfoNo === null) return;
+  const no = _ui.equipInfoNo;
+  const eq = (S && S.equipment || []).find(e => e.no === no);
+  if (!eq || eq.hidden || !S || S.phase !== 'play' || _equipInUse(no)) {
+    _ui.equipInfoNo = null;
+    const ov = document.getElementById('modalOverlay');
+    if (ov) ov.classList.remove('show');
+    return;
+  }
+  _renderEquipInfo();
+}
+
+function useEquipFromInfo() {
+  const no = _ui.equipInfoNo;
+  if (no === null) return;
+  const st = _equipInfoState(no);
+  if (!st.ok) { showToast(st.reason || '该道具不可用'); _renderEquipInfo(); return; }
+  closeModal('modalOverlay');
+  onEquipClick(no);
+}
+
+/** 道具行点击：使用中直接取消（不弹窗），否则打开说明弹窗 */
+function onEquipRowClick(no) {
+  if (_equipInUse(no)) { onEquipClick(no); return; }
+  showEquipInfo(no);
+}
+
 function _equipRowHTML() {
   if (!S.equipment || !S.equipment.length) return '';
   const stabActive = !!(S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined);
@@ -1083,28 +1201,15 @@ function _equipRowHTML() {
     // #14：高危拆弹专家不能使用稳定剂
     const expertNoStab = e.no === 9 && isExpertSeat(_actorSeat());
     // 该道具已进入选择流程（尚未使用）：按钮呈激活态，再点可取消
-    const active = !itLocked && !e.used && e.unlocked && (
-      (e.no === 1 && _ui.mode === 'neq') ||
-      (e.no === 2 && _ui.mode === 'walkie-card') ||
-      (e.no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3') ||
-      (e.no === 4 && _ui.mode === 'sticky') ||
-      (e.no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own')) ||
-      (e.no === 9 && stabActive) ||
-      (e.no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own')) ||
-      (e.no === 12 && _ui.mode === 'eqtag'));
+    const active = !itLocked && !e.used && e.unlocked
+      && (_equipModeActive(e.no) || (e.no === 9 && stabActive));
+    // 未隐藏的道具一律可点开说明窗（含已使用 / 未解锁 / 他人操作锁中）
     let cls = 'equip-btn';
-    let onclk = '';
-    let disabled = '';
-    if (e.used) { cls += ' used'; disabled = ' disabled'; }
-    else if (expertNoStab) { cls += ' locked expert-blocked'; disabled = ' disabled'; }
-    else if (e.unlocked) {
-      if (itLocked) { cls += ' locked'; disabled = ' disabled'; }
-      else {
-        cls += ' ready';
-        if (active) cls += ' active';
-        onclk = ` onclick="onEquipClick(${e.no})"`;
-      }
-    } else { cls += ' locked'; disabled = ' disabled'; }
+    if (e.used) cls += ' used';
+    else if (expertNoStab) cls += ' locked expert-blocked';
+    else if (e.unlocked && !itLocked) { cls += ' ready'; if (active) cls += ' active'; }
+    else cls += ' locked';
+    const onclk = ` onclick="onEquipRowClick(${e.no})"`;
     const tipText = lib && lib.desc ? _esc(lib.desc) : '';
     const lockTip = lockNum !== null
       ? `解锁条件：蓝色 ${e.no} 公开 ≥2（${Math.min(blueRevealedCount(e.no), 2)}/2）+ 🔒${lockNum} 公开 ≥2（${Math.min(blueRevealedCount(lockNum), 2)}/2）`
@@ -1117,7 +1222,7 @@ function _equipRowHTML() {
     const lockBadge = lockNum !== null
       ? `<span class="equip-lock${e.unlocked ? ' open' : ''}${lockCleared ? ' cleared' : ''}" data-testid="equip-lock-${e.no}" title="${_esc(lockTip)}">${lockCleared ? '🔓' : '🔒'}${lockNum}</span>`
       : '';
-    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${expertNoStab ? ' data-expert-blocked="1"' : ''}${onclk}${disabled}>
+    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${expertNoStab ? ' data-expert-blocked="1"' : ''}${onclk}>
       ${lockBadge}<span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
     </button>`;
   }).join('');
@@ -1731,13 +1836,7 @@ function cancelSkillFlow() {
 function onEquipClick(no) {
   const lock = _equipLockActive();
   // 该道具已进入选择流程但尚未真正使用：再次点击 = 取消
-  const active = (no === 1 && _ui.mode === 'neq')
-    || (no === 2 && _ui.mode === 'walkie-card')
-    || (no === 3 && _ui.mode === 'scan' && _ui.scanSrc === 'eq3')
-    || (no === 4 && _ui.mode === 'sticky')
-    || (no === 5 && (_ui.mode === 'super' || _ui.mode === 'super-guess' || _ui.mode === 'super-own'))
-    || (no === 10 && (_ui.mode === 'ray-target' || _ui.mode === 'ray-guess' || _ui.mode === 'ray-own'))
-    || (no === 12 && _ui.mode === 'eqtag');
+  const active = _equipModeActive(no);
   if (lock) {
     if (active) { cancelFlow(); showToast('已取消使用道具'); return; }
     if (_equipLockOwnedBy(mySeat()) && lock.no === no) {

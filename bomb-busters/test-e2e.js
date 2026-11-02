@@ -30,6 +30,13 @@ async function waitEval(page, fn, desc, arg, timeout = 15000) {
 
 const curSeat = page => page.evaluate(() => window._getOnlineState().currentPlayer);
 
+/** 打开道具说明弹窗并点击「使用道具」（未隐藏道具均先弹窗） */
+async function useEquip(page, no) {
+  await page.click(`[data-testid="equip-${no}"]`);
+  await page.waitForSelector('[data-testid="equip-info-use"]', { timeout: 5000 });
+  await page.click('[data-testid="equip-info-use"]');
+}
+
 (async () => {
 const browser = await chromium.launch();
 
@@ -425,8 +432,26 @@ await devA.evaluate(() => {
 });
 await devA.waitForTimeout(300);
 
-// ① 点击道具3（三重探测器）→ 进入扫描态 + 按钮激活；再次点击同一道具 → 取消
+// ① 点击道具3（三重探测器）→ 说明弹窗 → 使用道具 → 进入扫描态 + 按钮激活；再次点击同一道具 → 取消
 await devA.click('[data-testid="equip-3"]');
+await devA.waitForSelector('#modalOverlay.show', { timeout: 5000 });
+const infoProbe = await devA.evaluate(() => {
+  const root = document.getElementById('modalContent');
+  const btn = document.querySelector('[data-testid="equip-info-use"]');
+  return {
+    title: ((root.querySelector('h2') || {}).textContent || '').trim(),
+    desc: ((root.querySelector('[data-testid="equip-info-desc"]') || {}).textContent || '').trim(),
+    status: ((root.querySelector('[data-testid="equip-info-status"]') || {}).textContent || '').trim(),
+    disabled: !!(btn && btn.disabled),
+  };
+});
+if (!infoProbe.title.includes('道具 3') || !infoProbe.title.includes('三重探测器')) throw new Error('说明窗标题异常: ' + JSON.stringify(infoProbe));
+if (!infoProbe.desc.includes('相邻的 3 张未公开导线')) throw new Error('说明窗应展示道具作用: ' + JSON.stringify(infoProbe));
+if (!infoProbe.status.includes('已解锁') || infoProbe.disabled) throw new Error('已解锁道具的说明窗应可立即使用: ' + JSON.stringify(infoProbe));
+await devA.waitForTimeout(300);
+await devA.screenshot({ path: SHOTS + '/e2e-12a-equip-info.png' });
+await devA.click('[data-testid="equip-info-use"]');
+await waitEval(devA, () => !document.getElementById('modalOverlay').classList.contains('show'), '使用道具后说明窗关闭');
 await waitEval(devA, () => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes('依次点选')); }, '点击道具3进入扫描态');
 const eq3Active = await devA.evaluate(() => document.querySelector('[data-testid="equip-3"]').classList.contains('active'));
 if (!eq3Active) throw new Error('道具3使用中应呈激活态');
@@ -435,14 +460,14 @@ await devA.screenshot({ path: SHOTS + '/e2e-12b-equip-active.png' });
 await devA.click('[data-testid="equip-3"]');
 await waitEval(devA, () => !document.querySelector('.mode-hint') && !document.querySelector('[data-testid="equip-3"]').classList.contains('active'), '再次点击道具3取消');
 
-// ② 点击道具1（≠标签）→ 取消按钮退出
-await devA.click('[data-testid="equip-1"]');
+// ② 点击道具1（≠标签）→ 说明弹窗 → 使用道具 → 取消按钮退出
+await useEquip(devA, 1);
 await waitEval(devA, () => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes('相邻的 2 张')); }, '点击道具1进入≠选择态');
 await devA.click('[data-testid="btn-cancel"]');
 await waitEval(devA, () => !document.querySelector('.mode-hint'), '取消按钮退出≠选择态');
 
-// ③ 对讲机：选自己的牌 → 对象弹层 → 弹层取消 → 弹层关闭且未消耗道具
-await devA.click('[data-testid="equip-2"]');
+// ③ 对讲机：说明弹窗 → 使用道具 → 选自己的牌 → 对象弹层 → 弹层取消 → 弹层关闭且未消耗道具
+await useEquip(devA, 2);
 await waitEval(devA, () => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes('点选自己的 1 张未公开导线')); }, '点击道具2进入对讲机选牌态');
 await waitEval(devA, () => { const d = document.querySelector('.mode-desc'); return !!(d && d.textContent.includes('用法') && d.textContent.includes('被交换牌原标记自动废弃')); }, '对讲机选牌态展示用法说明');
 await devA.click(`.own-hand[data-seat="${seatA}"] .card-own:not(.revealed)`);
@@ -514,6 +539,24 @@ for (const [st, no, name] of [['used', '6', '抑制器'], ['locked', '2', '对�
 }
 console.log('道具区展示契约 OK（🔧 道具 / 编号角标 / 纯名称，无 ✓·🔒·emoji 前缀）');
 
+// 未解锁道具也可点开说明窗（展示作用 + 置灰按钮 + 未解锁原因）
+await devA.click('[data-testid="equip-2"]');
+await devA.waitForSelector('#modalOverlay.show', { timeout: 5000 });
+const lockedInfo = await devA.evaluate(() => ({
+  disabled: document.querySelector('[data-testid="equip-info-use"]').disabled,
+  status: (document.querySelector('[data-testid="equip-info-status"]') || {}).textContent || '',
+  desc: (document.querySelector('[data-testid="equip-info-desc"]') || {}).textContent || '',
+}));
+if (!lockedInfo.disabled) throw new Error('未解锁道具的「使用道具」按钮应置灰');
+if (!lockedInfo.status.includes('尚未解锁')) throw new Error('说明窗应提示未解锁原因: ' + JSON.stringify(lockedInfo));
+if (!lockedInfo.desc.includes('交换')) throw new Error('说明窗应展示对讲机作用: ' + JSON.stringify(lockedInfo));
+await devA.waitForTimeout(300);
+await devA.screenshot({ path: SHOTS + '/e2e-12i-equip-info-locked.png' });
+await devA.click('#modalContent .btn-secondary');
+await devA.waitForTimeout(300);
+if (await devA.evaluate(() => document.getElementById('modalOverlay').classList.contains('show'))) throw new Error('关闭说明窗失败');
+console.log('道具说明窗契约 OK（未解锁可查看、按钮置灰并说明原因）');
+
 await devA.evaluate(() => {
   window.S.equipment = [4, 5, 7, 8, 10, 11, 12].map(no => ({ no, unlocked: true, used: false }));
   window.saveStateDirect();
@@ -521,9 +564,9 @@ await devA.evaluate(() => {
 });
 await devA.waitForTimeout(300);
 
-// 点选式道具（4 便利贴 / 5 超级探测器 / 10 X/Y射线 / 12 ＝标签）：进入选择态 → 再次点击取消
+// 点选式道具（4 便利贴 / 5 超级探测器 / 10 X/Y射线 / 12 ＝标签）：说明窗 → 使用 → 进入选择态 → 再次点击取消
 for (const [no, txt] of [[4, '无信息标记的蓝色导线'], [5, '将扫描该整份手牌'], [10, '两个选项之一'], [12, '相邻的 2 张同色牌']]) {
-  await devA.click(`[data-testid="equip-${no}"]`);
+  await useEquip(devA, no);
   await waitEval(devA, t => { const h = document.querySelector('.mode-hint'); return !!(h && h.textContent.includes(t)); }, `道具${no}进入选择态`, txt);
   if (!(await devA.evaluate(n => document.querySelector(`[data-testid="equip-${n}"]`).classList.contains('active'), no))) {
     throw new Error(`道具${no}使用中应呈激活态`);
@@ -535,7 +578,7 @@ await devA.screenshot({ path: SHOTS + '/e2e-12f-eq4-12-hints.png' });
 
 // 7 备用电池：临时标记行动者已用技能 → 弹层可选、确认键启用 → 取消（恢复 skillUsed）
 await devA.evaluate(() => { window.S.players[window.S.currentSeat].skillUsed = true; window.saveStateDirect(); window.render(); });
-await devA.click('[data-testid="equip-7"]');
+await useEquip(devA, 7);
 await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 await devA.waitForSelector('[data-testid="battery-confirm"]', { timeout: 3000 });
 if (!(await devA.evaluate(() => document.querySelector('[data-testid="battery-confirm"]').disabled))) {
@@ -550,8 +593,8 @@ await devA.waitForTimeout(300);
 if (await devA.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) throw new Error('备用电池弹层取消后未关闭');
 await devA.evaluate(() => { window.S.players[window.S.currentSeat].skillUsed = false; window.saveStateDirect(); window.render(); });
 
-// 11 咖啡瓶：弹层列出其他玩家 → 取消
-await devA.click('[data-testid="equip-11"]');
+// 11 咖啡瓶：说明窗 → 使用 → 弹层列出其他玩家 → 取消
+await useEquip(devA, 11);
 await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const coffeeN = await devA.evaluate(() => document.querySelectorAll('[data-testid="coffee-to"]').length);
 if (coffeeN < 1) throw new Error('咖啡瓶应列出其他玩家');
@@ -569,8 +612,8 @@ if (eqAfter2.used.some(Boolean) || eqAfter2.cur !== seatA || eqAfter2.pending !=
   throw new Error('道具 4~12 取消路径不应有残留: ' + JSON.stringify(eqAfter2));
 }
 
-// 8 通用雷达：走完整 UI 路径公布数字 3 → 面板出现（行数=人数）→ 清理
-await devA.click('[data-testid="equip-8"]');
+// 8 通用雷达：说明窗 → 使用 → 完整 UI 路径公布数字 3 → 面板出现（行数=人数）→ 清理
+await useEquip(devA, 8);
 await devA.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const radarBtns = await devA.evaluate(() => document.querySelectorAll('#sheetContent .guess-grid .guess-btn').length);
 if (radarBtns !== 12) throw new Error('雷达数字格应为 12，得到 ' + radarBtns);

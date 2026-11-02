@@ -194,6 +194,8 @@ function renderOnlineLobby(){
       '<button id="ol-join" class="btn-main ol-btn" onclick="olJoinRoom()">🚪 加入房间</button>' +
       '<div class="ol-credit">@imStar100</div>' +
     '</div>';
+  const pref = /[?&]room=(\d{4})(?:&|$)/.exec(location.search);
+  if (pref) document.getElementById('ol-code').value = pref[1];
   const name = document.getElementById('ol-name');
   name.addEventListener('input', e => { _saveNick(e.target.value.trim()); });
 }

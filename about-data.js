@@ -1,12 +1,18 @@
 /* 关于弹窗数据：发版时只需要改这个文件。supportQrs 填赞赏码图片路径即可展示。 */
 window.ABOUT_DATA = {
-  updated: '2026-10-30',
+  updated: '2026-11-02',
   authorUrl: 'https://xhslink.com/m/6v4n9vWAfvp',
   // 可放微信/支付宝两张，也可只放一张：{ label: '微信', src: 'support-wechat.png' }
   supportQrs: [
     { label: '微信', src: 'support-wechat.png' }
   ],
   changelog: [
+    {
+      month: '2026 年 11 月',
+      items: [
+        { d: '11.02', t: '《弑君者》新增闯关配置；《炸弹克星》开放13~15关' }
+      ]
+    },
     {
       month: '2026 年 10 月',
       items: [

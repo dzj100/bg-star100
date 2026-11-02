@@ -170,6 +170,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .btn-full:active { transform: translateY(1px); box-shadow: 0 1px 0 0 var(--ink); }
 .btn-full.dim { opacity: .55; }
+.btn-full:disabled { opacity: .4; box-shadow: none; }
 .btn-primary { background: var(--gold); color: var(--ink); }
 .btn-secondary { background: #fff; color: var(--ink); }
 .btn-danger { background: var(--danger); color: #fff; }
@@ -340,6 +341,38 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .rules-scroll th, .rules-scroll td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
 .rules-scroll th { background: var(--surface2); white-space: nowrap; }
 .rules-scroll td:first-child { white-space: nowrap; font-weight: 600; }
+
+/* 道具说明弹窗 */
+.equip-info-desc {
+  font-size: .84rem;
+  line-height: 1.65;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+.equip-info-status {
+  font-size: .8rem;
+  font-weight: 800;
+  line-height: 1.5;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.equip-info-status.ok { color: #17a06b; background: rgba(23, 160, 107, .12); }
+.equip-info-status.bad { color: #b8321f; background: rgba(232, 64, 42, .1); }
+.equip-info-lock {
+  font-size: .74rem;
+  font-weight: 700;
+  color: #8a6a06;
+  background: #fff8e3;
+  border: 1.5px dashed #d9b44a;
+  border-radius: 8px;
+  padding: 6px 9px;
+  margin-bottom: 4px;
+}
 
 .sheet-overlay {
   position: fixed;

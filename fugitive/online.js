@@ -174,6 +174,8 @@ function renderOnlineLobby(){
       '<input id="ol-name" class="ol-input" type="text" maxlength="8" placeholder="昵称" value="' + esc(_nickName()) + '">' +
       '<button id="ol-join" class="ol-btn ol-join-btn" onclick="olJoinRoom()">🚪 加入房间</button>' +
     '</div>';
+  var pref = /[?&]room=(\d{4})(?:&|$)/.exec(location.search);
+  if (pref) document.getElementById('ol-code').value = pref[1];
   document.getElementById('ol-name').addEventListener('input', e => { _saveNick(e.target.value.trim()); });
 }
 
