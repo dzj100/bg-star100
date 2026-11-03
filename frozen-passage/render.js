@@ -193,6 +193,11 @@
     return !!(S && S.mode === 'online');
   }
 
+  /* 规则文案按联机语境展示：独立联机入口页开局前也算联机 */
+  function isOnlineContext() {
+    return isOnline() || !!window.FROZEN_ONLINE_ONLY;
+  }
+
   /* 本端在游戏内的座位号；未加入房间时退回 0 */
   function mySeat() {
     if (!isOnline()) return 0;
@@ -557,83 +562,164 @@
         saveSummary() + '"><span>继续航程</span><span class="save-summary">' + saveSummary() + '</span></button></div>'
       : '';
 
-    var startBtn = onlineOnly
-      ? '<button type="button" class="btn btn-primary btn-start" data-action="online-lobby">联机模式 · 2~4 人</button>'
-      : '<button type="button" class="btn ' + (S ? 'btn-ghost' : 'btn-primary') +
-        ' btn-start" data-action="start">' + (S ? '启程 · 新航路' : '启程') + '</button>';
+    var startLabel = onlineOnly ? '联机模式' : (S ? '启程 · 新航路' : '启程');
+    var startAction = onlineOnly ? 'online-lobby' : 'start';
+    var modeKicker = onlineOnly ? '多人协作 · ONLINE' : '单人解谜 · SOLO';
+    var ruleText = onlineOnly
+      ? '2~4 人 · 合作策略解谜'
+      : '单人 · 4 张手牌 · 3 个物品标记';
+    var desc = onlineOnly
+      ? '十五座冰山，三条彩色航路。<br>与队友共享一片冰面，共同抵达彼岸。'
+      : '十五座冰山，三条彩色航路。<br>让数字自左向右递增，让颜色从冰面连向远方。';
+    var foot = onlineOnly
+      ? '房主选择难度 · 房间进度实时同步'
+      : '启程时选择难度 · 进度保存在本机';
 
     var clearLink = !onlineOnly && S
       ? '<span aria-hidden="true">·</span><button type="button" class="text-btn" data-action="clear-save">清除存档</button>'
       : '';
-
     var setupLinks = onlineOnly
-      ? '<button type="button" class="text-btn" data-action="rules">规则</button>'
-      : '<button type="button" class="text-btn" data-action="rules">规则</button>' +
-        '<span aria-hidden="true">·</span>' +
-        '<button type="button" class="text-btn" data-action="stats">航行记录</button>' +
-        clearLink;
+      ? ''
+      : '<div class="setup-links">' +
+          '<button type="button" class="text-btn" data-action="stats">航行记录</button>' +
+          clearLink +
+        '</div>';
 
     setupScreen.innerHTML =
       '<div class="setup-wrap">' +
-        '<div class="hero">' +
-          '<div class="hero-art">' +
-            '<svg class="hero-scene" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
-              '<rect width="400" height="300" fill="#f2f5f6"/>' +
-              '<path d="M0 0h400v128c-140 34-286 26-400-10Z" fill="#e2e7e9"/>' +
-              '<circle cx="76" cy="60" r="48" fill="#ffffff" opacity=".14"/>' +
-              '<circle cx="76" cy="60" r="28" fill="#ffffff" opacity=".5"/>' +
-              '<path d="M-24 44c46-11 90-11 126 0" stroke="#ffffff" stroke-width="9" stroke-linecap="round" fill="none" opacity=".45"/>' +
-              '<path d="M212 30c30-7 58-6 84 2" stroke="#ffffff" stroke-width="6" stroke-linecap="round" fill="none" opacity=".38"/>' +
-              '<g stroke="#6f93a8" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".55">' +
-                '<path d="M152 74c3-4 6-4 9 0M166 67c3-4 6-4 9 0"/>' +
+        '<div class="cover-stage">' +
+          '<svg class="cover-art" viewBox="0 0 400 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
+            '<defs>' +
+              '<linearGradient id="fpSky" x1="0" y1="0" x2="400" y2="180" gradientUnits="userSpaceOnUse">' +
+                '<stop offset="0" stop-color="#eaeee8"/><stop offset="1" stop-color="#f6f8f3"/>' +
+              '</linearGradient>' +
+              '<linearGradient id="fpSea" x1="40" y1="320" x2="320" y2="700" gradientUnits="userSpaceOnUse">' +
+                '<stop offset="0" stop-color="#1a78b6"/><stop offset=".45" stop-color="#0c5b9c"/><stop offset="1" stop-color="#063c6c"/>' +
+              '</linearGradient>' +
+              '<radialGradient id="fpSheen" cx="200" cy="340" r="260" gradientUnits="userSpaceOnUse">' +
+                '<stop offset="0" stop-color="#ffffff" stop-opacity=".14"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>' +
+              '</radialGradient>' +
+              '<filter id="fpGrain" x="0" y="0" width="100%" height="100%">' +
+                '<feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" stitchTiles="stitch"/>' +
+                '<feColorMatrix type="saturate" values="0"/>' +
+                '<feComponentTransfer><feFuncA type="linear" slope=".05"/></feComponentTransfer>' +
+              '</filter>' +
+              '<clipPath id="fpSeaClip"><path d="M0 432C58 426 108 408 152 376C200 339 248 320 298 322C340 324 374 334 400 346V700H0Z"/></clipPath>' +
+            '</defs>' +
+            '<rect width="400" height="700" fill="#f6f8f3"/>' +
+            '<path d="M0 0h400v92L0 40Z" fill="url(#fpSky)"/>' +
+            '<g fill="none" stroke="#0b4d86" stroke-opacity=".055">' +
+              '<circle cx="60" cy="806" r="420"/><circle cx="60" cy="806" r="480"/>' +
+              '<circle cx="60" cy="806" r="545"/><circle cx="60" cy="806" r="615"/>' +
+            '</g>' +
+            '<g opacity=".8">' +
+              '<path d="M282 96l16-22 9 7 13-30 11 15 10-21 19 51Z" fill="#e9ebe4"/>' +
+              '<path d="M282 96l16-22 9 7 6-12-4 27Z" fill="#daddd6"/>' +
+              '<path d="M341 45l19 51h-30Z" fill="#e0e3dc"/>' +
+              '<path d="M298 74l9 7 13-30 4 6-13 29-9-5Z" fill="#f3f5ee"/>' +
+              '<path d="M282 96h74" stroke="#bcc7c8" stroke-width="1" opacity=".7"/>' +
+            '</g>' +
+            '<path d="M0 420C58 414 106 396 148 364C196 327 244 308 296 310C338 312 372 322 400 334V700H0Z" fill="#4a97c9" opacity=".6"/>' +
+            '<path d="M0 432C58 426 108 408 152 376C200 339 248 320 298 322C340 324 374 334 400 346V700H0Z" fill="url(#fpSea)"/>' +
+            '<path d="M0 432C58 426 108 408 152 376C200 339 248 320 298 322C340 324 374 334 400 346" fill="none" stroke="#ffffff" stroke-opacity=".32" stroke-width="1.4"/>' +
+            '<g clip-path="url(#fpSeaClip)">' +
+              '<rect x="0" y="300" width="400" height="400" fill="url(#fpSheen)"/>' +
+              '<g fill="none" stroke="#ffffff" stroke-linecap="round">' +
+                '<path d="M-20 505C60 492 130 462 200 420C268 380 340 372 430 392" stroke-opacity=".09" stroke-width="1.2"/>' +
+                '<path d="M-20 560C60 548 130 518 200 476C268 436 340 428 430 448" stroke-opacity=".07" stroke-width="1.2"/>' +
+                '<path d="M-20 626C60 614 130 584 200 542C268 502 340 494 430 514" stroke-opacity=".05" stroke-width="1.2"/>' +
               '</g>' +
-              '<g stroke="#9dbdcd" stroke-width="1" stroke-linejoin="round">' +
-                '<path d="M228 130l14-24 9 9 8-5 15 20Z" fill="#e9f3f8"/>' +
-                '<path d="M242 106l9 9-5 15h-12Z" fill="#dcebf3" stroke="none"/>' +
-                '<path d="M268 130l9-15 6 5 6-3 10 13Z" fill="#f1f8fb"/>' +
+              '<path class="cover-route" d="M118 414C176 444 252 474 352 506" fill="none" stroke="#ffffff" stroke-opacity=".26" stroke-width="1.4" stroke-dasharray="1.5 9" stroke-linecap="round"/>' +
+              '<g fill="#ffffff" fill-opacity=".45"><circle cx="180" cy="444" r="2.4"/><circle cx="258" cy="474" r="2.4"/></g>' +
+              '<circle cx="352" cy="506" r="3.4" fill="#e0262c" stroke="#ffffff" stroke-opacity=".55" stroke-width="1"/>' +
+              '<g opacity=".55" transform="translate(38 520) scale(.42)">' +
+                '<path d="M6 30 34 4 74 12 96 36 62 50 18 48Z" fill="#f7f4ea"/>' +
+                '<path d="M34 4 74 12 62 50 18 48Z" fill="#dfeaf2"/>' +
               '</g>' +
-              '<path d="M-40 178c64-62 158-70 238-30 72 36 138 30 242-34v186H-40Z" fill="#1768b5"/>' +
-              '<path d="M-40 222c82-10 142 4 210-2 74-6 140 2 210-12" stroke="#ffffff" stroke-opacity=".26" stroke-width="7" fill="none" stroke-linecap="round"/>' +
-              '<path d="M-20 264c70-8 120 2 186-2 70-4 128 2 196-8" stroke="#0f4f86" stroke-opacity=".22" stroke-width="5" fill="none" stroke-linecap="round"/>' +
-              '<path d="M206 168c22 4 44 4 66 0" stroke="#ffffff" stroke-opacity=".6" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="5 7" fill="none"/>' +
-              '<g transform="translate(96,-2)" stroke="#b9cbd6" stroke-width="1.2" stroke-linejoin="round">' +
-                '<rect x="221" y="74" width="3" height="84" rx="1.5" fill="#b9c7cf" stroke="none"/>' +
-                '<path d="M225 80v70h38Z" fill="#ffffff"/>' +
-                '<path d="M219 88v62h-30Z" fill="#f2f7fa"/>' +
-                '<path d="M222.5 70 202 79l20.5 9Z" fill="#e0262c" stroke="none"/>' +
-                '<path d="M196 158h58l-12 14h-30Z" fill="#e0262c" stroke="none"/>' +
-                '<path d="M204 158h42l-4 5h-34Z" fill="#ffffff" opacity=".35" stroke="none"/>' +
+            '</g>' +
+            '<g fill="none" stroke="#ffffff" stroke-linecap="round">' +
+              '<path d="M24 430C52 428 78 418 98 406" stroke-opacity=".34" stroke-width="1.2" stroke-dasharray="2 8"/>' +
+              '<path d="M40 446C62 442 82 434 102 422" stroke-opacity=".2" stroke-width="1" stroke-dasharray="2 10"/>' +
+            '</g>' +
+            '<g transform="translate(116 400) rotate(-7)">' +
+              '<g class="cover-boat-bob">' +
+                '<g opacity=".2" transform="translate(4 6)" fill="#063c6c">' +
+                  '<path d="M-31 0H33L23 13H-21Z"/><path d="M42 -6 6 -58 6 -6Z"/><path d="M-2 -46V-6H-38Z"/>' +
+                  '<rect x="0" y="-58" width="2.6" height="60"/>' +
+                '</g>' +
+                '<path d="M-31 0H33L23 13H-21Z" fill="#d92128"/>' +
+                '<path d="M-26 4H29" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>' +
+                '<rect x="0" y="-58" width="2.6" height="60" fill="#0a3557"/>' +
+                '<path d="M42 -6 6 -58 6 -6Z" fill="#ffffff"/>' +
+                '<path d="M42 -6 6 -58 6 -6Z" fill="none" stroke="#0a3557" stroke-opacity=".26"/>' +
+                '<path d="M6 -50V-8" stroke="#0a3557" stroke-opacity=".1"/>' +
+                '<path d="M-2 -46V-6H-38Z" fill="#f3eee3"/>' +
+                '<path d="M-2 -46V-6H-38Z" fill="none" stroke="#0a3557" stroke-opacity=".24"/>' +
+                '<path d="M0 -60 -19 -54 0 -48Z" fill="#0d63a4"/>' +
               '</g>' +
-            '</svg>' +
-            '<div class="hero-copy">' +
-              '<span class="hero-kicker">' + (onlineOnly ? '多人协作 · ONLINE' : '单人解谜 · SOLO') + '</span>' +
-              '<h1 class="hero-title">流冰航路</h1>' +
-              '<div class="hero-en">THE FROZEN PASSAGE</div>' +
+            '</g>' +
+            '<g transform="translate(6 638)"><g class="cover-floe floe-a">' +
+              '<ellipse cx="52" cy="54" rx="58" ry="10" fill="#042f58" opacity=".22"/>' +
+              '<path d="M6 30 34 4 76 12 98 36 64 52 18 48Z" fill="#f8f5ec"/>' +
+              '<path d="M34 4 76 12 64 52 18 48Z" fill="#dfeaf2"/>' +
+              '<path d="M76 12 98 36 64 52Z" fill="#c6dbe9"/>' +
+              '<path d="M34 4 76 12" stroke="#ffffff" stroke-width="1.4" opacity=".9"/>' +
+            '</g></g>' +
+            '<g transform="translate(300 664) scale(.8)"><g class="cover-floe floe-b">' +
+              '<ellipse cx="40" cy="42" rx="46" ry="9" fill="#042f58" opacity=".22"/>' +
+              '<path d="M4 26 26 4 62 10 80 30 50 42 14 38Z" fill="#f8f5ec"/>' +
+              '<path d="M26 4 62 10 50 42 14 38Z" fill="#dfeaf2"/>' +
+              '<path d="M62 10 80 30 50 42Z" fill="#c6dbe9"/>' +
+            '</g></g>' +
+            '<g fill="#0b4d86" fill-opacity=".16">' +
+              '<circle cx="86" cy="188" r="1.2"/><circle cx="302" cy="132" r="1"/>' +
+              '<circle cx="286" cy="264" r="1.3"/><circle cx="58" cy="286" r=".9"/>' +
+            '</g>' +
+            '<rect width="400" height="700" filter="url(#fpGrain)" opacity=".55"/>' +
+          '</svg>' +
+          '<div class="cover-content">' +
+            '<div class="cover-top">' +
+              '<div class="cover-brand">' +
+                '<span class="cover-mark" aria-hidden="true">' +
+                  '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/></svg>' +
+                '</span>' +
+                '<span class="cover-brand-text"><b>THE FROZEN PASSAGE</b><i>极地航路 · ' + (onlineOnly ? '协作' : '单人') + '航海志</i></span>' +
+              '</div>' +
+              '<span class="cover-kicker">' + modeKicker + '</span>' +
+            '</div>' +
+            '<div class="cover-main">' +
+              '<div class="cover-overline">POLAR ROUTE · N° 015</div>' +
+              '<h1 class="cover-title">流冰航路</h1>' +
+              '<div class="cover-en">The Frozen Passage</div>' +
+              '<div class="cover-orn" aria-hidden="true"><i></i></div>' +
+              '<p class="cover-quote">' + desc + '</p>' +
+            '</div>' +
+            '<div class="cover-bottom">' +
+              '<p class="cover-rule">' + ruleText + '</p>' +
+              saveRow +
+              '<div class="cover-actions">' +
+                '<button type="button" class="btn btn-cover-primary" data-action="' + startAction + '">' +
+                  '<span class="bcp-label">' + startLabel + '</span>' +
+                  '<span class="bcp-badge" aria-hidden="true">' +
+                    '<svg viewBox="0 0 16 16" focusable="false"><path d="M6 3.2 10.8 8 6 12.8"/></svg>' +
+                  '</span>' +
+                '</button>' +
+                '<button type="button" class="btn btn-cover-ghost" data-action="rules">查看规则</button>' +
+              '</div>' +
+              '<p class="cover-foot">' + foot + '</p>' +
+              setupLinks +
+              '<div class="credit" aria-label="@imStar100">' +
+                '<span class="credit-rule" aria-hidden="true"></span>' +
+                '<svg class="credit-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+                  '<path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/>' +
+                '</svg>' +
+                '<span class="credit-text">@imStar100</span>' +
+                '<span class="credit-rule" aria-hidden="true"></span>' +
+              '</div>' +
             '</div>' +
           '</div>' +
-          '<p class="hero-desc">' + (onlineOnly
-            ? '十五座冰山，三条彩色航路。<br>与队友共享一片冰面，共同抵达彼岸。'
-            : '十五座冰山，三条彩色航路。<br>让数字自左向右递增，让颜色从冰面连向远方。') + '</p>' +
         '</div>' +
-        '<div class="setup-panel">' +
-          saveRow +
-          startBtn +
-          '<div class="setup-links">' +
-            setupLinks +
-          '</div>' +
-          '<p class="setup-foot">' + (onlineOnly
-            ? '2~4 人协作 · 房间进度实时同步'
-            : '启程时选择难度 · 进度保存在本机') + '</p>' +
-        '</div>' +
-      '</div>' +
-      '<footer class="credit" aria-label="@imStar100">' +
-        '<span class="credit-rule" aria-hidden="true"></span>' +
-        '<svg class="credit-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-          '<path d="M12 2c.7 5.6 2.4 7.3 8 8-5.6.7-7.3 2.4-8 8-.7-5.6-2.4-7.3-8-8 5.6-.7 7.3-2.4 8-8Z"/>' +
-        '</svg>' +
-        '<span class="credit-text">@imStar100</span>' +
-        '<span class="credit-rule" aria-hidden="true"></span>' +
-      '</footer>';
+      '</div>';
   }
 
   /* ---------------- 游戏页 ---------------- */
@@ -1930,6 +2016,7 @@
 
   /* 规则页各标签的具体内容 */
   function rulePanel(tab) {
+    var online = isOnlineContext();
     if (tab === 'rules') {
       return '<p class="rule-lead">每次放牌都要同时满足四条规则（除了第 1 行在起始卡上，颜色任意）</p>' +
         '<div class="rule-item"><h4><em>①</em>支撑</h4><p>第 2 行起，下方需要的卡牌必须已经放好才能向上接续：两端的卡需 1 张，中间的卡需 2 张。</p></div>' +
@@ -1938,33 +2025,56 @@
         '<div class="rule-item"><h4><em>④</em>目标卡</h4><p>第 5 行若目标卡正面朝上，所放卡牌必须与目标卡同色。目标卡未启用时不约束。</p></div>';
     }
     if (tab === 'items') {
-      var lead = isOnline()
-        ? '联机局从 6 类物品各 2 张、共 12 张中随机抽 3 张共享；只有当前回合玩家可以使用，每张只能用一次。'
-        : '单人局从 6 个标记中随机抽 3 个，允许出现同类标记；每个标记只能用一次。';
+      var lead = online
+        ? '联机局从 6 类物品各 2 张、共 12 张中随机抽 3 张共享；只有当前回合玩家可以使用，每个物品只能用一次。'
+        : '单人局从 3 类物品各 2 张、共 6 张中随机抽 3 张；每个物品只能用一次。';
       var body = '<p class="rule-lead">' + lead + '</p>' +
         '<div class="rule-item"><h4><em>❄</em>因纽特智慧</h4><p>在本回合放置前使用。本回合的这次放置可以把牌放到已放置卡牌的紧邻位置，即使数字相同；隔空的同数字仍不允许。仍然只放 1 张、补 1 张。</p></div>' +
         '<div class="rule-item"><h4><em>🐕</em>狗拉雪橇</h4><p>把一张手牌放回抽牌堆底部，再从供应堆取一张。供应堆随后从抽牌堆补足。</p></div>' +
         '<div class="rule-item"><h4><em>📅</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>';
-      if (isOnline()) {
+      if (online) {
         body += '<div class="rule-item"><h4><em>📡</em>无线电广播</h4><p>补牌阶段使用：从一位队友手中取走 1 张牌，该队友随后从供应堆补 1 张，然后轮到下一位玩家。</p></div>' +
-          '<div class="rule-item"><h4><em>🚤</em>救生艇</h4><p>每位玩家同时选择 1 张手牌，全员就绪后一起传给左手边的玩家；选中的牌不能反悔。</p></div>' +
+          '<div class="rule-item"><h4><em>🚤</em>救生艇</h4><p>每位玩家同时选择 1 张手牌，全员就绪后一起传给左手边的玩家；交出牌后将动对新手牌排序。</p></div>' +
           '<div class="rule-item"><h4><em>🥫</em>罐头食品</h4><p>放置或卡住时使用：跳过这个回合，不放置也不补牌。</p></div>';
       }
       body += '<p class="sheet-note">一筹莫展时，可以先试试这些物品能力；物品使用后不可撤销。</p>';
       return body;
     }
     if (tab === 'ending') {
+      var failCopy = online
+        ? '轮到当前玩家时，其手牌没有任何合法落点，且物品也无法解救，即航路中断。当前玩家可以在卡住界面主动宣告失败。'
+        : '轮到你时，手牌没有任何合法落点，且物品也无法解救，即航路中断。可以在卡住界面主动宣告失败。';
       return '<p class="rule-lead">胜负只看 1 件事：能否放满。</p>' +
         '<div class="rule-item"><h4>胜利</h4><p>15 个位置全部放满立即胜利。</p></div>' +
-        '<div class="rule-item"><h4>失败</h4><p>轮到你时，手牌没有任何合法落点，且物品也无法解救，即航路中断。可以在卡住界面主动宣告失败。</p></div>';
+        '<div class="rule-item"><h4>失败</h4><p>' + failCopy + '</p></div>';
     }
-    return '<p class="rule-lead">把 15 张冰山卡填满倒三角。每回合放置 1 张、补 1 张；当没有任何合法落点时，航路中断。</p>' +
+    var flowLead = online
+      ? '全队轮流把 15 张冰山卡填满倒三角。当前玩家每回合放置 1 张、补 1 张；全队共用棋盘、供应堆与物品。'
+      : '把 15 张冰山卡填满倒三角。每回合放置 1 张、补 1 张；当没有任何合法落点时，航路中断。';
+    var handLimit = online
+      ? '<p class="rule-meta"><b>手牌上限</b><span>2 人 · <em>4 张</em></span><span>3~4 人 · <em>3 张</em></span></p>'
+      : '';
+    var setupCopy = online
+      ? '5 张目标卡在第 5 行上方，起始卡在第 1 行下方。难度由房主选择：新手 0 张目标卡正面，中等 3 张（左中右），专家 5 张（全部）。'
+      : '5 张目标卡在第 5 行上方，起始卡在第 1 行下方。新手模式 0 张目标卡正面，中等模式 3 张（左中右），专家模式 5 张（全部）。';
+    var refillCopy = online
+      ? '从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足，全队共用。'
+      : '从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足。';
+    var turnCopy = online
+      ? '<li><b>轮转</b><span>当前玩家完成放置与补牌后，轮到左手边下一位玩家。</span></li>'
+      : '';
+    var endCopy = online
+      ? '填满 15 位立即胜利；当前玩家无法放置且物品也无法解救，则航路中断。'
+      : '填满 15 位立即胜利；无法放置且物品也无法解救，则失败。';
+    return '<p class="rule-lead">' + flowLead + '</p>' +
+      handLimit +
       miniPyramid() +
       '<ol class="rule-steps">' +
-        '<li><b>设置</b><span>5 张目标卡在第 5 行上方，起始卡在第 1 行下方。新手模式 0 张目标卡正面，中等模式 3 张（左中右），专家模式 5 张（全部）。</span></li>' +
+        '<li><b>设置</b><span>' + setupCopy + '</span></li>' +
         '<li><b>放置</b><span>从手牌中选 1 张放到合法空位，必须满足支撑、颜色、数字、目标卡四条规则。</span></li>' +
-        '<li><b>补牌</b><span>从供应堆 3 张中选 1 张加入手牌；供应堆从抽牌堆补足。</span></li>' +
-        '<li><b>结束</b><span>填满 15 位立即胜利；无法放置且物品也无法解救，则失败。</span></li>' +
+        '<li><b>补牌</b><span>' + refillCopy + '</span></li>' +
+        turnCopy +
+        '<li><b>结束</b><span>' + endCopy + '</span></li>' +
       '</ol>' +
       '<p class="rule-verse"><b>起点提示：</b>第一张牌放在起始卡上，颜色任意。</p>';
   }
@@ -1982,7 +2092,7 @@
       title: '流冰航路 · 规则',
       body: '<div class="rule-tabs" role="tablist" aria-label="规则分类">' + tabs + '</div>' +
         rulePanel(tab) +
-        '<p class="rules-foot">流冰航路 · ' + (isOnline() ? '联机模式' : '单人模式') + '</p>',
+        '<p class="rules-foot">流冰航路 · ' + (isOnlineContext() ? '联机模式' : '单人模式') + '</p>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">关闭</button>'
     };
   };
