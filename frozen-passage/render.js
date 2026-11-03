@@ -34,6 +34,9 @@
     refresh: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M19.2 12a7.3 7.3 0 1 0-2.1 5.2"/></svg>',
     home: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11 12 4l8 7"/><path d="M6.5 9.5V20h11V9.5"/><path d="M10 20v-5h4v5"/></svg>',
     chart: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>',
+    radio: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="12" rx="2.5"/><path d="M7 9 17 4"/><circle cx="8" cy="15" r="1.2" fill="currentColor" stroke="none"/><path d="M12 15h6M12 18h4"/></svg>',
+    lifeboat: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 14h17l-2.4 4.4a2 2 0 0 1-1.7 1.1H7.6a2 2 0 0 1-1.7-1.1z"/><path d="M12 14V4M12 4l5 3-5 3"/><path d="M5 21h14"/></svg>',
+    canned: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6"/><path d="M5 11c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/></svg>',
     eye: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     iceberg: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 20 14H4z"/><path d="M4 18h16M7 21h10"/></svg>',
     play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>',
@@ -121,6 +124,9 @@
   function itemIcon(type) {
     if (type === 'inuit') return ICONS.snowflake;
     if (type === 'sled') return ICONS.sled;
+    if (type === 'radio') return ICONS.radio;
+    if (type === 'lifeboat') return ICONS.lifeboat;
+    if (type === 'canned') return ICONS.canned;
     return ICONS.scroll;
   }
 
@@ -170,6 +176,82 @@
   /* 当前局某类物品是否还有未使用的 */
   function hasUnused(type) {
     return !!S && F.hasUnusedItem(S, type);
+  }
+
+  /* ---------------- 联机辅助 ---------------- */
+
+  var SEAT_COLORS = ['#1768b5', '#c22f3c', '#2f8f6b', '#a2620c'];
+
+  /* 房间昵称来自用户输入，写入 innerHTML 前必须转义 */
+  function escapeHTML(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function isOnline() {
+    return !!(S && S.mode === 'online');
+  }
+
+  /* 本端在游戏内的座位号；未加入房间时退回 0 */
+  function mySeat() {
+    if (!isOnline()) return 0;
+    var seat = (typeof window._olSeatIndex === 'function') ? window._olSeatIndex() : null;
+    if (typeof seat === 'number') return seat;
+    return typeof S.currentSeat === 'number' ? S.currentSeat : 0;
+  }
+
+  /* 本端手牌：联机时 state.hand 只是当前回合玩家的镜像，不能直接用 */
+  function myHand() {
+    if (!S) return [];
+    return isOnline() ? F.handForSeat(S, mySeat()) : S.hand;
+  }
+
+  /* 本端现在是否可以操作（救生艇阶段全员可操作） */
+  function myTurn() {
+    if (!S || !isOnline()) return true;
+    return F.canSeatAct(S, mySeat());
+  }
+
+  function canSeatActNow(seat) {
+    if (!S || !isOnline()) return true;
+    return F.canSeatAct(S, seat);
+  }
+
+  function playerOf(seat) {
+    return isOnline() ? F.playerAt(S, seat) : null;
+  }
+
+  function playerName(seat) {
+    var p = playerOf(seat);
+    return p ? escapeHTML(p.name) : ('座位 ' + (Number(seat) + 1));
+  }
+
+  function currentPlayerName() {
+    return playerName(S.currentSeat);
+  }
+
+  function seatColor(seat) {
+    return SEAT_COLORS[Math.abs(Number(seat) || 0) % SEAT_COLORS.length];
+  }
+
+  /* 现在能否从供应堆取牌：普通补牌看当前玩家，无线电看被取牌者 */
+  function canPickSupplyNow() {
+    if (!S) return false;
+    if (!isOnline()) return S.phase === 'refill';
+    if (S.phase === 'refill') return myTurn();
+    if (S.phase === 'radio' && S.pending) return S.pending.toSeat === mySeat();
+    return false;
+  }
+
+  /* 按数字升序排列的卡牌副本（队友牌背从左到右由小到大） */
+  function sortCardsAsc(list) {
+    return list.slice().sort(function (a, b) {
+      var ca = F.getCard(a), cb = F.getCard(b);
+      if (!ca || !cb) return 0;
+      if (ca.number !== cb.number) return ca.number - cb.number;
+      return F.COLORS.indexOf(ca.color) - F.COLORS.indexOf(cb.color);
+    });
   }
 
   /* 各阶段的一句话提示 */
@@ -246,6 +328,8 @@
     }, 2800);
   }
 
+  window.showToast = toast;
+
   /* 保存偏好 */
   function savePrefs() {
     storageSet(PREFS_KEY, JSON.stringify(PREFS));
@@ -256,9 +340,9 @@
     storageSet(STATS_KEY, JSON.stringify(STATS));
   }
 
-  /* 保存当前对局与记录状态 */
+  /* 保存当前对局与记录状态（联机对局由房间快照同步，不写本机存档） */
   function saveGame() {
-    if (!S) return;
+    if (!S || S.mode === 'online') return;
     SAVE_META.savedAt = Date.now();
     storageSet(SAVE_KEY, JSON.stringify({
       state: S,
@@ -300,7 +384,7 @@
       var parsed = JSON.parse(raw);
       var candidate = parsed && parsed.state ? parsed.state : parsed;
       var state = F.deserialize(candidate);
-      if (!state) return;
+      if (!state || state.mode === 'online') return;
       S = state;
       SAVE_META.statsRecorded = !!(parsed && parsed.statsRecorded);
       SAVE_META.savedAt = (parsed && Number(parsed.savedAt)) || 0;
@@ -310,9 +394,9 @@
     }
   }
 
-  /* 对局结束且未记录时，记一次战绩 */
+  /* 对局结束且未记录时，记一次战绩（联机对局不计入本机单人统计） */
   function maybeRecordResult() {
-    if (!S || !isTerminal() || SAVE_META.statsRecorded) return;
+    if (!S || S.mode === 'online' || !isTerminal() || SAVE_META.statsRecorded) return;
     var stat = STATS[S.difficulty];
     if (!stat) stat = STATS[S.difficulty] = { plays: 0, wins: 0, best: null };
     stat.plays += 1;
@@ -465,19 +549,29 @@
     }).join('');
   }
 
-  /* 渲染设置页 */
+  /* 渲染设置页（独立联机入口页把主按钮换成联机模式） */
   function renderSetup() {
-    var saveRow = S
+    var onlineOnly = !!window.FROZEN_ONLINE_ONLY;
+    var saveRow = !onlineOnly && S
       ? '<div class="save-row"><button type="button" class="btn btn-primary" data-action="continue" aria-label="继续存档：' +
         saveSummary() + '"><span>继续航程</span><span class="save-summary">' + saveSummary() + '</span></button></div>'
       : '';
 
-    var startBtn = '<button type="button" class="btn ' + (S ? 'btn-ghost' : 'btn-primary') +
-      ' btn-start" data-action="start">' + (S ? '启程 · 新航路' : '启程') + '</button>';
+    var startBtn = onlineOnly
+      ? '<button type="button" class="btn btn-primary btn-start" data-action="online-lobby">联机模式 · 2~4 人</button>'
+      : '<button type="button" class="btn ' + (S ? 'btn-ghost' : 'btn-primary') +
+        ' btn-start" data-action="start">' + (S ? '启程 · 新航路' : '启程') + '</button>';
 
-    var clearLink = S
+    var clearLink = !onlineOnly && S
       ? '<span aria-hidden="true">·</span><button type="button" class="text-btn" data-action="clear-save">清除存档</button>'
       : '';
+
+    var setupLinks = onlineOnly
+      ? '<button type="button" class="text-btn" data-action="rules">规则</button>'
+      : '<button type="button" class="text-btn" data-action="rules">规则</button>' +
+        '<span aria-hidden="true">·</span>' +
+        '<button type="button" class="text-btn" data-action="stats">航行记录</button>' +
+        clearLink;
 
     setupScreen.innerHTML =
       '<div class="setup-wrap">' +
@@ -512,23 +606,24 @@
               '</g>' +
             '</svg>' +
             '<div class="hero-copy">' +
-              '<span class="hero-kicker">单人解谜 · SOLO</span>' +
+              '<span class="hero-kicker">' + (onlineOnly ? '多人协作 · ONLINE' : '单人解谜 · SOLO') + '</span>' +
               '<h1 class="hero-title">流冰航路</h1>' +
               '<div class="hero-en">THE FROZEN PASSAGE</div>' +
             '</div>' +
           '</div>' +
-          '<p class="hero-desc">十五座冰山，三条彩色航路。<br>让数字自左向右递增，让颜色从冰面连向远方。</p>' +
+          '<p class="hero-desc">' + (onlineOnly
+            ? '十五座冰山，三条彩色航路。<br>与队友共享一片冰面，共同抵达彼岸。'
+            : '十五座冰山，三条彩色航路。<br>让数字自左向右递增，让颜色从冰面连向远方。') + '</p>' +
         '</div>' +
         '<div class="setup-panel">' +
           saveRow +
           startBtn +
           '<div class="setup-links">' +
-            '<button type="button" class="text-btn" data-action="rules">规则</button>' +
-            '<span aria-hidden="true">·</span>' +
-            '<button type="button" class="text-btn" data-action="stats">航行记录</button>' +
-            clearLink +
+            setupLinks +
           '</div>' +
-          '<p class="setup-foot">启程时选择难度 · 进度自动保存在本机</p>' +
+          '<p class="setup-foot">' + (onlineOnly
+            ? '2~4 人协作 · 房间进度实时同步'
+            : '启程时选择难度 · 进度保存在本机') + '</p>' +
         '</div>' +
       '</div>' +
       '<footer class="credit" aria-label="@imStar100">' +
@@ -545,8 +640,9 @@
 
   /* 汇总当前选中牌的可放置信息，供渲染使用 */
   function buildView() {
+    var hand = S ? myHand() : [];
     var selected = null;
-    if (S && S.phase === 'place' && UI.selectedCardId && S.hand.indexOf(UI.selectedCardId) >= 0) {
+    if (S && S.phase === 'place' && UI.selectedCardId && hand.indexOf(UI.selectedCardId) >= 0) {
       selected = F.getCard(UI.selectedCardId);
     } else if (S && S.phase !== 'place') {
       UI.selectedCardId = null;
@@ -562,19 +658,22 @@
     });
     var counts = Object.create(null);
     if (S && S.phase === 'place') {
-      S.hand.forEach(function (id) { counts[id] = F.legalPlacements(S, id).length; });
+      hand.forEach(function (id) { counts[id] = F.legalPlacements(S, id).length; });
     }
-    return { selected: selected, placements: placements, legalMap: legalMap, supportMap: supportMap, counts: counts };
+    return { hand: hand, selected: selected, placements: placements, legalMap: legalMap, supportMap: supportMap, counts: counts };
   }
 
   /* 顶栏：菜单、回合信息、空位数、规则 */
   function renderTopbar() {
     var left = 15 - placedCount();
+    var sub = isOnline()
+      ? '联机 · ' + S.players.length + ' 人 · 第 ' + S.turn + ' 回合'
+      : '单人 · ' + DIFF_NAME[S.difficulty] + ' · 第 ' + S.turn + ' 回合';
     return '<header class="topbar">' +
       '<button type="button" class="icon-btn" id="btnMenu" data-action="menu" aria-label="打开菜单">' + ICONS.menu + '</button>' +
       '<div class="topbar-title">' +
-        '<span class="topbar-name">流冰航路</span>' +
-        '<span class="topbar-sub">单人 · ' + DIFF_NAME[S.difficulty] + ' · 第 ' + S.turn + ' 回合</span>' +
+        '<span class="topbar-name">流冰航路' + (isOnline() ? ' · 协作' : '') + '</span>' +
+        '<span class="topbar-sub">' + sub + '</span>' +
       '</div>' +
       '<div class="topbar-right">' +
         '<span class="remaining" aria-label="剩余 ' + left + ' 个空位"><b>' + left + '</b>空位</span>' +
@@ -585,6 +684,7 @@
 
   /* 信息栏：阶段提示，点击可查看操作记录 */
   function infoBar(view) {
+    if (isOnline()) return onlineInfoBar(view);
     var tone = '';
     var chip = '';
     var text = '';
@@ -627,6 +727,102 @@
       tone = 'is-danger';
       text = '没有可放置的卡牌 · 使用物品或宣告失败';
       actions = '<button type="button" class="mini-btn is-danger" data-action="open-stuck">办法</button>';
+    } else if (S.phase === 'won') {
+      tone = 'is-accent';
+      text = '航路贯通 · 15 个位置全部填满';
+      actions = '<button type="button" class="mini-btn" data-action="view-result">结算</button>';
+    } else if (S.phase === 'lost') {
+      tone = 'is-danger';
+      text = S.lossReason === 'no-hand' ? '手牌已空 · 航路中断' : '已宣告失败 · 航路中断';
+      actions = '<button type="button" class="mini-btn is-danger" data-action="view-result">结算</button>';
+    }
+
+    return '<div class="info-bar ' + tone + '" id="infoBar" data-action="open-history">' +
+      '<div class="info-main">' + chip + '<span class="info-text">' + text + '</span></div>' +
+      (side ? '<span class="info-side">' + side + '</span>' : '') +
+      (actions ? '<div class="info-actions">' + actions + '</div>' : '') +
+      '<button type="button" class="info-log" data-action="open-history" aria-label="查看操作记录" aria-haspopup="dialog" title="操作记录">' +
+        ICONS.history +
+      '</button>' +
+    '</div>';
+  }
+
+  /* 联机信息栏：显示当前回合玩家、等待对象与救生艇进度 */
+  function onlineInfoBar(view) {
+    var tone = '';
+    var chip = '';
+    var text = '';
+    var side = '';
+    var actions = '';
+    var meAct = myTurn();
+
+    if (S.phase === 'place') {
+      var wisdomChip = S.wisdom
+        ? '<span class="info-chip is-wisdom"><i></i>因纽特智慧</span>'
+        : '';
+      if (!meAct) {
+        chip = wisdomChip;
+        text = '等待 <b>' + currentPlayerName() + '</b> 放置';
+        side = '第 ' + S.turn + ' 回合';
+      } else if (view.selected) {
+        var count = view.placements.length;
+        chip = wisdomChip + cardChip(view.selected);
+        if (PREFS.hints) {
+          text = count > 0
+            ? '可放 <b>' + count + '</b> 个位置 · 点按闪烁空位'
+            : '这张牌目前无处可放';
+          tone = count > 0 ? (S.wisdom ? 'is-accent' : '') : 'is-warn';
+        } else {
+          text = '规则提示已关闭 · 直接点按空位尝试';
+          if (S.wisdom) tone = 'is-accent';
+        }
+        actions = '<button type="button" class="mini-btn" data-action="clear-select">取消</button>';
+      } else {
+        chip = wisdomChip;
+        text = S.wisdom
+          ? '因纽特智慧生效 · 本回合可与紧邻卡牌同数字'
+          : (PREFS.hints ? '轮到你 · 选择一张手牌' : '轮到你 · 直接尝试放置');
+        tone = S.wisdom ? 'is-accent' : '';
+        side = PREFS.hints ? '手牌 ' + view.hand.length + '/' + S.handLimit : '提示已关';
+      }
+    } else if (S.phase === 'refill') {
+      if (!meAct) {
+        text = '等待 <b>' + currentPlayerName() + '</b> 补牌';
+        side = '牌背只看颜色';
+      } else {
+        tone = 'is-accent';
+        text = '补牌阶段 · 从供应堆选择 1 张';
+        side = '牌背只看颜色';
+        actions = '<button type="button" class="mini-btn" data-action="open-refill">选牌</button>';
+      }
+    } else if (S.phase === 'radio') {
+      if (meAct) {
+        tone = 'is-accent';
+        chip = '<span class="info-chip is-wisdom"><i></i>无线电</span>';
+        text = '你被取走 ' + shortCard(S.pending.cardId) + ' · 从供应堆补 1 张';
+        side = '补完轮到下一位';
+        actions = '<button type="button" class="mini-btn" data-action="open-refill">补牌</button>';
+      } else {
+        text = '等待 <b>' + playerName(S.pending.toSeat) + '</b> 补牌';
+        side = '无线电广播';
+      }
+    } else if (S.phase === 'lifeboat') {
+      var picks = (S.pending && S.pending.picks) || {};
+      var picked = 0;
+      S.players.forEach(function (p) { if (picks[p.seat]) picked++; });
+      tone = 'is-accent';
+      chip = '<span class="info-chip is-wisdom"><i></i>救生艇</span>';
+      text = '选择 1 张传给左手边 · 已选 <b>' + picked + '/' + S.players.length + '</b>';
+      side = '全员就绪后结算';
+      actions = '<button type="button" class="mini-btn" data-action="open-lifeboat">选牌</button>';
+    } else if (S.phase === 'stuck') {
+      if (!meAct) {
+        text = '等待 <b>' + currentPlayerName() + '</b> 处理卡住';
+      } else {
+        tone = 'is-danger';
+        text = '没有可放置的卡牌 · 使用物品或宣告失败';
+        actions = '<button type="button" class="mini-btn is-danger" data-action="open-stuck">办法</button>';
+      }
     } else if (S.phase === 'won') {
       tone = 'is-accent';
       text = '航路贯通 · 15 个位置全部填满';
@@ -720,6 +916,7 @@
   /* 物品当前是否可用，以及不可用的原因 */
   function itemAvailability(type) {
     if (!hasUnused(type)) return { available: false, why: '已使用' };
+    if (isOnline() && !myTurn()) return { available: false, why: '等待轮到你' };
     if (type === 'inuit') {
       if (S.wisdom) return { available: false, why: '本回合已生效' };
       return {
@@ -732,15 +929,33 @@
     if (type === 'sled') {
       return { available: F.canUseSled(S), why: '需要手牌与供应堆' };
     }
+    if (type === 'radio') {
+      return {
+        available: F.canUseRadio(S),
+        why: S.phase === 'refill' ? '需要供应堆与有手牌的队友' : '补牌阶段使用'
+      };
+    }
+    if (type === 'lifeboat') {
+      return {
+        available: F.canUseLifeboat(S),
+        why: S.phase === 'place' || S.phase === 'stuck'
+          ? '需要全员都有手牌'
+          : '放置前使用'
+      };
+    }
+    if (type === 'canned') {
+      return { available: F.canUseCanned(S), why: '放置或卡住时使用' };
+    }
     return { available: F.canUseLog(S), why: '没有可替换的组合' };
   }
 
   /* 供应堆面板 */
   function renderSupply() {
+    var pickable = canPickSupplyNow();
     var cards = S.supply.map(function (id) {
       var card = F.getCard(id);
       return '<button type="button" class="supply-card color-' + card.color +
-        (S.phase === 'refill' ? ' is-pickable' : '') +
+        (pickable ? ' is-pickable' : '') +
         '" data-action="supply-card" data-card="' + id +
         '" aria-label="供应堆卡牌，' + colorName(card.color) + '色牌背">' +
         '<span class="supply-q" aria-hidden="true">?</span>' +
@@ -749,8 +964,8 @@
     }).join('');
 
     return '<section class="tray-panel supply-panel" aria-label="供应堆">' +
-      '<div class="tray-title"><span>供应堆 · ' + S.supply.length + '</span>' +
-        (S.phase === 'refill' ? '<span class="tray-pulse">选择 1 张</span>' : '') +
+      '<div class="tray-title"><span>供应堆' + (isOnline() ? ' · 共享' : '') + ' · ' + S.supply.length + '</span>' +
+        (pickable ? '<span class="tray-pulse">选择 1 张</span>' : '') +
       '</div>' +
       (S.supply.length
         ? '<div class="supply-row">' + cards + '</div>'
@@ -760,6 +975,8 @@
 
   /* 物品面板 */
   function renderItems() {
+    if (isOnline()) return renderOnlineItems();
+
     var unused = S.items.filter(function (it) { return !it.used; }).length;
     var tokens = S.items.map(function (item) {
       var av = itemAvailability(item.type);
@@ -783,25 +1000,59 @@
     '</section>';
   }
 
+  /* 联机物品面板：每张物品卡单独展示，同类型不合并 */
+  function renderOnlineItems() {
+    var leftTotal = S.items.filter(function (it) { return !it.used; }).length;
+    var tokens = S.items.map(function (item) {
+      var av = itemAvailability(item.type);
+      var classes = ['item-token'];
+      if (item.used) classes.push('is-used');
+      else if (!av.available) classes.push('is-unavailable');
+      var stateText = item.used ? '已使用' : (av.available ? '可使用' : '不可用，' + av.why);
+      return '<button type="button" class="' + classes.join(' ') + '" data-action="item" data-type="' + item.type +
+        '" data-item="' + item.id + '" aria-label="' + F.ITEM_NAME[item.type] + '，' + stateText + '。' +
+        F.ITEM_DESC[item.type] + '">' +
+        '<span class="item-icon" aria-hidden="true">' + itemIcon(item.type) + '</span>' +
+        '<span class="item-name">' + F.ITEM_NAME[item.type] + '</span>' +
+        (item.used ? '<span class="item-flag">已用</span>' : '') +
+      '</button>';
+    }).join('');
+
+    return '<section class="tray-panel items-panel items-panel-online" aria-label="共享物品">' +
+      '<div class="tray-title"><span>共享物品 · ' + leftTotal + '/' + S.items.length + '</span>' +
+        (S.phase === 'stuck' && myTurn() ? '<span class="tray-pulse">也许能脱困</span>' : '') +
+      '</div>' +
+      '<div class="items-row items-grid">' + tokens + '</div>' +
+    '</section>';
+  }
+
   /* 手牌区 */
   function renderHand(view) {
-    if (!S.hand.length) {
-      return '<footer class="hand-dock"><div class="hand"><span class="tray-empty">手牌已空</span></div></footer>';
+    var hand = view.hand || [];
+    var label = isOnline()
+      ? '<div class="hand-label"><span>你的手牌 · ' + hand.length + '/' + S.handLimit + '</span>' +
+        '<span>' + (S.phase === 'lifeboat' ? '点牌可选救生艇' : (myTurn() ? '轮到你' : '等待 ' + currentPlayerName())) + '</span></div>'
+      : '';
+    if (!hand.length) {
+      return '<footer class="hand-dock">' + label +
+        '<div class="hand"><span class="tray-empty">手牌已空</span></div></footer>';
     }
-    var canSelect = S.phase === 'place';
-    var cards = S.hand.map(function (id) {
+    var canSelect = S.phase === 'place' && myTurn();
+    var canLifeboatPick = isOnline() && S.phase === 'lifeboat';
+    var cards = hand.map(function (id) {
       var card = F.getCard(id);
       var count = view.counts[id] || 0;
       var classes = ['hand-card', 'color-' + card.color];
       if (UI.selectedCardId === id) classes.push('is-selected');
       if (PREFS.hints && canSelect && count === 0) classes.push('is-blocked');
       if (UI.animateHandCardId === id) classes.push('is-new');
+      if (isOnline() && !canSelect && !canLifeboatPick) classes.push('is-waiting');
       var aria = colorName(card.color) + ' ' + card.number;
       if (PREFS.hints && canSelect) aria += '，' + count + ' 个可放位置';
-      if (!canSelect) aria += '，' + phaseHint();
+      if (!canSelect && !canLifeboatPick) aria += '，' + phaseHint();
       return '<button type="button" class="' + classes.join(' ') + '" data-action="select-hand" data-card="' + id +
         '" aria-pressed="' + (UI.selectedCardId === id) + '"' +
-        (canSelect ? '' : ' aria-disabled="true"') +
+        (canSelect || canLifeboatPick ? '' : ' aria-disabled="true"') +
         ' aria-label="' + aria + '">' +
         '<span class="hand-inner">' +
           '<span class="hand-number">' + card.number + '</span>' +
@@ -813,7 +1064,42 @@
       '</button>';
     }).join('');
 
-    return '<footer class="hand-dock"><div class="hand" role="group" aria-label="手牌">' + cards + '</div></footer>';
+    return '<footer class="hand-dock">' + label +
+      '<div class="hand" role="group" aria-label="手牌">' + cards + '</div></footer>';
+  }
+
+  /* 联机队友条：色点 + 昵称 + 张数 + 升序缩略牌背（只显示颜色） */
+  function renderTeamBar() {
+    if (!isOnline()) return '';
+    var me = mySeat();
+    var pending = S.pending;
+    var rows = S.players.filter(function (p) { return p.seat !== me; }).map(function (p) {
+      var hand = sortCardsAsc(p.hand);
+      var backs = hand.map(function (id) {
+        var card = F.getCard(id);
+        return '<span class="team-back color-' + card.color + '" aria-hidden="true"></span>';
+      }).join('');
+      var status = '';
+      if (S.phase === 'lifeboat') {
+        var picked = pending && pending.picks && pending.picks[p.seat];
+        status = '<span class="team-status' + (picked ? ' is-ready' : '') + '">' +
+          (picked ? '已选' : '未选') + '</span>';
+      } else if (pending && pending.type === 'radio' && pending.toSeat === p.seat) {
+        status = '<span class="team-status is-ready">补牌中</span>';
+      } else if (p.seat === S.currentSeat) {
+        status = '<span class="team-status is-current">当前回合</span>';
+      }
+      return '<div class="team-row' + (p.seat === S.currentSeat ? ' is-current' : '') +
+        (pending && pending.type === 'radio' && pending.toSeat === p.seat ? ' is-target' : '') +
+        '" aria-label="' + escapeHTML(p.name) + '，' + p.hand.length + ' 张手牌">' +
+        '<span class="team-dot" style="background:' + seatColor(p.seat) + '"></span>' +
+        '<span class="team-name">' + escapeHTML(p.name) + '</span>' +
+        '<span class="team-backs">' + backs + '</span>' +
+        status +
+      '</div>';
+    }).join('');
+    if (!rows) return '';
+    return '<section class="team-bar" aria-label="队友手牌">' + rows + '</section>';
   }
 
   /* 渲染整个对局页 */
@@ -822,6 +1108,7 @@
     gameScreen.innerHTML =
       renderTopbar() +
       infoBar(view) +
+      renderTeamBar() +
       '<main class="game-main">' +
         '<div class="board-wrap">' + renderBoard(view) + '</div>' +
         '<div class="tray">' + renderSupply() + renderItems() + '</div>' +
@@ -1003,7 +1290,7 @@
   SHEETS.confirm = function (sheet) {
     var card = F.getCard(sheet.cardId);
     var slot = F.slotById(S, sheet.slotId);
-    if (!card || !slot || S.hand.indexOf(card.id) < 0) {
+    if (!card || !slot || myHand().indexOf(card.id) < 0) {
       return invalidSheet('无法放置', '手牌或位置已经变化，请重新选择。');
     }
     var check = F.canPlace(S, card.id, slot.id);
@@ -1099,7 +1386,7 @@
   SHEETS.sled = function (sheet) {
     if (!hasUnused('sled')) return invalidSheet('狗拉雪橇', '这件物品已经用过了。');
     if (!F.canUseSled(S)) return invalidSheet('狗拉雪橇', '需要同时有手牌和供应堆卡牌。');
-    var handPicks = S.hand.map(function (id) {
+    var handPicks = myHand().map(function (id) {
       var card = F.getCard(id);
       return '<button type="button" class="pick-card color-' + card.color +
         (sheet.handId === id ? ' is-picked' : '') +
@@ -1165,7 +1452,7 @@
     var handPicks = '';
     if (sheet.slotId) {
       handPicks = '<p class="sheet-step">2 · 用哪张手牌替换</p><div class="pick-row">' +
-        S.hand.map(function (id) {
+        myHand().map(function (id) {
           var card = F.getCard(id);
           var valid = !!validMap[id];
           return '<button type="button" class="pick-card color-' + card.color +
@@ -1248,11 +1535,201 @@
     };
   };
 
+  /* 无线电广播：选择队友与要取走的手牌 */
+  SHEETS.radio = function (sheet) {
+    if (!isOnline()) return invalidSheet('无线电广播', '这件物品只在联机模式可用。');
+    if (S.phase !== 'refill') return invalidSheet('无线电广播', '要在补牌阶段使用。');
+    if (!hasUnused('radio')) return invalidSheet('无线电广播', '这件物品已经用完了。');
+    if (!F.canUseRadio(S)) {
+      return invalidSheet('无线电广播', S.supply.length
+        ? '需要一位有手牌的队友。'
+        : '供应堆为空，目标玩家无法补牌。');
+    }
+
+    var targets = S.players.filter(function (p) {
+      return p.seat !== S.currentSeat && p.hand.length > 0;
+    });
+    var target = sheet.toSeat != null ? playerOf(sheet.toSeat) : null;
+    if (target && (target.seat === S.currentSeat || !target.hand.length)) {
+      target = null;
+      sheet.toSeat = null;
+      sheet.cardId = null;
+    }
+
+    var targetRows = targets.map(function (p) {
+      var active = sheet.toSeat === p.seat;
+      return '<button type="button" class="option-row' + (active ? ' is-picked' : '') +
+        '" data-action="radio-target" data-seat="' + p.seat +
+        '" aria-pressed="' + active + '">' +
+        '<span class="team-dot" style="background:' + seatColor(p.seat) + '"></span>' +
+        '<span class="option-text"><b>' + escapeHTML(p.name) + '</b><span>' +
+          p.hand.length + ' 张手牌 · 由其从供应堆补 1 张</span></span>' +
+        (active ? '<span class="tag">已选择</span>' : '') +
+      '</button>';
+    }).join('');
+
+    var cardRows = '';
+    if (target) {
+      if (sheet.cardId && target.hand.indexOf(sheet.cardId) < 0) sheet.cardId = null;
+      cardRows = '<p class="sheet-step">2 · 取走哪一张（只见牌背）</p><div class="pick-row">' +
+        sortCardsAsc(target.hand).map(function (id, idx) {
+          var card = F.getCard(id);
+          return '<button type="button" class="pick-card is-back color-' + card.color +
+            (sheet.cardId === id ? ' is-picked' : '') +
+            '" data-action="radio-card" data-card="' + id +
+            '" aria-pressed="' + (sheet.cardId === id) + '" aria-label="' +
+            colorName(card.color) + '色牌背，第 ' + (idx + 1) + ' 张">' +
+            '<span class="pick-inner" aria-hidden="true">?</span></button>';
+        }).join('') +
+      '</div>' +
+      '<p class="pick-legend">按数字从小到大排列；只能看到颜色与位置，取走后才会知道牌面。</p>';
+    }
+
+    var ready = target && sheet.cardId;
+    var preview = ready
+      ? '<p class="log-preview">取走这张牌加入手牌，' +
+        escapeHTML(target.name) + ' 随后从供应堆补 1 张。之后轮到下一位玩家。</p>'
+      : '<p class="sheet-note">先选择一位队友，再凭牌背选一张取走。取牌后你的回合结束。</p>';
+
+    return {
+      title: '无线电广播',
+      body: '<p class="sheet-lead">补牌时改为从队友处取走一张牌；被取牌的队友从供应堆补一张。' +
+        '供应堆现有 ' + S.supply.length + ' 张。</p>' +
+        '<p class="sheet-step">1 · 联系哪位队友</p>' +
+        '<div class="option-list">' + targetRows + '</div>' +
+        cardRows + preview,
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">取消</button>' +
+        '<button type="button" class="btn btn-primary" data-action="radio-confirm"' +
+        (ready ? '' : ' disabled') + '>取走这张牌</button>'
+    };
+  };
+
+  /* 无线电广播补牌：被取牌的玩家从供应堆补 1 张 */
+  SHEETS.radioSupply = function () {
+    if (!isOnline() || S.phase !== 'radio' || !S.pending) {
+      return invalidSheet('无线电广播', '当前没有等待补牌的无线电广播。');
+    }
+    if (S.pending.toSeat !== mySeat()) {
+      return invalidSheet('无线电广播', '等待 ' + playerName(S.pending.toSeat) + ' 从供应堆补牌。');
+    }
+    if (!S.supply.length) {
+      return invalidSheet('供应堆已空', '没有可补的卡牌，等待下一位玩家。');
+    }
+    var cards = S.supply.map(function (id) {
+      var card = F.getCard(id);
+      return '<button type="button" class="refill-card color-' + card.color +
+        '" data-action="radio-supply" data-card="' + id +
+        '" aria-label="选择' + colorName(card.color) + '色牌背">' +
+        '<span class="supply-q" aria-hidden="true">?</span>' +
+        '<span class="supply-color" aria-hidden="true">' + colorName(card.color) + '</span>' +
+      '</button>';
+    }).join('');
+    return {
+      title: '无线电 · 补牌',
+      body: '<p class="sheet-lead">' + playerName(S.pending.fromSeat) + ' 取走了你的 ' +
+        shortCard(S.pending.cardId) + '。从供应堆选择 1 张补入手牌。</p>' +
+        '<div class="refill-row">' + cards + '</div>' +
+        '<p class="refill-legend">补牌后轮到下一位玩家。</p>',
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">稍后再选</button>'
+    };
+  };
+
+  /* 救生艇使用确认 */
+  SHEETS.lifeboatIntro = function () {
+    if (!isOnline()) return invalidSheet('救生艇', '这件物品只在联机模式可用。');
+    if (S.phase !== 'place' && S.phase !== 'stuck') {
+      return invalidSheet('救生艇', '当前不能使用救生艇。');
+    }
+    if (!hasUnused('lifeboat')) return invalidSheet('救生艇', '这件物品已经用完了。');
+    if (!F.canUseLifeboat(S)) {
+      return invalidSheet('救生艇', '需要所有玩家都有手牌。');
+    }
+    return {
+      title: '救生艇',
+      body: '<p class="sheet-lead">全员同时暗选 1 张手牌，全部就绪后一起传给左手边的玩家。' +
+        '你的选择对其他玩家隐藏。使用后不可撤销。</p>' +
+        '<p class="sheet-note">当前 ' + S.players.length + ' 位玩家都有手牌，可以使用。</p>',
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">取消</button>' +
+        '<button type="button" class="btn btn-primary" data-action="lifeboat-start">放下救生艇</button>'
+    };
+  };
+
+  /* 救生艇：全员同时选 1 张，传给左手边 */
+  SHEETS.lifeboat = function (sheet) {
+    if (!isOnline() || S.phase !== 'lifeboat' || !S.pending) {
+      return invalidSheet('救生艇', '当前没有等待选牌的救生艇。');
+    }
+    var picks = S.pending.picks || {};
+    var hand = sortCardsAsc(myHand());
+    if (sheet.cardId && hand.indexOf(sheet.cardId) < 0) sheet.cardId = null;
+
+    var pickCards = hand.map(function (id) {
+      var card = F.getCard(id);
+      return '<button type="button" class="pick-card color-' + card.color +
+        (sheet.cardId === id ? ' is-picked' : '') +
+        '" data-action="lifeboat-card" data-card="' + id +
+        '" aria-pressed="' + (sheet.cardId === id) + '" aria-label="选择 ' +
+        colorName(card.color) + ' ' + card.number + '"><span class="pick-inner">' +
+        card.number + '</span></button>';
+    }).join('');
+
+    var statusRows = S.players.map(function (p) {
+      var picked = picks[p.seat];
+      var mine = p.seat === mySeat();
+      return '<div class="rescue-row' + (picked ? ' is-ready' : '') + '">' +
+        '<span class="team-dot" style="background:' + seatColor(p.seat) + '"></span>' +
+        '<span class="rescue-text"><b>' + escapeHTML(p.name) + (mine ? '（你）' : '') + '</b><span>' +
+          S.players.length + ' 人局 · 传给左手边</span></span>' +
+        '<span class="tag' + (picked ? ' is-ok' : '') + '">' + (picked ? '已选' : '未选') + '</span>' +
+      '</div>';
+    }).join('');
+
+    var pickedCount = S.players.filter(function (p) { return picks[p.seat]; }).length;
+    var chosen = sheet.cardId ? F.getCard(sheet.cardId) : null;
+    var preview = chosen
+      ? '<p class="log-preview">你将把 ' + shortCard(chosen.id) + ' 传给 ' +
+        playerName((mySeat() + 1) % S.players.length) + '。</p>'
+      : '<p class="sheet-note">选择一张手牌；全员就绪后由当前玩家结算。选中的牌会传给左手边。</p>';
+
+    return {
+      title: '救生艇',
+      body: '<p class="sheet-lead">每位玩家同时选择 1 张手牌，全部就绪后一起传给左手边的玩家。' +
+        '已选 <b>' + pickedCount + '/' + S.players.length + '</b>。</p>' +
+        (hand.length
+          ? '<p class="sheet-step">你的选择</p><div class="pick-row">' + pickCards + '</div>'
+          : '<p class="sheet-note">你没有手牌，无法选择。</p>') +
+        '<p class="sheet-step">全队状态</p><div class="rescue-list">' + statusRows + '</div>' +
+        preview,
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">查看棋盘</button>' +
+        '<button type="button" class="btn btn-primary" data-action="lifeboat-confirm"' +
+        (chosen ? '' : ' disabled') + '>确认选择</button>'
+    };
+  };
+
+  /* 罐头食品：跳过本回合 */
+  SHEETS.canned = function () {
+    if (!isOnline()) return invalidSheet('罐头食品', '这件物品只在联机模式可用。');
+    if (S.phase !== 'place' && S.phase !== 'stuck') {
+      return invalidSheet('罐头食品', '要在放置或卡住时使用。');
+    }
+    if (!hasUnused('canned')) return invalidSheet('罐头食品', '这件物品已经用完了。');
+    return {
+      title: '罐头食品',
+      body: '<p class="sheet-lead">确认跳过当前回合？不会放置卡牌，也不会补牌，直接轮到下一位玩家。' +
+        '这个操作不可撤销。</p>',
+      actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">取消</button>' +
+        '<button type="button" class="btn btn-primary" data-action="canned-confirm">跳过回合</button>'
+    };
+  };
+
   /* 卡住时的解救弹层 */
   SHEETS.stuck = function () {
     if (S.phase !== 'stuck') return invalidSheet('无法放置', '当前不是卡住状态。');
+    var types = isOnline()
+      ? ['inuit', 'sled', 'log', 'lifeboat', 'canned']
+      : ['inuit', 'sled', 'log'];
     var rows = '';
-    ['inuit', 'sled', 'log'].forEach(function (type) {
+    types.forEach(function (type) {
       if (!hasUnused(type)) return;
       var can;
       var reason;
@@ -1266,11 +1743,21 @@
         reason = S.supply.length
           ? '把手牌放回牌堆底，从供应堆换一张。'
           : '供应堆为空，无法换牌。';
-      } else {
+      } else if (type === 'log') {
         can = F.canUseLog(S);
         reason = can
           ? '替换一张已放置的卡牌。'
           : '没有手牌能放进已放置的位置。';
+      } else if (type === 'lifeboat') {
+        can = F.canUseLifeboat(S);
+        reason = can
+          ? '全员各选 1 张，传给左手边。'
+          : '需要全员都有手牌。';
+      } else {
+        can = F.canUseCanned(S);
+        reason = can
+          ? '跳过这个回合，不放置也不补牌。'
+          : '放置或卡住时使用。';
       }
       rows += '<div class="rescue-row">' +
         '<span class="rescue-icon" aria-hidden="true">' + itemIcon(type) + '</span>' +
@@ -1285,12 +1772,15 @@
       rows = '<div class="stuck-empty">物品已经用尽，没有别的办法了。</div>';
     }
 
+    var declare = !isOnline() || myTurn()
+      ? '<button type="button" class="btn btn-danger" data-action="declare-loss">宣告失败</button>'
+      : '';
     return {
       title: '无法放置',
       body: '<p class="sheet-lead">当前手牌没有任何合法落点。可以尝试尚未使用的物品，或宣告航路中断。</p>' +
         '<div class="stuck-list">' + rows + '</div>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">再看看</button>' +
-        '<button type="button" class="btn btn-danger" data-action="declare-loss">宣告失败</button>'
+        declare
     };
   };
 
@@ -1298,7 +1788,9 @@
   SHEETS.declare = function () {
     return {
       title: '宣告失败？',
-      body: '<p class="sheet-lead">这局会记为失败，最终棋盘仍保存在本机。这个操作不可撤销。</p>',
+      body: '<p class="sheet-lead">' + (isOnline()
+        ? '全队会记为失败，房间内所有玩家都会看到结算。这个操作不可撤销。'
+        : '这局会记为失败，最终棋盘仍保存在本机。这个操作不可撤销。') + '</p>',
       actions: '<button type="button" class="btn btn-ghost" data-action="open-stuck">返回</button>' +
         '<button type="button" class="btn btn-danger" data-action="confirm-loss">确认宣告</button>'
     };
@@ -1308,6 +1800,7 @@
   SHEETS.result = function () {
     var won = S.phase === 'won';
     var goalsUp = S.board.goals.filter(function (g) { return g.faceUp; }).length;
+    var online = isOnline();
     var sub;
     if (won) {
       sub = '第 ' + S.turn + ' 回合完成 · 目标卡 ' + goalsUp + '/5 已翻开';
@@ -1316,11 +1809,28 @@
     } else {
       sub = '第 ' + S.turn + ' 回合 · 主动宣告失败';
     }
+    if (online) sub = '联机 ' + S.players.length + ' 人 · ' + sub;
     var flavor = won
       ? '十五座冰山各就各位，成功穿越了西北航线！'
       : '冰面在最后一格前合拢，再接再厉，也许下一次就能通过！';
+    if (online) {
+      flavor = won
+        ? '全队协作铺好了整条冰上航路。可以回到房间再来一局。'
+        : '这一局在冰面前止步，回到房间调整策略再来一次。';
+    }
+    var actions;
+    if (online) {
+      var host = typeof window._olIsHost === 'function' && window._olIsHost();
+      actions = (host
+        ? '<button type="button" class="btn btn-primary" data-action="result-room">回到房间</button>'
+        : '<button type="button" class="btn btn-primary" data-action="noop" disabled>等待房主</button>') +
+        '<button type="button" class="btn btn-ghost" data-action="exit-room">退出房间</button>';
+    } else {
+      actions = '<button type="button" class="btn btn-primary" data-action="result-again">再来一局</button>' +
+        '<button type="button" class="btn btn-ghost" data-action="result-setup">返回设置</button>';
+    }
     return {
-      title: '本局结算',
+      title: online ? '全队结算' : '本局结算',
       body: '<div class="result-hero">' +
           '<div class="result-glyph' + (won ? '' : ' is-loss') + '" aria-hidden="true">' +
             (won ? ICONS.compass : ICONS.x) +
@@ -1334,8 +1844,7 @@
           '<div class="stat-cell"><b>' + DIFF_NAME[S.difficulty] + '</b><span>难度</span></div>' +
         '</div>' +
         '<p class="result-flavor">' + flavor + '</p>',
-      actions: '<button type="button" class="btn btn-primary" data-action="result-again">再来一局</button>' +
-        '<button type="button" class="btn btn-ghost" data-action="result-setup">返回设置</button>'
+      actions: actions
     };
   };
 
@@ -1352,6 +1861,26 @@
 
   /* 游戏内菜单弹层 */
   SHEETS.menu = function () {
+    if (isOnline()) {
+      return {
+        title: '菜单',
+        body: '<div class="menu-list">' +
+            '<button type="button" class="menu-row" data-action="menu-rules">' +
+              '<span class="menu-icon" aria-hidden="true">' + ICONS.book + '</span>规则说明' +
+              '<span class="menu-sub">流程 · 物品</span></button>' +
+            '<button type="button" class="menu-row" data-action="toggle-hints" aria-pressed="' + PREFS.hints + '">' +
+              '<span class="menu-icon" aria-hidden="true">' + ICONS.eye + '</span>规则提示' +
+              '<span class="switch' + (PREFS.hints ? ' is-on' : '') + '" aria-hidden="true"></span></button>' +
+            '<button type="button" class="menu-row" data-action="open-history">' +
+              '<span class="menu-icon" aria-hidden="true">' + ICONS.history + '</span>操作记录' +
+              '<span class="menu-sub">本局协作</span></button>' +
+            '<button type="button" class="menu-row is-danger" data-action="exit-room">' +
+              '<span class="menu-icon" aria-hidden="true">' + ICONS.home + '</span>退出房间' +
+              '<span class="menu-sub">本局无法继续</span></button>' +
+          '</div>',
+        actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">继续航路</button>'
+      };
+    }
     return {
       title: '菜单',
       body: '<div class="menu-list">' +
@@ -1409,11 +1938,20 @@
         '<div class="rule-item"><h4><em>④</em>目标卡</h4><p>第 5 行若目标卡正面朝上，所放卡牌必须与目标卡同色。目标卡未启用时不约束。</p></div>';
     }
     if (tab === 'items') {
-      return '<p class="rule-lead">单人局从 6 个标记中随机抽 3 个，允许出现同类标记；每个标记只能用一次。</p>' +
+      var lead = isOnline()
+        ? '联机局从 6 类物品各 2 张、共 12 张中随机抽 3 张共享；只有当前回合玩家可以使用，每张只能用一次。'
+        : '单人局从 6 个标记中随机抽 3 个，允许出现同类标记；每个标记只能用一次。';
+      var body = '<p class="rule-lead">' + lead + '</p>' +
         '<div class="rule-item"><h4><em>❄</em>因纽特智慧</h4><p>在本回合放置前使用。本回合的这次放置可以把牌放到已放置卡牌的紧邻位置，即使数字相同；隔空的同数字仍不允许。仍然只放 1 张、补 1 张。</p></div>' +
         '<div class="rule-item"><h4><em>🐕</em>狗拉雪橇</h4><p>把一张手牌放回抽牌堆底部，再从供应堆取一张。供应堆随后从抽牌堆补足。</p></div>' +
-        '<div class="rule-item"><h4><em>📅</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>' +
-        '<p class="sheet-note">一筹莫展时，可以先试试这些物品能力；物品使用后不可撤销。</p>';
+        '<div class="rule-item"><h4><em>📅</em>航海日志</h4><p>用一张手牌替换一张已放置的卡牌。换上的牌要重新满足四条规则，换下的牌回到手牌。</p></div>';
+      if (isOnline()) {
+        body += '<div class="rule-item"><h4><em>📡</em>无线电广播</h4><p>补牌阶段使用：从一位队友手中取走 1 张牌，该队友随后从供应堆补 1 张，然后轮到下一位玩家。</p></div>' +
+          '<div class="rule-item"><h4><em>🚤</em>救生艇</h4><p>每位玩家同时选择 1 张手牌，全员就绪后一起传给左手边的玩家；选中的牌不能反悔。</p></div>' +
+          '<div class="rule-item"><h4><em>🥫</em>罐头食品</h4><p>放置或卡住时使用：跳过这个回合，不放置也不补牌。</p></div>';
+      }
+      body += '<p class="sheet-note">一筹莫展时，可以先试试这些物品能力；物品使用后不可撤销。</p>';
+      return body;
     }
     if (tab === 'ending') {
       return '<p class="rule-lead">胜负只看 1 件事：能否放满。</p>' +
@@ -1444,7 +1982,7 @@
       title: '流冰航路 · 规则',
       body: '<div class="rule-tabs" role="tablist" aria-label="规则分类">' + tabs + '</div>' +
         rulePanel(tab) +
-        '<p class="rules-foot">流冰航路 · 单人模式</p>',
+        '<p class="rules-foot">流冰航路 · ' + (isOnline() ? '联机模式' : '单人模式') + '</p>',
       actions: '<button type="button" class="btn btn-ghost" data-action="close-sheet">关闭</button>'
     };
   };
@@ -1472,8 +2010,14 @@
     var mark = '';
     var text = '';
     var tags = '';
+    var who = isOnline() && entry.name
+      ? '<span class="log-who">' + escapeHTML(entry.name) + '</span> '
+      : '';
 
-    if (entry.type === 'place') {
+    if (entry.type === 'start') {
+      mark = '<span class="log-item">' + ICONS.compass + '</span>';
+      text = '<b>先手启程</b> · 联机 ' + S.players.length + ' 人 · 随机座位';
+    } else if (entry.type === 'place') {
       mark = miniLogCard(entry.cardId);
       var slot = F.slotById(S, entry.slotId);
       text = '放置 <b>' + cardName(entry.cardId) + '</b>' + (slot ? ' → ' + posLabel(slot) : '');
@@ -1494,6 +2038,24 @@
       var target = F.slotById(S, entry.slotId);
       text = '使用 <b>航海日志</b> · ' + cardName(entry.inCardId) + ' 替换 ' +
         cardName(entry.outCardId) + (target ? '（' + posLabel(target) + '）' : '');
+    } else if (entry.type === 'radio') {
+      mark = '<span class="log-item">' + ICONS.radio + '</span>';
+      text = '使用 <b>无线电广播</b> · 从 ' + playerName(entry.toSeat) + ' 取走 ' +
+        shortCard(entry.cardId);
+    } else if (entry.type === 'radio-refill') {
+      mark = miniLogCard(entry.cardId);
+      text = '无线电补牌 · <b>' + cardName(entry.cardId) + '</b> 加入手牌';
+    } else if (entry.type === 'lifeboat') {
+      mark = '<span class="log-item">' + ICONS.lifeboat + '</span>';
+      text = '使用 <b>救生艇</b> · 全员暗选一张手牌';
+    } else if (entry.type === 'lifeboat-pick') {
+      return '';
+    } else if (entry.type === 'lifeboat-done') {
+      mark = '<span class="log-item">' + ICONS.lifeboat + '</span>';
+      text = '<b>救生艇传牌</b> · 每人把选中的牌传给左手边';
+    } else if (entry.type === 'canned') {
+      mark = '<span class="log-item">' + ICONS.canned + '</span>';
+      text = '使用 <b>罐头食品</b> · 跳过本回合';
     } else if (entry.type === 'won') {
       mark = '<span class="log-item is-win">' + ICONS.compass + '</span>';
       text = '<b>航路贯通</b> · 15 个位置全部填满';
@@ -1506,7 +2068,7 @@
 
     return '<div class="log-row' + (isLatest ? ' is-latest' : '') + '">' +
       '<span class="log-mark">' + mark + '</span>' +
-      '<p class="log-text">' + text + tags + '</p>' +
+      '<p class="log-text">' + who + text + tags + '</p>' +
       (isLatest ? '<span class="log-latest">最新</span>' : '') +
     '</div>';
   }
@@ -1647,12 +2209,99 @@
     else if (S.phase === 'stuck') openSheet('stuck');
   }
 
-  /* 提交规则引擎的新状态，统一处理动画、存档与弹层 */
+  /* ---------------- 联机生命周期 ---------------- */
+
+  /* 联机开局：由 online.js 在全员就绪后调用 */
+  function startOnlineGame(names, difficulty) {
+    if (!names || names.length < 2 || names.length > 4) return false;
+    S = F.createOnlineGame({ names: names, difficulty: difficulty });
+    UI.screen = 'game';
+    UI.selectedCardId = null;
+    UI.animateSlotId = null;
+    UI.animateHandCardId = null;
+    closeSheet(false);
+    render();
+    var first = F.playerAt(S, S.currentSeat);
+    toast('联机启程 · ' + (first ? first.name : '随机座位') + ' 先手');
+    return true;
+  }
+
+  /* 应用远端快照；只在阶段切换时自动弹层，不打断玩家已打开的弹层 */
+  function applyOnlineState(raw) {
+    var next = F.deserialize(raw);
+    if (!next || next.mode !== 'online') return false;
+    var prevPhase = S ? S.phase : null;
+    var prevPending = S && S.pending ? S.pending.type : null;
+    var my = mySeat();
+    S = next;
+    UI.screen = 'game';
+    if (UI.selectedCardId && F.handForSeat(next, my).indexOf(UI.selectedCardId) < 0) {
+      UI.selectedCardId = null;
+    }
+    render();
+    syncOnlineSheet(prevPhase, prevPending, my);
+    return true;
+  }
+
+  /* 联机弹层与远端阶段对齐 */
+  function syncOnlineSheet(prevPhase, prevPending, my) {
+    if (!S) return;
+    if (UI.sheet) {
+      var type = UI.sheet.type;
+      var stale = false;
+      if (type === 'refill') stale = S.phase !== 'refill' || !myTurn();
+      else if (type === 'stuck') stale = S.phase !== 'stuck' || !myTurn();
+      else if (type === 'lifeboat') stale = S.phase !== 'lifeboat';
+      else if (type === 'lifeboatIntro') stale = S.phase !== 'place' && S.phase !== 'stuck';
+      else if (type === 'radio') stale = S.phase !== 'refill' || !myTurn();
+      else if (type === 'radioSupply') {
+        stale = S.phase !== 'radio' || !S.pending || S.pending.toSeat !== my;
+      } else if (type === 'confirm') {
+        stale = S.phase !== 'place' || !myTurn() ||
+          F.handForSeat(S, my).indexOf(UI.sheet.cardId) < 0;
+      } else if (type === 'result') {
+        stale = S.phase !== 'won' && S.phase !== 'lost';
+      }
+      if (stale) closeSheet(false);
+      else if (type === 'lifeboat') renderSheet();
+    }
+    if (UI.sheet) return;
+    if (S.phase === 'lifeboat' && prevPhase !== 'lifeboat') openSheet('lifeboat');
+    else if (S.phase === 'radio' && prevPending !== 'radio' &&
+      S.pending && S.pending.toSeat === my) openSheet('radioSupply');
+    else if ((S.phase === 'won' || S.phase === 'lost') && prevPhase !== S.phase) {
+      openSheet('result');
+    }
+  }
+
+  /* 退出/解散房间时清空对局 */
+  function clearOnlineState() {
+    S = null;
+    UI.screen = 'setup';
+    UI.selectedCardId = null;
+    UI.animateSlotId = null;
+    UI.animateHandCardId = null;
+    SAVE_META = { statsRecorded: false, savedAt: 0 };
+    closeSheet(false);
+    render();
+  }
+
+  /* 回到设置页（联机返回首页也走这里） */
+  function showSetup() {
+    UI.screen = 'setup';
+    UI.selectedCardId = null;
+    closeSheet(false);
+    render();
+  }
+
+  /* 提交规则引擎的新状态，统一处理动画、存档、同步与弹层 */
   function commit(next, opts) {
     opts = opts || {};
     var previousPhase = S ? S.phase : null;
+    var online = !!next && next.mode === 'online';
+    var nextHand = online ? F.handForSeat(next, mySeat()) : next.hand;
     var keepSelection = opts.keepSelection && UI.selectedCardId &&
-      next.hand.indexOf(UI.selectedCardId) >= 0 ? UI.selectedCardId : null;
+      nextHand.indexOf(UI.selectedCardId) >= 0 ? UI.selectedCardId : null;
     S = next;
     UI.selectedCardId = keepSelection;
     UI.animateSlotId = opts.animateSlotId || null;
@@ -1668,33 +2317,60 @@
     closeSheet(false);
     render();
 
-    var willOpen = opts.prompt !== false && (
-      (S.phase === 'refill' && previousPhase !== 'refill') ||
-      (S.phase === 'stuck' && previousPhase !== 'stuck') ||
-      ((S.phase === 'won' || S.phase === 'lost') && previousPhase !== S.phase)
-    );
-
-    if (opts.toast && !willOpen) toast(opts.toast, opts.tone);
-
-    if (opts.prompt !== false) {
-      if (S.phase === 'refill' && previousPhase !== 'refill') {
-        openSheet('refill');
-      } else if (S.phase === 'stuck' && previousPhase !== 'stuck') {
-        openSheet('stuck');
-      } else if ((S.phase === 'won' || S.phase === 'lost') && previousPhase !== S.phase) {
-        openSheet('result');
+    if (online && !opts.skipOnlinePush) {
+      if (S.phase === 'won' || S.phase === 'lost') {
+        if (typeof window._olEndGame === 'function') window._olEndGame();
+      } else if (typeof window._olPushState === 'function') {
+        window._olPushState();
       }
     }
+
+    var meAct = !online || myTurn();
+    var opened = null;
+    if (S.phase === 'won' || S.phase === 'lost') {
+      if (previousPhase !== S.phase) opened = 'result';
+    } else if (online && S.phase === 'lifeboat' && previousPhase !== 'lifeboat') {
+      opened = 'lifeboat';
+    } else if (meAct && S.phase === 'refill' && previousPhase !== 'refill') {
+      opened = 'refill';
+    } else if (meAct && S.phase === 'stuck' && previousPhase !== 'stuck') {
+      opened = 'stuck';
+    } else if (online && S.phase === 'radio' && previousPhase !== 'radio' &&
+      S.pending && S.pending.toSeat === mySeat()) {
+      opened = 'radioSupply';
+    }
+
+    var willOpen = opts.prompt !== false && !!opened;
+    if (opts.toast && !willOpen) toast(opts.toast, opts.tone);
+    if (opened) openSheet(opened);
   }
 
   /* 选中或取消选中一张手牌 */
   function selectHand(cardId) {
     if (!S) return;
+    if (isOnline() && S.phase === 'lifeboat') {
+      if (myHand().indexOf(cardId) < 0) return;
+      if (!canSeatActNow(mySeat())) {
+        toast('当前不能选择救生艇手牌。', 'warn');
+        return;
+      }
+      if (UI.sheet && UI.sheet.type === 'lifeboat') {
+        UI.sheet.cardId = cardId;
+        renderSheet('[data-action="lifeboat-card"][data-card="' + cardId + '"]');
+      } else {
+        openSheet('lifeboat', { cardId: cardId });
+      }
+      return;
+    }
     if (S.phase !== 'place') {
       toast(phaseHint(), 'warn');
       return;
     }
-    if (S.hand.indexOf(cardId) < 0) return;
+    if (isOnline() && !myTurn()) {
+      toast('等待 ' + currentPlayerName() + ' 放置。', 'warn');
+      return;
+    }
+    if (myHand().indexOf(cardId) < 0) return;
     UI.selectedCardId = UI.selectedCardId === cardId ? null : cardId;
     render();
     if (UI.selectedCardId) {
@@ -1710,6 +2386,10 @@
     if (!S) return;
     if (S.phase !== 'place') {
       toast(phaseHint(), 'warn');
+      return;
+    }
+    if (isOnline() && !myTurn()) {
+      toast('等待 ' + currentPlayerName() + ' 放置。', 'warn');
       return;
     }
     var slot = F.slotById(S, slotId);
@@ -1740,6 +2420,11 @@
   /* 确认放置 */
   function confirmPlacement() {
     if (!UI.sheet || UI.sheet.type !== 'confirm') return;
+    if (isOnline() && !myTurn()) {
+      closeSheet();
+      toast('等待 ' + currentPlayerName() + ' 放置。', 'warn');
+      return;
+    }
     var card = F.getCard(UI.sheet.cardId);
     var slot = F.slotById(S, UI.sheet.slotId);
     var wasWisdom = !!S.wisdom;
@@ -1761,6 +2446,10 @@
       toast(phaseHint(), 'warn');
       return;
     }
+    if (isOnline() && !myTurn()) {
+      toast('等待 ' + currentPlayerName() + ' 补牌。', 'warn');
+      return;
+    }
     var card = F.getCard(cardId);
     var result = F.chooseSupply(S, cardId);
     if (!result.ok) {
@@ -1771,6 +2460,106 @@
       animateHandCardId: cardId,
       toast: '补入一张' + colorName(card.color) + '色卡牌 · 第 ' + result.state.turn + ' 回合'
     });
+  }
+
+  /* 无线电广播：取走目标玩家手牌 */
+  function applyRadio() {
+    if (!UI.sheet || UI.sheet.type !== 'radio') return;
+    if (!isOnline()) return;
+    if (!UI.sheet.toSeat || !UI.sheet.cardId) {
+      toast('先选择一位队友和一张手牌。', 'warn');
+      return;
+    }
+    var keptName = cardName(UI.sheet.cardId);
+    var target = playerOf(UI.sheet.toSeat);
+    var result = F.useRadio(S, UI.sheet.toSeat, UI.sheet.cardId);
+    if (!result.ok) {
+      toast(result.message || '无法使用无线电广播。', 'warn');
+      return;
+    }
+    commit(result.state, {
+      toast: '取走 ' + keptName + ' · 等待 ' +
+        (target ? target.name : '队友') + ' 从供应堆补牌'
+    });
+  }
+
+  /* 无线电广播：被取牌玩家补供应堆 */
+  function applyRadioSupply(cardId) {
+    if (!isOnline() || S.phase !== 'radio' || !S.pending) return;
+    var result = F.chooseRadioSupply(S, mySeat(), cardId);
+    if (!result.ok) {
+      toast(result.message || '无法补牌。', 'warn');
+      return;
+    }
+    var card = F.getCard(cardId);
+    commit(result.state, {
+      animateHandCardId: cardId,
+      toast: '无线电补入一张' + colorName(card.color) + '色卡牌'
+    });
+  }
+
+  /* 救生艇：进入全员暗选阶段 */
+  function startLifeboat() {
+    if (!isOnline()) return;
+    if (!myTurn()) {
+      toast('等待 ' + currentPlayerName() + ' 使用物品。', 'warn');
+      return;
+    }
+    var result = F.useLifeboat(S);
+    if (!result.ok) {
+      toast(result.message || '无法使用救生艇。', 'warn');
+      return;
+    }
+    commit(result.state, { prompt: false, toast: '救生艇下水 · 请选择一张手牌' });
+    openSheet('lifeboat');
+  }
+
+  /* 救生艇：确认自己暗选的手牌 */
+  function confirmLifeboatPick() {
+    if (!UI.sheet || UI.sheet.type !== 'lifeboat') return;
+    if (!UI.sheet.cardId) {
+      toast('先选择一张手牌。', 'warn');
+      return;
+    }
+    var result = F.lifeboatPick(S, mySeat(), UI.sheet.cardId);
+    if (!result.ok) {
+      toast(result.message || '无法选择救生艇手牌。', 'warn');
+      return;
+    }
+    var stillWaiting = result.state.phase === 'lifeboat';
+    commit(result.state, {
+      prompt: false,
+      toast: stillWaiting ? '已选择救生艇手牌 · 等待队友' : '救生艇传牌完成'
+    });
+  }
+
+  /* 救生艇：收齐全员暗选后由当前玩家结算（online.js 调用） */
+  function completeLifeboat() {
+    if (!isOnline() || !S || S.phase !== 'lifeboat') return false;
+    var result = F.completeLifeboat(S, mySeat());
+    if (!result.ok) return false;
+    commit(result.state, {
+      prompt: false,
+      skipOnlinePush: true,
+      toast: null
+    });
+    toast('救生艇传牌完成 · 每人收到左手边的牌');
+    return true;
+  }
+
+  /* 罐头食品：跳过本回合 */
+  function applyCanned() {
+    if (!isOnline()) return;
+    if (!myTurn()) {
+      toast('等待 ' + currentPlayerName() + ' 使用物品。', 'warn');
+      return;
+    }
+    var result = F.useCanned(S);
+    if (!result.ok) {
+      toast(result.message || '无法使用罐头食品。', 'warn');
+      return;
+    }
+    commit(result.state, { toast: '罐头食品 · 跳过本回合' });
   }
 
   /* 使用因纽特智慧 */
@@ -1848,7 +2637,12 @@
 
   /* 确认宣告失败 */
   function declareLoss() {
-    var result = F.declareLoss(S);
+    if (isOnline() && !myTurn()) {
+      closeSheet();
+      toast('等待 ' + currentPlayerName() + ' 决定。', 'warn');
+      return;
+    }
+    var result = F.declareLoss(S, isOnline() ? mySeat() : undefined);
     if (!result.ok) {
       toast(result.message || '无法宣告失败。', 'warn');
       return;
@@ -1863,6 +2657,44 @@
     if (!hasUnused(type)) {
       toast(F.ITEM_NAME[type] + '已经用过了。', 'warn');
       return;
+    }
+    if (isOnline()) {
+      if (!myTurn()) {
+        toast('等待 ' + currentPlayerName() + ' 使用物品。', 'warn');
+        return;
+      }
+      if (type === 'radio') {
+        if (S.phase !== 'refill') {
+          toast('无线电广播要在补牌阶段使用。', 'warn');
+          return;
+        }
+        if (!F.canUseRadio(S)) {
+          toast(S.supply.length ? '需要一位有手牌的队友。' : '供应堆为空。', 'warn');
+          return;
+        }
+        openSheet('radio', { toSeat: null, cardId: null });
+        return;
+      }
+      if (type === 'lifeboat') {
+        if (S.phase !== 'place' && S.phase !== 'stuck') {
+          toast(phaseHint(), 'warn');
+          return;
+        }
+        if (!F.canUseLifeboat(S)) {
+          toast('需要所有玩家都有手牌。', 'warn');
+          return;
+        }
+        openSheet('lifeboatIntro');
+        return;
+      }
+      if (type === 'canned') {
+        if (S.phase !== 'place' && S.phase !== 'stuck') {
+          toast(phaseHint(), 'warn');
+          return;
+        }
+        openSheet('canned');
+        return;
+      }
     }
     if (type === 'inuit') {
       if (S.wisdom) {
@@ -1959,6 +2791,10 @@
   var ACTIONS = {
     diff: function (el) { updateDifficulty(el.getAttribute('data-diff')); },
     start: function () { openSheet('voyage'); },
+    'online-lobby': function () {
+      if (typeof window.showOnlineLobby === 'function') window.showOnlineLobby();
+      else toast('联机模块未加载，请刷新重试。', 'warn');
+    },
     'voyage-start': function () {
       if (S) openSheet('overwrite');
       else startNewGame({ difficulty: PREFS.difficulty });
@@ -1993,10 +2829,14 @@
     'confirm-place': function () { confirmPlacement(); },
     'supply-card': function () {
       if (S.phase === 'refill') openSheet('refill');
+      else if (isOnline() && S.phase === 'radio' && S.pending &&
+        S.pending.toSeat === mySeat()) openSheet('radioSupply');
       else toast('补牌时从供应堆 3 张中选 1 张，牌背只显示颜色。');
     },
     'open-refill': function () {
       if (S.phase === 'refill') openSheet('refill');
+      else if (isOnline() && S.phase === 'radio' && S.pending &&
+        S.pending.toSeat === mySeat()) openSheet('radioSupply');
       else toast('现在不是补牌阶段。', 'warn');
     },
     'choose-supply': function (el) { chooseSupply(el.getAttribute('data-card')); },
@@ -2004,10 +2844,63 @@
       openInuitOption(el.getAttribute('data-card'), el.getAttribute('data-slot'));
     },
     'use-inuit': function () { activateInuit(); },
-    item: function (el) { handleItem(el.getAttribute('data-type')); },
+    item: function (el) {
+      var itemId = el.getAttribute('data-item');
+      if (itemId && S && S.items) {
+        var picked = null;
+        S.items.forEach(function (it) { if (it.id === itemId) picked = it; });
+        if (picked && !picked.used) {
+          var rest = S.items.filter(function (it) { return it !== picked; });
+          for (var i = 0; i < rest.length; i++) {
+            if (rest[i].type === picked.type && !rest[i].used) {
+              rest.splice(i, 0, picked);
+              S.items = rest;
+              break;
+            }
+          }
+        }
+      }
+      handleItem(el.getAttribute('data-type'));
+    },
     'stuck-inuit': function () { openSheet('inuit'); },
     'stuck-sled': function () { openSheet('sled', { handId: null, supplyId: null }); },
     'stuck-log': function () { openSheet('log', { slotId: null, cardId: null }); },
+    'stuck-lifeboat': function () { openSheet('lifeboatIntro'); },
+    'stuck-canned': function () { openSheet('canned'); },
+    'radio-target': function (el) {
+      if (!UI.sheet || UI.sheet.type !== 'radio') return;
+      UI.sheet.toSeat = Number(el.getAttribute('data-seat'));
+      UI.sheet.cardId = null;
+      renderSheet('[data-action="radio-target"][data-seat="' + UI.sheet.toSeat + '"]');
+    },
+    'radio-card': function (el) {
+      if (!UI.sheet || UI.sheet.type !== 'radio') return;
+      var cardId = el.getAttribute('data-card');
+      UI.sheet.cardId = UI.sheet.cardId === cardId ? null : cardId;
+      renderSheet('[data-action="radio-card"][data-card="' + cardId + '"]');
+    },
+    'radio-confirm': function () { applyRadio(); },
+    'radio-supply': function (el) { applyRadioSupply(el.getAttribute('data-card')); },
+    'lifeboat-start': function () { startLifeboat(); },
+    'lifeboat-card': function (el) {
+      if (!UI.sheet || UI.sheet.type !== 'lifeboat') return;
+      var cardId = el.getAttribute('data-card');
+      UI.sheet.cardId = UI.sheet.cardId === cardId ? null : cardId;
+      renderSheet('[data-action="lifeboat-card"][data-card="' + cardId + '"]');
+    },
+    'lifeboat-confirm': function () { confirmLifeboatPick(); },
+    'open-lifeboat': function () {
+      if (isOnline() && S.phase === 'lifeboat') openSheet('lifeboat');
+      else toast('现在不是救生艇阶段。', 'warn');
+    },
+    'canned-confirm': function () { applyCanned(); },
+    'result-room': function () {
+      if (typeof window._olReturnToWaiting === 'function') window._olReturnToWaiting();
+    },
+    'exit-room': function () {
+      if (typeof window.exitOnlineRoom === 'function') window.exitOnlineRoom();
+    },
+    noop: function () {},
     'sled-hand': function (el) {
       UI.sheet.handId = el.getAttribute('data-card');
       renderSheet('[data-action="sled-hand"][data-card="' + UI.sheet.handId + '"]');
@@ -2090,7 +2983,7 @@
   function init() {
     loadPrefs();
     loadStats();
-    loadSave();
+    if (!window.FROZEN_ONLINE_ONLY) loadSave();
     if (S) {
       maybeRecordResult();
       saveGame();
@@ -2120,6 +3013,18 @@
       return true;
     },
     openSheet: openSheet,
-    closeSheet: closeSheet
+    closeSheet: closeSheet,
+    render: function () { render(); },
+    showSetup: showSetup,
+    startOnlineGame: startOnlineGame,
+    applyOnlineState: applyOnlineState,
+    clearOnlineState: clearOnlineState,
+    completeLifeboat: completeLifeboat,
+    getOnlineState: function () { return S; },
+    getPlayers: function () { return S && S.players ? S.players : []; },
+    getCurrentPlayer: function () { return S ? S.currentSeat : 0; },
+    getPlayerColors: function () {
+      return (S && S.players ? S.players : []).map(function (p) { return seatColor(p.seat); });
+    }
   };
 })();

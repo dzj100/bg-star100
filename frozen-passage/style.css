@@ -385,8 +385,8 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
 .game-screen {
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  grid-template-areas: "top" "info" "main" "hand";
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "info" "team" "main" "hand";
   overflow: hidden;
 }
 .topbar {
@@ -777,6 +777,115 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
   position: absolute; top: 2px; right: 3px;
   font-size: 6.5px; letter-spacing: .02em; color: var(--muted);
 }
+.items-grid { flex-wrap: wrap; }
+.items-grid .item-token { flex: 1 1 calc(33.333% - 4px); min-width: 54px; }
+
+/* ---------------- 联机：队友与共享物品 ---------------- */
+.team-bar {
+  grid-area: team;
+  width: calc(100% - 20px);
+  max-width: 1100px;
+  margin: 4px auto 0;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 0 2px 2px;
+  scrollbar-width: none;
+}
+.team-bar::-webkit-scrollbar { display: none; }
+.team-row {
+  flex: 1 1 auto;
+  min-width: 118px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85);
+}
+.team-row.is-current { border-color: rgba(23, 104, 181, .38); background: #f4faff; }
+.team-row.is-target { border-color: rgba(162, 98, 12, .42); background: #fffaf0; }
+.team-dot {
+  flex: none;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .9);
+}
+.team-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10px; font-weight: 700; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.team-status {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(23, 104, 181, .08);
+  color: var(--ice-strong);
+  font-size: 8px; white-space: nowrap;
+}
+.team-status.is-ready { background: rgba(47, 143, 107, .12); color: #2f7d5d; }
+.team-status.is-current { background: rgba(23, 104, 181, .12); }
+.team-backs {
+  flex: none;
+  display: flex; align-items: center; gap: 2px;
+  margin-left: auto;
+  min-height: 11px;
+}
+.team-back {
+  width: 7px; height: 11px;
+  border: 1px solid var(--c-border);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .35) 0 1px, transparent 1px 3px),
+    linear-gradient(160deg, var(--c2), var(--c1) 88%);
+}
+
+/* 联机手牌标签与等待态 */
+.hand-label {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  max-width: 560px;
+  margin: 0 auto 5px;
+  padding: 0 2px;
+  font-size: 9px; letter-spacing: .08em; color: var(--muted);
+}
+.hand-label span:last-child { color: var(--ice-strong); }
+.hand-card.is-waiting { opacity: .5; cursor: default; }
+.hand-card.is-waiting:active { transform: none; }
+
+/* 联机弹层补充 */
+.option-list { display: flex; flex-direction: column; gap: 0; }
+.option-row.is-picked {
+  border-color: rgba(23, 104, 181, .44);
+  background: #f2f9ff;
+  box-shadow: inset 3px 0 0 rgba(23, 104, 181, .55);
+}
+.rescue-row.is-ready {
+  border-color: rgba(47, 143, 107, .34);
+  background: #f4fbf7;
+}
+.tag.is-ok {
+  border-color: rgba(47, 143, 107, .34);
+  background: rgba(47, 143, 107, .1);
+  color: #2f7d5d;
+}
+.menu-row.is-danger { color: #a1302a; border-color: rgba(196, 60, 52, .28); }
+.menu-row.is-danger .menu-icon { color: #c43c34; }
+.log-who { color: var(--ice-strong); font-weight: 700; }
+.info-bar.is-danger { cursor: pointer; }
+.mini-btn.is-danger { color: #a1302a; border-color: rgba(196, 60, 52, .32); background: #fff6f4; }
+
+@media (max-width: 560px) {
+  .team-row { min-width: 110px; gap: 3px; padding: 3px 5px 4px; }
+  .team-name { font-size: 9.5px; }
+  .team-status { font-size: 7.5px; }
+  .items-grid .item-token { flex-basis: calc(33.333% - 4px); }
+  .hand-label { padding: 0 10px; }
+}
+
 
 /* ---------------- 手牌 ---------------- */
 .hand-dock {
@@ -1018,6 +1127,13 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
   background: linear-gradient(160deg, var(--c2), var(--c1) 86%);
   color: var(--c-ink); font-size: 18px; font-weight: 800;
 }
+.pick-card.is-back .pick-inner {
+  font-size: 14px; opacity: .82;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .28) 0 2px, transparent 2px 7px),
+    linear-gradient(160deg, var(--c2), var(--c1) 86%);
+}
+.pick-legend { margin: 6px 0 0; font-size: 10px; color: var(--muted); }
 .pick-card.is-picked { transform: translateY(-4px); filter: drop-shadow(0 0 9px var(--c-glow)); }
 .pick-card.is-invalid { opacity: .3; }
 .pick-card:disabled { cursor: not-allowed; }
@@ -1422,8 +1538,8 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
   }
   .game-screen {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "top top" "info info" "main hand";
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "top top" "info info" "team team" "main hand";
   }
   .topbar { padding: calc(2px + var(--safe-top)) 10px 2px; grid-template-columns: 34px minmax(0, 1fr) auto; }
   .icon-btn { width: 32px; height: 32px; flex-basis: 32px; }

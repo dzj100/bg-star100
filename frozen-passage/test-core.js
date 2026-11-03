@@ -855,6 +855,657 @@ test('损坏存档与错误版本返回 null', function () {
   assert.strictEqual(FP.deserialize({ version: 999 }), null);
 });
 
+/* ================= 联机模式 ================= */
+
+function online(names, seed, difficulty) {
+  return FP.createOnlineGame({
+    seed: seed == null ? 2024 : seed,
+    difficulty: difficulty || 'novice',
+    names: names || ['阿冰', '小航']
+  });
+}
+
+function assertSorted(hand, label) {
+  for (var i = 1; i < hand.length; i++) {
+    var prev = FP.CARDS[hand[i - 1]];
+    var cur = FP.CARDS[hand[i]];
+    assert.ok(prev.number < cur.number ||
+      (prev.number === cur.number && FP.COLORS.indexOf(prev.color) < FP.COLORS.indexOf(cur.color)),
+      (label || '') + ' 手牌未升序：' + hand.join(','));
+  }
+}
+
+function assertMirror(s) {
+  assert.deepStrictEqual(s.players[s.currentSeat].hand, s.hand, 'hand 应镜像当前玩家手牌');
+  assertSorted(s.hand, '当前玩家');
+}
+
+function seatHands(s) {
+  return s.players.map(function (p) { return p.hand.slice(); });
+}
+
+function cardCount(s) {
+  var all = s.supply.concat(s.draw);
+  s.players.forEach(function (p) { all = all.concat(p.hand); });
+  return all;
+}
+
+/* 让 r2-2 成为唯一空位，且必须大于 6 才能落子（用于 stuck 场景） */
+function makeStuckBoard(s) {
+  s.board.slots.forEach(function (slot) { slot.cardId = null; });
+  setGoals(s, ['blue', 'red', 'red', 'black', 'blue']);
+  put(s, 1, 1, 'blue-4');
+  put(s, 2, 1, 'blue-6');
+  put(s, 2, 2, 'black-7');
+  put(s, 3, 1, 'blue-5');
+  put(s, 3, 2, 'black-6');
+  put(s, 3, 3, 'black-9');
+  put(s, 4, 1, 'blue-3');
+  put(s, 4, 2, 'red-4');
+  put(s, 4, 3, 'black-5');
+  put(s, 4, 4, 'red-7');
+  put(s, 5, 1, 'blue-1');
+  put(s, 5, 2, 'red-5');
+  put(s, 5, 3, 'black-8');
+  put(s, 5, 4, 'blue-9');
+  put(s, 5, 5, 'red-9');
+}
+
+/* ---------------- 13. 联机开局与发牌 ---------------- */
+
+console.log('\n[13] 联机开局与发牌');
+
+test('联机开局人数必须是 2~4 人', function () {
+  assert.throws(function () { online(['独行者'], 1); });
+  assert.throws(function () { online(['A', 'B', 'C', 'D', 'E'], 1); });
+  assert.throws(function () { online([], 1); });
+});
+
+test('2/3/4 人发牌数量与 27 张拆分', function () {
+  var cases = [
+    { n: 2, hand: 4, draw: 16 },
+    { n: 3, hand: 3, draw: 15 },
+    { n: 4, hand: 3, draw: 12 }
+  ];
+  cases.forEach(function (c) {
+    var names = [];
+    for (var i = 0; i < c.n; i++) names.push('玩家' + i);
+    var s = online(names, 4321);
+    assert.strictEqual(s.mode, 'online');
+    assert.strictEqual(s.players.length, c.n);
+    s.players.forEach(function (p, i) {
+      assert.strictEqual(p.seat, i);
+      assert.strictEqual(p.hand.length, c.hand);
+      assertSorted(p.hand, '座位 ' + i);
+    });
+    assert.strictEqual(s.handLimit, c.hand);
+    assert.strictEqual(s.supply.length, 3);
+    assert.strictEqual(s.draw.length, c.draw);
+    var all = cardCount(s);
+    assert.strictEqual(all.length, 27);
+    assert.strictEqual(new Set(all).size, 27);
+    assert.strictEqual(s.board.slots.length, 15);
+    assert.strictEqual(s.board.goals.length, 5);
+    assertMirror(s);
+  });
+});
+
+test('先手由种子决定并可复现', function () {
+  var a = online(['阿冰', '小航', '老舵'], 9876);
+  var b = online(['阿冰', '小航', '老舵'], 9876);
+  assert.strictEqual(a.currentSeat, b.currentSeat);
+  assert.strictEqual(FP.stateHash(a), FP.stateHash(b), '同 seed + 同 names 应完全复现');
+  assert.ok(a.currentSeat >= 0 && a.currentSeat < 3);
+  assert.strictEqual(a.activeSeat, a.currentSeat);
+  assert.strictEqual(a.rev, 0);
+  assert.strictEqual(a.pending, null);
+  assert.strictEqual(a.players[a.currentSeat].hand.length, 3);
+  assertMirror(a);
+
+  var start = a.log.filter(function (e) { return e.type === 'start'; });
+  assert.strictEqual(start.length, 1, '开局日志记录先手');
+  assert.strictEqual(start[0].seat, a.currentSeat);
+  assert.strictEqual(start[0].name, a.players[a.currentSeat].name);
+
+  var seats = {};
+  for (var seed = 1; seed <= 40; seed++) seats[online(['A', 'B'], seed).currentSeat] = true;
+  assert.strictEqual(Object.keys(seats).length, 2, '先手不应固定');
+});
+
+test('联机从 12 张物品池中随机抽 3 张', function () {
+  var seenTypes = {};
+  for (var seed = 1; seed <= 120; seed++) {
+    var s = online(['A', 'B', 'C'], seed);
+    assert.strictEqual(s.items.length, 3);
+    assert.strictEqual(new Set(s.items.map(function (it) { return it.id; })).size, 3);
+    s.items.forEach(function (it) {
+      assert.ok(!it.used);
+      assert.ok(['inuit', 'sled', 'log', 'radio', 'lifeboat', 'canned'].indexOf(it.type) >= 0);
+      assert.ok(FP.ITEM_NAME[it.type] && FP.ITEM_DESC[it.type], it.type + ' 应有中文名与描述');
+      seenTypes[it.type] = true;
+    });
+  }
+  assert.strictEqual(Object.keys(seenTypes).length, 6, '多局之后 6 类物品都应能出现');
+});
+
+test('单人物品仍只抽 3 个且不含无线电/救生艇/罐头', function () {
+  for (var seed = 1; seed <= 200; seed++) {
+    var s = fresh('novice', seed);
+    assert.strictEqual(s.items.length, 3);
+    s.items.forEach(function (it) {
+      assert.ok(['inuit', 'sled', 'log'].indexOf(it.type) >= 0, '单人池不应出现 ' + it.type);
+    });
+  }
+});
+
+/* ---------------- 14. 座次轮转与操作权 ---------------- */
+
+console.log('\n[14] 座次轮转与操作权');
+
+test('放置 → 补牌 → 下一座位；turn 只在回合完成时 +1', function () {
+  var s = online(['A', 'B', 'C'], 314);
+  var seat = s.currentSeat;
+  var card = s.hand[0];
+  var r = FP.placeCard(s, card, 'r1-1');
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(s.phase, 'refill');
+  assert.strictEqual(s.turn, 1, '放置本身不推进 turn');
+  assert.strictEqual(s.currentSeat, seat, '补牌前仍是同一位玩家');
+  assert.strictEqual(s.hand.length, 2);
+  assertMirror(s);
+  assert.strictEqual(s.players[seat].hand.indexOf(card), -1);
+  assert.strictEqual(s.lastAction.seat, seat, '日志带座位');
+  assert.strictEqual(s.lastAction.name, s.players[seat].name, '日志带昵称');
+
+  var pick = s.supply[0];
+  var r2 = FP.chooseSupply(s, pick);
+  assert.ok(r2.ok, r2.message);
+  s = r2.state;
+  assert.strictEqual(s.turn, 2);
+  assert.strictEqual(s.currentSeat, (seat + 1) % 3);
+  assert.strictEqual(s.activeSeat, s.currentSeat);
+  assert.strictEqual(s.phase, 'place');
+  assert.strictEqual(s.players[seat].hand.length, 3);
+  assert.ok(s.players[seat].hand.indexOf(pick) >= 0);
+  assertMirror(s);
+
+  var refill = s.log.filter(function (e) { return e.type === 'refill'; })[0];
+  assert.strictEqual(refill.seat, seat);
+  assert.strictEqual(refill.name, s.players[seat].name);
+});
+
+test('供应堆为空时放置后直接轮到下一位', function () {
+  var s = online(['A', 'B'], 315);
+  s.supply = [];
+  s.draw = [];
+  var seat = s.currentSeat;
+  var r = FP.placeCard(s, s.hand[0], 'r1-1');
+  assert.ok(r.ok);
+  s = r.state;
+  assert.notStrictEqual(s.phase, 'refill');
+  assert.strictEqual(s.turn, 2);
+  assert.strictEqual(s.currentSeat, (seat + 1) % 2);
+  assertMirror(s);
+});
+
+test('操作权：普通阶段只有当前座位', function () {
+  var s = online(['A', 'B', 'C'], 316);
+  var seat = s.currentSeat;
+  assert.strictEqual(FP.actorSeat(s), seat);
+  assert.strictEqual(FP.canSeatAct(s, seat), true);
+  assert.strictEqual(FP.canSeatAct(s, (seat + 1) % 3), false);
+  assert.strictEqual(FP.canSeatAct(s, (seat + 2) % 3), false);
+
+  // handForSeat 返回副本，不影响引擎状态
+  var h = FP.handForSeat(s, (seat + 1) % 3);
+  assert.strictEqual(h.length, 3);
+  h.push('blue-1');
+  assert.strictEqual(s.players[(seat + 1) % 3].hand.length, 3);
+
+  // 补牌阶段仍只有当前玩家
+  s = FP.placeCard(s, s.hand[0], 'r1-1').state;
+  assert.strictEqual(s.phase, 'refill');
+  assert.strictEqual(FP.canSeatAct(s, seat), true);
+  assert.strictEqual(FP.canSeatAct(s, (seat + 1) % 3), false);
+
+  // 终局任何人都不可以操作
+  s.phase = 'lost';
+  assert.strictEqual(FP.canSeatAct(s, seat), false);
+  assert.strictEqual(FP.canSeatAct(s, 0), false);
+});
+
+test('非当前玩家不能放置/补牌/使用物品', function () {
+  var s = online(['A', 'B'], 317);
+  var seat = s.currentSeat;
+  var other = 1 - seat;
+  var otherHand = FP.handForSeat(s, other);
+
+  // 引擎始终代当前玩家行动，其他端由 canSeatAct 拦截
+  assert.strictEqual(FP.canSeatAct(s, other), false);
+  assert.strictEqual(s.hand.indexOf(otherHand[0]) >= 0, false, '当前玩家手牌里没有对方的牌');
+  var r = FP.placeCard(s, otherHand[0], 'r1-1');
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'hand');
+
+  // 补牌阶段非当前玩家不能用供应堆（操作权）
+  var s2 = FP.placeCard(s, s.hand[0], 'r1-1').state;
+  assert.strictEqual(s2.phase, 'refill');
+  assert.strictEqual(FP.canSeatAct(s2, other), false);
+});
+
+/* ---------------- 15. 联机物品：无线电 ---------------- */
+
+console.log('\n[15] 联机物品：无线电');
+
+test('无线电只在补牌阶段可用，供应堆为空时不可用', function () {
+  var s = online(['A', 'B'], 401);
+  setItems(s, ['radio']);
+  assert.strictEqual(s.phase, 'place');
+  assert.strictEqual(FP.canUseRadio(s), false);
+  assert.strictEqual(FP.useRadio(s, 0, 'blue-1').ok, false);
+
+  var seat = s.currentSeat;
+  s = FP.placeCard(s, s.hand[0], 'r1-1').state;
+  assert.strictEqual(FP.canUseRadio(s), true);
+  var to = 1 - seat;
+  var target = FP.handForSeat(s, to)[0];
+
+  var empty = Object.assign({}, s, { supply: [] });
+  assert.strictEqual(FP.canUseRadio(empty), false);
+
+  // 目标必须是有手牌的其他玩家
+  assert.strictEqual(FP.useRadio(s, seat, target).ok, false, '不能选自己');
+  var noHand = JSON.parse(JSON.stringify(s));
+  noHand.players[to].hand = [];
+  assert.strictEqual(FP.useRadio(noHand, to, target).ok, false);
+  assert.strictEqual(FP.canUseRadio(noHand), false);
+  assert.strictEqual(FP.useRadio(s, to, 'blue-1').ok, false, '不能拿不在目标手牌里的牌');
+});
+
+test('无线电完整流程：A 取 B 的牌 → B 从供应堆补 → 回合轮转', function () {
+  var s = online(['阿冰', '小航'], 402);
+  setItems(s, ['radio']);
+  var seat = s.currentSeat;
+  var to = 1 - seat;
+
+  s = FP.placeCard(s, s.hand[0], 'r1-1').state;
+  assert.strictEqual(s.phase, 'refill');
+  var aHand = s.players[seat].hand.length;
+  var bHand = s.players[to].hand.length;
+  var supplyBefore = s.supply.length;
+  var drawBefore = s.draw.length;
+  var targetCard = s.players[to].hand[0];
+  var supplyCard = s.supply[1];
+
+  var r = FP.useRadio(s, to, targetCard);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(s.phase, 'radio');
+  assert.strictEqual(s.currentSeat, seat, '本回合尚未结束');
+  assert.strictEqual(s.turn, 1);
+  assert.strictEqual(s.pending.type, 'radio');
+  assert.strictEqual(s.pending.fromSeat, seat);
+  assert.strictEqual(s.pending.toSeat, to);
+  assert.strictEqual(s.pending.cardId, targetCard);
+  assert.strictEqual(s.pending.stage, 'supply');
+  assert.strictEqual(s.activeSeat, to);
+  assert.strictEqual(s.players[to].hand.length, bHand - 1);
+  assert.strictEqual(s.players[seat].hand.length, aHand + 1);
+  assert.ok(s.players[seat].hand.indexOf(targetCard) >= 0);
+  assert.strictEqual(s.supply.length, supplyBefore, '取得阶段不动供应堆');
+  assertMirror(s);
+  assertSorted(s.players[seat].hand, 'A');
+
+  // 无线电补牌阶段：只有目标玩家可操作
+  assert.strictEqual(FP.canSeatAct(s, to), true);
+  assert.strictEqual(FP.canSeatAct(s, seat), false);
+  assert.strictEqual(FP.actorSeat(s), to);
+  assert.strictEqual(FP.chooseRadioSupply(s, seat, supplyCard).ok, false);
+  assert.strictEqual(FP.placeCard(s, s.hand[0], 'r2-1').ok, false, '无线电阶段不能放置');
+  assert.strictEqual(FP.useCanned(s).ok, false, '无线电阶段不能跳回合');
+  assert.strictEqual(FP.useInuit(s).ok, false);
+  assert.strictEqual(FP.useLifeboat(s).ok, false);
+
+  var r2 = FP.chooseRadioSupply(s, to, supplyCard);
+  assert.ok(r2.ok, r2.message);
+  s = r2.state;
+  assert.strictEqual(s.pending, null);
+  assert.ok(s.phase === 'place' || s.phase === 'stuck');
+  assert.strictEqual(s.currentSeat, (seat + 1) % 2, 'A 的回合结束并轮转');
+  assert.strictEqual(s.turn, 2);
+  assert.strictEqual(s.activeSeat, s.currentSeat);
+  assert.strictEqual(s.players[to].hand.length, bHand);
+  assert.ok(s.players[to].hand.indexOf(supplyCard) >= 0);
+  assert.strictEqual(s.supply.length, supplyBefore);
+  assert.strictEqual(s.draw.length, drawBefore - 1, '供应堆从抽牌堆补足');
+  assertMirror(s);
+  assert.strictEqual(FP.isOnline(s), true);
+});
+
+/* ---------------- 16. 联机物品：救生艇 ---------------- */
+
+console.log('\n[16] 联机物品：救生艇');
+
+test('救生艇要求所有玩家手牌非空', function () {
+  var s = online(['A', 'B', 'C'], 501);
+  setItems(s, ['lifeboat']);
+  assert.strictEqual(FP.canUseLifeboat(s), true);
+  var victim = JSON.parse(JSON.stringify(s));
+  victim.players[(s.currentSeat + 1) % 3].hand = [];
+  assert.strictEqual(FP.canUseLifeboat(victim), false);
+  assert.strictEqual(FP.useLifeboat(victim).ok, false);
+  assert.strictEqual(FP.useLifeboat(victim).code, 'hand');
+});
+
+test('救生艇完整流程：全员选牌 → 当前玩家结算 → 左手边收到牌', function () {
+  var s = online(['A', 'B', 'C'], 502);
+  setItems(s, ['lifeboat']);
+  var cur = s.currentSeat;
+  var n = 3;
+  var r = FP.useLifeboat(s);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(s.phase, 'lifeboat');
+  assert.strictEqual(s.activeSeat, -1);
+  assert.strictEqual(FP.actorSeat(s), -1);
+  assert.strictEqual(s.pending.type, 'lifeboat');
+  [0, 1, 2].forEach(function (seat) {
+    assert.strictEqual(s.pending.picks[seat], null);
+    assert.strictEqual(FP.canSeatAct(s, seat), true, '救生艇阶段全员可操作');
+  });
+  assert.strictEqual(FP.canSeatAct(s, 3), false);
+
+  var picks = {};
+  s.players.forEach(function (p, i) { picks[p.seat] = p.hand[i % p.hand.length]; });
+  var before = seatHands(s);
+
+  // 当前玩家先选，再由其他人选满（避免自动结算，走手动结算路径）
+  s = FP.lifeboatPick(s, cur, picks[cur]).state;
+  assert.strictEqual(s.phase, 'lifeboat');
+  assert.strictEqual(s.pending.picks[cur], picks[cur]);
+  assert.strictEqual(s.pending.picks[(cur + 1) % n], null, '不会替别人选');
+
+  // 只能选自己手牌中的牌
+  var foreign = (function () {
+    for (var i = 0; i < n; i++) {
+      if (i !== (cur + 1) % n) return picks[i];
+    }
+    return null;
+  })();
+  var bad = FP.lifeboatPick(s, (cur + 1) % n, foreign);
+  assert.strictEqual(bad.ok, false);
+  assert.strictEqual(bad.code, 'hand');
+
+  for (var i = 1; i < n; i++) {
+    var seat = (cur + i) % n;
+    var rr = FP.lifeboatPick(s, seat, picks[seat]);
+    assert.ok(rr.ok, rr.message);
+    s = rr.state;
+  }
+  assert.strictEqual(s.phase, 'lifeboat', '非当前玩家选完不会自动结算');
+
+  // 非当前玩家不能结算
+  var deny = FP.completeLifeboat(s, (cur + 1) % n);
+  assert.strictEqual(deny.ok, false);
+  assert.strictEqual(deny.code, 'seat');
+
+  var done = FP.completeLifeboat(s);
+  assert.ok(done.ok, done.message);
+  s = done.state;
+  assert.strictEqual(s.pending, null);
+  assert.strictEqual(s.activeSeat, s.currentSeat);
+  assert.strictEqual(s.currentSeat, cur, '救生艇后仍由当前玩家继续本回合');
+  assert.strictEqual(s.phase === 'place' || s.phase === 'stuck', true);
+
+  s.players.forEach(function (p, i) {
+    var expectIn = picks[(p.seat - 1 + n) % n];
+    assert.ok(p.hand.indexOf(expectIn) >= 0, '座位 ' + p.seat + ' 应收到左手边的牌 ' + expectIn);
+    assert.strictEqual(p.hand.indexOf(picks[p.seat]), -1, '自己选的牌已传出');
+    assert.strictEqual(p.hand.length, before[i].length);
+    assertSorted(p.hand, '座位 ' + p.seat);
+  });
+  assertMirror(s);
+
+  var twice = FP.completeLifeboat(s);
+  assert.strictEqual(twice.ok, false, '不能重复传牌');
+});
+
+test('救生艇：当前玩家最后选牌时自动结算', function () {
+  var s = online(['A', 'B'], 503);
+  setItems(s, ['lifeboat']);
+  var cur = s.currentSeat;
+  var other = 1 - cur;
+  s = FP.useLifeboat(s).state;
+  var a = s.players[cur].hand[0];
+  var b = s.players[other].hand[1];
+  s = FP.lifeboatPick(s, other, b).state;
+  var r = FP.lifeboatPick(s, cur, a);
+  assert.ok(r.ok);
+  s = r.state;
+  assert.strictEqual(s.pending, null, '自动完成');
+  assert.ok(s.players[cur].hand.indexOf(b) >= 0, '2 人局等价互换');
+  assert.ok(s.players[other].hand.indexOf(a) >= 0);
+});
+
+/* ---------------- 17. 罐头 / 卡住 / 判负 ---------------- */
+
+console.log('\n[17] 联机罐头与判负');
+
+test('罐头在放置阶段跳过回合（不放置不补牌）', function () {
+  var s = online(['A', 'B', 'C'], 601);
+  setItems(s, ['canned']);
+  var cur = s.currentSeat;
+  var before = seatHands(s);
+  var boardBefore = s.board.slots.map(function (x) { return x.cardId; });
+  var supplyBefore = s.supply.length;
+  var drawBefore = s.draw.length;
+
+  assert.strictEqual(FP.canUseCanned(s), true);
+  var r = FP.useCanned(s);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(FP.hasUnusedItem(s, 'canned'), false);
+  assert.strictEqual(s.items.filter(function (it) {
+    return it.type === 'canned' && it.used;
+  }).length, 1);
+  assert.strictEqual(s.currentSeat, (cur + 1) % 3);
+  assert.strictEqual(s.turn, 2);
+  assert.strictEqual(s.supply.length, supplyBefore);
+  assert.strictEqual(s.draw.length, drawBefore);
+  assert.deepStrictEqual(s.board.slots.map(function (x) { return x.cardId; }), boardBefore);
+  assert.deepStrictEqual(s.players[cur].hand, before[cur], '不放置也不补牌');
+  assertMirror(s);
+});
+
+test('罐头在卡住时可用并跳回合', function () {
+  var s = online(['A', 'B'], 602);
+  setItems(s, ['canned']);
+  var cur = s.currentSeat;
+  s.phase = 'stuck';
+  s.lossHint = true;
+  assert.strictEqual(FP.canUseCanned(s), true);
+  var r = FP.useCanned(s);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.notStrictEqual(s.phase, 'stuck');
+  assert.strictEqual(s.currentSeat, (cur + 1) % 2);
+  assert.strictEqual(s.turn, 2);
+  assertMirror(s);
+});
+
+test('无合法落点时轮到该玩家进入 stuck', function () {
+  var s = online(['A', 'B'], 603);
+  setItems(s, ['canned']);
+  var cur = s.currentSeat;
+  var next = 1 - cur;
+  makeStuckBoard(s);
+  s.players[next].hand = ['red-1', 'red-2', 'red-3', 'red-6'];
+  s.hand = s.players[cur].hand.slice();
+  s.phase = 'place';
+  s.supply = [];
+  s.draw = [];
+
+  var r = FP.useCanned(s);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(s.currentSeat, next);
+  assert.strictEqual(s.phase, 'stuck');
+  assert.strictEqual(s.lossHint, true);
+  assert.strictEqual(FP.hasAnyLegalPlacement(s), false);
+  // 救生艇仍需全员有手牌，但当前玩家已卡住：可以宣告失败
+  assert.strictEqual(FP.declareLoss(s, cur).ok, false, '非当前玩家不能宣告失败');
+  assert.ok(FP.declareLoss(s).ok);
+});
+
+test('手牌为空轮到该玩家时判负 no-hand', function () {
+  var s = online(['A', 'B'], 604);
+  var cur = s.currentSeat;
+  var next = 1 - cur;
+  s.players[next].hand = [];
+  s.hand = s.players[cur].hand.slice();
+  s.phase = 'refill';
+  var r = FP.chooseSupply(s, s.supply[0]);
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.strictEqual(s.currentSeat, next);
+  assert.strictEqual(s.phase, 'lost');
+  assert.strictEqual(s.lossReason, 'no-hand');
+});
+
+test('联机因纽特/雪橇/航海日志只作用于当前玩家', function () {
+  var s = online(['A', 'B'], 605);
+  setItems(s, ['inuit']);
+  var cur = s.currentSeat;
+  var other = 1 - cur;
+  var otherBefore = FP.handForSeat(s, other);
+
+  // 因纽特智慧：用手牌摆出“紧邻同数字”的落点
+  s.board.slots.forEach(function (slot) { slot.cardId = null; });
+  put(s, 1, 1, 'blue-4');
+  put(s, 2, 1, 'blue-5');
+  s.players[cur].hand = ['red-5', 'black-1', 'black-2', 'black-3'];
+  s.hand = s.players[cur].hand.slice();
+  s.phase = 'place';
+
+  assert.ok(FP.inuitPlacements(s).some(function (o) { return o.cardId === 'red-5'; }));
+  var u = FP.useInuit(s);
+  assert.ok(u.ok, u.message);
+  s = u.state;
+  assert.strictEqual(s.wisdom, true);
+  assert.deepStrictEqual(FP.handForSeat(s, other), otherBefore, '队友手牌不受影响');
+  assert.strictEqual(s.players[cur].hand.indexOf('red-5') >= 0, true);
+
+  s = FP.placeCard(s, 'red-5', 'r2-2').state;
+  assert.strictEqual(FP.slotByPos(s, 2, 2).cardId, 'red-5');
+  assert.deepStrictEqual(FP.handForSeat(s, other), otherBefore);
+
+  // 狗拉雪橇：作用于当前玩家手牌
+  var s2 = online(['A', 'B'], 606);
+  setItems(s2, ['sled']);
+  var c2 = s2.currentSeat;
+  var o2 = 1 - c2;
+  var o2Before = FP.handForSeat(s2, o2);
+  var handCard = s2.hand[0];
+  var supplyCard = s2.supply[0];
+  var sled = FP.useSled(s2, handCard, supplyCard);
+  assert.ok(sled.ok, sled.message);
+  s2 = sled.state;
+  assert.ok(s2.hand.indexOf(supplyCard) >= 0);
+  assert.strictEqual(s2.hand.indexOf(handCard), -1);
+  assert.deepStrictEqual(FP.handForSeat(s2, o2), o2Before);
+  assertMirror(s2);
+
+  // 航海日志：作用于共享棋盘
+  var s3 = online(['A', 'B'], 607);
+  setItems(s3, ['log']);
+  var c3 = s3.currentSeat;
+  s3.board.slots.forEach(function (slot) { slot.cardId = null; });
+  put(s3, 1, 1, 'blue-4');
+  var swapIn = null;
+  var swapOut = 'blue-4';
+  for (var i = 0; i < s3.players[c3].hand.length; i++) {
+    var id = s3.players[c3].hand[i];
+    if (FP.canPlace(s3, id, 'r1-1', { ignoreOccupied: true, requireUpperColor: true, wisdom: false }).ok) {
+      swapIn = id;
+      break;
+    }
+  }
+  assert.ok(swapIn, '应存在可换入的牌');
+  var lg = FP.useLog(s3, 'r1-1', swapIn);
+  assert.ok(lg.ok, lg.message);
+  s3 = lg.state;
+  assert.strictEqual(FP.slotByPos(s3, 1, 1).cardId, swapIn);
+  assert.ok(s3.players[c3].hand.indexOf(swapOut) >= 0);
+  assertMirror(s3);
+});
+
+/* ---------------- 18. 联机新鲜度与序列化 ---------------- */
+
+console.log('\n[18] 联机新鲜度与序列化');
+
+test('rev 随每次成功操作单调递增（含 lifeboatPick）', function () {
+  var s = online(['A', 'B', 'C'], 701);
+  setItems(s, ['radio', 'lifeboat']);
+  var revs = [s.rev];
+  var push = function (st) {
+    assert.ok(st.rev > revs[revs.length - 1], 'rev 应递增：' + revs[revs.length - 1] + ' → ' + st.rev);
+    revs.push(st.rev);
+    return st;
+  };
+
+  s = push(FP.placeCard(s, s.hand[0], 'r1-1').state);
+  s = push(FP.chooseSupply(s, s.supply[0]).state);
+  // 无线电（补牌 → 目标补 supply）
+  s = FP.placeCard(s, s.hand[0], 'r2-1').state;
+  var revBeforeRadio = s.rev;
+  var to = (s.currentSeat + 1) % 3;
+  s = push(FP.useRadio(s, to, s.players[to].hand[0]).state);
+  s = push(FP.chooseRadioSupply(s, to, s.supply[0]).state);
+  assert.ok(s.rev > revBeforeRadio);
+
+  // 救生艇：每个 pick 都递增
+  s = FP.useLifeboat(s).state;
+  var revBeforePicks = s.rev;
+  s.players.forEach(function (p) { s = push(FP.lifeboatPick(s, p.seat, p.hand[0]).state); });
+  assert.ok(s.rev >= revBeforePicks + 3);
+  for (var i = 1; i < revs.length; i++) assert.ok(revs[i] > revs[i - 1]);
+});
+
+test('联机状态 serialize / deserialize 往返，hand 镜像可重建', function () {
+  var s = online(['A', 'B', 'C'], 702, 'medium');
+  setItems(s, ['lifeboat']);
+  s = FP.placeCard(s, s.hand[0], 'r1-1').state;
+  s = FP.chooseSupply(s, s.supply[0]).state;
+  s = FP.useLifeboat(s).state;
+
+  var back = FP.deserialize(FP.serialize(s));
+  assert.ok(back);
+  assert.strictEqual(back.mode, 'online');
+  assert.strictEqual(back.players.length, 3);
+  assert.strictEqual(FP.stateHash(back), FP.stateHash(s));
+
+  // hand 镜像缺失时从 players 重建
+  var broken = JSON.parse(FP.serialize(s));
+  delete broken.hand;
+  var fixed = FP.deserialize(broken);
+  assert.ok(fixed);
+  assert.deepStrictEqual(fixed.hand, fixed.players[fixed.currentSeat].hand);
+});
+
+test('损坏的联机快照返回 null', function () {
+  var s = online(['A', 'B'], 703);
+  assert.strictEqual(FP.deserialize(Object.assign({}, s, { players: [] })), null);
+  assert.strictEqual(FP.deserialize(Object.assign({}, s, {
+    players: [{ seat: 0, name: 'A' }, { seat: 1, name: 'B', hand: [] }]
+  })), null);
+  assert.strictEqual(FP.deserialize(Object.assign({}, s, { currentSeat: 5 })), null);
+  assert.strictEqual(FP.deserialize(Object.assign({}, s, { rev: 'x' })), null);
+  var badCard = JSON.parse(JSON.stringify(s));
+  badCard.players[0].hand.push('purple-1');
+  assert.strictEqual(FP.deserialize(badCard), null);
+});
+
 /* ---------------- 汇总 ---------------- */
 
 console.log('\n————————————————');
