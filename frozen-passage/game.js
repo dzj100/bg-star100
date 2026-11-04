@@ -861,7 +861,10 @@
     sortHand(next);
     if (next.draw.length > 0) next.supply.push(next.draw.pop());
     syncHandToPlayer(next);
-    pushLog(next, { turn: next.turn, type: 'refill', cardId: cardId }, meta.seat);
+    /* 联机补牌只公开颜色：其他玩家不应从日志得知摸到了什么数字 */
+    pushLog(next, isOnline(next)
+      ? { turn: next.turn, type: 'refill', color: CARDS[cardId].color }
+      : { turn: next.turn, type: 'refill', cardId: cardId }, meta.seat);
     setLastAction(next, { type: 'refill', cardId: cardId, turn: next.turn }, meta.seat);
     bump(next);
     endTurn(next);
@@ -891,12 +894,20 @@
     next.draw.unshift(handCardId);
     markItemUsed(next, 'sled');
     syncHandToPlayer(next);
-    pushLog(next, {
-      turn: next.turn,
-      type: 'sled',
-      handCardId: handCardId,
-      supplyCardId: supplyCardId
-    }, meta.seat);
+    /* 联机日志只公开颜色：换回牌堆的手牌与摸走的供应堆牌都不应泄露数字 */
+    pushLog(next, isOnline(next)
+      ? {
+          turn: next.turn,
+          type: 'sled',
+          handColor: CARDS[handCardId].color,
+          supplyColor: CARDS[supplyCardId].color
+        }
+      : {
+          turn: next.turn,
+          type: 'sled',
+          handCardId: handCardId,
+          supplyCardId: supplyCardId
+        }, meta.seat);
     setLastAction(next, {
       type: 'sled',
       handCardId: handCardId,
@@ -1026,7 +1037,7 @@
       fromSeat: next.currentSeat,
       toSeat: toSeat,
       toName: t.name,
-      cardId: cardId
+      color: CARDS[cardId].color
     }, meta.seat);
     setLastAction(next, {
       type: 'radio',
@@ -1064,7 +1075,7 @@
       type: 'radio-refill',
       fromSeat: pending.fromSeat,
       toSeat: pending.toSeat,
-      cardId: cardId
+      color: CARDS[cardId].color
     }, meta.seat);
     setLastAction(next, {
       type: 'radio-refill',

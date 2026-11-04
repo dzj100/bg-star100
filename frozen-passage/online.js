@@ -67,6 +67,7 @@ let HOOK_getPlayers = null;        // () => Array<{seat?, name, hand}>
 let HOOK_getCurrentPlayer = null;  // () => number
 let HOOK_getPlayerColors = null;   // () => string[]
 let HOOK_showLanding = null;       // () => void
+let HOOK_dismissSheet = null;      // () => void，关闭游戏层底部弹层（结算后返回房间）
 let HOOK_waitingExtras = null;     // () => string，等候室难度卡（房主可选、成员只读）
 let HOOK_refreshWaitingExtras = null; // () => void，游戏侧自行就地刷新难度卡
 let HOOK_completeLifeboat = null;  // () => void，收齐全员暗选后执行交换并清空 pending
@@ -668,34 +669,35 @@ function _subscribeToRoom(roomId) {
 /**
  * 处理远端对局状态。
  * @param {object} row - rooms 行
- * @param {boolean} [force] - 权威重同步（跳过新鲜度过滤）
  */
-function _handleRemoteState(row, force) {
+function _handleRemoteState(row) {
   const state = row.state;
   if (!state) return;
 
   const remotePushId = state._pushId;
   if (remotePushId && _myPushedIds.has(remotePushId)) return;   // 自己的推送回声
+  if (remotePushId && remotePushId === _lastAppliedPushId) return;
 
-  if (!force) {
-    if (remotePushId && remotePushId === _lastAppliedPushId) return;
+  // rev 是本局唯一权威进度：任何路径（含轮询强制重同步）都不能用更旧的快照回滚本地。
+  // 轮询的 GET 可能在本端操作前发出、在推送落地后才返回，此时回包内容仍是旧进度，
+  // 若放行会把刚放置的牌滚回手牌、阶段退回放置前。
+  const local = _getState();
+  const sameGame = !!(local && local.seed === state.seed &&
+    typeof local.rev === 'number' && typeof state.rev === 'number');
+  if (sameGame && state.rev < local.rev) {
+    console.log('[online] ignore stale rev', state.rev, '<', local.rev);
+    return;
+  }
+  if (!sameGame) {
     const remoteTs = state._ts || 0;
     if (remoteTs && remoteTs < _lastAppliedTs - 3000) {
       console.log('[online] ignore stale ts', remoteTs, '<', _lastAppliedTs - 3000);
       return;
     }
-    // rev 新鲜度：本地已推进（本端刚操作）时不接受更旧的快照；
-    // 新一局（seed 变化）或本地已终局（准备回房间）时放行
-    const local = _getState();
-    if (local && _gameStarted && !_isTerminal(local) && local.seed === state.seed) {
-      const lo = _orderValue(local);
-      const ro = _orderValue(state);
-      if (lo > ro) {
-        console.log('[online] ignore stale rev', ro, '<', lo);
-        return;
-      }
-    }
   }
+
+  if (remotePushId) _lastAppliedPushId = remotePushId;
+  _lastAppliedTs = Math.max(_lastAppliedTs, state._ts || 0);
 
   _isReceiving = true;
   _gameStarted = true;
@@ -910,7 +912,7 @@ async function _resyncRoom() {
     } else if (room.status === 'finished') {
       _handleRemoteFinished(room, true);
     } else if (room.status === 'playing' && room.state) {
-      _handleRemoteState(room, true);
+      _handleRemoteState(room);
     } else if (room.status === 'waiting' && room.seats) {
       _renderWaitingIfChanged(room);
     }
@@ -1013,6 +1015,10 @@ function _switchToWaitingView() {
   _olCloseDialog();
   const em = document.getElementById('endModal');
   if (em && em.classList) em.classList.remove('show');
+  // 结算抽屉挂在 #app 外层，切回等候室时必须显式关闭
+  if (typeof HOOK_dismissSheet === 'function') {
+    try { HOOK_dismissSheet(); } catch (e) { /* ignore */ }
+  }
   _showLobbyView();
 }
 
@@ -1573,6 +1579,7 @@ function initOnline(hooks) {
   HOOK_getCurrentPlayer = hooks.getCurrentPlayer || null;
   HOOK_getPlayerColors = hooks.getPlayerColors || null;
   HOOK_showLanding = hooks.showLanding || null;
+  HOOK_dismissSheet = hooks.dismissSheet || null;
   HOOK_waitingExtras = hooks.waitingExtras || null;
   HOOK_refreshWaitingExtras = hooks.refreshWaitingExtras || null;
   HOOK_completeLifeboat = hooks.completeLifeboat || null;

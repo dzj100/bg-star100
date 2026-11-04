@@ -64,14 +64,11 @@
     selectedCardId: null,
     sheet: null,
     focusReturn: null,
-    animateSlotId: null,
-    animateHandCardId: null,
     sheetPlacement: null
   };
 
   var toastTimer = null;
   var routeTimer = null;
-  var animTimer = null;
 
   var setupScreen = document.getElementById('setupScreen');
   var gameScreen = document.getElementById('gameScreen');
@@ -447,6 +444,19 @@
     if (target && target.focus) {
       try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
     }
+  }
+
+  /*
+   * 一次性动效：渲染完成后才挂 class，动画结束即移除。
+   * 不写入渲染输出，因此后续重渲染不会让同一动画反复播放。
+   */
+  function animateOnce(el, cls) {
+    if (!el) return;
+    el.classList.add(cls);
+    el.addEventListener('animationend', function handler() {
+      el.classList.remove(cls);
+      el.removeEventListener('animationend', handler);
+    });
   }
 
   /* 打开底部弹层 */
@@ -956,7 +966,6 @@
       classes.push(view.legalMap[slot.id] ? 'is-legal' : 'is-illegal');
     }
     if (view.selected && PREFS.hints && view.supportMap[slot.id]) classes.push('is-support');
-    if (UI.animateSlotId === slot.id) classes.push('is-just-placed');
 
     var aria = posLabel(slot) + '，';
     if (card) {
@@ -1131,7 +1140,6 @@
       var classes = ['hand-card', 'color-' + card.color];
       if (UI.selectedCardId === id) classes.push('is-selected');
       if (PREFS.hints && canSelect && count === 0) classes.push('is-blocked');
-      if (UI.animateHandCardId === id) classes.push('is-new');
       if (isOnline() && !canSelect && !canLifeboatPick) classes.push('is-waiting');
       var aria = colorName(card.color) + ' ' + card.number;
       if (PREFS.hints && canSelect) aria += '，' + count + ' 个可放位置';
@@ -1168,7 +1176,11 @@
       var status = '';
       if (S.phase === 'lifeboat') {
         var picked = pending && pending.picks && pending.picks[p.seat];
-        status = '<span class="team-status' + (picked ? ' is-ready' : '') + '">' +
+        var pickedCard = picked ? F.getCard(picked) : null;
+        /* 已选牌只公开颜色：展示牌背色块，不显示数字 */
+        status = (pickedCard ? '<span class="team-back team-pick color-' + pickedCard.color +
+            '" aria-hidden="true"></span>' : '') +
+          '<span class="team-status' + (picked ? ' is-ready' : '') + '">' +
           (picked ? '已选' : '未选') + '</span>';
       } else if (pending && pending.type === 'radio' && pending.toSeat === p.seat) {
         status = '<span class="team-status is-ready">补牌中</span>';
@@ -1177,6 +1189,7 @@
       }
       return '<div class="team-row' + (p.seat === S.currentSeat ? ' is-current' : '') +
         (pending && pending.type === 'radio' && pending.toSeat === p.seat ? ' is-target' : '') +
+        '" data-seat="' + p.seat +
         '" aria-label="' + escapeHTML(p.name) + '，' + p.hand.length + ' 张手牌">' +
         '<span class="team-dot" style="background:' + seatColor(p.seat) + '"></span>' +
         '<span class="team-name">' + escapeHTML(p.name) + '</span>' +
@@ -1672,8 +1685,10 @@
     }
 
     var ready = target && sheet.cardId;
-    var preview = ready
-      ? '<p class="log-preview">取走这张牌加入手牌，' +
+    var pickedCard = ready ? F.getCard(sheet.cardId) : null;
+    var preview = pickedCard
+      ? '<p class="log-preview">取走 <span class="pick-color-tag color-' + pickedCard.color +
+        '">' + colorName(pickedCard.color) + '色牌</span> 加入手牌，' +
         escapeHTML(target.name) + ' 随后从供应堆补 1 张。之后轮到下一位玩家。</p>'
       : '<p class="sheet-note">先选择一位队友，再凭牌背选一张取走。取牌后你的回合结束。</p>';
 
@@ -1761,11 +1776,14 @@
 
     var statusRows = S.players.map(function (p) {
       var picked = picks[p.seat];
+      var pickedCard = picked ? F.getCard(picked) : null;
       var mine = p.seat === mySeat();
       return '<div class="rescue-row' + (picked ? ' is-ready' : '') + '">' +
         '<span class="team-dot" style="background:' + seatColor(p.seat) + '"></span>' +
         '<span class="rescue-text"><b>' + escapeHTML(p.name) + (mine ? '（你）' : '') + '</b><span>' +
           S.players.length + ' 人局 · 传给左手边</span></span>' +
+        (pickedCard ? '<span class="team-back team-pick color-' + pickedCard.color +
+          '" aria-hidden="true"></span>' : '') +
         '<span class="tag' + (picked ? ' is-ok' : '') + '">' + (picked ? '已选' : '未选') + '</span>' +
       '</div>';
     }).join('');
@@ -2115,6 +2133,12 @@
       card.number + '</i></span>';
   }
 
+  /* 联机日志只公开颜色的牌背 */
+  function miniColorCard(color) {
+    if (!color) return '';
+    return '<span class="log-card is-masked color-' + color + '" aria-hidden="true"><i>?</i></span>';
+  }
+
   /* 操作记录的一行 */
   function historyRow(entry, isLatest) {
     var mark = '';
@@ -2134,27 +2158,42 @@
       if (entry.newRoute) tags += '<span class="log-tag is-route">新航线</span>';
       if (entry.wisdom) tags += '<span class="log-tag">因纽特</span>';
     } else if (entry.type === 'refill') {
-      mark = miniLogCard(entry.cardId);
-      text = '补牌 · <b>' + cardName(entry.cardId) + '</b> 加入手牌';
+      if (isOnline()) {
+        var refillColor = entry.color || (F.getCard(entry.cardId) || {}).color;
+        mark = miniColorCard(refillColor);
+        text = '补牌 · <b>' + colorName(refillColor) + '色牌</b> 加入手牌';
+      } else {
+        mark = miniLogCard(entry.cardId);
+        text = '补牌 · <b>' + cardName(entry.cardId) + '</b> 加入手牌';
+      }
     } else if (entry.type === 'inuit') {
       mark = '<span class="log-item">' + ICONS.snowflake + '</span>';
       text = '使用 <b>因纽特智慧</b> · 本回合可同数字相邻';
     } else if (entry.type === 'sled') {
       mark = '<span class="log-item">' + ICONS.sled + '</span>';
-      text = '使用 <b>狗拉雪橇</b> · ' + cardName(entry.handCardId) + ' 回牌堆，' +
-        cardName(entry.supplyCardId) + ' 入手';
+      if (isOnline()) {
+        var sledHandColor = entry.handColor || (F.getCard(entry.handCardId) || {}).color;
+        var sledSupplyColor = entry.supplyColor || (F.getCard(entry.supplyCardId) || {}).color;
+        text = '使用 <b>狗拉雪橇</b> · ' + colorName(sledHandColor) + '色牌回牌堆，' +
+          colorName(sledSupplyColor) + '色牌入手';
+      } else {
+        text = '使用 <b>狗拉雪橇</b> · ' + cardName(entry.handCardId) + ' 回牌堆，' +
+          cardName(entry.supplyCardId) + ' 入手';
+      }
     } else if (entry.type === 'log') {
       mark = '<span class="log-item">' + ICONS.scroll + '</span>';
       var target = F.slotById(S, entry.slotId);
       text = '使用 <b>航海日志</b> · ' + cardName(entry.inCardId) + ' 替换 ' +
         cardName(entry.outCardId) + (target ? '（' + posLabel(target) + '）' : '');
     } else if (entry.type === 'radio') {
+      var radioColor = entry.color || (F.getCard(entry.cardId) || {}).color;
       mark = '<span class="log-item">' + ICONS.radio + '</span>';
-      text = '使用 <b>无线电广播</b> · 从 ' + playerName(entry.toSeat) + ' 取走 ' +
-        shortCard(entry.cardId);
+      text = '使用 <b>无线电广播</b> · 从 ' + playerName(entry.toSeat) + ' 取走 <b>' +
+        colorName(radioColor) + '色牌</b>';
     } else if (entry.type === 'radio-refill') {
-      mark = miniLogCard(entry.cardId);
-      text = '无线电补牌 · <b>' + cardName(entry.cardId) + '</b> 加入手牌';
+      var radioRefillColor = entry.color || (F.getCard(entry.cardId) || {}).color;
+      mark = miniColorCard(radioRefillColor);
+      text = '无线电补牌 · <b>' + colorName(radioRefillColor) + '色牌</b> 加入手牌';
     } else if (entry.type === 'lifeboat') {
       mark = '<span class="log-item">' + ICONS.lifeboat + '</span>';
       text = '使用 <b>救生艇</b> · 全员暗选一张手牌';
@@ -2288,8 +2327,6 @@
     SAVE_META = { statsRecorded: false, savedAt: Date.now() };
     UI.screen = 'game';
     UI.selectedCardId = null;
-    UI.animateSlotId = null;
-    UI.animateHandCardId = null;
     closeSheet(false);
     saveGame();
     render();
@@ -2327,8 +2364,6 @@
     S = F.createOnlineGame({ names: names, difficulty: difficulty });
     UI.screen = 'game';
     UI.selectedCardId = null;
-    UI.animateSlotId = null;
-    UI.animateHandCardId = null;
     closeSheet(false);
     render();
     var first = F.playerAt(S, S.currentSeat);
@@ -2340,6 +2375,12 @@
   function applyOnlineState(raw) {
     var next = F.deserialize(raw);
     if (!next || next.mode !== 'online') return false;
+    /* 兜底：同局快照的 rev 只增不减，旧回包不得回滚已渲染的进度 */
+    if (S && S.mode === 'online' && S.seed === next.seed &&
+      typeof S.rev === 'number' && typeof next.rev === 'number' && next.rev < S.rev) {
+      return false;
+    }
+    var prev = S;
     var prevPhase = S ? S.phase : null;
     var prevPending = S && S.pending ? S.pending.type : null;
     var my = mySeat();
@@ -2349,6 +2390,7 @@
       UI.selectedCardId = null;
     }
     render();
+    animateChanges(prev, next);
     syncOnlineSheet(prevPhase, prevPending, my);
     return true;
   }
@@ -2389,8 +2431,6 @@
     S = null;
     UI.screen = 'setup';
     UI.selectedCardId = null;
-    UI.animateSlotId = null;
-    UI.animateHandCardId = null;
     SAVE_META = { statsRecorded: false, savedAt: 0 };
     closeSheet(false);
     render();
@@ -2404,9 +2444,51 @@
     render();
   }
 
+  /* 取某局某座位的手牌（单人只有座位 0） */
+  function handOf(state, seat) {
+    if (!state) return [];
+    return state.mode === 'online' ? F.handForSeat(state, seat) : (state.hand || []);
+  }
+
+  /* 按前后快照差异补播动效：只在真正变化的那一步播放一次 */
+  function animateChanges(prev, next) {
+    if (!prev || !next || prev.mode !== next.mode) return;
+    var online = next.mode === 'online';
+    var my = online ? mySeat() : 0;
+
+    var prevHand = handOf(prev, my);
+    handOf(next, my).forEach(function (id) {
+      if (prevHand.indexOf(id) < 0) {
+        animateOnce(document.querySelector('.hand-card[data-card="' + id + '"]'), 'is-new');
+      }
+    });
+
+    var prevSlots = {};
+    prev.board.slots.forEach(function (s) { prevSlots[s.id] = s.cardId; });
+    next.board.slots.forEach(function (s) {
+      if (s.cardId && prevSlots[s.id] !== s.cardId) {
+        animateOnce(slotEl(s.id), 'is-just-placed');
+      }
+    });
+
+    if (prev.supply.join('|') !== next.supply.join('|')) {
+      animateOnce(document.querySelector('.supply-row'), 'is-updated');
+    }
+
+    if (!online) return;
+    next.players.forEach(function (p) {
+      if (p.seat === my) return;
+      if (handOf(prev, p.seat).slice().sort().join('|') !==
+        p.hand.slice().sort().join('|')) {
+        animateOnce(document.querySelector('.team-row[data-seat="' + p.seat + '"]'), 'is-updated');
+      }
+    });
+  }
+
   /* 提交规则引擎的新状态，统一处理动画、存档、同步与弹层 */
   function commit(next, opts) {
     opts = opts || {};
+    var prev = S;
     var previousPhase = S ? S.phase : null;
     var online = !!next && next.mode === 'online';
     var nextHand = online ? F.handForSeat(next, mySeat()) : next.hand;
@@ -2414,18 +2496,12 @@
       nextHand.indexOf(UI.selectedCardId) >= 0 ? UI.selectedCardId : null;
     S = next;
     UI.selectedCardId = keepSelection;
-    UI.animateSlotId = opts.animateSlotId || null;
-    UI.animateHandCardId = opts.animateHandCardId || null;
-    if (animTimer) clearTimeout(animTimer);
-    animTimer = setTimeout(function () {
-      UI.animateSlotId = null;
-      UI.animateHandCardId = null;
-    }, 700);
 
     maybeRecordResult();
     saveGame();
     closeSheet(false);
     render();
+    animateChanges(prev, next);
 
     if (online && !opts.skipOnlinePush) {
       if (S.phase === 'won' || S.phase === 'lost') {
@@ -2547,7 +2623,7 @@
     var message = '放下 ' + cardName(card.id) + ' · ' +
       (slot.row === 1 ? '航路起点' : (newRoute ? '另起' + colorName(card.color) + '色航线' : '接入同色航路'));
     if (wasWisdom) message += ' · 因纽特智慧';
-    commit(result.state, { animateSlotId: slot.id, toast: message });
+    commit(result.state, { toast: message });
   }
 
   /* 补牌阶段选择一张供应堆卡牌 */
@@ -2567,7 +2643,6 @@
       return;
     }
     commit(result.state, {
-      animateHandCardId: cardId,
       toast: '补入一张' + colorName(card.color) + '色卡牌 · 第 ' + result.state.turn + ' 回合'
     });
   }
@@ -2603,7 +2678,6 @@
     }
     var card = F.getCard(cardId);
     commit(result.state, {
-      animateHandCardId: cardId,
       toast: '无线电补入一张' + colorName(card.color) + '色卡牌'
     });
   }
@@ -2708,7 +2782,6 @@
     }
     commit(result.state, {
       prompt: false,
-      animateHandCardId: UI.sheet.supplyId,
       toast: '狗拉雪橇：换入一张' + colorName(supplyCard.color) + '色卡牌'
     });
     if (result.state.phase === 'stuck') {
@@ -2734,8 +2807,6 @@
     }
     commit(result.state, {
       prompt: false,
-      animateSlotId: UI.sheet.slotId,
-      animateHandCardId: outCardId,
       toast: '航海日志：换下 ' + cardName(outCardId)
     });
     if (result.state.phase === 'stuck') {

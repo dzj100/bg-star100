@@ -815,6 +815,9 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
 .slot.is-support .slot-inner { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .75), inset 0 -10px 20px rgba(8, 30, 50, .14); }
 .slot.is-flash { animation: flashSlot .45s ease-in-out 2; }
 .slot.is-just-placed .slot-inner { animation: placeIn .55s cubic-bezier(.2, .9, .2, 1); }
+.slot.is-just-placed { animation: slotLand .7s ease-out; }
+.supply-row.is-updated { animation: supplySwap .5s cubic-bezier(.2, .9, .2, 1); }
+.team-row.is-updated { animation: teamPulse .7s ease-out; }
 
 /* 颜色 */
 .color-blue {
@@ -1003,6 +1006,7 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
     repeating-linear-gradient(135deg, rgba(255, 255, 255, .35) 0 1px, transparent 1px 3px),
     linear-gradient(160deg, var(--c2), var(--c1) 88%);
 }
+.team-pick { flex: none; width: 8px; height: 12px; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
 
 /* 联机手牌标签与等待态 */
 .hand-label {
@@ -1295,6 +1299,22 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
 }
 .pick-legend { margin: 6px 0 0; font-size: 10px; color: var(--muted); }
 .pick-card.is-picked { transform: translateY(-4px); filter: drop-shadow(0 0 9px var(--c-glow)); }
+.pick-color-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .68);
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pick-color-tag::before {
+  content: '';
+  width: 7px; height: 7px; border-radius: 50%;
+  background: linear-gradient(160deg, var(--c2), var(--c1) 86%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08);
+}
 .pick-card.is-invalid { opacity: .3; }
 .pick-card:disabled { cursor: not-allowed; }
 .pick-supply {
@@ -1450,6 +1470,7 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
   color: var(--c-ink);
   font-style: normal; font-size: 10.5px; font-weight: 800;
 }
+.log-card.is-masked i { font-size: 9px; font-weight: 700; opacity: .7; }
 .log-item {
   width: 22px; height: 22px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1889,6 +1910,20 @@ body.is-playing .spark-c { bottom: 30%; left: 7%; }
 @keyframes cardIn {
   0% { transform: scale(.7) translateY(12px); opacity: 0; }
   60% { transform: scale(1.05) translateY(0); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes slotLand {
+  0% { filter: drop-shadow(0 0 0 rgba(162, 98, 12, 0)); }
+  35% { filter: drop-shadow(0 0 10px rgba(162, 98, 12, .55)); }
+  100% { filter: drop-shadow(0 0 0 rgba(162, 98, 12, 0)); }
+}
+@keyframes supplySwap {
+  0% { transform: translateY(5px); opacity: .35; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes teamPulse {
+  0% { transform: scale(.97); background-color: rgba(23, 104, 181, .14); }
+  60% { transform: scale(1.015); }
   100% { transform: scale(1); }
 }
 
