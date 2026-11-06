@@ -747,6 +747,23 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   line-height: 1.4;
 }
 
+/* #18 蝙蝠之友：回合揭示条 */
+.board-bat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -1px 0 8px;
+  padding: 5px 8px;
+  background: #eef4ff;
+  border: 1.5px solid #a9b8e0;
+  border-radius: 8px;
+  font-size: .7rem;
+  font-weight: 800;
+  color: #32407a;
+}
+.bat-title { font-size: .7rem; font-weight: 900; color: #2b3a78; letter-spacing: .04em; }
+
 /* ============================================================
    玩家行 / 手牌
    ============================================================ */
@@ -813,6 +830,35 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   padding: 5px 8px;
   font-weight: 800;
 }
+/* #17：匹诺曹徽章与提醒 */
+.liar-badge {
+  font-size: .66rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  border: 1px solid #b48ad8;
+  color: #6b2fa0;
+  font-weight: 800;
+}
+.liar-hint {
+  color: #6b2fa0;
+  background: #f7efff;
+  border: 1.5px dashed #b48ad8;
+  border-radius: 10px;
+  padding: 5px 8px;
+  font-weight: 800;
+}
+/* #18：蝙蝠之友回合归属徽章 */
+.bat-owner-badge {
+  font-size: .66rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  border: 1px solid #8fa4d8;
+  color: #32407a;
+  font-weight: 800;
+}
+.bat-bar .bar-title { color: #2b3a78; }
 
 /* 手牌：一份手牌占一行；一人多份时上下分行，行间虚线分隔 */
 .pr-shares, .own-shares { display: flex; flex-direction: column; }
@@ -1071,6 +1117,24 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   padding: 5px 8px;
 }
 .equip-chain.stopped { color: var(--text-dim); background: #f2ecdd; border-color: #cfc3a8; }
+/* #18：随回合自动触发的雷达（不可手动使用） */
+.equip-btn.bat-auto {
+  background: #eef4ff;
+  border-color: #8fa4d8;
+  color: #32407a;
+}
+.equip-btn.bat-auto .equip-tip { display: none; }
+/* #17：匹诺曹禁用道具提示 */
+.equip-liar-hint {
+  flex-basis: 100%;
+  font-size: .7rem;
+  font-weight: 800;
+  color: #6b2fa0;
+  background: #f7efff;
+  border: 1.5px dashed #b48ad8;
+  border-radius: 8px;
+  padding: 5px 8px;
+}
 
 /* ============================================================
    行动条 / 被动选择
@@ -1203,6 +1267,8 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 }
 .radar-chip.yes { background: #d9f0f3; color: #0d4a52; border-color: #4f959d; }
 .radar-chip.no { background: #ece9df; color: #8b8574; }
+.radar-panel.radar-bat { border-color: #8fa4d8; box-shadow: 0 2px 0 rgba(50, 64, 122, .12); }
+.radar-panel.radar-bat .radar-head { color: #2b3a78; }
 
 /* ============================================================
    对讲机交换结果面板

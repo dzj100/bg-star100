@@ -636,14 +636,20 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   g.openMissionSheet();
   const sheet = g.document.getElementById('sheetContent').innerHTML;
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 12 关');
+  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 15 关');
   includes(sheet, 'data-mission-id="7"', '抽屉应包含 #10');
   includes(sheet, 'data-mission-id="8"', '抽屉应包含 #11');
   includes(sheet, 'data-mission-id="9"', '抽屉应包含 #12');
   includes(sheet, 'data-mission-id="10"', '抽屉应包含 #13');
   includes(sheet, 'data-mission-id="11"', '抽屉应包含 #14');
   includes(sheet, 'data-mission-id="12"', '抽屉应包含 #15');
+  includes(sheet, 'data-mission-id="13"', '抽屉应包含 #16');
+  includes(sheet, 'data-mission-id="14"', '抽屉应包含 #17');
+  includes(sheet, 'data-mission-id="15"', '抽屉应包含 #18');
   includes(sheet, 'Новосибирск', '抽屉应包含 #15 名称');
+  includes(sheet, '这很合理', '抽屉应包含 #16 名称');
+  includes(sheet, '匹诺曹', '抽屉应包含 #17 名称');
+  includes(sheet, '蝙蝠之友', '抽屉应包含 #18 名称');
   includes(sheet, 'mi-tag current', '当前关卡应有标记');
   includes(sheet, '>#8<');
   includes(sheet, '最终测试');
@@ -3290,6 +3296,309 @@ await t('联机：加入成功直接使用 RPC 权威快照，不再本地追加
   const html = o.document.getElementById('online').innerHTML;
   eq((html.match(/class="setup-chip"/g) || []).length, 3,
     '等候室应显示 3 个席位（旧逻辑会把返回快照再加一次，变成 4 个）');
+});
+
+/* ──────────────────────────── #16 这很合理 ──────────────────────────── */
+
+await t('#16 这很合理：3 人局 51 张 / 1 红 + 黄 3选2 / 顺序门槛 4/4', () => {
+  const g = dealMission(13, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 13);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄（实际入库）');
+  eq(S.phase, 'mark', '本关正常进行开局标记');
+  eq(S.board.redNums.length, 1);
+  eq(S.board.yellowNums.length, 3, '抽出的 3 根黄线全部标到数轴');
+  const hand = handWireNums(g);
+  eq(hand.red.length, 1);
+  eq(hand.yellow.length, 2, '黄线只随机入库 2 根');
+  assert(subsetOf(hand.yellow, S.board.yellowNums), '入库黄线应来自候选');
+  eq(S.board.yellowMark, 'hollow');
+  eq(S.board.yellowNote, '3选2');
+  eq(S.board.orderNeed, 4, '前序须 4/4 公开');
+  eq(S.board.orderNums.length, 3);
+  assert(S.log.some(l => l.msg.includes('前一个数字公开 ≥4 根')), '日志应写明 4/4 门槛');
+});
+
+await t('#16 2 人局：54 张 / 2 红 + 4 黄全部入库', () => {
+  const g = dealMission(13, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 54, '48 蓝 + 2 红 + 4 黄');
+  eq(S.board.redNums.length, 2);
+  eq(S.board.yellowNums.length, 4);
+  const hand = handWireNums(g);
+  eq(hand.red.length, 2);
+  eq(hand.yellow.length, 4);
+  eq(S.board.orderNeed, 4);
+});
+
+await t('#16 前置 3/4 仍爆炸；4/4 后才可公开下一数字', () => {
+  const g = loadGame();
+  const f = [C('blue', 5, { revealed: true }), C('blue', 5, { revealed: true }), C('blue', 5, { revealed: true })];
+  const own10 = C('blue', 10), target10 = C('blue', 10);
+  const S = use(g, sc(2, [[[own10]], [[target10, ...f, C('blue', 4)]]], {
+    board: { orderNums: [5, 10, 3], orderNeed: 4 },
+  }));
+  const r = g.doPairCut(1, target10.id, { kind: 'blue', num: 10 }, own10.id);
+  assert(r.ok);
+  eq(S.result.reason, 'boom-order');
+  assert(!own10.revealed && !target10.revealed);
+  assert(S.log.some(l => l.msg.includes('须先公开 4 根蓝色 5')), '日志应写明 4 根门槛');
+
+  const g2 = loadGame();
+  const f2 = [C('blue', 5, { revealed: true }), C('blue', 5, { revealed: true }),
+    C('blue', 5, { revealed: true }), C('blue', 5, { revealed: true })];
+  const own10b = C('blue', 10), target10b = C('blue', 10);
+  const S2 = use(g2, sc(2, [[[own10b]], [[target10b, ...f2, C('blue', 4)]]], {
+    board: { orderNums: [5, 10, 3], orderNeed: 4 },
+  }));
+  const r2 = g2.doPairCut(1, target10b.id, { kind: 'blue', num: 10 }, own10b.id);
+  assert(r2.ok && r2.hit, '4/4 后应可公开');
+  assert(own10b.revealed && target10b.revealed);
+  eq(S2.result, null);
+});
+
+await t('#16 选关卡片：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(13).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#16 这很合理');
+  includes(html, '3 条黄导线（3选2）');
+  includes(html, '4/4');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 13 }));
+});
+
+/* ──────────────────────────── #17 匹诺曹 ──────────────────────────── */
+
+await t('#17 匹诺曹：3 人局 50 张 / 抽 3 红用 2 / 队长=匹诺曹 / 无标记阶段推进', () => {
+  const g = dealMission(14, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 14);
+  eq(boardTotals(g), 50, '48 蓝 + 2 红');
+  eq(S.phase, 'mark', '其余玩家正常标记');
+  eq(S.liarSeat, S.captainSeat, '队长为匹诺曹');
+  assert(S.noMarkSeats.indexOf(S.captainSeat) >= 0, '匹诺曹不能自行标记');
+  eq(S.ready[S.captainSeat], true, '匹诺曹视为已完成');
+  eq(S.board.redNums.length, 3);
+  eq(handWireNums(g).red.length, 2);
+  eq(S.board.redMark, 'hollow');
+  eq(S.board.redNote, '3选2');
+  eq(S.board.yellowNums.length, 0);
+  assert(S.log.some(l => l.msg.includes('匹诺曹') && l.msg.includes('2 个错误信息标记')), '应记录系统假标记');
+  assert(S.log.some(l => l.msg.includes('不能使用双重探测器') && l.msg.includes('道具')), '应记录技能/道具禁用');
+});
+
+await t('#17 匹诺曹：系统放置 2 个假标记，显示数字互异且不等于真实数字', () => {
+  const g = dealMission(14, ['A', 'B', 'C']);
+  const S = st(g);
+  const cap = S.players[S.captainSeat];
+  const fakes = [];
+  cap.shares.forEach(sh => sh.forEach(c => { if (c.info && c.info.fake) fakes.push(c); }));
+  eq(fakes.length, 2, '应恰好 2 个假标记');
+  fakes.forEach(c => {
+    eq(c.kind, 'blue');
+    assert(c.info.num >= 1 && c.info.num <= 12);
+    assert(c.info.num !== c.num, '显示数字不能等于真实数字');
+  });
+  assert(fakes[0].info.num !== fakes[1].info.num, '两个假数字应互不相同');
+  const all = S.players.flatMap(p => p.shares.flat());
+  eq(all.filter(c => c.info && !c.info.fake).length, 0, '系统中不应有其他信息标记');
+});
+
+await t('#17 2 人局：51 张 / 3 红全部入库', () => {
+  const g = dealMission(14, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 51, '48 蓝 + 3 红');
+  eq(S.board.redNums.length, 3);
+  eq(handWireNums(g).red.length, 3);
+});
+
+await t('#17 匹诺曹：双人剪线失误只公开猜测值，其他未命中公开真实身份', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7);
+  const target9 = C('blue', 9), extra = C('blue', 4);
+  const S = use(g, sc(2, [[[own7]], [[target9, extra]]], { current: 0 }));
+  S.liarSeat = 1;
+  const r = g.doPairCut(1, target9.id, { kind: 'blue', num: 7 }, own7.id);
+  assert(r.ok && !r.hit);
+  eq(target9.fail.type, 'blue');
+  eq(target9.fail.num, 7, '应显示被猜的数字');
+  assert(target9.fail.num !== target9.num, '不应泄露真实数字');
+  assert(S.log.some(l => l.msg.includes('匹诺曹') && l.msg.includes('按猜测显示')), '日志应说明假标记');
+
+  const g2 = loadGame();
+  const t9 = C('blue', 9);
+  const S2 = use(g2, sc(2, [[[C('blue', 7)]], [[t9, C('blue', 4)]]], { current: 0 }));
+  S2.liarSeat = 1;
+  g2._placeScanMark(t9, 1, 0, 'skill');
+  eq(t9.fail.type, 'blue');
+  eq(t9.fail.num, 9, '其他未命中仍公开真实身份');
+});
+
+await t('#17 匹诺曹：不能使用双重探测器与任何道具', () => {
+  const g = loadGame();
+  const c1 = C('blue', 5), c2 = C('yellow', 2.1);
+  const S = use(g, sc(2, [[[c1, c2]], [[C('blue', 9)]]], {
+    current: 0,
+    equipment: [{ no: 1, unlocked: true, used: false }],
+  }));
+  S.liarSeat = 0;
+  includes(g.useSkill().msg, '匹诺曹不能使用双重探测器');
+  includes(g.useNeqTag(0, c1.id, c2.id).msg, '匹诺曹不能使用道具');
+  includes(g._equipBasic(1, 0).msg, '匹诺曹不能使用道具');
+  assert(!S.players[0].skillUsed, '被拒绝时不应消耗技能');
+});
+
+/* ──────────────────────────── #18 蝙蝠之友 ──────────────────────────── */
+
+await t('#18 蝙蝠之友：3 人局 50 张 / 无标记直接开始 / 仅通用雷达自动生效', () => {
+  const g = dealMission(15, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 15);
+  eq(boardTotals(g), 50, '48 蓝 + 2 红');
+  eq(S.phase, 'play', '无开局标记');
+  eq(S.currentSeat, S.captainSeat, '队长先行动');
+  assert(S.bat && S.bat.turnSeat === S.captainSeat);
+  eq(S.bat.designatedSeat, null);
+  eq(S.bat.onlyRed, false);
+  eq(S.equipment.length, 1);
+  eq(S.equipment[0].no, 8);
+  eq(S.equipment[0].unlocked, true);
+  eq(S.equipment[0].reusable, true);
+  eq(S.equipment[0].used, false);
+  assert(typeof S.bat.current === 'number' && S.bat.current >= 1 && S.bat.current <= 12, '应揭示 1~12');
+  eq(S.radar.num, S.bat.current, '揭示与雷达为同一动作');
+  eq(S.radar.bat, true);
+  eq(S.bat.queue.length, 11, '队列消耗 1 个数字');
+  assert(S.bat.revealed.indexOf(S.bat.current) >= 0);
+  assert(S.log.some(l => l.msg.includes('揭示数字') && l.msg.includes('通用雷达')), '日志应记录自动揭示+雷达');
+  eq(S.board.redMark, 'solid');
+  eq(S.board.redNums.length, 2);
+  eq(handWireNums(g).red.length, 2);
+});
+
+await t('#18 2 人局：51 张 / 3 红全部入库', () => {
+  const g = dealMission(15, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 51, '48 蓝 + 3 红');
+  eq(S.board.redNums.length, 3);
+  eq(handWireNums(g).red.length, 3);
+});
+
+await t('#18 指定行动者：可含自己；行动者只能剪当前数字；回合从本回合玩家下一位继续', () => {
+  const g = dealMission(15, ['A', 'B', 'C']);
+  const S = st(g);
+  const N = S.bat.current;
+  const owner = S.bat.turnSeat;
+  const holders = [0, 1, 2].filter(s => g.hiddenBlueCount(s, N) > 0);
+  assert(holders.length > 0, '应存在持有蓝色 N 的玩家');
+  const target = holders[0];
+  const r = g.chooseBatExecutor(target);
+  assert(r.ok, r.msg);
+  eq(S.bat.designatedSeat, target);
+  eq(S.currentSeat, target, '行动者借用本回合推送权');
+
+  const wrong = N === 12 ? 1 : N + 1;
+  const execCard = g.hiddenBlueCards(target, N)[0];
+  const otherSeat = (target + 1) % 3;
+  const targetCard = S.players[otherSeat].shares.flat().find(c => !c.revealed);
+  const plan = g._planPairCut(otherSeat, targetCard.id, { kind: 'blue', num: wrong }, execCard.id);
+  assert(!plan.ok);
+  includes(plan.msg, `本回合只能剪蓝色 ${N}`);
+
+  g.endTurn(target);
+  eq(S.bat.turnSeat, (owner + 1) % 3, '回合归属按当前玩家推进');
+  eq(S.currentSeat, (owner + 1) % 3);
+  eq(S.bat.designatedSeat, null);
+  assert(typeof S.bat.current === 'number', '下一位回合应重新揭示数字');
+});
+
+await t('#18 仅剩红色导线：不揭示、不触发雷达、队列不消耗', () => {
+  const g = loadGame();
+  const red = C('red', 1.5);
+  const S = use(g, sc(2, [[[red]], [[C('blue', 3)]]], { phase: 'play', current: 0 }));
+  S.bat = { queue: [5, 6], revealed: [], current: null, turnSeat: 0, designatedSeat: null, onlyRed: false };
+  g._batTurnStart(0);
+  eq(S.bat.onlyRed, true);
+  eq(S.bat.current, null);
+  eq(S.bat.queue.length, 2, '队列不应消耗');
+  eq(S.radar, null);
+  eq(S.bat.designatedSeat, null);
+  includes(S.log.map(l => l.msg).join('|'), '只能公开红色导线');
+});
+
+await t('#18 行动者技能限当前数字；通用雷达不能手动使用', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), t7 = C('blue', 7), t9 = C('blue', 9);
+  const S = use(g, sc(2, [[[own7]], [[t7, t9]]], {
+    current: 0,
+    equipment: [{ no: 8, unlocked: true, used: false, reusable: true }],
+  }));
+  S.bat = { queue: [], revealed: [], current: 7, turnSeat: 0, designatedSeat: 0, onlyRed: false };
+  assert(g.useSkill().ok);
+  includes(g.doScan([t7.id, t9.id], 8, own7.id, 'skill').msg, '本回合只能剪蓝色 7');
+  const hit = g.doScan([t7.id, t9.id], 7, own7.id, 'skill');
+  assert(hit.ok && hit.hit, '猜当前数字应命中');
+  eq(S.pending && S.pending.type, 'scanPick');
+
+  const g2 = loadGame();
+  const S2 = use(g2, sc(2, [[[C('blue', 5)]], [[C('blue', 6)]]], {
+    current: 0,
+    equipment: [{ no: 8, unlocked: true, used: false, reusable: true }],
+  }));
+  S2.bat = { queue: [], revealed: [], current: 5, turnSeat: 0, designatedSeat: null, onlyRed: false };
+  includes(g2.useRadar(5).msg, '不能手动使用');
+});
+
+await t('#18 界面：数字条 / 指定行动者 / 自动雷达展示', () => {
+  const g = loadGameWithRender();
+  const c = C('blue', 5);
+  const S = use(g, sc(2, [[[c]], [[C('blue', 6)]]], {
+    current: 0,
+    equipment: [{ no: 8, unlocked: true, used: false, reusable: true }],
+  }));
+  S.bat = { queue: [9, 10], revealed: [5], current: 5, turnSeat: 0, designatedSeat: null, onlyRed: false };
+  S.radar = { num: 5, rows: g._radarRowsFor(5), by: 0, bat: true };
+  g.render();
+  const html = g.document.getElementById('app').innerHTML;
+  includes(html, 'data-testid="bat-info"');
+  includes(html, '当前数字 5');
+  includes(html, 'data-testid="bat-designate-bar"');
+  includes(html, 'data-testid="equip-8"');
+  includes(html, 'bat-auto');
+  includes(html, '自动触发，不消耗');
+  includes(html, '🦇 通用雷达');
+});
+
+await t('#18 选关卡片：追加规则文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(15).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#18 蝙蝠之友');
+  includes(html, '自动揭示数字');
+  includes(html, '通用雷达');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 15 }));
+  g.openMissionSheet();
+  const sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-mission-id="15"');
+  includes(sheet, '指定行动者限剪该数字');
+});
+
+await t('#16/#17/#18 本关规则抽屉：特殊说明可渲染', () => {
+  const expect = {
+    13: ['4/4', '剪线顺序'],
+    14: ['匹诺曹', '错误信息标记'],
+    15: ['蝙蝠之友', '通用雷达', '指定'],
+  };
+  for (const id of [13, 14, 15]) {
+    const g = loadGameWithRender();
+    g.window._olPendingChallenge = { missionId: id };
+    g.dealGame(['A', 'B', 'C']);
+    g.showMissionRules();
+    const html = g.document.getElementById('modalContent').innerHTML;
+    expect[id].forEach(kw => includes(html, kw, `#${id} 规则应包含 ${kw}`));
+  }
 });
 
 /* ══════════════════════════════ 结果 ══════════════════════════════ */

@@ -1,6 +1,6 @@
 /**
  * 炸弹克星 端到端测试（Playwright）
- * 覆盖：着陆页+规则（含 #9 顺序规则与 #10~#15 特殊关卡）→ 建房/加入 → 房主切换关卡（成员同步 #5/#9/#10~#15）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
+ * 覆盖：着陆页+通用规则 → 建房/加入 → 房主切换关卡（成员同步 #5/#9/#10~#18）→ 开始 → 信息标记（跨端同步）→ 双人剪线命中 ×2（跨端同步）
  *       → 界面契约（板/道具/技能/头部/日志）→ 双重探测器扫描全流程（含被动方选牌）
  *       → 单人剪线气泡 → 公开红线气泡 → 结算弹窗（双端）→ 终局区（房主按钮/成员等待提示）
  *       → 再来一局（远端弹窗自动关闭）→ 返回房间（等候室）→ 新玩家加入 → 房主重开
@@ -70,10 +70,7 @@ const rules = await p1.evaluate(() => {
   };
 });
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
-if (!rules.text.includes('#9 轻重缓急') || !rules.text.includes('违反顺序立即爆炸')) throw new Error('规则弹层缺少 #9 顺序剪线说明');
-for (const kw of ['#10 困境', '自由剪线', '#11 又蓝又红', '视为红色导线', '#12 失踪的装备', '🔒', '#13', '剪所有红色导线', '跳过开局标记', '#14 高危拆弹专家', '#15 例外', '链式解锁']) {
-  if (!rules.text.includes(kw)) throw new Error('规则弹层缺少特殊关卡说明: ' + kw);
-}
+if (!rules.text.includes('跳过开局标记')) throw new Error('规则弹层缺少开局标记例外说明');
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
 if (rules.rows.join(',') !== '4,4,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
 if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
@@ -91,9 +88,13 @@ await p1.waitForTimeout(300);
 await p1.click('text=联机模式');
 await p1.waitForTimeout(400);
 await p1.click('text=创建房间');
-await p1.waitForTimeout(2500);
+const code = await waitEval(p1, () => {
+  const el = document.querySelector('.setup-header h1');
+  const m = el && el.textContent.match(/\d{4}/);
+  return m ? m[0] : '';
+}, '创建房间', undefined, 30000);
+await p1.waitForTimeout(500);
 await p1.screenshot({ path: SHOTS + '/e2e-2-waiting-host.png' });
-const code = (await p1.textContent('.setup-header h1')).match(/\d{4}/)[0];
 console.log('房间号:', code);
 const extras = await p1.textContent('.waiting-extras');
 if (!extras.includes('#4 实地练习第一天')) throw new Error('等候室默认关卡应为 #4: ' + extras);
@@ -107,8 +108,14 @@ await p2.click('text=联机模式');
 await p2.fill('#joinRoomInput', code);
 await p2.fill('#joinNameInput', '小明');
 await p2.click('text=加入房间');
-await p2.waitForTimeout(2500);
-await p1.waitForTimeout(1500);
+await waitEval(p2, () => {
+  const el = document.querySelector('.setup-header h1');
+  return el && /\d{4}/.test(el.textContent) ? el.textContent : '';
+}, '加入房间', undefined, 30000);
+await waitEval(p1, () => {
+  const el = document.querySelector('#online');
+  return el && el.textContent.includes('小明') ? el.textContent : '';
+}, '房主看到新成员', undefined, 30000);
 await p1.screenshot({ path: SHOTS + '/e2e-3-waiting-2p-host.png' });
 await p2.screenshot({ path: SHOTS + '/e2e-4-waiting-2p-p2.png' });
 
@@ -119,14 +126,14 @@ if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-swit
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
-if (missionCount !== 12) throw new Error('关卡抽屉应列出 12 关，得到 ' + missionCount);
-for (const id of [6, 7, 8, 9, 10, 11, 12]) {
+if (missionCount !== 15) throw new Error('关卡抽屉应列出 15 关，得到 ' + missionCount);
+for (const id of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
   if (!(await p1.evaluate(n => !!document.querySelector(`[data-testid="mission-item-${n}"]`), id))) {
     throw new Error('关卡抽屉应包含 mission-item-' + id);
   }
 }
-const sheetText = await p1.textContent('#sheetContent');
-for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备', '#13 红色警报', '#14 高危拆弹专家', '#15 Новосибирск任务']) {
+const sheetText = (await p1.textContent('#sheetContent')).replace(/\s+/g, ' ');
+for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备', '#13 红色警报', '#14 高危拆弹专家', '#15 Новосибирск任务', '#16 这很合理', '#17 匹诺曹', '#18 蝙蝠之友']) {
   if (!sheetText.includes(kw)) throw new Error('关卡抽屉缺少 ' + kw);
 }
 await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
@@ -135,8 +142,11 @@ await p1.waitForTimeout(500);
 if (await p1.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) {
   throw new Error('点选关卡后抽屉应收起');
 }
-const hostCard = await p1.textContent('.waiting-extras');
-if (!hostCard.includes('#5 实地练习第二天') || !hostCard.includes('3选2')) {
+const hostCard = await waitEval(p1, () => {
+  const el = document.querySelector('.waiting-extras');
+  return el && el.textContent.includes('#5 实地练习第二天') ? el.textContent : '';
+}, '房主卡片更新为 #5', undefined, 15000);
+if (!hostCard.includes('3选2')) {
   throw new Error('房主关卡卡片未更新为 #5: ' + hostCard);
 }
 await waitEval(p2, () => {
@@ -149,8 +159,11 @@ console.log('成员同步 #5 OK');
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
 await p1.click('[data-testid="mission-item-6"]');
-const host9 = await p1.textContent('.waiting-extras');
-if (!host9.includes('#9 轻重缓急') || !host9.includes('剪线顺序') || !host9.includes('违者立即爆炸')) {
+const host9 = await waitEval(p1, () => {
+  const el = document.querySelector('.waiting-extras');
+  return el && el.textContent.includes('#9 轻重缓急') ? el.textContent : '';
+}, '房主卡片更新为 #9', undefined, 15000);
+if (!host9.includes('剪线顺序') || !host9.includes('违者立即爆炸')) {
   throw new Error('房主关卡卡片未显示 #9 追加规则: ' + host9);
 }
 await waitEval(p2, () => {
@@ -166,13 +179,19 @@ const specials = [
   { id: 9, name: '#12 失踪的装备', kws: ['额外 🔒 一个数字', '锁数字公开 ≥2'] },
   { id: 10, name: '#13 红色警报', kws: ['3 根红色导线', '系统随机标记每人 1 张蓝线', '剪所有红色导线', '否则立即爆炸判负'] },
   { id: 11, name: '#14 高危拆弹专家', kws: ['双人剪线时若失误', '不能使用【稳定剂】', '3 条黄导线（3选2）'] },
-  { id: 12, name: '#15 Новосибирск任务', kws: ['3 条红导线（3选1）', '道具区的牌全部隐藏并锁上', '4 根蓝色导线全部公开', '剩余道具保持隐藏'] },
+  { id: 12, name: '#15 Новосибирск任务', kws: ['3 条红导线（3选1）', '道具区的牌全部隐藏并锁上', '4 根蓝色导线全部公开', '道具全部解锁或蓝线全部公开时停止'] },
+  { id: 13, name: '#16 这很合理', kws: ['3 条黄导线（3选2）', '4/4 全部公开', '违者立即爆炸'] },
+  { id: 14, name: '#17 匹诺曹', kws: ['2 个错误信息标记', '不能使用双重探测器或任何道具', '3 条红导线（3选2）'] },
+  { id: 15, name: '#18 蝙蝠之友', kws: ['自动揭示数字 N', '同步触发【通用雷达】', '指定 1 名持有未公开蓝色 N', '仅红手'] },
 ];
 for (const m of specials) {
   await p1.click('[data-testid="mission-switch"]');
   await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
   await p1.click(`[data-testid="mission-item-${m.id}"]`);
-  const hostCard = await p1.textContent('.waiting-extras');
+  const hostCard = await waitEval(p1, (name) => {
+    const el = document.querySelector('.waiting-extras');
+    return el && el.textContent.includes(name) ? el.textContent : '';
+  }, `房主卡片更新为 ${m.name}`, m.name, 15000);
   for (const kw of [m.name].concat(m.kws)) {
     if (!hostCard.includes(kw)) throw new Error(`房主关卡卡片缺少「${kw}」: ` + hostCard);
   }
@@ -483,6 +502,8 @@ const eqAfter = await devA.evaluate(() => ({
   pending: window.S.pending,
   cur: window.S.currentSeat,
   modeHint: !!document.querySelector('.mode-hint'),
+  modeText: (document.querySelector('.mode-hint') || {}).textContent || '',
+  sheetShown: document.getElementById('sheetOverlay').classList.contains('show'),
 }));
 if (eqAfter.used.some(Boolean) || eqAfter.pending !== null || eqAfter.cur !== seatA || eqAfter.modeHint) {
   throw new Error('取消后不应消耗道具/不产生残留: ' + JSON.stringify(eqAfter));

@@ -294,8 +294,9 @@ function _missionSpecialRulesHTML(mission, pCount) {
   const blocks = [];
   if (setup.orderCount) {
     const order = (S && S.board && Array.isArray(S.board.orderNums)) ? S.board.orderNums : [];
+    const needText = setup.orderNeed > 2 ? `≥${setup.orderNeed} 根（须 4/4 全部公开）` : '≥2 根';
     blocks.push(`<h3>⏱ 剪线顺序</h3>
-      <p>开局随机抽出 ${setup.orderCount} 个蓝色数字作为剪线顺序${order.length ? `：<b>${order.join(' → ')}</b>` : ''}。必须按该顺序公开蓝色导线，前一个数字公开 ≥2 根后才能公开下一个；违反顺序立即爆炸。</p>`);
+      <p>开局随机抽出 ${setup.orderCount} 个蓝色数字作为剪线顺序${order.length ? `：<b>${order.join(' → ')}</b>` : ''}。必须按该顺序公开蓝色导线，前一个数字公开 ${needText} 后才能公开下一个；违反顺序立即爆炸。</p>`);
   }
   if (setup.freeCut) {
     const mins = Math.round((mission.timerSec || 0) / 60);
@@ -341,6 +342,20 @@ function _missionSpecialRulesHTML(mission, pCount) {
       <p>本局队长成为「高危拆弹专家」${cap ? `：<b>${_esc(cap)}</b>` : ''}。专家进行双人剪线时若失误，炸弹立即爆炸。</p>
       <p>专家不能使用【稳定剂】；其他玩家与单人剪线、道具扫描等行动不受影响。</p>`);
   }
+  if (setup.liar) {
+    const cap = (S && Array.isArray(S.players) && typeof S.captainSeat === 'number'
+      && S.players[S.captainSeat]) ? S.players[S.captainSeat].name : '';
+    blocks.push(`<h3>🤥 匹诺曹</h3>
+      <p>本局队长是<b>「匹诺曹」</b>${cap ? `：<b>${_esc(cap)}</b>` : ''}，不能进行开局信息标记，也不能使用双重探测器或任何道具。</p>
+      <p>系统会在匹诺曹手牌放置 2 个错误信息标记：显示的数字不等于该牌真实数字。对匹诺曹发起双人剪线失误时，该牌只按「被猜的数字」显示错误标记。</p>
+      <p>匹诺曹作为猜测方时行为正常。</p>`);
+  }
+  if (setup.bat) {
+    blocks.push(`<h3>🦇 蝙蝠之友</h3>
+      <p>本局没有开局信息标记，发牌后由队长直接开始。道具区只有【通用雷达】，开局即生效、不消耗、不能手动使用。</p>
+      <p>每回合开始系统从 1~12 洗混队列中揭示一个数字 N，并同步触发一次【通用雷达】。回合玩家指定 1 名持有未公开蓝色 N 的玩家（可为自己）执行剪线行动，行动者只能对 N 进行双人/单人剪线；结算后从回合玩家的下一位继续。</p>
+      <p>若当前玩家手上只剩红色导线时，本回合不触发雷达，只能公开红色导线。</p>`);
+  }
   return blocks.join('');
 }
 
@@ -358,10 +373,16 @@ function showMissionRules() {
     : '';
   const actionLine = setup.redAlert
     ? '双人剪线、单人剪线或「剪所有红色导线」'
-    : '双人剪线、单人剪线或公开红色导线';
+    : (setup.bat
+      ? '按系统揭示的数字 N 进行双人/单人剪线，或在仅剩红导线时公开红色导线'
+      : '双人剪线、单人剪线或公开红色导线');
   const markLine = setup.redAlert
     ? '本局跳过开局信息标记。'
-    : '开局每人必须公开标记 1 张自己的蓝色导线。';
+    : (setup.bat
+      ? '本局跳过开局信息标记，发牌后由队长直接开始。'
+      : (setup.liar
+        ? '本局跳过匹诺曹的开局信息标记，其余玩家正常标记。'
+        : '开局每人必须公开标记 1 张自己的蓝色导线。'));
   el.innerHTML = `
     <h2>📜 ${_esc(meta.code)} ${_esc(meta.name)}</h2>
     <div class="rules-scroll">
@@ -395,7 +416,7 @@ function showRules() {
       · 蓝线 1~12 <b>各 4 张</b>（共 48 张）<br>
       · 红线 1.5~11.5 按关卡随机抽取<br>
       · 黄线 1.1~11.1 按关卡随机抽取<br>
-      ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线（关卡 #13 例外：跳过开局标记）</p>
+      ② 随机选中一名玩家成为队长，随后全部导线洗混尽可能均分给各个玩家，每份从小到大排列，发牌后每人<b>必须</b>公开标记自己 1 张蓝色导线</p>
       <table>
         <thead><tr><th>人数</th><th>手牌分配</th></tr></thead>
         <tbody>
@@ -421,7 +442,7 @@ function showRules() {
       </table>
       <p>⏭️ 已公开全部手牌的玩家，轮到其回合时将<b>自动跳过</b></p>
       <h3>🔧 道具介绍</h3>
-      <p>开局随机抽「人数」张道具加入游戏；某编号蓝色导线公开 ≥2 张时，自动解锁对应编号道具，每张每局限用 1 次。道具 1、4、12 可在任意玩家回合使用，其余道具仅在自己回合使用（关卡 #15 例外：道具身份隐藏并上锁，按随机目标数字链式解锁）</p>
+      <p>开局随机抽「人数」张道具加入游戏；某编号蓝色导线公开 ≥2 张时，自动解锁对应编号道具，每张每局限用 1 次。道具 1、4、12 可在任意玩家回合使用，其余道具仅在自己回合使用</p>
       <table>
         <thead><tr><th>道具</th><th>效果</th></tr></thead>
         <tbody>
@@ -622,8 +643,8 @@ function _radarPanelHTML() {
       <span class="radar-chips">${chips}</span>
     </div>`;
   }).join('');
-  return `<div class="radar-panel" data-testid="radar-panel">
-    <div class="radar-head">📡 通用雷达：蓝色 ${r.num} 的未公开残留</div>
+  return `<div class="radar-panel${r.bat ? ' radar-bat' : ''}" data-testid="radar-panel">
+    <div class="radar-head">${r.bat ? '🦇' : '📡'} 通用雷达：蓝色 ${r.num} 的未公开残留</div>
     ${rows}
   </div>`;
 }
@@ -733,16 +754,17 @@ function _boardHTML() {
   const orderNums = Array.isArray(b.orderNums) ? b.orderNums : [];
   let orderHTML = '';
   if (orderNums.length) {
+    const need = b.orderNeed || 2;
     const steps = orderNums.map((n, i) => {
       const prev = i > 0 ? orderNums[i - 1] : null;
       const prevRev = prev === null ? 0 : blueRevealedCount(prev);
-      const locked = i > 0 && prevRev < 2;
+      const locked = i > 0 && prevRev < need;
       const rev = blueRevealedCount(n);
-      const sub = locked ? `🔒 先 ${prev}×2` : `${rev}/4`;
+      const sub = locked ? `🔒 先 ${prev}×${need}` : `${rev}/4`;
       const tip = i === 0
         ? '首个数字，无需前置'
         : locked
-          ? `需先公开 2 根蓝色 ${prev}（当前 ${prevRev} 根）`
+          ? `需先公开 ${need} 根蓝色 ${prev}（当前 ${prevRev} 根）`
           : `已解锁：蓝色 ${prev} 已公开 ${prevRev} 根`;
       const arrow = i > 0 ? '<span class="order-arrow">→</span>' : '';
       return `${arrow}<span class="order-step${i === 0 ? ' first' : ''}${locked ? ' locked' : ''}" data-order-num="${n}" title="${tip}">
@@ -752,7 +774,23 @@ function _boardHTML() {
     orderHTML = `<div class="board-order" data-testid="cut-order" data-order-nums="${orderNums.join(',')}">
       <span class="order-title">⏱ 剪线顺序</span>
       <span class="order-steps">${steps}</span>
-      <span class="order-tip">前序公开 ≥2 根解锁下一数字</span>
+      <span class="order-tip">${need > 2 ? `前序 4/4 公开解锁下一数字` : '前序公开 ≥2 根解锁下一数字'}</span>
+    </div>`;
+  }
+  let batHTML = '';
+  if (S.bat) {
+    const bat = S.bat;
+    const cur = bat.onlyRed
+      ? '仅剩红导线（不揭示）'
+      : (typeof bat.current === 'number' ? `当前数字 ${bat.current}` : '无可用数字');
+    const desig = (typeof bat.designatedSeat === 'number' && S.players && S.players[bat.designatedSeat])
+      ? S.players[bat.designatedSeat].name : '待指定';
+    batHTML = `<div class="board-bat" data-testid="bat-info" data-bat-current="${typeof bat.current === 'number' ? bat.current : ''}">
+      <span class="bat-title">🦇 蝙蝠之友</span>
+      <span>${_esc(cur)}</span>
+      <span>行动者：${_esc(desig)}</span>
+      <span>待揭示 ${bat.queue.length}</span>
+      <span>已揭示 ${bat.revealed.length}</span>
     </div>`;
   }
   const countdownHTML = deadline
@@ -775,6 +813,7 @@ function _boardHTML() {
     </div>
     ${freeHTML}
     ${orderHTML}
+    ${batHTML}
     <div class="board-cells">${cells.join('')}</div>
     <div class="board-legend">
       <span class="legend legend-r">${redIcon} 红导线${redNote ? `（${redNote}）` : ''}：${redNums.join('、') || '—'}</span>
@@ -977,17 +1016,20 @@ function _playerRowHTML(seat) {
     `<div class="cards" data-share="${si}">${share.map((c, i) => _enemyCardHTML(c, share, i, seat, si)).join('')}</div>`).join('');
   const markBadge = S.phase === 'mark'
     ? (S.ready[seat]
-      ? `<span class="mark-badge ok">${noMark ? '🎖 免标记' : '✅ 已标记'}</span>`
+      ? `<span class="mark-badge ok">${isLiarSeat(seat) ? '🤥 匹诺曹（系统标记）' : (noMark ? '🎖 免标记' : '✅ 已标记')}</span>`
       : '<span class="mark-badge wait">⏳ 标记中</span>')
     : '';
   const lastBadge = lastCut
     ? `<span class="last-cut-badge">✂️ ${S.pCount > 2 ? '刚剪线' : '上一位'}</span>`
     : '';
   const expertBadge = isExpertSeat(seat) ? '<span class="expert-badge">💣 高危专家</span>' : '';
+  const liarBadge = isLiarSeat(seat) ? '<span class="liar-badge">🤥 匹诺曹</span>' : '';
+  const batOwnerBadge = (S.bat && S.phase === 'play' && S.bat.turnSeat === seat)
+    ? `<span class="bat-owner-badge" data-testid="bat-owner">🦇 ${S.bat.designatedSeat === null ? '等待指定' : '本回合'}</span>` : '';
   return `<div class="player-row${isCur ? ' current' : ''}" data-seat="${seat}">
     <div class="pr-head">
       <span class="p-chip${isCur ? ' active' : ''}" style="--pc:${color}">${_esc(p.name)}${seat === S.captainSeat ? ' 🎖' : ''}</span>
-      ${markBadge}${lastBadge}${expertBadge}
+      ${markBadge}${lastBadge}${expertBadge}${liarBadge}${batOwnerBadge}
       <span class="pr-meta">未公开 ${hiddenCards(seat).length}</span>
     </div>
     <div class="pr-shares">${shares}</div>
@@ -1006,10 +1048,12 @@ function _ownHandHTML(seat) {
   let status = '';
   if (S.phase === 'mark') {
     status = S.ready[seat]
-      ? `<span class="mark-badge ok">${noMark ? '🎖 本关免标记（队长）' : '✅ 已放置信息标记'}</span>`
+      ? `<span class="mark-badge ok">${isLiarSeat(seat) ? '🤥 匹诺曹：系统已放错误标记' : (noMark ? '🎖 本关免标记（队长）' : '✅ 已放置信息标记')}</span>`
       : '<span class="mark-badge wait">⏳ 请点选 1 张蓝色导线</span>';
+  } else if (S.bat && S.bat.turnSeat === seat && S.bat.designatedSeat === null && !S.result) {
+    status = '<span class="mark-badge now">🦇 请指定本回合行动者</span>';
   } else if (isCur) {
-    status = `<span class="mark-badge now">${S.freeCut ? '✂️ 轮到你剪线' : '🎯 你的回合'}</span>`;
+    status = `<span class="mark-badge now">${S.bat ? '🦇 本回合行动者' : (S.freeCut ? '✂️ 轮到你剪线' : '🎯 你的回合')}</span>`;
   } else if (S.phase === 'play' && S.freeCut && !S.result) {
     if (hiddenCards(seat).length === 0) {
       status = '<span class="mark-badge ok">✅ 手牌已全部公开</span>';
@@ -1023,6 +1067,7 @@ function _ownHandHTML(seat) {
     <div class="oh-head">
       <span class="p-chip${isCur ? ' active' : ''}">${mine ? '🙋 你' : _esc(p.name)}</span>
       ${isExpertSeat(seat) ? '<span class="expert-badge">💣 高危专家</span>' : ''}
+      ${isLiarSeat(seat) ? '<span class="liar-badge">🤥 匹诺曹</span>' : ''}
       ${status}
     </div>
     <div class="own-shares">${shares}</div>
@@ -1108,7 +1153,12 @@ function _equipInfoState(no) {
   if (S.result) return { ok: false, reason: '本局已结束' };
   if (S.pending || S.fx) return { ok: false, reason: '请先完成当前操作' };
   if (S.scanMode) return { ok: false, reason: '已启动探测器，本回合只能扫描' };
-  if (no === 9 && isExpertSeat(_actionSeat())) return { ok: false, reason: '高危拆弹专家不能使用稳定剂' };
+  if (S.bat && no === 8) return { ok: false, reason: '本关【通用雷达】随回合开始自动触发，不能手动使用' };
+  const user = _canUseEquipAnytime(no)
+    ? (mySeat() !== null ? mySeat() : _actionSeat())
+    : _actionSeat();
+  if (isLiarSeat(user)) return { ok: false, reason: '匹诺曹不能使用道具' };
+  if (no === 9 && isExpertSeat(user)) return { ok: false, reason: '高危拆弹专家不能使用稳定剂' };
   const lock = _equipLockActive();
   if (lock) {
     return _equipLockOwnedBy(mySeat())
@@ -1187,6 +1237,7 @@ function _equipRowHTML() {
   const lock = _equipLockActive();
   const lockMine = !!lock && _equipLockOwnedBy(mySeat());
   const chain = S.equipChain || null;
+  const liarMe = isLiarSeat(mySeat());
   const btns = S.equipment.map((e, idx) => {
     // #15：隐藏道具只显示牌背，不泄露编号/名称
     if (e.hidden) {
@@ -1196,6 +1247,13 @@ function _equipRowHTML() {
     }
     const lib = (typeof EQUIPMENT_LIB === 'object' && EQUIPMENT_LIB[e.no]) || null;
     const name = lib ? lib.name : '道具 ' + e.no;
+    // #18：唯一的通用雷达由回合开始自动触发，不消耗、不可手动点击
+    if (S.bat && e.no === 8) {
+      return `<button class="equip-btn bat-auto" data-testid="equip-8" data-no="8" disabled>
+        <span class="equip-no">8</span><span class="equip-name">📡 ${_esc(name)}</span>
+        <span class="equip-tip">回合开始自动触发，不消耗</span>
+      </button>`;
+    }
     const lockNum = typeof e.lockNum === 'number' ? e.lockNum : null;
     const itLocked = !!lock && !(lockMine && lock.no === e.no);
     // #14：高危拆弹专家不能使用稳定剂
@@ -1206,23 +1264,25 @@ function _equipRowHTML() {
     // 未隐藏的道具一律可点开说明窗（含已使用 / 未解锁 / 他人操作锁中）
     let cls = 'equip-btn';
     if (e.used) cls += ' used';
+    else if (liarMe) cls += ' locked liar-blocked';
     else if (expertNoStab) cls += ' locked expert-blocked';
     else if (e.unlocked && !itLocked) { cls += ' ready'; if (active) cls += ' active'; }
     else cls += ' locked';
-    const onclk = ` onclick="onEquipRowClick(${e.no})"`;
+    const onclk = liarMe ? '' : ` onclick="onEquipRowClick(${e.no})"`;
     const tipText = lib && lib.desc ? _esc(lib.desc) : '';
     const lockTip = lockNum !== null
       ? `解锁条件：蓝色 ${e.no} 公开 ≥2（${Math.min(blueRevealedCount(e.no), 2)}/2）+ 🔒${lockNum} 公开 ≥2（${Math.min(blueRevealedCount(lockNum), 2)}/2）`
       : '';
     const expertTip = expertNoStab ? '高危拆弹专家不能使用稳定剂' : '';
-    const tip = (tipText || lockTip || expertTip)
-      ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : '', _esc(expertTip)].filter(Boolean).join(' ｜ ')}</span>`
+    const liarTip = liarMe ? '匹诺曹不能使用任何道具' : '';
+    const tip = (tipText || lockTip || expertTip || liarTip)
+      ? `<span class="equip-tip">${[tipText, lockTip ? _esc(lockTip) : '', _esc(expertTip), _esc(liarTip)].filter(Boolean).join(' ｜ ')}</span>`
       : '';
     const lockCleared = lockNum !== null && blueRevealedCount(lockNum) >= 2;
     const lockBadge = lockNum !== null
       ? `<span class="equip-lock${e.unlocked ? ' open' : ''}${lockCleared ? ' cleared' : ''}" data-testid="equip-lock-${e.no}" title="${_esc(lockTip)}">${lockCleared ? '🔓' : '🔒'}${lockNum}</span>`
       : '';
-    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${expertNoStab ? ' data-expert-blocked="1"' : ''}${onclk}>
+    return `<button class="${cls}" data-testid="equip-${e.no}" data-no="${e.no}"${lockNum !== null ? ` data-lock-num="${lockNum}"` : ''}${expertNoStab ? ' data-expert-blocked="1"' : ''}${liarMe ? ' data-liar-blocked="1"' : ''}${onclk}>
       ${lockBadge}<span class="equip-no">${e.no}</span><span class="equip-name">${_esc(name)}${active ? ' ✕' : ''}</span>${tip}
     </button>`;
   }).join('');
@@ -1236,6 +1296,7 @@ function _equipRowHTML() {
   return `<div class="equip-row" data-testid="equipment">
     <span class="equip-label">🔧 道具</span>
     <div class="equip-btns">${btns}</div>
+    ${liarMe ? '<div class="equip-liar-hint" data-testid="equip-liar-hint">🤥 匹诺曹不能使用任何道具</div>' : ''}
     ${chainLine}
   </div>`;
 }
@@ -1337,6 +1398,8 @@ function _actionBarHTML() {
   const modeBar = _modeHintBar();
   if (modeBar) return modeBar;
 
+  if (S.bat) return _batActionBarHTML();
+
   const stabSeat = (S.cutMods && S.cutMods.stabilize !== null && S.cutMods.stabilize !== undefined)
     ? S.cutMods.stabilize : null;
 
@@ -1372,11 +1435,13 @@ function _actionBarHTML() {
   const soloOK = soloOptions(actor).length > 0;
   const redOK = canRevealRed(actor);
   const alertOK = canRedAlert(actor);
-  const skillOK = !S.players[actor].skillUsed;
+  const liar = isLiarSeat(actor);
+  const skillOK = !S.players[actor].skillUsed && !liar;
   return `<div class="action-bar">
     <div class="bar-title">${S.freeCut ? '🔓 自由剪线：选择 1 次行动' : '🎯 你的回合：选择 1 次行动'}（可选用道具）</div>
     ${stabSeat !== null ? '<div class="mode-hint stabilize-hint">🧪 稳定状态生效中：本回合剪线失误不计、红线不爆（点道具 9 可取消）</div>' : ''}
     ${isExpertSeat(actor) ? '<div class="mode-hint expert-hint">⚠️ 高危拆弹专家：双人剪线失误立即爆炸；不能使用稳定剂</div>' : ''}
+    ${liar ? '<div class="mode-hint liar-hint">🤥 匹诺曹：不能使用双重探测器或任何道具</div>' : ''}
     <div class="bar-btns">
       <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线</button>
       <button class="action-btn" data-action="solo" data-testid="btn-solo"${soloOK ? '' : ' disabled'} onclick="startSoloCut()">🎯 单人剪线</button>
@@ -1386,6 +1451,67 @@ function _actionBarHTML() {
       <button class="action-btn" data-action="skill" data-testid="btn-skill"${skillOK ? '' : ' disabled'} onclick="startSkill()">🔎 双重探测器</button>
     </div>
   </div>`;
+}
+
+/** #18 蝙蝠之友：仅红手 → 公开红线；未指定 → 选择行动者；已指定 → 限数字 N 的行动栏 */
+function _batActionBarHTML() {
+  const b = S.bat;
+  const owner = b.turnSeat;
+  const desig = b.designatedSeat;
+  const own = canActAs(owner);
+  const actor = _actorSeat();
+  if (b.onlyRed) {
+    const ok = own && actor === owner && canRevealRed(owner);
+    if (!own) return _waitHTML(`🦇 ${_esc(_playerName(owner))} 手上只剩红色导线，等待其公开…`);
+    return `<div class="action-bar bat-bar" data-testid="bat-only-red">
+      <div class="bar-title">🦇 仅剩红色导线：本回合不揭示数字</div>
+      <div class="mode-hint">只能公开自己剩余的全部红色导线。</div>
+      <div class="bar-btns">
+        <button class="action-btn" data-action="red" data-testid="btn-red"${ok ? '' : ' disabled'} onclick="startRevealRed()">🚨 公开红色导线</button>
+      </div>
+    </div>`;
+  }
+  if (typeof b.current !== 'number') {
+    return own ? _waitHTML('🦇 已没有可揭示的数字…') : _waitHTML(`⏳ 等待 ${_esc(_playerName(owner))} 行动…`);
+  }
+  if (desig === null) {
+    if (!own) {
+      return _waitHTML(`🦇 等待 ${_esc(_playerName(owner))} 指定本回合行动者（数字 ${b.current}）…`);
+    }
+    const seats = [];
+    for (let s = 0; s < S.pCount; s++) {
+      if (hiddenBlueCount(s, b.current) > 0) {
+        seats.push(`<button class="action-btn${s === owner ? ' primary' : ''}" data-testid="bat-seat-${s}" onclick="onBatPick(${s})">${_esc(_playerName(s))}${s === owner ? '（自己）' : ''}</button>`);
+      }
+    }
+    if (!seats.length) return _waitHTML(`🦇 没有人持有未公开的蓝色 ${b.current}…`);
+    return `<div class="action-bar bat-bar" data-testid="bat-designate-bar">
+      <div class="bar-title">🦇 揭示数字 ${b.current}：指定本回合行动者</div>
+      <div class="bar-btns">${seats.join('')}</div>
+      <div class="waiting-hint">行动者只能对蓝色 ${b.current} 进行双人/单人剪线；结算后从你的下一位继续</div>
+    </div>`;
+  }
+  if (!canActAs(desig)) {
+    return _waitHTML(`🦇 ${_esc(_playerName(desig))} 正在执行剪线（回合归属 ${_esc(_playerName(owner))}）…`);
+  }
+  const soloOK = soloOptions(desig).some(o => o.kind !== 'yellow' && o.num === b.current);
+  const skillOK = !S.players[desig].skillUsed;
+  return `<div class="action-bar bat-bar" data-testid="bat-act-bar">
+    <div class="bar-title">🦇 本回合行动者：${_esc(_playerName(desig))} · 只能剪蓝色 ${b.current}</div>
+    <div class="mode-hint">回合结束后从 ${_esc(_playerName(owner))} 的下一位继续</div>
+    <div class="bar-btns">
+      <button class="action-btn" data-action="pair" data-testid="btn-pair" onclick="startPairCut()">✂️ 双人剪线（蓝色 ${b.current}）</button>
+      <button class="action-btn" data-action="solo" data-testid="btn-solo"${soloOK ? '' : ' disabled'} onclick="startSoloCut()">🎯 单人剪线（蓝色 ${b.current}）</button>
+      <button class="action-btn" data-action="skill" data-testid="btn-skill"${skillOK ? '' : ' disabled'} onclick="startSkill()">🔎 双重探测器</button>
+    </div>
+  </div>`;
+}
+
+/** #18：指定本回合行动者 */
+function onBatPick(seat) {
+  if (!S || !S.bat) return;
+  const r = chooseBatExecutor(seat);
+  if (!r.ok) showToast(r.msg);
 }
 
 /** 单机自由剪线：选定本机当前操作的玩家 */

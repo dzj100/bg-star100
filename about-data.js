@@ -1,6 +1,6 @@
 /* 关于弹窗数据：发版时只需要改这个文件。supportQrs 填赞赏码图片路径即可展示。 */
 window.ABOUT_DATA = {
-  updated: '2026-11-02',
+  updated: '2026-11-06',
   authorUrl: 'https://xhslink.com/m/6v4n9vWAfvp',
   // 可放微信/支付宝两张，也可只放一张：{ label: '微信', src: 'support-wechat.png' }
   supportQrs: [
@@ -10,6 +10,7 @@ window.ABOUT_DATA = {
     {
       month: '2026 年 11 月',
       items: [
+        { d: '11.06', t: '《炸弹克星》开放16~18关' },
         { d: '11.03', t: '《流冰航路》联机模式上线' },
         { d: '11.02', t: '《弑君者》新增闯关配置；《炸弹克星》开放13~15关' }
       ]

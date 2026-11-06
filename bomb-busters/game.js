@@ -140,6 +140,33 @@ const MISSIONS = {
     equipChain: true,
     marks: { red: 'hollow' },
   },
+  13: {
+    id: 13, name: '#16 这很合理',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+      two:      { red: { draw: 2, use: 2 }, yellow: { draw: 4, use: 4 } },
+    },
+    orderCount: 3,
+    orderNeed: 4,
+    marks: { yellow: 'hollow' },
+  },
+  14: {
+    id: 14, name: '#17 匹诺曹',
+    setup: {
+      standard: { red: { draw: 3, use: 2, note: '3选2' }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 3, use: 3 }, yellow: { draw: 0, use: 0 } },
+    },
+    liar: true,
+    marks: { red: 'hollow' },
+  },
+  15: {
+    id: 15, name: '#18 蝙蝠之友',
+    setup: {
+      standard: { red: { draw: 2, use: 2 }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 3, use: 3 }, yellow: { draw: 0, use: 0 } },
+    },
+    bat: true,
+  },
 };
 
 /** 按人数展开关卡的开局参数 */
@@ -156,6 +183,7 @@ function missionSetup(mission, pCount) {
     redMark: (mission.marks && mission.marks.red && cfg.red.draw > cfg.red.use) ? 'hollow' : 'solid',
     yellowMark: (mission.marks && mission.marks.yellow && cfg.yellow.draw > cfg.yellow.use) ? 'hollow' : 'solid',
     orderCount: mission.orderCount || 0,
+    orderNeed: mission.orderNeed || 2,
     freeCut: !!mission.freeCut,
     timerSec: pCount === 2 ? (mission.timerSecTwo || mission.timerSec || 0) : (mission.timerSec || 0),
     excludeEquip: mission.excludeEquip || [],
@@ -165,6 +193,8 @@ function missionSetup(mission, pCount) {
     redAlert: !!mission.redAlert,
     expert: !!mission.expert,
     equipChain: !!mission.equipChain,
+    liar: !!mission.liar,
+    bat: !!mission.bat,
   };
 }
 
@@ -331,6 +361,95 @@ function blueRevealedCount(num) {
   return n;
 }
 
+/** #17：该座位是否为匹诺曹（本局队长） */
+function isLiarSeat(seat) {
+  return !!(S && typeof seat === 'number' && S.liarSeat === seat);
+}
+
+/** #18：是否仍有未公开的指定数字蓝线 */
+function _hasUnrevealedBlue(num) {
+  let has = false;
+  _eachCard(c => {
+    if (!has && c.kind === 'blue' && c.num === num && !c.revealed && !isRedLikeCard(c)) has = true;
+  });
+  return has;
+}
+
+/** #18：通用雷达结果行（自动触发时复用【8 通用雷达】的展示） */
+function _radarRowsFor(num) {
+  return S.players.map((p, seat) => ({
+    seat,
+    per: (p.shares || []).map(sh => sh.some(c =>
+      c.kind === 'blue' && c.num === num && !c.revealed && !isRedLikeCard(c))),
+  }));
+}
+
+/** #18：该座位未公开手牌是否只剩红色导线（含 #11 视为红线的蓝线） */
+function _onlyRedHand(seat) {
+  const h = hiddenCards(seat);
+  return h.length > 0 && h.every(isRedLikeCard);
+}
+
+/**
+ * #18 回合开始：仅红手则不揭示数字、不触发雷达；否则按队列揭示数字 N，
+ * 同一次动作自动触发【通用雷达】。队列空时用仍有未公开蓝线的数字重新洗混。
+ */
+function _batTurnStart(seat) {
+  if (!S || !S.bat) return;
+  const b = S.bat;
+  b.turnSeat = seat;
+  b.designatedSeat = null;
+  b.current = null;
+  b.onlyRed = false;
+  S.radar = null;
+
+  if (_onlyRedHand(seat)) {
+    b.onlyRed = true;
+    addLog(`🦇 ${S.players[seat].name} 手上只剩红色导线：本回合不触发通用雷达，只能公开红色导线`, 'warn');
+    return;
+  }
+  for (;;) {
+    if (!b.queue.length) {
+      const pool = BLUE_NUMS.filter(n => _hasUnrevealedBlue(n));
+      if (!pool.length) {
+        addLog('🦇 已没有可揭示的数字（蓝线全部公开）', 'warn');
+        return;
+      }
+      b.queue = shuffle(pool);
+      addLog('🦇 数字队列已空：将仍有未公开蓝线的数字重新洗混', 'warn');
+    }
+    const n = b.queue.shift();
+    if (!_hasUnrevealedBlue(n)) {
+      addLog(`🦇 数字 ${n} 已没有未公开蓝线，顺延揭示下一个`, 'warn');
+      continue;
+    }
+    b.current = n;
+    if (b.revealed.indexOf(n) < 0) b.revealed.push(n);
+    S.radar = { num: n, rows: _radarRowsFor(n), by: seat, bat: true };
+    addLog(`🦇 回合开始揭示数字 ${n}，同步触发【通用雷达】`, 'warn');
+    return;
+  }
+}
+
+/** #18：本回合玩家指定 1 名持有未公开蓝色 N 的玩家作为行动者（可含自己） */
+function chooseBatExecutor(seat) {
+  const b = S && S.bat;
+  if (!b || S.phase !== 'play') return { ok: false, msg: '当前不能指定行动者' };
+  if (S.pending || S.fx || S.result || S.scanMode) return { ok: false, msg: '当前不能指定行动者' };
+  if (b.onlyRed) return { ok: false, msg: '本回合只能公开红色导线' };
+  if (typeof b.current !== 'number') return { ok: false, msg: '本回合没有可剪线的数字' };
+  if (typeof seat !== 'number' || !S.players[seat]) return { ok: false, msg: '无效的玩家' };
+  if (!canActAs(b.turnSeat)) return { ok: false, msg: '只能由本回合玩家指定行动者' };
+  if (hiddenBlueCount(seat, b.current) === 0) return { ok: false, msg: `该玩家没有未公开的蓝色 ${b.current}` };
+  const owner = b.turnSeat;
+  b.designatedSeat = seat;
+  S.currentSeat = seat;               // 行动者借用本回合推送权；回合归属仍记在 bat.turnSeat
+  addLog(`🦇 ${S.players[owner].name} 指定 ${S.players[seat].name} 剪蓝色 ${b.current}`);
+  saveState();
+  _render();
+  return { ok: true };
+}
+
 /**
  * #9 顺序剪线：检查本次即将公开的蓝色数字是否违反解锁顺序。
  * 规则：序列中第 k 个数字须在第 k-1 个数字已公开 ≥2 根后才能公开。
@@ -339,6 +458,7 @@ function blueRevealedCount(num) {
 function orderRevealViolation(nums) {
   const order = (S && S.board && Array.isArray(S.board.orderNums)) ? S.board.orderNums : [];
   if (!order.length) return null;
+  const need = (S && S.board && S.board.orderNeed) || 2;
   const seen = new Set();
   for (const num of nums) {
     if (!Number.isInteger(num) || seen.has(num)) continue;
@@ -347,14 +467,14 @@ function orderRevealViolation(nums) {
     if (idx <= 0) continue;
     const prev = order[idx - 1];
     const have = blueRevealedCount(prev);
-    if (have < 2) return { num, prev, have, need: 2, idx };
+    if (have < need) return { num, prev, have, need, idx };
   }
   return null;
 }
 
 /** 违反顺序：立即爆炸（不消耗稳定剂） */
 function _boomOrder(v) {
-  addLog(`💥 剪线顺序错误：蓝色 ${v.num} 须先公开 2 根蓝色 ${v.prev}（当前 ${v.have} 根）`, 'bad');
+  addLog(`💥 剪线顺序错误：蓝色 ${v.num} 须先公开 ${v.need} 根蓝色 ${v.prev}（当前 ${v.have} 根）`, 'bad');
   _boom('boom-order');
 }
 
@@ -632,10 +752,12 @@ function dealGame(names, missionId) {
   let eqPool = Array.from({ length: 12 }, (_, i) => i + 1);
   if (setup.excludeEquip.length) eqPool = eqPool.filter(n => setup.excludeEquip.indexOf(n) < 0);
   if (redBlueNums.length) eqPool = eqPool.filter(n => redBlueNums.indexOf(n) < 0);
-  const eqNos = shuffle(eqPool).slice(0, pCount).sort((a, b) => a - b);
+  // #18：道具区固定只有【通用雷达】，开局即生效、全局不消耗，由回合开始自动触发
+  const eqNos = setup.bat ? [8] : shuffle(eqPool).slice(0, pCount).sort((a, b) => a - b);
   const lockNums = setup.equipLocks ? shuffle(BLUE_NUMS).slice(0, pCount) : [];
   const equipment = eqNos.map((no, i) => {
-    const eq = { no, unlocked: false, used: false };
+    const eq = { no, unlocked: !!setup.bat, used: false };
+    if (setup.bat) eq.reusable = true;                // #18：自动触发，不计消耗
     if (setup.equipLocks) eq.lockNum = lockNums[i];   // #12：每张道具额外锁定一个数字
     if (setup.equipChain) eq.hidden = true;           // #15：道具身份隐藏，按解锁顺序逐一揭示
     return eq;
@@ -643,8 +765,8 @@ function dealGame(names, missionId) {
   // #15：开局随机选 1 个蓝色数字作为第一张道具的解锁目标
   const chainTarget = setup.equipChain ? shuffle(BLUE_NUMS)[0] : null;
 
-  // #11 双人局：队长不能进行蓝线信息标记（视为已完成）
-  const noMarkSeats = setup.twoCaptainNoMark ? [captainSeat] : [];
+  // #11 双人局 / #17 匹诺曹：队长不能进行蓝线信息标记（视为已完成）
+  const noMarkSeats = (setup.twoCaptainNoMark || setup.liar) ? [captainSeat] : [];
   const ready = Array(pCount).fill(false);
   noMarkSeats.forEach(s => { ready[s] = true; });
 
@@ -670,11 +792,12 @@ function dealGame(names, missionId) {
 
   S = {
     players,
-    phase: setup.redAlert ? 'play' : 'mark',   // #13：无标记阶段，直接进入对局
+    phase: (setup.redAlert || setup.bat) ? 'play' : 'mark',   // #13/#18：无标记阶段，直接进入对局
     missionId: mission.id,
     dealStamp: Date.now(),           // 每局唯一（结算弹窗按此去重展示）
     captainSeat,
-    currentSeat: setup.redAlert ? (setup.freeCut ? -2 : captainSeat) : -1,
+    currentSeat: setup.bat ? captainSeat
+      : (setup.redAlert ? (setup.freeCut ? -2 : captainSeat) : -1),
     turnNo: prevTurnNo,
     equipRev: 0,                     // 道具锁版本（上锁/释放各 +1；远程端据此丢弃迟到旧锁）
     equipLock: null,
@@ -687,6 +810,7 @@ function dealGame(names, missionId) {
       redNote: setup.redNote,
       yellowNote: setup.yellowNote,
       orderNums,                                           // #9：蓝线剪线解锁顺序（空数组=无顺序限制）
+      orderNeed: setup.orderNeed,                          // #9/#16：公开下一数字前需先公开的上一数字根数
       redBlueNums,                                         // #11：本局视为红线的蓝线数字
       deadline,                                            // #10：倒计时截止时间戳（null=无倒计时）
       timeLimitSec,
@@ -700,7 +824,16 @@ function dealGame(names, missionId) {
     redAlert: setup.redAlert,        // #13：红线定点分配 + 无手动标记 + 「剪所有红色导线」
     expert: setup.expert,            // #14：队长为高危拆弹专家（双人剪线失误即爆、禁用稳定剂）
     equipChain: setup.equipChain ? { target: chainTarget, stopped: false } : null,  // #15：道具隐藏 + 链式解锁目标
-    noMarkSeats,                     // #11 双人局：不能进行蓝线信息标记的座位
+    liarSeat: setup.liar ? captainSeat : null,       // #17：匹诺曹座位
+    bat: setup.bat ? {                               // #18：蝙蝠之友自动揭示状态
+      queue: shuffle(BLUE_NUMS),                     // 待揭示数字队列
+      revealed: [],                                  // 已揭示数字（本局累计）
+      current: null,                                 // 当前行动数字 N
+      turnSeat: captainSeat,                         // 当前回合归属（行动者仅借用本回合）
+      designatedSeat: null,                          // 本回合指定行动者（尚未指定 = null）
+      onlyRed: false,                                // 仅剩红导线：本回合只公开红线、不揭示
+    } : null,
+    noMarkSeats,                     // #11 双人局 / #17 匹诺曹：不能进行蓝线信息标记的座位
     pending: null,
     scanMode: null,
     cutMods: { stabilize: null },    // 稳定剂准备态（道具 9）
@@ -719,9 +852,32 @@ function dealGame(names, missionId) {
     S.ready[seat] = true;
   });
 
+  // #17：匹诺曹不能自行标记；系统在其手牌放置 2 个错误信息标记（显示数字互不相同且不等于自身真实数字）
+  if (setup.liar) {
+    const pool = [];
+    (players[captainSeat].shares || []).forEach(sh => sh.forEach(c => {
+      if (c.kind === 'blue' && !c.revealed) pool.push(c);
+    }));
+    const picked = [];
+    const realUsed = new Set();
+    shuffle(pool).forEach(c => {
+      if (picked.length >= 2 || realUsed.has(c.num)) return;
+      realUsed.add(c.num);
+      picked.push(c);
+    });
+    const fakeUsed = new Set();
+    picked.forEach(c => {
+      const cands = BLUE_NUMS.filter(n => n !== c.num && !fakeUsed.has(n));
+      const fake = cands[Math.floor(Math.random() * cands.length)];
+      fakeUsed.add(fake);
+      c.info = { num: fake, fake: true };
+    });
+    S.ready[captainSeat] = true;
+  }
+
   addLog(`🧨 ${mission.name} 开始！${pCount} 人局：${missionWiresText(setup)} 已标记到板上`);
   if (orderNums.length) {
-    addLog(`⏱ 本局剪线顺序：${orderNums.map(n => '蓝色 ' + n).join(' → ')}（前一个数字公开 ≥2 根后才能公开下一个）`, 'warn');
+    addLog(`⏱ 本局剪线顺序：${orderNums.map(n => '蓝色 ' + n).join(' → ')}（前一个数字公开 ≥${S.board.orderNeed} 根后才能公开下一个）`, 'warn');
   }
   if (redBlueNums.length) {
     addLog(`🎲 本局蓝线 ${redBlueNums.join('、')} 视为红色导线：只能在自己手上只剩这些牌时用「公开红线」公开`, 'warn');
@@ -747,8 +903,12 @@ function dealGame(names, missionId) {
     if (pCount >= 3) addLog('📌 本局无法自行标记：系统已为每位玩家随机标记 1 张蓝色导线', 'warn');
     else addLog(`📌 2 人局：队长不进行任何标记，${names[1 - captainSeat]} 已随机标记 1 张蓝色导线`, 'warn');
     addLog(`🎖 随机队长：${names[captainSeat]}（由队长先行动）`, 'warn');
+  } else if (setup.liar) {
+    addLog(`🎖 随机队长：${names[captainSeat]}（匹诺曹，不能自行标记）。请其余玩家放置信息标记`, 'warn');
   } else if (noMarkSeats.length) {
     addLog(`🎖 随机队长：${names[captainSeat]}（本关不能进行蓝线信息标记）。请其余玩家放置信息标记`, 'warn');
+  } else if (setup.bat) {
+    addLog(`🎖 随机队长：${names[captainSeat]}（由队长先行动）`, 'warn');
   } else {
     addLog(`🎖 随机队长：${names[captainSeat]}。请所有人放置信息标记（标记 1 张自己的蓝色导线）`);
   }
@@ -759,12 +919,23 @@ function dealGame(names, missionId) {
     addLog(`🃏 道具区隐藏并上锁：共 ${equipment.length} 张道具，看不到具体道具`, 'warn');
     addLog(`🎯 首张道具解锁目标：蓝色 ${chainTarget}（公开全部 4 根后自动解锁并激活）`, 'warn');
   }
+  if (setup.liar) {
+    addLog(`🤥 匹诺曹：${names[captainSeat]}（队长）不能自行标记，系统已在其手牌放置 2 个错误信息标记`, 'warn');
+    addLog('🚫 匹诺曹不能使用双重探测器，也不能使用任何道具', 'warn');
+  }
+  if (setup.bat) {
+    addLog('🦇 蝙蝠之友：本局不能进行蓝线信息标记，每回合开始自动揭示数字并触发【通用雷达】', 'warn');
+  }
+  if (setup.bat) _batTurnStart(captainSeat);
   saveStateDirect();
   _seenEquipRev = 0;                    // 新一局：道具锁版本重新计数
   _render();
   if (autoMarks.length) {
     _alertToastStamp = S.dealStamp;      // 房主已在本端提示，避免应用远端快照时重复
     showToast('本局无法自行标记，已随机标记');
+  } else if (setup.liar) {
+    _alertToastStamp = S.dealStamp;
+    showToast('匹诺曹无法自行标记，已放置错误标记');
   }
 }
 
@@ -822,6 +993,13 @@ function placeInfoToken(cardId) {
 
 /** 合法猜测项（猜测选择器数据）：我持有的未公开蓝数字 + 是否可猜黄色 */
 function legalGuessOptions(seat) {
+  if (S.bat) {
+    const n = S.bat.current;
+    return {
+      nums: (typeof n === 'number' && hiddenBlueCount(seat, n) > 0) ? [n] : [],
+      yellow: false,
+    };
+  }
   const nums = [];
   for (const n of BLUE_NUMS) if (hiddenBlueCount(seat, n) > 0) nums.push(n);
   return { nums, yellow: hiddenYellowCount(seat) > 0 };
@@ -847,6 +1025,12 @@ function _planPairCut(toSeat, cardId, guess, ownCardId) {
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
   if (toSeat === actor || !S.players[toSeat]) return { ok: false, msg: '请选择其他玩家' };
+  if (S.bat) {
+    if (S.bat.onlyRed) return { ok: false, msg: '本回合只能公开红色导线' };
+    if (typeof S.bat.current !== 'number') return { ok: false, msg: '本回合没有可剪线的数字' };
+    if (S.bat.designatedSeat === null) return { ok: false, msg: '请先指定本回合行动者' };
+    if (actor !== S.bat.designatedSeat) return { ok: false, msg: '本回合只能由指定行动者剪线' };
+  }
 
   const card = _findCardById(cardId);
   if (!card || !_isInShares(card, S.players[toSeat].shares)) return { ok: false, msg: '无效的目标牌' };
@@ -856,10 +1040,12 @@ function _planPairCut(toSeat, cardId, guess, ownCardId) {
   let label;
   if (guess && guess.kind === 'blue') {
     if (!(Number.isInteger(guess.num) && guess.num >= 1 && guess.num <= 12)) return { ok: false, msg: '无效的数字' };
+    if (S.bat && guess.num !== S.bat.current) return { ok: false, msg: `本回合只能剪蓝色 ${S.bat.current}` };
     if (hiddenBlueCount(actor, guess.num) === 0) return { ok: false, msg: `你没有未公开的蓝色 ${guess.num}` };
     hit = card.kind === 'blue' && card.num === guess.num && !isRedLikeCard(card);
     label = `蓝色 ${guess.num}`;
   } else {
+    if (S.bat) return { ok: false, msg: `本回合只能剪蓝色 ${S.bat.current}` };
     if (hiddenYellowCount(actor) === 0) return { ok: false, msg: '你没有未公开的黄导线' };
     hit = card.kind === 'yellow';
     label = '黄色导线';
@@ -906,8 +1092,14 @@ function _applyPairCut(plan) {
       if (isRedLikeCard(card)) { _boom('boom-red'); return { ok: true, hit: false }; }
     }
     if (!isRedLikeCard(card)) {
-      card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
-      addLog('🔖 该牌真实信息已被标记公开');
+      if (toSeat === S.liarSeat) {
+        // #17：对匹诺曹的双人剪线失误，只公开「被猜的数字」，而非真实身份
+        card.fail = guess.kind === 'blue' ? { type: 'blue', num: guess.num } : { type: 'yellow' };
+        addLog(`🤥 匹诺曹错误标记按猜测显示为${label}`);
+      } else {
+        card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
+        addLog('🔖 该牌真实信息已被标记公开');
+      }
     }
     endTurn(actor);
   }
@@ -947,9 +1139,16 @@ function _planSoloCut(opt) {
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (S.bat) {
+    if (S.bat.onlyRed) return { ok: false, msg: '本回合只能公开红色导线' };
+    if (typeof S.bat.current !== 'number') return { ok: false, msg: '本回合没有可剪线的数字' };
+    if (S.bat.designatedSeat === null) return { ok: false, msg: '请先指定本回合行动者' };
+    if (actor !== S.bat.designatedSeat) return { ok: false, msg: '本回合只能由指定行动者剪线' };
+  }
 
   if (opt && (opt.kind === 'pair' || opt.kind === 'all')) {
     const n = opt.num;
+    if (S.bat && n !== S.bat.current) return { ok: false, msg: `本回合只能剪蓝色 ${S.bat.current}` };
     const hidden = hiddenBlueCount(actor, n);
     const rev = blueRevealedCount(n);
     const ok = (opt.kind === 'pair') ? (rev === 2 && hidden === 2) : (rev === 0 && hidden === 4);
@@ -958,6 +1157,7 @@ function _planSoloCut(opt) {
     return { ok: true, actor, kind: opt.kind, num: n, cards, count: cards.length, label: `蓝色 ${n}` };
   }
   if (opt && opt.kind === 'yellow') {
+    if (S.bat) return { ok: false, msg: `本回合只能剪蓝色 ${S.bat.current}` };
     const mine = hiddenCards(actor).filter(c => c.kind === 'yellow');
     if (!(mine.length > 0 && mine.length === _hiddenYellowAll().length)) return { ok: false, msg: '不满足黄线清收条件' };
     return { ok: true, actor, kind: 'yellow', num: null, cards: mine, count: mine.length, label: '黄色导线' };
@@ -1007,6 +1207,7 @@ function _planRevealRed() {
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (S.bat && !S.bat.onlyRed) return { ok: false, msg: '本回合须先指定行动者剪线' };
   if (!canRevealRed(actor)) return { ok: false, msg: '只有持红者在自己其余牌全部公开时才能公开红线' };
   const cards = hiddenCards(actor);
   return { ok: true, actor, cards, card: cards[0], count: cards.length, label: '红色导线' };
@@ -1085,6 +1286,12 @@ function useSkill() {
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (isLiarSeat(actor)) return { ok: false, msg: '匹诺曹不能使用双重探测器' };
+  if (S.bat) {
+    if (S.bat.onlyRed) return { ok: false, msg: '本回合只能公开红色导线' };
+    if (S.bat.designatedSeat === null) return { ok: false, msg: '请先指定本回合行动者' };
+    if (actor !== S.bat.designatedSeat) return { ok: false, msg: '本回合只能由指定行动者剪线' };
+  }
   const p = S.players[actor];
   if (p.skillUsed) return { ok: false, msg: '本局已使用过双重探测器' };
   if (S.scanMode) return { ok: false, msg: '已启动探测器' };
@@ -1129,6 +1336,13 @@ function _planScan(cardIds, num, ownCardId, src) {
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (isLiarSeat(actor) && src === 'skill') return { ok: false, msg: '匹诺曹不能使用双重探测器' };
+  if (S.bat) {
+    if (S.bat.onlyRed) return { ok: false, msg: '本回合只能公开红色导线' };
+    if (S.bat.designatedSeat === null) return { ok: false, msg: '请先指定本回合行动者' };
+    if (actor !== S.bat.designatedSeat) return { ok: false, msg: '本回合只能由指定行动者剪线' };
+    if (num !== S.bat.current) return { ok: false, msg: `本回合只能剪蓝色 ${S.bat.current}` };
+  }
   const count = src === 'skill' ? 2 : 3;
 
   if (src === 'skill') {
@@ -1275,23 +1489,23 @@ function _placeScanMark(card, targetSeat, fromSeat, src) {
 
 /** 【≠标签】：同一份内相邻 2 张（编号不同、至少 1 张蓝色，可含已公开牌） */
 function useNeqTag(shareIdx, cardId1, cardId2) {
-  const g = _equipBasic(1);
-  if (!g.ok) return g;
   const a = _equipActor(1);
   if (!a.ok) return a;
   const actor = a.seat;
+  const g = _equipBasic(1, actor);
+  if (!g.ok) return g;
   const eq = g.eq;
 
   const p = S.players[actor];
   const share = (p.shares || [])[shareIdx];
-  if (!share) return { ok: false, msg: '无效的份' };
+  if (!share) return { ok: false, msg: '无效的选中' };
   const i1 = share.findIndex(c => c.id === cardId1);
   const i2 = share.findIndex(c => c.id === cardId2);
   if (i1 < 0 || i2 < 0 || Math.abs(i1 - i2) !== 1) return { ok: false, msg: '须为同一份内相邻的 2 张牌' };
   const c1 = share[Math.min(i1, i2)];
   const c2 = share[Math.max(i1, i2)];
   if (c1.neq || c2.neq) return { ok: false, msg: '该牌已有【≠】标签' };
-  if (c1.num === c2.num) return { ok: false, msg: '两张牌编号相同，无标记意义' };
+  if (c1.num === c2.num) return { ok: false, msg: '两张牌编号相同，无法标记' };
   if (c1.kind !== 'blue' && c2.kind !== 'blue') return { ok: false, msg: '至少需含 1 张蓝色导线' };
 
   const pairId = 'nq' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36);
@@ -1311,6 +1525,7 @@ function useWalkie(fromCardId, toSeat) {
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (isLiarSeat(actor)) return { ok: false, msg: '匹诺曹不能使用道具' };
   const eq = S.equipment.find(e => e.no === 2);
   if (!eq || !eq.unlocked || eq.used) return { ok: false, msg: '【对讲机】不可用' };
   if (toSeat === actor || !S.players[toSeat]) return { ok: false, msg: '请选择其他玩家' };
@@ -1435,17 +1650,19 @@ function _validateNeqPairs() {
 //  道具 4~12（解锁 = 对应编号蓝线公开 ≥2；除 1/4/12 外仅自己回合可用）
 // ════════════════════════════════════════════════════════════════
 
-/** 道具基础可用性（不含回合/操作锁判定） */
-function _equipBasic(no) {
+/** 道具基础可用性（不含回合/操作锁判定）；seat = 使用者（缺省取当前行动者） */
+function _equipBasic(no, seat) {
   if (!S || S.phase !== 'play' || S.pending || S.result || S.fx) {
     return { ok: false, msg: '现在不能行动' };
   }
   if (S.scanMode) return { ok: false, msg: '已启动探测器，请执行扫描' };
+  const user = (typeof seat === 'number') ? seat : _actionSeat();
+  if (isLiarSeat(user)) return { ok: false, msg: '匹诺曹不能使用道具' };   // #17
   const eq = S.equipment.find(e => e.no === no);
   const name = (EQUIPMENT_LIB[no] || {}).name || ('道具 ' + no);
   if (!eq) return { ok: false, msg: `【${name}】不可用` };
   if (eq.hidden) return { ok: false, msg: '该道具尚未揭示' };   // #15：隐藏道具不可用
-  if (no === 9 && isExpertSeat(_actionSeat())) {
+  if (no === 9 && isExpertSeat(user)) {
     return { ok: false, msg: '【稳定剂】不可用：高危拆弹专家不能使用' };
   }
   if (eq.used) return { ok: false, msg: `【${name}】已使用过` };
@@ -1478,11 +1695,13 @@ function _equipActor(no) {
     if (!_equipLockOwnedBy(mySeat())) {
       return { ok: false, msg: `等待 ${S.players[lock.seat].name} 完成道具操作` };
     }
+    if (isLiarSeat(lock.seat)) return { ok: false, msg: '匹诺曹不能使用道具' };
     return { ok: true, seat: lock.seat, lock };
   }
   if (!_canAct()) return { ok: false, msg: '现在不能行动' };
   const actor = _actionSeat();
   if (actor === null) return { ok: false, msg: '现在不能行动' };
+  if (isLiarSeat(actor)) return { ok: false, msg: '匹诺曹不能使用道具' };
   return { ok: true, seat: actor, lock: null };
 }
 
@@ -1501,7 +1720,11 @@ function _equipStartBlock(no) {
   }
   if (!_canUseEquipAnytime(no) && !_myTurn()) return '只能在自己回合使用道具';
   if (_canUseEquipAnytime(no) && mySeat() === null && !_myTurn()) return '现在不能行动';
-  const g = _equipBasic(no);
+  const user = _canUseEquipAnytime(no)
+    ? (mySeat() !== null ? mySeat() : _actionSeat())
+    : _actionSeat();
+  if (isLiarSeat(user)) return '匹诺曹不能使用道具';
+  const g = _equipBasic(no, user);
   if (!g.ok) return g.msg;
   return null;
 }
@@ -1530,11 +1753,11 @@ function _cancelMyEquipLock() {
 
 /** 【便利贴】：再标记自己 1 张未公开且无信息标记的蓝线（绑定于牌，交换废弃） */
 function useStickyNote(cardId) {
-  const g = _equipBasic(4);
-  if (!g.ok) return g;
   const a = _equipActor(4);
   if (!a.ok) return a;
   const actor = a.seat;
+  const g = _equipBasic(4, actor);
+  if (!g.ok) return g;
   const card = _findCardById(cardId);
   if (!card || !_isInShares(card, S.players[actor].shares)) return { ok: false, msg: '请选择自己的导线' };
   if (card.kind !== 'blue') return { ok: false, msg: '只能标记蓝色导线' };
@@ -1668,6 +1891,7 @@ function useBattery(seats) {
 
 /** 【通用雷达】：选 1 个蓝数字，系统按真实手牌自动公布每人每份「有/无」未公开该数字蓝线 */
 function useRadar(num) {
+  if (S && S.bat) return { ok: false, msg: '本关【通用雷达】随回合开始自动触发，不能手动使用' };
   const g = _equipUsable(8);
   if (!g.ok) return g;
   if (!(Number.isInteger(num) && num >= 1 && num <= 12)) return { ok: false, msg: '无效的数字' };
@@ -1861,11 +2085,11 @@ function useCoffee(targetSeat) {
 
 /** 【＝标签】：同一份内相邻 2 张，宣告「编号相同」（蓝蓝同数字 / 黄黄 / 红红）；至少 1 张未公开 */
 function useEqTag(shareIdx, cardId1, cardId2) {
-  const g = _equipBasic(12);
-  if (!g.ok) return g;
   const a = _equipActor(12);
   if (!a.ok) return a;
   const actor = a.seat;
+  const g = _equipBasic(12, actor);
+  if (!g.ok) return g;
   const p = S.players[actor];
   const share = (p.shares || [])[shareIdx];
   if (!share) return { ok: false, msg: '无效的手牌' };
@@ -2041,13 +2265,15 @@ function endTurn(actorSeat) {
     _render();
     return;
   }
-  let next = S.currentSeat;
+  // #18：回合归属按「本回合玩家」推进，而非借用本回合的行动者
+  let next = S.bat ? S.bat.turnSeat : S.currentSeat;
   for (let i = 0; i < S.pCount; i++) {
     next = (next + 1) % S.pCount;
     if (hiddenCards(next).length > 0) break;
     addLog(`⏭️ ${S.players[next].name} 的手牌已全部公开，自动跳过其回合`, 'warn');
   }
   S.currentSeat = next;
+  if (S.bat) _batTurnStart(next);
   saveState();
   _render();
 }
@@ -2152,6 +2378,12 @@ function applyOnlineState(state) {
     _alertToastStamp = state.dealStamp;
     showToast('本局无法自行标记，已随机标记');
   }
+  // #17 匹诺曹的系统错误标记：远端玩家进入本局后提示一次
+  if (state && state.phase === 'play' && state.liarSeat != null
+      && state.dealStamp && state.dealStamp !== _alertToastStamp) {
+    _alertToastStamp = state.dealStamp;
+    showToast('匹诺曹无法自行标记，已放置错误标记');
+  }
   // 迟到重放的旧锁快照：版本低于本地已应用的版本时不得重新上锁
   if (prev && state && state.equipLock
       && (state.equipRev || 0) < (prev.equipRev || 0)) {
@@ -2250,13 +2482,15 @@ function openMissionSheet() {
     const selected = m.id === current;
     const passed = !!(prog[m.id] && prog[m.id].passed);
     const extras = [];
-    if (m.orderCount) extras.push(`⏱ ${m.orderCount} 个蓝线数字顺序剪线`);
+    if (m.orderCount) extras.push(`⏱ ${m.orderCount} 个蓝线数字顺序剪线${(m.orderNeed || 2) > 2 ? '（前序 4/4 公开才解锁）' : ''}`);
     if (m.freeCut) extras.push(`⌛ ${Math.round((m.timerSec || 0) / 60)} 分钟倒计时（2 人 ${Math.round((m.timerSecTwo || m.timerSec || 0) / 60)} 分钟）+ 自由剪线`);
     if (m.redBlueCount) extras.push(`🎲 ${m.redBlueCount} 个数字的蓝线视为红线`);
     if (m.equipLocks) extras.push('🔒 道具额外上锁');
     if (m.redAlert) extras.push('🚨 红线定点分配 + 随机标记 + 剪所有红色导线');
     if (m.expert) extras.push('⚠️ 队长为高危拆弹专家（双人剪线失误即爆炸、禁用稳定剂）');
     if (m.equipChain) extras.push('🔧 道具隐藏并上锁，目标数字 4 根蓝线全公开自动解锁');
+    if (m.liar) extras.push('🤥 队长为匹诺曹（2 个假标记、禁用技能与道具）');
+    if (m.bat) extras.push('🦇 每回合自动揭示数字并触发雷达，指定行动者限剪该数字');
     return `<button type="button" class="mission-item${selected ? ' selected' : ''}"
         data-mission-id="${m.id}" data-testid="mission-item-${m.id}"
         onclick="selectMission(${m.id})">
@@ -2308,7 +2542,9 @@ function waitingExtrasHTML() {
       </div>
       <div class="we-line">开局：${std}${two !== std ? `（2 人局：${two}）` : ''} 标记到板上</div>
       ${missionHasHiddenPick(mission) ? '<div class="we-line">数轴标出全部候选；牌库只混入其中随机选中的导线，具体是哪几条保密</div>' : ''}
-      ${mission.orderCount ? `<div class="we-line">本关追加：开场公开 ${mission.orderCount} 个蓝线数字的剪线顺序；前一个数字公开 ≥2 根后才能公开下一个，违者立即爆炸</div>` : ''}
+      ${mission.orderCount ? `<div class="we-line">本关追加：开场公开 ${mission.orderCount} 个蓝线数字的剪线顺序；前一个数字公开 ≥${mission.orderNeed || 2} 根后才能公开下一个${(mission.orderNeed || 2) > 2 ? '（4/4 全部公开）' : ''}，违者立即爆炸</div>` : ''}
+      ${mission.liar ? '<div class="we-line">本关追加：队长成为「匹诺曹」，不能自行标记、不能使用双重探测器或任何道具；系统在其手牌放置 2 个错误信息标记</div>' : ''}
+      ${mission.bat ? '<div class="we-line">本关追加：没有开局信息标记；每回合开始自动揭示数字 N 并同步触发【通用雷达】，当前玩家指定 1 名持有未公开蓝色 N 的玩家（可为自己）执行本回合行动，行动者只能剪 N；结算后从当前玩家下一位继续。仅红手则不揭示、只公开红线</div>' : ''}
       ${mission.freeCut ? `<div class="we-line">本关追加：发牌即开始 ${Math.round((mission.timerSec || 0) / 60)} 分钟倒计时（2 人局 ${Math.round((mission.timerSecTwo || mission.timerSec || 0) / 60)} 分钟），超时失败；自由剪线（须等待上一位完成，3 人及以上不能连续剪线）</div>` : ''}
       ${mission.excludeEquip && mission.excludeEquip.length ? `<div class="we-line">本局不出现的道具：${mission.excludeEquip.map(n => (EQUIPMENT_LIB[n] || {}).name || ('道具 ' + n)).join('、')}</div>` : ''}
       ${mission.redBlueCount ? `<div class="we-line">本关追加：随机 ${mission.redBlueCount} 个数字的蓝导线视为红色导线，只能在手中只剩这些牌时通过「公开红线」公开；对应数字道具不会出现${mission.twoCaptainNoMark ? '；2 人局队长不能进行蓝线信息标记' : ''}</div>` : ''}
