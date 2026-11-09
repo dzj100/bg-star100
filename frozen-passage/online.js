@@ -159,6 +159,7 @@ function _getState() {
 }
 
 function _applyState(state) {
+  try { if (window.BG) BG.onlineState('playing', state); } catch (e) {}
   if (typeof HOOK_applyOnlineState === 'function') {
     try { HOOK_applyOnlineState(state); return; } catch (e) { console.warn('[online] applyOnlineState failed:', e); return; }
   }
@@ -1063,6 +1064,7 @@ async function startOnlineGame() {
     _showGameView();
     if (typeof HOOK_render === 'function') HOOK_render();
     await _markPushAndSend(_getState(), 'playing');
+    try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
     return true;
   } catch (e) {
     _toast('开始游戏失败: ' + (e.message || e));

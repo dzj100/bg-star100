@@ -470,6 +470,7 @@ async function startOnlineGame() {
     document.getElementById('online').style.display = 'none';
     showGame();
     await netUpdateGameState(_onlineRoomId, state, 'playing');
+    try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
   } catch (e) {
     alert('开始游戏失败: ' + e.message);
   } finally {

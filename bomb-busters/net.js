@@ -122,6 +122,7 @@ async function netUpdateGameState(shortId, gameState, status) {
   const roomId = _fullId(shortId);
   const update = { state: gameState };
   if (status) update.status = status;
+  try { if (window.BG) BG.onlineState(status, gameState); } catch (e) {}
   const ATTEMPTS = 3;
   for (let i = 0; i < ATTEMPTS; i++) {
     const { error } = await _supabase.from('rooms').update(update).eq('id', roomId);

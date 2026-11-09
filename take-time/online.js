@@ -530,6 +530,7 @@ function _handleRemoteFinished(row, force) {
 
 /** 应用远程状态到本地 S */
 function _applyRemoteState(state) {
+  try { if (window.BG) BG.onlineState('playing', state); } catch (e) {}
   // 记录新鲜度标记：后续拒绝比它更旧的快照
   if (state) {
     if (state._pushId) _lastAppliedPushId = state._pushId;
@@ -721,6 +722,7 @@ async function startOnlineGame() {
     document.getElementById('app').style.display = 'block';
     if (typeof HOOK_render === 'function') HOOK_render();
     await _markPushAndSend(window._getOnlineState(), 'playing');
+    try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
   } catch (e) {
     alert('开始游戏失败: ' + e.message);
   } finally {

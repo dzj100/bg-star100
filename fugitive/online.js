@@ -494,6 +494,7 @@ async function _reconcileOnce(){
         // 若在此剥除，结算行到达后地点牌直接翻明，观感与警探端不一致。
         _recordSeenPush(rs);
         applyOnlineState(rs);
+        try { if (window.BG) BG.onlineState('playing', rs); } catch (e) {}
         _lastPushCur = _curSeatOf(state); // 镜像行动座位：与实时路径一致，避免后续移交回合被误判
         applied = true;
         console.warn('[online] reconcile applied ' + rs._pushId + ' (missed realtime row)');
@@ -575,6 +576,7 @@ async function olStartGame(){
     state.humanRole = OL.myRole;
     render();
     _markPush(state, 'playing');
+  try { if (window.BG) BG.onlineStart((OL.seats || []).length); } catch (e) {}
   } catch(e){
     alert('开始游戏失败：' + e.message);
   } finally { _busy = false; _setLoading(false); }
@@ -604,6 +606,7 @@ function olRematch(){
   state.humanRole = OL.myRole;
   render();
   _markPush(state, 'playing');
+  try { if (window.BG) BG.onlineStart((OL.seats || []).length); } catch (e) {}
 }
 
 /** 对局/结算 → 等候室（房主「重选身份/模式」推送后本地复位，或收到 waiting 行时随行复位）：
@@ -788,6 +791,7 @@ function _handleRemoteState(row){
     _startReconcile();
     if(firstEnter) _showGameUI(); // 首次收到对局状态（成员由房主发牌进入）
     applyOnlineState(st);
+    try { if (window.BG) BG.onlineState('playing', st); } catch (e) {}
     _lastPushCur = _curSeatOf(st); // 镜像对方推送的当前行动座位：避免在对方新局上重复补推
     if(firstEnter) _toastNet('对局开始：' + (OL.oppName ? '对手 ' + esc(OL.oppName) : '对手') + ' 已就位');
   } finally {

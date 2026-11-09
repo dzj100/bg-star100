@@ -373,6 +373,7 @@ function _subscribeToRoom(roomId) {
       S = newState;
       initUidCounter();
       S.phase = 'playing';
+      try { if (window.BG) BG.onlineState('playing', S); } catch (e) {}
 
       if (changed) {
         if (document.getElementById('app').style.display === 'none') {
@@ -430,6 +431,7 @@ async function startOnlineGame() {
     document.getElementById('app').style.display = 'block';
     render();
     await _markPushAndSend(S, 'playing');
+    try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
   } catch (e) {
     alert('开始游戏失败: ' + e.message);
   } finally {

@@ -382,6 +382,7 @@ button { font-family:inherit; }
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="about-data.js"></script>
+<script src="track.js"></script>
 <script>
 (function(){
 'use strict';
@@ -560,6 +561,8 @@ document.addEventListener('click', function(e){
   var plays = readPlays();
   plays[a.dataset.name] = (plays[a.dataset.name] || 0) + 1;
   try { localStorage.setItem(PLAY_KEY, JSON.stringify(plays)); } catch (e) {}
+  var src = a.classList.contains('result-item') ? 'search' : (a.closest('#sec-fav') ? 'fav' : 'card');
+  try { if (window.BG && BG.markClick) BG.markClick(src); } catch (err) {}
 });
 
 /* ---------------- 搜索弹窗 ---------------- */

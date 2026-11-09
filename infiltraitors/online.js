@@ -553,6 +553,7 @@ async function _launchGame(seats){
   await _ui().applyRemote(st, { replay: false }); // 开局弹窗（配置 + 发牌 + 随机先手）由 UI 层演出
   _startReconcile();
   _markPush('playing');
+  try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
 }
 
 /** 再来一局：沿用当前任务配置（房主专用，结算页按钮调用） */
@@ -753,6 +754,7 @@ async function _receiveState(st, firstEnter){
     _ui().setSeat(_engSeat);
     _ui().setRoom(_roomId, (st.seats || []).length);
     await _ui().applyRemote(st, { replay: true });
+    try { if (window.BG) BG.onlineState('playing', st); } catch (e) {}
     _lastPushCur = _curSeatOf(st); // 镜像对方推送的当前行动座位：避免在对方新局上重复补推
     if(firstEnter) _toastNet('对局开始：' + (st.seats || []).length + ' 人协作');
     _startReconcile();
@@ -971,6 +973,7 @@ async function _tryReconnect(){
       _ui().showGame();
       // intro:false —— 中途重连不再回放开局弹窗（把当前 introId 记为已见）
       await _ui().applyRemote(room.state, { replay: false, intro: false });
+      try { if (window.BG) BG.onlineState('playing', room.state); } catch (e) {}
       _lastPushCur = _curSeatOf(room.state);
       _startReconcile();
       _toastNet('已恢复到房间 ' + _roomId);
