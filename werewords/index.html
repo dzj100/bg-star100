@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>狼人真言发牌助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 30px;
+            color: #e94560;
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        .btn {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:hover {
+            background: #c73e54;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #0f3460;
+        }
+
+        .btn-secondary:hover {
+            background: #1a4a7a;
+        }
+
+        /* 首页 */
+        .home-screen {
+            display: block;
+        }
+
+        .player-count-selector {
+            margin: 30px 0;
+        }
+
+        .player-count-selector label {
+            display: block;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .count-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .count-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .count-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #e94560;
+            background: transparent;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .count-btn.selected {
+            background: #e94560;
+        }
+
+        /* .count-btn:hover {
+            background: #e94560;
+        } */
+
+        /* 静音按钮 */
+        .mute-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 100;
+            line-height: 40px;
+        }
+
+        /* 规则按钮 */
+        .rules-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 100;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 40px;
+        }
+
+        /* 转盘页面 */
+        .roulette-screen {
+            display: none;
+        }
+
+        .roulette-container {
+            margin: 40px 0;
+            position: relative;
+        }
+
+        .roulette-wheel {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            border: 4px solid #e94560;
+            margin: 0 auto;
+            position: relative;
+            background: radial-gradient(circle, #16213e 0%, #1a1a2e 100%);
+        }
+
+        .roulette-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            transform-origin: center bottom;
+            width: 8px;
+            height: 120px;
+            background: linear-gradient(to top, #e94560 0%, #ff6b6b 100%);
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.8);
+        }
+
+        .roulette-arrow::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 20px solid #ff6b6b;
+        }
+
+        /* 身份查看页面 */
+        .role-screen {
+            display: none;
+        }
+
+        .role-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px 20px;
+            margin: 20px 0;
+        }
+
+        .role-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #e94560;
+        }
+
+        .role-name {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .magic-word {
+            font-size: 28px;
+            color: #ffd700;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .word-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .word-option {
+            padding: 15px;
+            background: #0f3460;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 18px;
+        }
+
+        .word-option:hover {
+            border-color: #e94560;
+        }
+
+        .word-option.selected {
+            background: #e94560;
+            border-color: #e94560;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #888;
+            margin-top: 20px;
+        }
+
+        /* 倒计时 */
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e94560;
+            margin: 20px 0;
+        }
+
+        /* 狼人队友信息 */
+        .wolf-teammates {
+            font-size: 14px;
+            color: #ff6b6b;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        /* 传递提示页面 */
+        .pass-screen {
+            display: none;
+        }
+
+        .pass-icon {
+            font-size: 80px;
+            margin: 40px 0;
+        }
+
+        .pass-text {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        /* 游戏开始页面 */
+        .start-screen {
+            display: none;
+        }
+
+        .game-ready {
+            font-size: 24px;
+            margin: 40px 0;
+        }
+
+        .timer-display {
+            font-size: 48px;
+            color: #e94560;
+            margin: 30px 0;
+        }
+
+        /* 隐藏类 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 时间到提示 */
+        .time-up-message {
+            margin: 20px 0;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 咒语展示 */
+        .magic-word-reveal {
+            font-size: 36px;
+            color: #ffd700;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(255, 215, 0, 0.15);
+            border-radius: 15px;
+            border: 2px solid #ffd700;
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
+        }
+
+        /* Toast提示 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            z-index: 2000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- 静音按钮 -->
+    <button class="mute-btn" id="muteBtn">🔊</button>
+    
+    <!-- Toast提示 -->
+    <div id="toast" class="toast"></div>
+
+    <div class="container">
+        <!-- 首页 -->
+        <div class="home-screen" id="homeScreen">
+            <button class="rules-btn" id="rulesBtn">📖</button>
+            <h1>🐺 狼人真言 🐺</h1>
+            <p style="margin-bottom: 30px; color: #888;">发牌助手</p>
+
+            <div class="player-count-selector">
+                <label>选择玩家人数</label>
+                <div class="count-buttons" id="countButtons">
+                    <div class="count-row">
+                        <button class="count-btn" data-count="4">4</button>
+                        <button class="count-btn" data-count="5">5</button>
+                        <button class="count-btn" data-count="6">6</button>
+                    </div>
+                    <div class="count-row">
+                        <button class="count-btn" data-count="7">7</button>
+                        <button class="count-btn" data-count="8">8</button>
+                        <button class="count-btn" data-count="9">9</button>
+                        <button class="count-btn" data-count="10">10</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <button class="btn" id="startGameBtn" disabled>开始游戏</button>
+                <button class="btn btn-secondary" id="seatConfigBtn" style="font-size: 14px; padding: 10px 30px; margin-top: 10px;">座位配置</button>
+            </div>
+            <p id="footerCredit" style="position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 12px; color: #555; pointer-events: none;">@imStar100</p>
+        </div>
+
+        <!-- 座位配置弹窗 -->
+        <div id="seatConfigModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #1a1a2e; border-radius: 20px; padding: 30px; max-width: 90%; width: 360px; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);">
+                <h2 style="color: #e94560; margin-bottom: 20px; font-size: 22px;">座位配置</h2>
+                <textarea id="playerNamesInput" placeholder="为了更好游戏体验，请输入参与游戏的玩家昵称，从你开始按照顺时针座次输入，一行一个&#10;不输入也没事儿，可以直接选择玩家人数开局" style="width: 100%; min-height: 200px; padding: 15px; border: 2px solid #0f3460; border-radius: 10px; background: rgba(255,255,255,0.05); color: #fff; font-size: 16px; resize: vertical; font-family: inherit;"></textarea>
+                <p id="seatConfigHint" style="color: #888; font-size: 12px; margin-top: 10px; min-height: 20px;"></p>
+                <p id="clearSeatConfigBtn" style="text-align: center; margin-top: 10px; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; -webkit-tap-highlight-color: transparent;">清空座位配置</p>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="cancelSeatConfigBtn" style="flex: 1; -webkit-tap-highlight-color: transparent;">取消</button>
+                    <button class="btn" id="confirmSeatConfigBtn" style="flex: 1; -webkit-tap-highlight-color: transparent;">确认</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 身份选择弹窗 -->
+        <div id="identitySelectModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #1a1a2e; border-radius: 20px; padding: 30px; max-width: 90%; width: 360px; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);">
+                <h2 style="color: #e94560; margin-bottom: 15px; font-size: 22px;">选择你的身份</h2>
+                <p style="color: #aaa; margin-bottom: 20px; font-size: 14px;">你是座位配置中的哪一位？</p>
+                <div id="identitySelectList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;"></div>
+            </div>
+        </div>
+
+        <!-- 规则查看弹窗 -->
+        <div id="rulesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #1a1a2e; border-radius: 20px; padding: 30px 30px 5px; max-width: 90%; width: 90%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);">
+                <h2 style="color: #e94560; margin-bottom: 20px; font-size: 22px;">游戏规则</h2>
+                
+                <div style="text-align: left; color: #fff; line-height: 1.8; overflow-y: auto; flex: 1;">
+                    <h3 style="color: #e94560; margin: 20px 0 10px 0;">📋 身份配置</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <thead>
+                            <tr style="background: rgba(233, 69, 96, 0.2);">
+                                <th style="padding: 10px; border: 1px solid #444;">玩家数</th>
+                                <th style="padding: 10px; border: 1px solid #444;">村长</th>
+                                <th style="padding: 10px; border: 1px solid #444;">先知</th>
+                                <th style="padding: 10px; border: 1px solid #444;">狼人</th>
+                                <th style="padding: 10px; border: 1px solid #444;">村民</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roleTableBody"></tbody>
+                    </table>
+                    
+                    <h3 style="color: #e94560; margin: 20px 0 10px 0;">🎮 操作流程</h3>
+                    <ol style="margin-left: 20px; margin-bottom: 20px;">
+                        <li><strong>选择人数</strong>：点击数字按钮选择4-10人（或使用座位配置）</li>
+                        <li><strong>开始游戏</strong>：点击"开始游戏"按钮</li>
+                        <li><strong>选择村长</strong>：转动转盘随机选择村长</li>
+                        <li><strong>村长选词</strong>：村长从5个词语中选择1个作为魔法咒语</li>
+                        <li><strong>查看身份</strong>：村长确认后，依次传递给其他玩家查看身份</li>
+                        <li><strong>传递设备</strong>：每位玩家查看后点击"确认并隐藏"，然后交给左手边玩家</li>
+                        <li><strong>游戏开始</strong>：所有人查看完毕后进入4分钟讨论时间</li>
+                    </ol>
+                    
+                    <h3 style="color: #e94560; margin: 20px 0 10px 0;">💡 游戏提示</h3>
+                    <ul style="margin-left: 20px; margin-bottom: 20px;">
+                        <li>村长额外分配一个身份，既是村长也是普通角色</li>
+                        <li>先知和狼人可以看到魔法咒语</li>
+                        <li>若有多位狼人，他们可以看到狼队友编号</li>
+                        <li>每轮游戏结束后可以重新开始，如有座位配置会保留座位配置</li>
+                    </ul>
+                    
+                    <h3 style="color: #e94560; margin: 20px 0 10px 0;">⚙️ 座位配置</h3>
+                    <ul style="margin-left: 20px; margin-bottom: 20px;">
+                        <li>支持输入线下玩家的昵称</li>
+                        <li>玩家昵称至少4个，至多10个</li>
+                        <li>游戏中会显示对应昵称，如"张三，你的身份是"</li>
+                        <!-- <li>按昵称列表顺时针传递顺序</li> -->
+                        <li>配置会自动保存，下次游戏自动加载</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button class="btn" id="closeRulesBtn">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自定义Confirm弹窗 -->
+        <div id="customConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center;">
+            <div style="background: #1a1a2e; border-radius: 20px; padding: 30px; max-width: 90%; width: 360px; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);">
+                <p id="customConfirmMessage" style="color: #fff; font-size: 16px; text-align: center; margin-bottom: 25px; line-height: 1.6;"></p>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="customConfirmCancelBtn" style="flex: 1; -webkit-tap-highlight-color: transparent;">取消</button>
+                    <button class="btn" id="customConfirmOkBtn" style="flex: 1; -webkit-tap-highlight-color: transparent;">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 转盘页面 -->
+        <div class="roulette-screen" id="rouletteScreen">
+            <h1>选择村长</h1>
+            <p id="rouletteHint">转动箭头，随机选择一位玩家担任村长</p>
+
+            <div class="roulette-container">
+                <div class="roulette-wheel" id="rouletteWheel">
+                    <div class="roulette-arrow" id="rouletteArrow"></div>
+                </div>
+            </div>
+
+            <div class="chief-confirm-message hidden" id="chiefConfirmMessage">
+                <p style="font-size: 28px; color: #e94560; margin: 20px 0;">🎯 你是村长</p>
+            </div>
+            <button class="btn hidden" id="confirmChiefRoleBtn">确认担任村长</button>
+            <button class="btn" id="spinRouletteBtn">转动箭头</button>
+        </div>
+
+        <!-- 村长身份页面 -->
+        <div class="role-screen" id="chiefScreen">
+            <h1>🎯 你是村长</h1>
+            <p style="margin: 20px 0;">你被选中担任本局游戏的村长</p>
+
+            <button class="btn" id="confirmChiefRoleBtn">确认担任村长</button>
+        </div>
+
+        <!-- 村长选词页面 -->
+        <div class="role-screen" id="chiefWordScreen">
+            <h1>选择魔法咒语</h1>
+            <p>从以下词语中选择一个作为魔法咒语</p>
+
+            <div class="word-options" id="wordOptions"></div>
+
+            <div class="countdown hidden" id="chiefCountdown">3</div>
+            <button class="btn" id="confirmChiefBtn" disabled>确认并隐藏</button>
+        </div>
+
+        <!-- 身份查看页面 -->
+        <div class="role-screen" id="roleScreen">
+            <div class="progress-text" id="progressText"></div>
+
+            <div class="role-card">
+                <div class="role-title">你的身份是</div>
+                <div class="role-name" id="roleName"></div>
+                <div class="magic-word hidden" id="magicWordDisplay"></div>
+                <div class="wolf-teammates hidden" id="wolfTeammates"></div>
+            </div>
+
+            <div class="countdown hidden" id="roleCountdown">3</div>
+            <button class="btn" id="viewRoleBtn">查看我的身份</button>
+            <button class="btn hidden" id="confirmRoleBtn" disabled>确认并隐藏</button>
+        </div>
+
+        <!-- 传递提示页面 -->
+        <div class="pass-screen" id="passScreen">
+            <div class="pass-icon">📱</div>
+            <div class="pass-text">请交给左手边的玩家</div>
+            <button class="btn" id="nextPlayerBtn">下一位查看</button>
+        </div>
+
+        <!-- 游戏开始页面 -->
+        <div class="start-screen" id="startScreen">
+            <div class="game-ready" id="gameReadyText">
+                <h1>🎉 准备就绪</h1>
+                <p>所有人已就绪</p>
+                <p>进入白天阶段</p>
+            </div>
+            <div class="timer-display" id="timerDisplay">04:00</div>
+            <button class="btn hidden" id="guessedCorrectlyBtn" style="margin-top: 20px; font-size: 16px; padding: 12px 30px;">已猜对了</button>
+            <div class="time-up-message hidden" id="timeUpMessage">
+                <p style="font-size: 24px; color: #e94560; margin: 20px 0;">⏰ 时间到了！</p>
+            </div>
+            <button class="btn hidden" id="viewMagicWordBtn">查看咒语</button>
+            <div class="magic-word-reveal hidden" id="magicWordReveal"></div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <button class="btn hidden" id="restartBtn">重新开始</button>
+                <button class="btn btn-secondary hidden" id="reviewBtn" style="font-size: 14px; padding: 10px 30px; margin-top: 10px;">本局复盘</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 本局复盘弹窗 -->
+    <div id="reviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: #1a1a2e; border-radius: 20px; padding: 30px 30px 5px; max-width: 90%; width: 360px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(233, 69, 96, 0.5);">
+            <h2 style="color: #e94560; margin-bottom: 20px; font-size: 22px;">本局复盘</h2>
+            
+            <div style="overflow-y: auto; flex: 1;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: rgba(233, 69, 96, 0.2);">
+                            <th style="padding: 12px; border: 1px solid #444;">玩家</th>
+                            <th style="padding: 12px; border: 1px solid #444;">身份</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviewTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; margin-top: 10px;">
+                <button class="btn" id="closeReviewBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

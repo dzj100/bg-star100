@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>夺狗囧事</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#1a1a2e;--card-bg:#16213e;--accent:#e94560;--text:#eee;--card-size:clamp(48px,12vw,64px);--gap:8px}
+html,body{height:100%;height:100dvh}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow-x:hidden}
+button{font-family:inherit;border:none;cursor:pointer;touch-action:manipulation}
+
+/* Header */
+#header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#0f3460}
+#header h1{font-size:1.2rem;user-select:none}
+#help-btn{background:var(--accent);color:#fff;border-radius:50%;width:32px;height:32px;font-size:1rem;font-weight:bold}
+
+/* Setup */
+#setup-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;position:relative}
+#setup-screen h2{font-size:1.4rem}
+.player-count-group{display:flex;gap:12px}
+.player-count-group button{width:56px;height:56px;border-radius:12px;background:var(--card-bg);color:var(--text);font-size:1.5rem;border:2px solid transparent;transition:border-color .2s}
+.player-count-group button:active{border-color:var(--accent)}
+
+/* Game Board */
+#game-board{flex:1;display:none;flex-direction:column;padding:8px}
+#game-board.active{display:flex}
+
+/* Door Bar */
+#door-bar{display:none;justify-content:center;gap:var(--gap);padding:8px 0;margin-bottom:8px}
+#door-bar.active{display:flex}
+.door{width:var(--card-size);height:var(--card-size);border-radius:8px;background:#2a2a4a;display:flex;align-items:center;justify-content:center;font-size:1.5rem;border:2px solid #444;transition:all .3s;position:relative}
+.door.open{background:#e94560;border-color:#e94560;color:#fff}
+.door-label{position:absolute;font-size:.7rem;bottom:-17px;color:#aaa}
+
+/* Player Rows */
+#player-rows{flex:1;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.player-row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:12px;background:rgba(255,255,255,.03);transition:background .3s}
+.player-row.highlight{background:rgba(233,69,96,.15);box-shadow:0 0 12px rgba(233,69,96,.3)}
+.player-row.out{opacity:.4}
+.player-label{min-width:72px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8rem}
+.player-label .name{font-weight:bold;font-size:.9rem}
+.player-label .stats{font-size:.7rem;color:#aaa}
+.player-label .leader-star{font-size:1.2rem;line-height:1}
+.card-slots{display:flex;gap:var(--gap)}
+.card{width:var(--card-size);height:var(--card-size);border-radius:8px;background:var(--card-bg);display:flex;align-items:center;justify-content:center;font-size:1.6rem;border:2px solid #333;transition:transform .3s,background .3s;position:relative}
+.card.revealed{background:#2a4a3a;border-color:#4a8}
+.card.back{background:repeating-linear-gradient(45deg,#16213e,#16213e 4px,#1a2744 4px,#1a2744 8px)}
+
+/* Action Bar */
+#action-bar{padding:12px 0;display:flex;justify-content:center}
+#action-bar button{background:var(--accent);color:#fff;padding:14px 32px;border-radius:12px;font-size:1.1rem;font-weight:bold;min-width:200px}
+
+/* Modal */
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+#modal-overlay.active{display:flex}
+#modal{background:#16213e;border-radius:16px;padding:24px;max-width:400px;width:100%;text-align:center}
+#modal h3{margin-bottom:16px;font-size:1.2rem}
+#modal p{margin-bottom:16px;line-height:1.5;color:#ccc}
+#modal .card-select{display:flex;justify-content:center;gap:var(--gap);margin-bottom:20px}
+#modal .card-select .card{cursor:pointer}
+#modal .card-select .card.selected{border-color:var(--accent);transform:scale(1.1)}
+#modal .action-buttons{display:flex;flex-direction:column;gap:10px}
+#modal .action-buttons button{padding:14px;border-radius:10px;font-size:1rem;font-weight:bold;background:#2a2a4a;color:var(--text)}
+#modal .action-buttons button.primary{background:var(--accent)}
+#modal .action-buttons button:disabled{opacity:.3;cursor:not-allowed}
+#modal .confirm-btn{margin-top:16px;background:var(--accent);color:#fff;padding:12px 40px;border-radius:10px;font-size:1rem;font-weight:bold}
+
+/* Overlay (pass phone) */
+#pass-overlay{position:fixed;inset:0;background:#0f3460;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:24px;text-align:center;padding:24px}
+#pass-overlay.active{display:flex}
+#pass-overlay h2{font-size:1.5rem}
+#pass-overlay p{color:#aaa;font-size:1rem}
+#pass-overlay button{background:var(--accent);color:#fff;padding:16px 40px;border-radius:12px;font-size:1.2rem;font-weight:bold}
+
+/* Rules Modal */
+#rules-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:300;padding:16px}
+#rules-modal.active{display:flex}
+#rules-dialog{background:#16213e;border-radius:16px;max-width:500px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+#rules-header{padding:20px 24px 12px;flex-shrink:0;border-bottom:1px solid #333}
+#rules-header h2{color:var(--accent);font-size:1.2rem;margin:0}
+#rules-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 24px}
+#rules-content h3{margin:16px 0 8px;font-size:1rem}
+#rules-content p,#rules-content li{font-size:.85rem;line-height:1.6;color:#ccc;margin-bottom:6px}
+#rules-content ul{padding-left:20px}
+#rules-close-bar{padding:12px 24px;border-top:1px solid #333;flex-shrink:0}
+#rules-close{background:var(--accent);color:#fff;padding:10px 32px;border-radius:8px;font-size:1rem;width:100%}
+
+/* Settlement highlight */
+.settlement-dog{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1 id="title">夺狗囧事</h1>
+  <button id="help-btn">?</button>
+</div>
+
+<div id="setup-screen">
+  <h2>选择玩家数量</h2>
+  <div class="player-count-group" id="count-buttons"></div>
+  <div style="position:absolute;bottom:10px;color:#555;font-size:.75rem">@imStar100</div>
+</div>
+
+<div id="game-board">
+  <div id="door-bar"></div>
+  <div id="player-rows"></div>
+  <div id="action-bar"></div>
+</div>
+
+<div id="modal-overlay"><div id="modal"></div></div>
+<div id="pass-overlay"></div>
+<div id="rules-modal"><div id="rules-dialog"><div id="rules-header"><h2>夺狗囧事 规则说明</h2></div><div id="rules-scroll"><div id="rules-content"></div></div><div id="rules-close-bar"><button id="rules-close">关闭</button></div></div></div>
+
+<script>
+// ==================== STATE MANAGER ====================
+const STORAGE_KEY = 'dog-joker-state';
+
+const StateManager = {
+  _state: null,
+
+  // 返回游戏的初始默认状态对象
+  defaultState() {
+    return {
+      playerCount: 0,
+      players: [],
+      phase: 'setup',
+      leaderIndex: 0,
+      activePlayerIndex: 0,
+      openDoors: [],
+      roundNumber: 0,
+      hidingProgress: 0,
+      okPlayers: [],
+      actedCount: 0,
+      settlementInfo: null,
+      pendingSettlement: null,
+      leaderResetPending: false,
+      roundStartLeader: 0,
+    };
+  },
+
+  // 加载游戏状态（当前直接初始化为默认状态）
+  load() {
+    this._state = this.defaultState();
+  },
+
+  // 持久化保存游戏进度到 localStorage
+  save() {
+    const s = this._state;
+    if (s.phase === 'setup') return;
+    const cache = {
+      playerCount: s.playerCount,
+      players: s.players.map(p => ({ id: p.id, wins: p.wins, losses: p.losses, isOut: p.isOut })),
+      leaderIndex: s.roundStartLeader,
+      roundNumber: s.roundNumber,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cache)); } catch {}
+  },
+
+  // 读取缓存中的游戏进度，返回缓存对象或 null
+  loadCache() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+
+  // 获取当前游戏状态的引用
+  get() { return this._state; },
+
+  // 合并更新状态并触发重新渲染，所有状态变更必须通过此方法进行
+  set(partial) {
+    Object.assign(this._state, partial);
+    this.save();
+    Renderer.render();
+  },
+
+  // 重置游戏到初始状态并触发重新渲染
+  reset() {
+    this._state = this.defaultState();
+    this.save();
+    Renderer.render();
+  }
+};
+
+// ==================== GAME LOGIC ====================
+const GameLogic = {
+  // 初始化游戏：创建指定数量的玩家，进入藏狗阶段
+  initGame(count) {
+    const players = [];
+    for (let i = 0; i < count; i++) {
+      players.push({
+        id: i, wins: 0, losses: 0, isOut: false,
+        cards: Array(5).fill('back'),
+        revealedThisRound: Array(5).fill(false),
+      });
+    }
+    StateManager.set({
+      playerCount: count,
+      players,
+      phase: 'hiding-ready',
+      leaderIndex: 0,
+      activePlayerIndex: 0,
+      openDoors: [],
+      roundNumber: 1,
+      hidingProgress: 0,
+      okPlayers: [],
+      actedCount: 0,
+      settlementInfo: null,
+      pendingSettlement: null,
+      roundStartLeader: 0,
+    });
+  },
+
+  // 从缓存恢复游戏进度，进入新一轮藏狗阶段
+  initFromCache(cache) {
+    const players = [];
+    for (let i = 0; i < cache.playerCount; i++) {
+      const cached = cache.players.find(p => p.id === i);
+      players.push({
+        id: i,
+        wins: cached ? cached.wins : 0,
+        losses: cached ? cached.losses : 0,
+        isOut: cached ? cached.isOut : false,
+        cards: Array(5).fill('back'),
+        revealedThisRound: Array(5).fill(false),
+      });
+    }
+    let leader = cache.leaderIndex;
+    if (players[leader] && players[leader].isOut) {
+      leader = this.getNextActivePlayer(leader);
+      if (leader === -1) leader = 0;
+    }
+    StateManager.set({
+      playerCount: cache.playerCount,
+      players,
+      phase: 'hiding-ready',
+      leaderIndex: leader,
+      activePlayerIndex: leader,
+      openDoors: [],
+      roundNumber: cache.roundNumber,
+      hidingProgress: 0,
+      okPlayers: [],
+      actedCount: 0,
+      settlementInfo: null,
+      pendingSettlement: null,
+      leaderResetPending: false,
+      roundStartLeader: leader,
+    });
+  },
+
+  // 获取当前未出局的存活玩家数量
+  getActivePlayerCount() {
+    return StateManager.get().players.filter(p => !p.isOut).length;
+  },
+
+  // 从指定索引开始顺时针查找下一个未出局的玩家，返回-1表示无人可用
+  getNextActivePlayer(fromIndex) {
+    const s = StateManager.get();
+    let idx = fromIndex;
+    for (let i = 0; i < s.playerCount; i++) {
+      idx = (idx + 1) % s.playerCount;
+      if (!s.players[idx].isOut) return idx;
+    }
+    return -1;
+  },
+
+  // 弹出藏狗选择弹窗，让当前玩家选择🐶放置位置
+  showHidingModal() {
+    const s = StateManager.get();
+    const pid = s.activePlayerIndex;
+    Renderer.showModal({
+      title: `玩家${pid+1} 藏狗`,
+      text: '请把自己的小狗放置到1张牌上',
+      type: 'hide',
+      playerId: pid,
+    });
+  },
+
+  // 确认藏狗：设置卡牌，推进到下一位玩家或进入搜查阶段
+  confirmHide(cardIndex) {
+    const s = StateManager.get();
+    const pid = s.activePlayerIndex;
+    const players = [...s.players];
+    players[pid] = { ...players[pid], cards: Array(5).fill('cross') };
+    players[pid].cards[cardIndex] = 'dog';
+
+    const nextHiding = s.hidingProgress + 1;
+    const activeCount = players.filter(p => !p.isOut).length;
+    if (nextHiding >= activeCount) {
+      StateManager.set({ players, hidingProgress: nextHiding, phase: 'searching-ready', activePlayerIndex: s.leaderIndex });
+      Renderer.hideModal();
+    } else {
+      const nextPid = this.getNextActivePlayer(pid);
+      StateManager.set({ players, hidingProgress: nextHiding, activePlayerIndex: nextPid, phase: 'hiding-ready' });
+      Renderer.hideModal();
+    }
+  },
+
+  // 撤销藏狗：重置所有存活玩家的卡牌，从领袖重新开始藏狗
+  restartHiding() {
+    const s = StateManager.get();
+    const players = s.players.map(p => ({
+      ...p,
+      cards: Array(5).fill('back'),
+    }));
+    StateManager.set({
+      players,
+      hidingProgress: 0,
+      activePlayerIndex: s.leaderIndex,
+      phase: 'hiding-ready',
+    });
+  },
+
+  // 进入搜查阶段，重置行动玩家为领袖
+  startSearching() {
+    const s = StateManager.get();
+    StateManager.set({ phase: 'searching-ready', activePlayerIndex: s.leaderIndex, openDoors: [] });
+  },
+
+  // 弹出领袖首次选门弹窗，强制选择1扇门打开
+  showLeaderDoorSelect() {
+    const s = StateManager.get();
+    Renderer.showModal({
+      title: `领袖⭐️ 玩家${s.leaderIndex+1} 开门`,
+      text: '请选择1扇门打开',
+      type: 'leader-door',
+    });
+  },
+
+  // 领袖开门：记录已开门，传递给下一位玩家或触发全员OK结算
+  leaderOpenDoor(doorNum) {
+    const s = StateManager.get();
+    const openDoors = [...s.openDoors, doorNum];
+    const nextPid = this.getNextActivePlayer(s.leaderIndex);
+    if (nextPid === -1 || nextPid === s.leaderIndex) {
+      StateManager.set({ openDoors });
+      Renderer.hideModal();
+      this.resolveAllOk();
+    } else {
+      StateManager.set({ openDoors, activePlayerIndex: nextPid, phase: 'searching-ready' });
+      Renderer.hideModal();
+    }
+  },
+
+  // 弹出非领袖行动弹窗，提供OK/再开一扇/重新开门/揭发四个选项
+  showNonLeaderActions() {
+    const s = StateManager.get();
+    const pid = s.activePlayerIndex;
+    const isLeader = pid === s.leaderIndex;
+    const canReopen = s.openDoors.length > 0 && (5 - s.openDoors.length) >= (s.openDoors.length + 1);
+    const canOpenAnother = s.openDoors.length < 5;
+    const unrevealedIndices = isLeader ? [] : s.players[s.leaderIndex].revealedThisRound
+      .map((r, i) => r ? -1 : i).filter(i => i >= 0);
+    const canAccuse = !isLeader && unrevealedIndices.length > 0;
+
+    Renderer.showModal({
+      title: `玩家${pid+1} 行动`,
+      text: isLeader ? '选择你的行动' : `选择你的行动（当前领袖⭐️ 玩家${s.leaderIndex+1} ）`,
+      type: 'non-leader',
+      canReopen,
+      canOpenAnother,
+      canAccuse,
+      unrevealedIndices,
+    });
+  },
+
+  // 处理非领袖玩家的行动选择（ok/open-another/reopen/accuse）
+  nonLeaderAction(action, payload, leaderIdxOverride) {
+    const s = StateManager.get();
+    const pid = s.activePlayerIndex;
+    const currentLeader = leaderIdxOverride !== undefined ? leaderIdxOverride : s.leaderIndex;
+    const activeNonLeaderCount = s.players.filter((p, i) => !p.isOut && i !== currentLeader).length;
+
+    if (action === 'ok') {
+      const isLeader = pid === currentLeader;
+      let okPlayers = s.okPlayers;
+      if (!isLeader && !okPlayers.includes(pid)) {
+        okPlayers = [...okPlayers, pid];
+      }
+      StateManager.set({ okPlayers });
+      Renderer.hideModal();
+
+      const activeNonLeaders = s.players.filter((p, i) => !p.isOut && i !== currentLeader);
+      const allOk = activeNonLeaders.every(p => okPlayers.includes(p.id));
+      if (!isLeader && allOk) {
+        this.resolveAllOk();
+        return;
+      }
+      // Pass to next non-leader or back to leader
+      this.passToNextOrLeader(pid, currentLeader);
+    }
+    else if (action === 'open-another') {
+      const doorNum = payload;
+      const openDoors = [...s.openDoors, doorNum];
+      // open-another clears all OK records
+      StateManager.set({ openDoors, leaderIndex: pid, okPlayers: [] });
+      Renderer.hideModal();
+      // Pass to next non-leader (relative to new leader) or back to new leader
+      this.passToNextOrLeader(pid, pid);
+    }
+    else if (action === 'reopen') {
+      const currentCount = s.openDoors.length;
+      const newCount = currentCount + 1;
+      const closedDoors = [1,2,3,4,5].filter(d => !s.openDoors.includes(d));
+      Renderer.hideModal();
+      Renderer.showModal({
+        title: `重新开门`,
+        text: `关闭当前${currentCount}扇门，选择${newCount}扇新门打开`,
+        type: 'reopen-select',
+        newCount,
+        availableDoors: closedDoors,
+      });
+    }
+    else if (action === 'accuse') {
+      const cardIdx = payload;
+      const players = [...s.players];
+      const leaderCard = players[currentLeader].cards[cardIdx];
+      players[currentLeader].revealedThisRound[cardIdx] = true;
+      // Accuser's OK record removed since last action is accuse
+      const okPlayers = s.okPlayers.filter(id => id !== pid);
+
+      if (leaderCard === 'dog') {
+        StateManager.set({ players, okPlayers });
+        Renderer.hideModal();
+        this.resolveSettlement('accuse-dog', { loserId: currentLeader, accuserId: pid });
+      } else {
+        StateManager.set({ players, okPlayers });
+        Renderer.hideModal();
+
+        // Check if leader now has >=3 crosses revealed → immediate settlement
+        const leaderCrossCount = players[currentLeader].revealedThisRound
+          .filter((r, i) => r && players[currentLeader].cards[i] === 'cross').length;
+        if (leaderCrossCount >= 3) {
+          this.resolveSettlement('leader-3-cross', {});
+          return;
+        }
+
+        // Leader 2nd cross revealed → mark for door reset, pass to leader
+        if (leaderCrossCount === 2) {
+          StateManager.set({
+            phase: 'searching-ready',
+            activePlayerIndex: currentLeader,
+            leaderResetPending: true,
+          });
+          return;
+        }
+
+        // Accuse cross does NOT count as OK, pass to next or back to leader
+        this.passToNextOrLeader(pid, currentLeader);
+      }
+    }
+  },
+
+  // 将行动权传递给下一位存活玩家，若回到领袖则领袖再次行动
+  passToNextOrLeader(fromPid, currentLeader) {
+    const nextPid = this.getNextActivePlayer(fromPid);
+    if (nextPid === -1) {
+      // No one left, should not happen but fallback to leader
+      StateManager.set({ activePlayerIndex: currentLeader, phase: 'searching-ready' });
+    } else if (nextPid === currentLeader) {
+      // Wrapped back to leader — not all OK, leader gets another turn
+      StateManager.set({ activePlayerIndex: currentLeader, phase: 'searching-ready' });
+    } else {
+      StateManager.set({ activePlayerIndex: nextPid, phase: 'searching-ready' });
+    }
+  },
+
+  // 确认重新开门：替换已开门集合，夺取领袖标记并重置okPlayers
+  confirmReopen(selectedDoors) {
+    const s = StateManager.get();
+    const pid = s.activePlayerIndex;
+    StateManager.set({ openDoors: selectedDoors, leaderIndex: pid, okPlayers: [] });
+    Renderer.hideModal();
+    this.passToNextOrLeader(pid, pid);
+  },
+
+  // 全员OK或领袖≥3❌️时触发结算入口，延迟到用户确认后再执行翻牌和计算
+  resolveAllOk() {
+    this.resolveSettlement('all-ok', {});
+  },
+
+  // 进入待结算阶段：暂存触发信息，不翻牌不弹窗，等待用户点击【查看结算】
+  resolveSettlement(triggerType, data) {
+    StateManager.set({
+      phase: 'pending-settlement',
+      pendingSettlement: { triggerType, ...data },
+    });
+  },
+
+  // 用户点击【查看结算】后执行：翻牌、计算胜负、判定终局并弹出对应弹窗
+  confirmSettlement() {
+    const s = StateManager.get();
+    const pending = s.pendingSettlement;
+    if (!pending) return;
+    const triggerType = pending.triggerType;
+    const players = s.players.map(p => ({...p, revealedThisRound: [...p.revealedThisRound]}));
+    const sortedDoors = [...s.openDoors].sort((a,b) => a-b);
+    const order = [];
+    let idx = s.leaderIndex;
+    for (let i = 0; i < s.playerCount; i++) {
+      if (!players[idx].isOut) order.push(idx);
+      idx = (idx + 1) % s.playerCount;
+    }
+
+    let loserId = -1;
+    let winnerIds = [];
+    let accuserId = pending.accuserId;
+
+    if (triggerType === 'accuse-dog') {
+      loserId = pending.loserId;
+      players[loserId].losses += 1;
+      if (players[loserId].losses >= 3) players[loserId].isOut = true;
+
+      for (const pidx of order) {
+        if (pidx === loserId) continue;
+        const dogIdx = players[pidx].cards.indexOf('dog');
+        if (dogIdx >= 0 && players[pidx].revealedThisRound[dogIdx]) continue;
+        const crossCount = players[pidx].revealedThisRound.filter((r, i) => r && players[pidx].cards[i] === 'cross').length;
+        const threshold = (pidx === accuserId) ? 2 : 3;
+        if (crossCount >= threshold) {
+          players[pidx].wins += 1;
+          winnerIds.push(pidx);
+        }
+      }
+    } else if (triggerType === 'all-ok') {
+      let dogFound = false;
+      for (const pid of order) {
+        for (const doorNum of sortedDoors) {
+          const cardIdx = doorNum - 1;
+          if (players[pid].revealedThisRound[cardIdx]) continue;
+          players[pid].revealedThisRound[cardIdx] = true;
+          if (players[pid].cards[cardIdx] === 'dog' && !dogFound) {
+            dogFound = true;
+            loserId = pid;
+          }
+        }
+        if (dogFound) break;
+      }
+
+      if (dogFound) {
+        players[loserId].losses += 1;
+        if (players[loserId].losses >= 3) players[loserId].isOut = true;
+        for (const pid of order) {
+          if (pid === loserId) continue;
+          const dogIdx = players[pid].cards.indexOf('dog');
+          if (dogIdx >= 0 && players[pid].revealedThisRound[dogIdx]) continue;
+          const crossCount = players[pid].revealedThisRound.filter((r, i) => r && players[pid].cards[i] === 'cross').length;
+          if (crossCount >= 3) {
+            players[pid].wins += 1;
+            winnerIds.push(pid);
+          }
+        }
+      } else {
+        for (const pid of order) {
+          const crossCount = players[pid].revealedThisRound.filter((r, i) => r && players[pid].cards[i] === 'cross').length;
+          if (crossCount >= 3) {
+            players[pid].wins += 1;
+            winnerIds.push(pid);
+          }
+        }
+      }
+    } else if (triggerType === 'leader-3-cross') {
+      winnerIds = [s.leaderIndex];
+      players[s.leaderIndex].wins += 1;
+    }
+
+    const actualTrigger = triggerType === 'all-ok' ? (loserId >= 0 ? 'all-ok-dog' : 'all-ok-safe') : triggerType;
+    const settlementInfo = { triggerType: actualTrigger, loserId, winnerIds };
+    if (accuserId !== undefined) settlementInfo.accuserId = accuserId;
+
+    // Temporarily apply players to check game over without triggering render
+    const prevPlayers = s.players;
+    s.players = players;
+    const gameOver = this.checkGameOver();
+    s.players = prevPlayers;
+
+    const newPhase = gameOver ? 'gameover' : 'settlement';
+    StateManager.set({ players, settlementInfo, phase: newPhase });
+
+    if (gameOver) {
+      Renderer.showGameOverModal();
+    } else {
+      Renderer.showSettlementModal();
+    }
+  },
+
+  // 检查游戏是否结束：有人达到2胜或仅剩1名存活玩家
+  checkGameOver() {
+    const s = StateManager.get();
+    const winners = s.players.filter(p => p.wins >= 2);
+    if (winners.length > 0) return true;
+    const alive = s.players.filter(p => !p.isOut);
+    if (alive.length <= 1) return true;
+    return false;
+  },
+
+  // 开始新一轮：重置卡牌和翻开状态，保留胜负记录和出局状态，清空结算信息
+  startNewRound() {
+    const s = StateManager.get();
+    const players = s.players.map(p => ({
+      ...p,
+      cards: Array(5).fill('back'),
+      revealedThisRound: Array(5).fill(false),
+    }));
+    let leader = s.leaderIndex;
+    if (players[leader].isOut) {
+      leader = this.getNextActivePlayer(leader);
+      if (leader === -1) leader = 0;
+    }
+    StateManager.set({
+      players,
+      phase: 'hiding-ready',
+      leaderIndex: leader,
+      activePlayerIndex: leader,
+      openDoors: [],
+      roundNumber: s.roundNumber + 1,
+      hidingProgress: 0,
+      okPlayers: [],
+      actedCount: 0,
+      settlementInfo: null,
+      pendingSettlement: null,
+      leaderResetPending: false,
+      roundStartLeader: leader,
+    });
+    Renderer.hideModal();
+  },
+
+  // 完全重置游戏到初始选择人数界面
+  fullReset() {
+    Renderer.hideModal();
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    Renderer._cacheChecked = false;
+    StateManager.reset();
+  }
+};
+
+// ==================== RENDERER ====================
+const Renderer = {
+  _pendingCallback: null,
+  _reopenSelection: [],
+
+  _cacheChecked: false,
+
+  // 主渲染入口：根据当前phase切换设置界面或游戏面板，并刷新各子组件
+  render() {
+    const s = StateManager.get();
+    const setupScreen = document.getElementById('setup-screen');
+    const gameBoard = document.getElementById('game-board');
+
+    if (s.phase === 'setup') {
+      setupScreen.style.display = 'flex';
+      gameBoard.classList.remove('active');
+      this.renderSetupButtons();
+      if (!this._cacheChecked) {
+        this._cacheChecked = true;
+        const cache = StateManager.loadCache();
+        if (cache) {
+          this.showModal({
+            title: '检测到游戏进度',
+            text: `上次记录了${cache.playerCount}名玩家、第${cache.roundNumber}轮的进度，是否继续？`,
+            type: 'confirm',
+            onConfirm: () => GameLogic.initFromCache(cache),
+          });
+        }
+      }
+    } else {
+      setupScreen.style.display = 'none';
+      gameBoard.classList.add('active');
+      this.renderDoorBar();
+      this.renderPlayerRows();
+      this.renderActionBar();
+    }
+  },
+
+  // 渲染玩家数量选择按钮（2~5人），仅首次调用时创建
+  renderSetupButtons() {
+    const container = document.getElementById('count-buttons');
+    if (container.children.length > 0) return;
+    for (let i = 2; i <= 5; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.onclick = () => GameLogic.initGame(i);
+      container.appendChild(btn);
+    }
+  },
+
+  // 渲染门栏：搜查/结算阶段显示5扇门的开关状态
+  renderDoorBar() {
+    const s = StateManager.get();
+    const bar = document.getElementById('door-bar');
+    if (s.phase !== 'searching' && s.phase !== 'searching-ready' && s.phase !== 'settlement' && s.phase !== 'pending-settlement' && s.phase !== 'gameover') {
+      bar.classList.remove('active');
+      return;
+    }
+    bar.classList.add('active');
+    bar.innerHTML = '';
+    for (let d = 1; d <= 5; d++) {
+      const el = document.createElement('div');
+      el.className = 'door' + (s.openDoors.includes(d) ? ' open' : '');
+      el.innerHTML = `${s.openDoors.includes(d) ? '🚪' : '🔒'}<span class="door-label">${d}</span>`;
+      bar.appendChild(el);
+    }
+  },
+
+  // 渲染所有玩家的卡牌行：包含标签、领袖标记、高亮、翻开/背面状态
+  renderPlayerRows() {
+    const s = StateManager.get();
+    const container = document.getElementById('player-rows');
+    container.innerHTML = '';
+    s.players.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+      const isActive = i === s.activePlayerIndex && (s.phase === 'hiding-ready' || s.phase === 'hiding' || s.phase === 'searching' || s.phase === 'searching-ready');
+      if (isActive) row.classList.add('highlight');
+      if (p.isOut) row.classList.add('out');
+
+      const label = document.createElement('div');
+      label.className = 'player-label';
+      const isLeader = i === s.leaderIndex && (s.phase === 'searching' || s.phase === 'searching-ready' || s.phase === 'settlement' || s.phase === 'pending-settlement' || s.phase === 'gameover');
+      label.innerHTML = `
+        ${isLeader ? '<span class="leader-star">⭐️</span>' : ''}
+        <span class="name">玩家${i+1}</span>
+        <span class="stats">胜${p.wins} 败${p.losses}</span>
+      `;
+
+      let _lpTimer = null;
+      label.addEventListener('pointerdown', () => {
+        _lpTimer = setTimeout(() => Renderer.peekDog(i), 500);
+      });
+      label.addEventListener('pointerup', () => clearTimeout(_lpTimer));
+      label.addEventListener('pointerleave', () => clearTimeout(_lpTimer));
+
+      const slots = document.createElement('div');
+      slots.className = 'card-slots';
+      p.cards.forEach((card, ci) => {
+        const cel = document.createElement('div');
+        const revealed = p.revealedThisRound[ci];
+        cel.className = 'card' + (revealed ? ' revealed' : ' back');
+        if (revealed) {
+          cel.textContent = card === 'dog' ? '🐶' : '❌️';
+          if (card === 'dog') cel.classList.add('settlement-dog');
+        }
+        slots.appendChild(cel);
+      });
+
+      row.appendChild(label);
+      row.appendChild(slots);
+      container.appendChild(row);
+    });
+  },
+
+  // 渲染底部操作栏：根据phase显示行动按钮或结算提示+查看结算按钮
+  renderActionBar() {
+    const s = StateManager.get();
+    const bar = document.getElementById('action-bar');
+    bar.innerHTML = '';
+    if (s.phase === 'pending-settlement' || s.phase === 'settlement' || s.phase === 'gameover') {
+      const pending = s.pendingSettlement;
+      let reason = '';
+      if (pending && pending.triggerType === 'accuse-dog') {
+        reason = `玩家${pending.loserId+1}被揭发出🐶`;
+      } else if (pending && pending.triggerType === 'all-ok') {
+        reason = '所有非领袖玩家均选择OK';
+      } else if (pending && pending.triggerType === 'leader-3-cross') {
+        reason = '领袖被翻开3张❌️';
+      }
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px';
+      if (s.phase === 'pending-settlement') {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'color:#e94560;font-size:.95rem;font-weight:bold';
+        hint.textContent = `当前轮因「${reason}」将进行结算`;
+        wrapper.appendChild(hint);
+      }
+      const btn = document.createElement('button');
+      btn.textContent = '查看结算';
+      if (s.phase === 'settlement') {
+        btn.onclick = () => Renderer.showSettlementModal();
+      } else if (s.phase === 'gameover') {
+        btn.onclick = () => Renderer.showGameOverModal();
+      } else {
+        btn.onclick = () => GameLogic.confirmSettlement();
+      }
+      wrapper.appendChild(btn);
+      bar.appendChild(wrapper);
+    } else if (s.phase === 'hiding-ready') {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px';
+      const undoBtn = document.createElement('button');
+      undoBtn.textContent = '撤销';
+      undoBtn.style.cssText = 'background:transparent;color:#aaa;padding:8px 20px;border-radius:8px;font-size:.7rem;min-width:auto';
+      undoBtn.onclick = () => {
+        Renderer.showModal({
+          title: '撤销藏狗',
+          text: '确定要重新开始本轮藏狗吗？',
+          type: 'confirm',
+          onConfirm: () => GameLogic.restartHiding(),
+        });
+      };
+      wrapper.appendChild(undoBtn);
+      const btn = document.createElement('button');
+      btn.textContent = `玩家${s.activePlayerIndex + 1}行动`;
+      btn.onclick = () => {
+        StateManager.set({ phase: 'hiding' });
+        GameLogic.showHidingModal();
+      };
+      wrapper.appendChild(btn);
+      bar.appendChild(wrapper);
+    } else if (s.phase === 'searching-ready') {
+      if (s.leaderResetPending) {
+        const btn = document.createElement('button');
+        btn.textContent = `关所有门，领袖⭐️ 玩家${s.leaderIndex+1}重开一扇`;
+        btn.onclick = () => {
+          StateManager.set({ phase: 'searching', leaderResetPending: false, openDoors: [], okPlayers: [] });
+          GameLogic.showLeaderDoorSelect();
+        };
+        bar.appendChild(btn);
+      } else {
+        const btn = document.createElement('button');
+        const isLeaderFirstTurn = s.activePlayerIndex === s.leaderIndex && s.openDoors.length === 0;
+        btn.textContent = `玩家${s.activePlayerIndex + 1}行动`;
+        btn.onclick = () => {
+          StateManager.set({ phase: 'searching' });
+          if (isLeaderFirstTurn) {
+            GameLogic.showLeaderDoorSelect();
+          } else {
+            GameLogic.showNonLeaderActions();
+          }
+        };
+        bar.appendChild(btn);
+      }
+    }
+  },
+
+  // 通用弹窗渲染器：根据config.type渲染藏狗/选门/行动/选牌/重新开门等不同弹窗内容
+  showModal(config) {
+    const overlay = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
+    overlay.classList.add('active');
+
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+        const s = StateManager.get();
+        if (s.phase === 'hiding') {
+          StateManager.set({ phase: 'hiding-ready' });
+        } else if (s.phase === 'searching') {
+          StateManager.set({ phase: 'searching-ready' });
+        }
+      }
+    };
+    modal.onclick = (e) => e.stopPropagation();
+
+    if (config.type === 'hide') {
+      let selectedIdx = -1;
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="card-select" id="hide-cards"></div>
+        <button class="confirm-btn" id="hide-confirm" disabled>确认</button>
+      `;
+      const cardContainer = document.getElementById('hide-cards');
+      for (let i = 0; i < 5; i++) {
+        const c = document.createElement('div');
+        c.className = 'card back';
+        c.dataset.idx = i;
+        c.onclick = () => {
+          selectedIdx = i;
+          cardContainer.querySelectorAll('.card').forEach((el, j) => {
+            el.classList.toggle('selected', j === i);
+            el.textContent = j === i ? '🐶' : '❌️';
+            el.classList.remove('back');
+          });
+          document.getElementById('hide-confirm').disabled = false;
+        };
+        cardContainer.appendChild(c);
+      }
+      document.getElementById('hide-confirm').onclick = () => {
+        if (selectedIdx >= 0) GameLogic.confirmHide(selectedIdx);
+      };
+    }
+    else if (config.type === 'leader-door') {
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="card-select" id="door-cards"></div>
+      `;
+      const container = document.getElementById('door-cards');
+      for (let d = 1; d <= 5; d++) {
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.textContent = d;
+        c.style.cursor = 'pointer';
+        c.onclick = () => GameLogic.leaderOpenDoor(d);
+        container.appendChild(c);
+      }
+    }
+    else if (config.type === 'non-leader') {
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="action-buttons">
+          <button class="primary" id="btn-ok">OK</button>
+          <button id="btn-open-another" ${config.canOpenAnother ? '' : 'disabled'}>再开一扇</button>
+          <button id="btn-reopen" ${config.canReopen ? '' : 'disabled'}>重新开门</button>
+          <button id="btn-accuse" ${config.canAccuse ? '' : 'disabled'}>揭发领袖</button>
+        </div>
+      `;
+      document.getElementById('btn-ok').onclick = () => GameLogic.nonLeaderAction('ok');
+      document.getElementById('btn-open-another').onclick = () => {
+        this.hideModal();
+        const s = StateManager.get();
+        const closedDoors = [1,2,3,4,5].filter(d => !s.openDoors.includes(d));
+        this.showModal({
+          title: '再开一扇',
+          text: '选择1扇未开启的门',
+          type: 'pick-door',
+          doors: closedDoors,
+          callback: (d) => GameLogic.nonLeaderAction('open-another', d),
+        });
+      };
+      document.getElementById('btn-reopen').onclick = () => GameLogic.nonLeaderAction('reopen');
+      document.getElementById('btn-accuse').onclick = () => {
+        this.hideModal();
+        const s = StateManager.get();
+        const leaderAtModalTime = s.leaderIndex;
+        this.showModal({
+          title: `揭发领袖⭐️ 玩家${leaderAtModalTime+1}`,
+          text: `选择1张未翻开的牌`,
+          type: 'pick-card',
+          indices: config.unrevealedIndices,
+          callback: (idx) => GameLogic.nonLeaderAction('accuse', idx, leaderAtModalTime),
+        });
+      };
+    }
+    else if (config.type === 'pick-door') {
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="card-select" id="pick-doors"></div>
+      `;
+      const container = document.getElementById('pick-doors');
+      config.doors.forEach(d => {
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.textContent = d;
+        c.style.cursor = 'pointer';
+        c.onclick = () => { this.hideModal(); config.callback(d); };
+        container.appendChild(c);
+      });
+    }
+    else if (config.type === 'pick-card') {
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="card-select" id="pick-cards"></div>
+      `;
+      const container = document.getElementById('pick-cards');
+      config.indices.forEach(i => {
+        const c = document.createElement('div');
+        c.className = 'card back';
+        c.textContent = i + 1;
+        c.style.cursor = 'pointer';
+        c.onclick = () => { this.hideModal(); config.callback(i); };
+        container.appendChild(c);
+      });
+    }
+    else if (config.type === 'reopen-select') {
+      this._reopenSelection = [];
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="card-select" id="reopen-doors"></div>
+        <button class="confirm-btn" id="reopen-confirm" disabled>确认</button>
+      `;
+      const container = document.getElementById('reopen-doors');
+      config.availableDoors.forEach(d => {
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.textContent = d;
+        c.style.cursor = 'pointer';
+        c.onclick = () => {
+          if (this._reopenSelection.includes(d)) {
+            this._reopenSelection = this._reopenSelection.filter(x => x !== d);
+          } else if (this._reopenSelection.length < config.newCount) {
+            this._reopenSelection.push(d);
+          }
+          container.querySelectorAll('.card').forEach(el => {
+            el.classList.toggle('selected', this._reopenSelection.includes(parseInt(el.textContent)));
+          });
+          document.getElementById('reopen-confirm').disabled = this._reopenSelection.length !== config.newCount;
+        };
+        container.appendChild(c);
+      });
+      document.getElementById('reopen-confirm').onclick = () => {
+        if (this._reopenSelection.length === config.newCount) {
+          GameLogic.confirmReopen([...this._reopenSelection]);
+        }
+      };
+    }
+    else if (config.type === 'confirm') {
+      modal.innerHTML = `
+        <h3>${config.title}</h3>
+        <p>${config.text}</p>
+        <div class="action-buttons">
+          <button class="primary" id="confirm-yes">确定</button>
+          <button id="confirm-no">取消</button>
+        </div>
+      `;
+      document.getElementById('confirm-yes').onclick = () => {
+        this.hideModal();
+        if (config.onConfirm) config.onConfirm();
+      };
+      document.getElementById('confirm-no').onclick = () => {
+        this.hideModal();
+      };
+    }
+  },
+
+  // 关闭通用弹窗
+  hideModal() {
+    document.getElementById('modal-overlay').classList.remove('active');
+  },
+
+  // 长按玩家标签查看狗的位置
+  peekDog(playerIdx) {
+    const s = StateManager.get();
+    const player = s.players[playerIdx];
+    const dogIdx = player.cards.indexOf('dog');
+    if (dogIdx < 0) return;
+    this.showModal({
+      title: '查看小狗位置',
+      text: `是否查看玩家${playerIdx + 1}的🐶的位置？`,
+      type: 'confirm',
+      onConfirm: () => {
+        const doorNum = dogIdx + 1;
+        Renderer.showModal({
+          title: '小狗位置',
+          text: `玩家${playerIdx + 1}的🐶在第 ${doorNum} 扇门后`,
+          type: 'confirm',
+          onConfirm: null,
+        });
+      },
+    });
+  },
+
+  // 显示传手机遮罩层，提示下一位玩家确认身份后执行回调
+  showPassOverlay(nextPid, callback) {
+    const overlay = document.getElementById('pass-overlay');
+    overlay.classList.add('active');
+    overlay.innerHTML = `
+      <h2>请将手机传给左手边玩家</h2>
+      <p>下一位：玩家${nextPid + 1}</p>
+      <button id="pass-confirm">我是玩家${nextPid + 1}</button>
+    `;
+    this._pendingCallback = callback;
+    document.getElementById('pass-confirm').onclick = () => {
+      overlay.classList.remove('active');
+      if (this._pendingCallback) {
+        const cb = this._pendingCallback;
+        this._pendingCallback = null;
+        cb();
+      }
+    };
+  },
+
+  // 弹出本轮结算弹窗：展示触发原因、胜负结果和各玩家当前战绩
+  showSettlementModal() {
+    const s = StateManager.get();
+    const info = s.settlementInfo;
+    let html = `<h3>本轮结算</h3><p>`;
+    if (info.triggerType === 'accuse-dog') {
+      html += `玩家${info.loserId+1} 被揭发出🐶！失败+1<br>`;
+      if (info.winnerIds.length > 0) {
+        const names = info.winnerIds.map(id => {
+          if (id === info.accuserId) return `玩家${id+1}(揭发者)`;
+          return `玩家${id+1}`;
+        });
+        html += `${names.join(', ')} 成功+1`;
+      }
+    } else if (info.triggerType === 'all-ok-dog') {
+      html += `玩家${info.loserId+1} 被翻出🐶！失败+1`;
+      if (info.winnerIds.length > 0) {
+        html += `<br>玩家${info.winnerIds.map(id=>id+1).join(',')} 翻开≥3张❌️，成功+1`;
+      }
+    } else if (info.triggerType === 'leader-3-cross') {
+      html += `领袖被翻开3张❌️！领袖成功+1`;
+    } else {
+      if (info.winnerIds.length > 0) {
+        html += `玩家${info.winnerIds.map(id=>id+1).join(',')} 翻开≥3张❌️，成功+1`;
+      } else {
+        html += `本轮无人达成成功条件`;
+      }
+    }
+    html += `</p><p>当前状态：</p><ul style="text-align:left;padding-left:20px;color:#ccc;font-size:.85rem">`;
+    s.players.forEach(p => {
+      if (!p.isOut) html += `<li>玩家${p.id+1}：胜${p.wins}/2 败${p.losses}/3</li>`;
+      else html += `<li>玩家${p.id+1}：已出局</li>`;
+    });
+    html += `</ul><button class="confirm-btn" onclick="GameLogic.startNewRound()">下一轮</button>`;
+    const overlay = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
+    overlay.classList.add('active');
+    modal.innerHTML = html;
+  },
+
+  // 弹出游戏结束弹窗：展示获胜者或最后幸存者、本轮结算信息，提供重新开始按钮
+  showGameOverModal() {
+    const s = StateManager.get();
+    const winners = s.players.filter(p => p.wins >= 2);
+    const alive = s.players.filter(p => !p.isOut);
+    let html = `<h3>游戏结束</h3><p>`;
+    if (winners.length > 0) {
+      html += `🎉 玩家${winners.map(p=>p.id+1).join(', ')} 获胜！`;
+    } else {
+      html += `🏆 玩家${alive.map(p=>p.id+1).join(', ')} 成为最后幸存者！`;
+    }
+    html += `</p>`;
+
+    // 本轮结算信息
+    const info = s.settlementInfo;
+    if (info) {
+      html += `<p style="border-top:1px solid #333;padding-top:8px;margin-top:8px"><b>本轮结算：</b><br>`;
+      if (info.triggerType === 'accuse-dog') {
+        html += `玩家${info.loserId+1} 被揭发出🐶！失败+1<br>`;
+        if (info.winnerIds.length > 0) {
+          const names = info.winnerIds.map(id => {
+            if (id === info.accuserId) return `玩家${id+1}(揭发者)`;
+            return `玩家${id+1}`;
+          });
+          html += `${names.join(', ')} 成功+1`;
+        }
+      } else if (info.triggerType === 'all-ok-dog') {
+        html += `玩家${info.loserId+1} 被翻出🐶！失败+1`;
+        if (info.winnerIds.length > 0) {
+          html += `<br>玩家${info.winnerIds.map(id=>id+1).join(',')} 翻开≥3张❌️，成功+1`;
+        }
+      } else if (info.triggerType === 'leader-3-cross') {
+        html += `领袖被翻开3张❌️！领袖成功+1`;
+      } else {
+        if (info.winnerIds.length > 0) {
+          html += `玩家${info.winnerIds.map(id=>id+1).join(',')} 翻开≥3张❌️，成功+1`;
+        } else {
+          html += `本轮无人达成成功条件`;
+        }
+      }
+      html += `</p>`;
+    }
+
+    html += `<p>最终状态：</p><ul style="text-align:left;padding-left:20px;color:#ccc;font-size:.85rem;margin:12px 0">`;
+    s.players.forEach(p => {
+      html += `<li>玩家${p.id+1}：胜${p.wins} 败${p.losses} ${p.isOut?'(出局)':''}</li>`;
+    });
+    html += `</ul><button class="confirm-btn" onclick="GameLogic.fullReset()">重新开始游戏</button>`;
+    const overlay = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
+    overlay.classList.add('active');
+    modal.innerHTML = html;
+  },
+
+  // 显示游戏规则说明页面
+  showRules() {
+    const modal = document.getElementById('rules-modal');
+    const content = document.getElementById('rules-content');
+    content.innerHTML = `
+      <h3>游戏目标</h3>
+      <p>累计2次成功获胜；累计3次失败出局。</p>
+      <h3>游戏流程</h3>
+      <ul>
+        <li><b>藏狗</b>：每人将🐶藏在5张牌中的1张，其余为❌️</li>
+        <li><b>搜查</b>：领袖⭐先开1扇门，之后所有人依次行动（四选一）：
+          <ul>
+            <li><b>OK</b>：记录该玩家认为开这些门是OK的</li>
+            <li><b>再开一扇</b>：再开1扇未开的门，成为新领袖⭐️</li>
+            <li><b>重新开门</b>：关门后重开(原数量+1)扇的门，成为新领袖⭐️</li>
+            <li><b>揭发领袖</b>：翻开领袖1张未翻开的牌（领袖不可揭发自己）</li>
+          </ul>
+        </li>
+      </ul>
+      <h3>结算触发</h3>
+      <ul>
+        <li><b>全员OK</b>：所有非领袖均OK时触发。从领袖起按顺序翻玩家<开门>的牌，翻出🐶则该玩家失败+1，终止后续翻牌</li>
+        <li><b>揭发领袖出🐶</b>：立即结算领袖失败+1</li>
+        <li><b>揭发领袖≥3张❌️</b>：领袖本局成功+1，其余玩家不参与结算</li>
+      </ul>
+      <h3>结算判定</h3>
+      <ul>
+        <li>被翻出🐶：失败+1</li>
+        <li>翻开≥3张❌️且未被翻出🐶：成功+1</li>
+        <li>揭发者翻出🐶时，自己若有≥2张❌️：成功+1</li>
+      </ul>
+    `;
+    document.getElementById('rules-scroll').scrollTop = 0;
+    modal.classList.add('active');
+  }
+};
+
+document.getElementById('rules-close').onclick = () => document.getElementById('rules-modal').classList.remove('active');
+
+// ==================== INIT ====================
+document.getElementById('help-btn').onclick = () => Renderer.showRules();
+
+let longPressTimer = null;
+const title = document.getElementById('title');
+title.addEventListener('pointerdown', () => {
+  longPressTimer = setTimeout(() => {
+    if (confirm('确定要重置整个游戏吗？所有进度将丢失。')) {
+      GameLogic.fullReset();
+    }
+  }, 1000);
+});
+title.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+title.addEventListener('pointerleave', () => clearTimeout(longPressTimer));
+
+StateManager.load();
+Renderer.render();
+
+window.addEventListener('beforeunload', (e) => {
+  const s = StateManager.get();
+  if (s.phase !== 'setup') {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// PV tracking via Supabase
+// fetch('https://smcplxyjjvehbizirvrw.supabase.co/rest/v1/page_views', {
+//   method: 'POST',
+//   headers: {
+//     'apikey': 'sb_publishable_oxRaF279KqO-4ZEhcxl2RQ_gfXA84mt',
+//     'Content-Type': 'application/json',
+//     'Prefer': 'return=minimal',
+//   },
+//   body: JSON.stringify({
+//     page: 'dog-joker',
+//     user_agent: navigator.userAgent,
+//     referrer: document.referrer,
+//   }),
+//   keepalive: true,
+// });
+</script>
+</body>
+</html>

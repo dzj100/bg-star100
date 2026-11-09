@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>捉虫猫日记</title>
+<style>
+:root {
+  --bg: #d6e8f0;
+  --surface: #faf5eb;
+  --card-bg: #fff8ee;
+  --accent: #d94f5c;
+  --gold: #e8a832;
+  --text: #3d3228;
+  --text-dim: #8a7e72;
+  --safe: #5aad5e;
+  --danger: #d94f5c;
+  --radius: 14px;
+  --btn-h: 56px;
+  --blue: #5ba4d9;
+  --orange: #e8943a;
+  --grass: #ade9aa;
+  --stone: #afaeae;
+  --swamp: #ad9978;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:-apple-system,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; overflow-x:hidden; }
+
+/* Landing */
+#landing { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100dvh; padding:20px; text-align:center; }
+#landing h1 { font-size:2rem; margin-bottom:8px; color:var(--gold); }
+#landing p { color:var(--text-dim); margin-bottom:48px; }
+#landing .credit { position:absolute; bottom:10px; font-size:.75rem; color:var(--text-dim); }
+.btn-primary { background:var(--accent); color:#fff; border:none; height:var(--btn-h); padding:0 32px; border-radius:var(--radius); font-size:18px; cursor:pointer; box-shadow:none; }
+.btn-primary:active { opacity:.8; }
+
+/* Game */
+#game { display:none; flex-direction:column; min-height:100dvh; padding:56px 12px 12px; padding-bottom:max(12px, env(safe-area-inset-bottom)); }
+
+/* Top bar */
+.top-bar { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--surface); border-radius:var(--radius); margin-bottom:12px; }
+.player-indicator { display:flex; align-items:center; gap:8px; font-weight:bold; font-size:16px; }
+.player-dot { width:12px; height:12px; border-radius:50%; }
+.score-board { display:flex; gap:12px; font-size:14px; }
+.score-item { display:flex; align-items:center; gap:4px; }
+
+/* Grid */
+.grid-container { flex:1; display:flex; align-items:center; justify-content:center; }
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:min(90vw, 360px); aspect-ratio:1; }
+
+/* Tile with 3D flip */
+.tile-wrapper { position:relative; perspective:600px; cursor:pointer; border-radius:12px; }
+.tile-wrapper.disabled { pointer-events:none; }
+.tile-inner { position:relative; width:100%; height:100%; transition:transform 0.5s ease; transform-style:preserve-3d; border-radius:12px; }
+.tile-inner.flipped { transform:rotateY(180deg); }
+.tile-face { position:absolute; inset:0; backface-visibility:hidden; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:13px; user-select:none; }
+.tile-front { z-index:2; }
+.tile-back { transform:rotateY(180deg); background:var(--card-bg); }
+.tile-front.grass { background:var(--grass); }
+.tile-front.stone { background:var(--stone); }
+.tile-front .front-icon { font-size:28px; opacity:1; text-shadow:1px 1px 0 rgba(60,50,40,.3); }
+.tile-back .back-content { display:flex; flex-wrap:wrap; gap:2px; justify-content:center; align-items:center; font-size:20px; }
+.tile-back.swamp-tile { background:var(--swamp); }
+
+/* Overlays on tile */
+.tile-overlay { position:absolute; inset:0; border-radius:12px; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:10; }
+.net-marker { font-size:72px; opacity:.5; }
+.net-blue { border:3px solid var(--blue); background:rgba(91,164,217,.18); }
+.net-orange { border:3px solid var(--orange); background:rgba(232,148,58,.18); }
+
+/* Player tokens */
+.player-token { position:absolute; width:36px; height:36px; border-radius:50%; border:2px solid #fff; z-index:20; display:flex; align-items:center; justify-content:center; font-size:18px; transition:all .3s ease; box-shadow:0 2px 6px rgba(0,0,0,.4); }
+.token-blue { background:var(--blue); top:4px; left:4px; }
+.token-orange { background:var(--orange); bottom:4px; right:4px; }
+
+/* Highlight valid moves */
+.tile-wrapper.valid-move::after { content:''; position:absolute; inset:0; border-radius:12px; border:3px solid var(--gold); z-index:15; animation:pulse 1s infinite; pointer-events:none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Path highlight */
+.tile-wrapper.in-path::after { content:''; position:absolute; inset:0; border-radius:12px; border:3px dashed var(--gold); z-index:15; pointer-events:none; }
+
+/* Game over bar */
+.game-over-bar { margin-top:12px; }
+
+/* Bottom panel */
+.bottom-panel { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+.action-row { display:flex; gap:8px; }
+.action-btn { flex:1; height:var(--btn-h); border:none; border-radius:var(--radius); font-size:14px; font-weight:bold; cursor:pointer; color:#fff; transition:all .2s; }
+.action-btn:disabled { opacity:.3; cursor:not-allowed; }
+.action-btn.selected { outline:3px solid var(--gold); outline-offset:2px; }
+.action-btn.act1 { background:#4a90d9; }
+.action-btn.act2 { background:#b55dae; }
+.action-btn.act3 { background:#e8734a; }
+
+.control-row { display:flex; gap:8px; }
+.ctrl-btn { flex:1; height:var(--btn-h); border:none; border-radius:var(--radius); font-size:14px; cursor:pointer; color:#fff; }
+.ctrl-btn.undo { background:#8a9bae; }
+.ctrl-btn.cancel { background:#a08060; }
+.ctrl-btn.confirm { background:var(--safe); }
+.ctrl-btn:disabled { opacity:.3; cursor:not-allowed; }
+
+.info-text { text-align:center; font-size:13px; color:var(--text-dim); min-height:20px; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(60,50,40,.5); z-index:100; display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+.modal-overlay.show { opacity:1; pointer-events:auto; }
+.modal { background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-width:480px; max-height:80dvh; overflow-y:auto; padding:24px 20px; padding-bottom:max(24px, env(safe-area-inset-bottom)); transform:translateY(100%); transition:transform .25s ease-out; text-align:center; }
+.modal-overlay.show .modal { transform:translateY(0); }
+.modal h2 { font-size:24px; margin-bottom:12px; color:var(--gold); }
+.modal p { margin-bottom:20px; color:var(--text-dim); }
+.modal .btn-primary { width:100%; }
+
+/* Flip choice modal */
+.flip-choices { display:flex; flex-direction:column; gap:10px; }
+.flip-choices button { width:100%; height:var(--btn-h); border:none; border-radius:var(--radius); font-size:16px; cursor:pointer; color:#fff; }
+.flip-choices .choice-flip-back { background:#8a9bae; }
+.flip-choices .choice-net { background:var(--accent); }
+.flip-choices .choice-nothing { background:#a08060; }
+
+/* Header bar */
+.header-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--surface); box-shadow:0 1px 4px rgba(60,50,40,.12); position:fixed; top:0; left:0; right:0; z-index:50; }
+.header-title { font-size:16px; font-weight:bold; color:var(--text); }
+.header-actions { display:flex; gap:8px; }
+.header-btn { background:rgba(60,50,40,.08); border:1px solid rgba(60,50,40,.2); border-radius:8px; padding:6px 14px; font-size:13px; color:var(--text); cursor:pointer; display:flex; align-items:center; gap:6px; }
+.header-btn:active { opacity:.7; }
+.header-btn .btn-icon { font-size:15px; }
+
+/* Landing header */
+#landing { position:relative; }
+.landing-header { position:absolute; top:0; right:0; padding:10px 16px; }
+
+/* Rules modal content */
+.rules-content { text-align:left; font-size:14px; line-height:1.8; color:var(--text); max-height:60dvh; overflow-y:auto; }
+.rules-content h3 { font-size:16px; margin:16px 0 8px; color:var(--text); }
+.rules-content h3:first-child { margin-top:0; }
+.rules-content ul { padding-left:20px; margin:4px 0; }
+.rules-content li { margin:2px 0; }
+.rules-content p { margin:4px 0; }
+
+/* Confirm modal */
+.confirm-actions { display:flex; gap:10px; margin-top:16px; }
+.confirm-actions button { flex:1; height:var(--btn-h); border:none; border-radius:var(--radius); font-size:16px; cursor:pointer; color:#fff; }
+.confirm-yes { background:var(--accent); }
+.confirm-no { background:#a08060; color:#fff !important; }
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <div class="landing-header">
+    <button class="header-btn" onclick="showRules()"><span class="btn-icon">📖</span> 规则</button>
+  </div>
+  <h1>🐱 捉虫猫日记</h1>
+  <p>2人对战桌游助手</p>
+  <button class="btn-primary" onclick="startGame()">开始游戏</button>
+  <div class="credit">@imStar100</div>
+</div>
+
+<div id="game">
+  <div class="header-bar">
+    <div class="header-title">捉虫猫日记</div>
+    <div class="header-actions">
+      <button class="header-btn" onclick="confirmRestart()"><span class="btn-icon">🔄</span> 重置</button>
+      <button class="header-btn" onclick="showRules()"><span class="btn-icon">📖</span> 规则</button>
+    </div>
+  </div>
+  <div class="top-bar">
+    <div class="player-indicator">
+      <div class="player-dot" id="turnDot"></div>
+      <span id="turnName"></span>
+    </div>
+    <div class="score-board">
+      <div class="score-item">🦋 <span id="butterflyCount">0</span></div>
+      <div class="score-item">🐞 <span id="ladybugCount">0</span></div>
+    </div>
+  </div>
+  <div class="info-text" id="infoText"></div>
+  <div class="grid-container">
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="game-over-bar" id="gameOverBar" style="display:none">
+    <button class="btn-primary" style="width:100%" onclick="resetGame()">再来一局</button>
+  </div>
+  <div class="bottom-panel">
+    <div class="action-row" id="actionRow">
+      <button class="action-btn act1" id="btnAct0" onclick="selectAction(0)">走1步<br><small>翻到达格</small></button>
+      <button class="action-btn act2" id="btnAct1" onclick="selectAction(1)">走2步<br><small>翻途径格</small></button>
+      <button class="action-btn act3" id="btnAct2" onclick="selectAction(2)">走3步<br><small>翻出发格</small></button>
+    </div>
+    <div class="control-row" id="controlRow" style="display:none">
+      <button class="ctrl-btn undo" onclick="undoStep()">撤销</button>
+      <button class="ctrl-btn cancel" onclick="cancelPath()">取消</button>
+      <button class="ctrl-btn confirm" id="btnConfirm" onclick="confirmMove()" disabled>确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Flip choice modal -->
+<div class="modal-overlay" id="flipModal" onclick="if(event.target===this)closeFlipModal()">
+  <div class="modal">
+    <h2 id="flipModalTitle">选择操作</h2>
+    <p id="flipModalDesc">此格已翻开，请选择：</p>
+    <div class="flip-choices" id="flipChoices"></div>
+  </div>
+</div>
+
+<!-- Win modal -->
+<div class="modal-overlay" id="winModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2 id="winTitle"></h2>
+    <p id="winDesc"></p>
+    <button class="btn-primary" onclick="resetGame()">再来一局</button>
+  </div>
+</div>
+
+<!-- Rules modal -->
+<div class="modal-overlay" id="rulesModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2>游戏规则</h2>
+    <div class="rules-content">
+      <h3>游戏概述</h3>
+      <p>2人对战桌游，小蓝 vs 小橙，在3×3棋盘上移动并翻开格子，率先集齐6只目标昆虫获胜。</p>
+      <h3>棋盘</h3>
+      <p>9张板块洗混后3×3排列。正面为草地或石头，背面隐藏蝴蝶🦋、瓢虫🐞或水洼🌊。</p>
+      <h3>初始设置</h3>
+      <ul>
+        <li>两名玩家随机降落在对角格子</li>
+        <li>每人获得3个捕虫网标记</li>
+        <li>小蓝先手，目标收集🐞瓢虫</li>
+        <li>小橙后手，目标收集🦋蝴蝶</li>
+      </ul>
+      <h3>行动规则</h3>
+      <p>每回合选择以下3种行动之一（每种各限用1次，用完3种后重置）：</p>
+      <ul>
+        <li><b>走1步</b> → 翻转到达格</li>
+        <li><b>走2步</b> → 翻转途径格（中间经过的格子）</li>
+        <li><b>走3步</b> → 翻转出发格（移动前的位置）</li>
+      </ul>
+      <h3>移动规则</h3>
+      <ul>
+        <li>只能走相邻格子（上下左右），可拐弯</li>
+        <li>同一次移动不能走回头路</li>
+        <li>不能停在已翻开的水洼上（可以路过）</li>
+      </ul>
+      <h3>翻转规则</h3>
+      <ul>
+        <li>未翻开的格子 → 翻开显示内容</li>
+        <li>已翻开的格子 → 可选择：翻回去 / 放捕虫网 / 不操作</li>
+        <li>放过捕虫网的格子和水洼不能再翻回去</li>
+      </ul>
+      <h3>胜利条件</h3>
+      <p>回合结束时，全场翻开的同类昆虫≥6只即获胜：</p>
+      <ul>
+        <li>🐞瓢虫 ≥ 6 → 小蓝胜</li>
+        <li>🦋蝴蝶 ≥ 6 → 小橙胜</li>
+      </ul>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-top:16px" onclick="document.getElementById('rulesModal').classList.remove('show')">关闭</button>
+  </div>
+</div>
+
+<!-- Confirm restart modal -->
+<div class="modal-overlay" id="confirmModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2>确认重新开局？</h2>
+    <p>当前游戏进度将丢失</p>
+    <div class="confirm-actions">
+      <button class="confirm-no" onclick="document.getElementById('confirmModal').classList.remove('show')">取消</button>
+      <button class="confirm-yes" onclick="doRestart()">确认重开</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'cat-diary-state';
+
+const TILE_DEFS = [
+  { front:'grass', back:{butterfly:2,ladybug:0} },
+  { front:'grass', back:{butterfly:0,ladybug:2} },
+  { front:'grass', back:{butterfly:2,ladybug:1} },
+  { front:'grass', back:{butterfly:1,ladybug:2} },
+  { front:'grass', back:{butterfly:1,ladybug:1} },
+  { front:'stone', back:{butterfly:1,ladybug:0} },
+  { front:'stone', back:{butterfly:0,ladybug:1} },
+  { front:'stone', back:'swamp' },
+  { front:'stone', back:'swamp' },
+];
+
+const ADJ = [
+  [1,3],[0,2,4],[1,5],
+  [0,4,6],[1,3,5,7],[2,4,8],
+  [3,7],[4,6,8],[5,7]
+];
+
+let state = null;
+let uiState = { selectedAction:null, path:[], pendingFlip:null };
+
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadState() {
+  try {
+    const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(s && s.tiles && s.players) return s;
+  } catch(e){}
+  return null;
+}
+
+function initState() {
+  const tiles = shuffle(TILE_DEFS).map((d,i)=>({
+    id:i, frontType:d.front, back:d.back, flipped:false, net:null
+  }));
+  const spawns = Math.random()<0.5 ? [0,8] : [2,6];
+  return {
+    phase:'playing',
+    tiles,
+    players:[
+      {id:'blue',name:'小蓝',pos:spawns[0],nets:3,actionsUsed:[false,false,false]},
+      {id:'orange',name:'小橙',pos:spawns[1],nets:3,actionsUsed:[false,false,false]}
+    ],
+    currentPlayer:0,
+    winner:null
+  };
+}
+
+function startGame() {
+  state = initState();
+  uiState = {selectedAction:null,path:[],pendingFlip:null};
+  saveState();
+  document.getElementById('landing').style.display='none';
+  document.getElementById('game').style.display='flex';
+  render();
+}
+
+function resetGame() {
+  localStorage.removeItem(STORAGE_KEY);
+  document.getElementById('winModal').classList.remove('show');
+  startGame();
+}
+
+function showRules() {
+  document.getElementById('rulesModal').classList.add('show');
+}
+
+function confirmRestart() {
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function doRestart() {
+  document.getElementById('confirmModal').classList.remove('show');
+  localStorage.removeItem(STORAGE_KEY);
+  state = null;
+  uiState = {selectedAction:null,path:[],pendingFlip:null};
+  document.getElementById('game').style.display='none';
+  document.getElementById('landing').style.display='flex';
+}
+
+function curPlayer() { return state.players[state.currentPlayer]; }
+function otherPlayer() { return state.players[1-state.currentPlayer]; }
+
+function getVisibleInsects() {
+  let b=0,l=0;
+  state.tiles.forEach(t=>{
+    if(t.flipped && t.back!=='swamp') {
+      b += t.back.butterfly||0;
+      l += t.back.ladybug||0;
+    }
+  });
+  return {butterfly:b,ladybug:l};
+}
+
+function checkWin() {
+  const v=getVisibleInsects();
+  console.log(`[昆虫统计] 蝴蝶=${v.butterfly}, 瓢虫=${v.ladybug}`);
+  const blueWin=v.ladybug>=6, orangeWin=v.butterfly>=6;
+  if(blueWin && orangeWin) {
+    if(v.ladybug>v.butterfly) return 'blue';
+    if(v.butterfly>v.ladybug) return 'orange';
+    const loser=state.players[state.currentPlayer].id;
+    return loser==='blue'?'orange':'blue';
+  }
+  if(blueWin) return 'blue';
+  if(orangeWin) return 'orange';
+  return null;
+}
+
+function isSwamp(tile) { return tile.back==='swamp'; }
+
+function canFlipBack(tile) {
+  return tile.flipped && !tile.net && !isSwamp(tile);
+}
+
+// Movement logic
+function getValidNeighbors(pos, excludeSet) {
+  return ADJ[pos].filter(n=>!excludeSet.has(n));
+}
+
+function selectAction(idx) {
+  const p=curPlayer();
+  if(p.actionsUsed[idx]) return;
+  uiState.selectedAction=idx;
+  uiState.path=[];
+  render();
+}
+
+function handleTileClick(tileIdx) {
+  if(uiState.selectedAction===null) return;
+  const p=curPlayer();
+  const stepsNeeded = uiState.selectedAction+1;
+  const currentEnd = uiState.path.length>0 ? uiState.path[uiState.path.length-1] : p.pos;
+  const visited = new Set([p.pos,...uiState.path]);
+
+  if(!ADJ[currentEnd].includes(tileIdx)) return;
+  if(visited.has(tileIdx)) return;
+
+  uiState.path.push(tileIdx);
+  console.log(`[路径规划] 当前路径: [${uiState.path.join(',')}]`);
+
+  // Only check swamp on final destination
+  if(uiState.path.length===stepsNeeded) {
+    const destTile = state.tiles[tileIdx];
+    if(destTile.flipped && isSwamp(destTile)) {
+      uiState.path.pop();
+      console.log(`[路径规划] 终点是已翻开的水洼, 不允许停留`);
+      render();
+      return;
+    }
+  }
+  render();
+}
+
+function undoStep() {
+  if(uiState.path.length>0) {
+    uiState.path.pop();
+    console.log(`[路径规划] 撤销一步, 当前路径: [${uiState.path.join(',')}]`);
+    render();
+  }
+}
+
+function cancelPath() {
+  uiState.selectedAction=null;
+  uiState.path=[];
+  render();
+}
+
+function confirmMove() {
+  const actionIdx = uiState.selectedAction;
+  const p = curPlayer();
+  const path = [...uiState.path];
+  const dest = path[path.length-1];
+  const origin = p.pos;
+
+  console.log(`[确认移动] 玩家=${p.id}, 行动=走${actionIdx+1}步, 路径=[${path.join(',')}], 起点=${origin}, 终点=${dest}`);
+
+  // Move player
+  p.pos = dest;
+  p.actionsUsed[actionIdx] = true;
+
+  // Check if all actions used -> reset
+  if(p.actionsUsed.every(u=>u)) {
+    console.log(`[行动重置] 玩家=${p.id} 三种行动已用完, 重置行动次数`);
+    p.actionsUsed = [false,false,false];
+  }
+
+  // Determine which tile to flip
+  let flipTarget;
+  if(actionIdx===0) flipTarget=dest;        // walk 1: flip destination
+  else if(actionIdx===1) flipTarget=path[0]; // walk 2: flip intermediate (1st step)
+  else flipTarget=origin;                    // walk 3: flip origin
+
+  uiState.selectedAction=null;
+  uiState.path=[];
+
+  // Process flip
+  processFlip(flipTarget);
+}
+
+function processFlip(tileIdx) {
+  const tile = state.tiles[tileIdx];
+  console.log(`[翻转处理] 格子=${tileIdx}, 已翻开=${tile.flipped}, 捕虫网=${tile.net}, 背面=${JSON.stringify(tile.back)}, 是否水洼=${isSwamp(tile)}`);
+
+  if(!tile.flipped) {
+    console.log(`[翻转处理] -> 翻开格子（当前未翻开）`);
+    doFlipUp(tileIdx);
+  } else if(tile.net || isSwamp(tile)) {
+    console.log(`[翻转处理] -> 跳过操作（捕虫网=${tile.net}, 水洼=${isSwamp(tile)}）`);
+    endTurn();
+  } else {
+    console.log(`[翻转处理] -> 弹出选择弹窗（已翻开、无网、非水洼）`);
+    showFlipChoice(tileIdx);
+  }
+}
+
+let animatingTile = null;
+
+function doFlipUp(tileIdx) {
+  const tile = state.tiles[tileIdx];
+  tile.flipped = true;
+  saveState();
+  animatingTile = tileIdx;
+  render();
+  animatingTile = null;
+
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      const el = document.querySelector(`[data-tile="${tileIdx}"] .tile-inner`);
+      if(el) el.classList.add('flipped');
+    });
+  });
+
+  setTimeout(()=>{
+    endTurn();
+  }, 550);
+}
+
+function doFlipDown(tileIdx) {
+  const tile = state.tiles[tileIdx];
+  tile.flipped = false;
+  saveState();
+  // Render still shows flipped because we need to animate from flipped->unflipped
+  // Temporarily override
+  animatingTile = tileIdx;
+  // Force render to show flipped state (override in renderGrid)
+  const el = document.querySelector(`[data-tile="${tileIdx}"] .tile-inner`);
+  if(el) el.classList.remove('flipped');
+  animatingTile = null;
+
+  setTimeout(()=>{
+    render();
+    endTurn();
+  }, 550);
+}
+
+function doPlaceNet(tileIdx) {
+  const p = curPlayer();
+  if(p.nets<=0) return;
+  const tile = state.tiles[tileIdx];
+  tile.net = p.id;
+  p.nets--;
+  console.log(`[放置捕虫网] 玩家=${p.id} 在格子${tileIdx}放置捕虫网, 剩余=${p.nets}`);
+  saveState();
+  render();
+  closeFlipModal();
+  endTurn();
+}
+
+function showFlipChoice(tileIdx) {
+  uiState.pendingFlip = tileIdx;
+  const p = curPlayer();
+  const choices = document.getElementById('flipChoices');
+  let html = '';
+  html += `<button class="choice-flip-back" onclick="onFlipChoice('back')">翻回去</button>`;
+  if(p.nets>0) {
+    html += `<button class="choice-net" onclick="onFlipChoice('net')">放捕虫网 (剩余${p.nets})</button>`;
+  }
+  html += `<button class="choice-nothing" onclick="onFlipChoice('skip')">不操作</button>`;
+  choices.innerHTML = html;
+  document.getElementById('flipModal').classList.add('show');
+}
+
+function onFlipChoice(choice) {
+  const tileIdx = uiState.pendingFlip;
+  closeFlipModal();
+  if(choice==='back') {
+    doFlipDown(tileIdx);
+  } else if(choice==='net') {
+    doPlaceNet(tileIdx);
+  } else {
+    endTurn();
+  }
+}
+
+function closeFlipModal() {
+  document.getElementById('flipModal').classList.remove('show');
+  uiState.pendingFlip=null;
+}
+
+function endTurn() {
+  const w = checkWin();
+  if(w) {
+    state.winner = w;
+    state.phase = 'game-over';
+    saveState();
+    render();
+    showWinModal(w);
+    return;
+  }
+
+  state.currentPlayer = 1 - state.currentPlayer;
+  saveState();
+  render();
+}
+
+function showWinModal(winner) {
+  const names = {blue:'小蓝',orange:'小橙'};
+  const insects = {blue:'🐞 瓢虫',orange:'🦋 蝴蝶'};
+  document.getElementById('winTitle').textContent = `${names[winner]}获胜！`;
+  document.getElementById('winDesc').textContent = `场上已翻开6只以上${insects[winner]}`;
+  document.getElementById('winModal').classList.add('show');
+}
+
+// Render
+function render() {
+  if(!state) return;
+
+  // Game over bar
+  const gameOverBar = document.getElementById('gameOverBar');
+  gameOverBar.style.display = state.phase==='game-over'?'block':'none';
+
+  // Top bar
+  const cp = curPlayer();
+  const dot = document.getElementById('turnDot');
+  dot.style.background = cp.id==='blue'?'var(--blue)':'var(--orange)';
+  const targetInsect = cp.id==='blue'?'🐞瓢虫':'🦋蝴蝶';
+  document.getElementById('turnName').textContent = `${cp.name}的回合 · 收集${targetInsect}`;
+
+  const v = getVisibleInsects();
+  document.getElementById('butterflyCount').textContent = v.butterfly;
+  document.getElementById('ladybugCount').textContent = v.ladybug;
+
+  // Info text
+  const info = document.getElementById('infoText');
+  if(uiState.selectedAction!==null) {
+    const steps = uiState.selectedAction+1;
+    const labels=['翻到达格','翻途径格','翻出发格'];
+    info.textContent = `走${steps}步 · ${labels[uiState.selectedAction]} · 请点击相邻格子 (${uiState.path.length}/${steps})`;
+  } else {
+    info.textContent = `请选择行动 · 捕虫网: 蓝${state.players[0].nets} / 橙${state.players[1].nets}`;
+  }
+
+  // Grid
+  renderGrid();
+
+  // Action buttons
+  const p = curPlayer();
+  for(let i=0;i<3;i++) {
+    const btn = document.getElementById(`btnAct${i}`);
+    btn.disabled = p.actionsUsed[i] || uiState.selectedAction!==null;
+    btn.classList.toggle('selected', uiState.selectedAction===i);
+  }
+
+  // Control row
+  const ctrlRow = document.getElementById('controlRow');
+  const actRow = document.getElementById('actionRow');
+  if(state.phase==='game-over') {
+    ctrlRow.style.display='none';
+    actRow.style.display='none';
+  } else if(uiState.selectedAction!==null) {
+    ctrlRow.style.display='flex';
+    actRow.style.display='none';
+    const steps = uiState.selectedAction+1;
+    document.getElementById('btnConfirm').disabled = uiState.path.length!==steps;
+  } else {
+    ctrlRow.style.display='none';
+    actRow.style.display='flex';
+  }
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const p = curPlayer();
+  const op = otherPlayer();
+  const visited = new Set([p.pos,...uiState.path]);
+
+  let validMoves = new Set();
+  if(uiState.selectedAction!==null) {
+    const currentEnd = uiState.path.length>0 ? uiState.path[uiState.path.length-1] : p.pos;
+    const steps = uiState.selectedAction+1;
+    if(uiState.path.length < steps) {
+      const isLastStep = uiState.path.length === steps - 1;
+      ADJ[currentEnd].forEach(n=>{
+        if(visited.has(n)) return;
+        if(isLastStep) {
+          const t=state.tiles[n];
+          if(t.flipped && isSwamp(t)) return;
+        }
+        validMoves.add(n);
+      });
+    }
+  }
+
+  let html='';
+  for(let i=0;i<9;i++) {
+    const t = state.tiles[i];
+    const isValid = validMoves.has(i);
+    const inPath = uiState.path.includes(i);
+    let cls = 'tile-wrapper';
+    if(isValid) cls+=' valid-move';
+    if(inPath) cls+=' in-path';
+
+    const showFlipped = t.flipped && animatingTile!==i;
+    const flippedCls = showFlipped?'flipped':'';
+    const frontCls = t.frontType;
+    const frontIcon = t.frontType==='grass'?'🌿':'🪨';
+
+    let backHtml='';
+    if(t.back==='swamp') {
+      backHtml=`<div class="tile-face tile-back swamp-tile"><span style="font-size:28px">🌊</span><small>水洼</small></div>`;
+    } else {
+      let icons='';
+      for(let b=0;b<(t.back.butterfly||0);b++) icons+='🦋';
+      for(let l=0;l<(t.back.ladybug||0);l++) icons+='🐞';
+      backHtml=`<div class="tile-face tile-back"><div class="back-content">${icons}</div></div>`;
+    }
+
+    // Net overlay
+    let netHtml='';
+    if(t.net) {
+      const nc = t.net==='blue'?'net-blue':'net-orange';
+      netHtml=`<div class="tile-overlay ${nc}"><span class="net-marker">🕸️</span></div>`;
+    }
+
+    // Player tokens
+    let tokenHtml='';
+    if(p.pos===i) {
+      const tc = p.id==='blue'?'token-blue':'token-orange';
+      tokenHtml+=`<div class="player-token ${tc}">🐱</div>`;
+    }
+    if(op.pos===i) {
+      const tc = op.id==='blue'?'token-blue':'token-orange';
+      tokenHtml+=`<div class="player-token ${tc}">🐱</div>`;
+    }
+
+    html+=`<div class="${cls}" data-tile="${i}" onclick="handleTileClick(${i})">
+      <div class="tile-inner ${flippedCls}">
+        <div class="tile-face tile-front ${frontCls}"><span class="front-icon">${frontIcon}</span></div>
+        ${backHtml}
+      </div>
+      ${netHtml}
+      ${tokenHtml}
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+
+// Boot
+document.addEventListener('DOMContentLoaded', ()=>{
+  const saved = loadState();
+  if(saved && saved.phase==='playing') {
+    state=saved;
+    uiState={selectedAction:null,path:[],pendingFlip:null};
+    document.getElementById('landing').style.display='none';
+    document.getElementById('game').style.display='flex';
+    render();
+  } else if(saved && saved.phase==='game-over') {
+    state=saved;
+    uiState={selectedAction:null,path:[],pendingFlip:null};
+    document.getElementById('landing').style.display='none';
+    document.getElementById('game').style.display='flex';
+    render();
+    showWinModal(state.winner);
+  }
+});
+</script>
+</body>
+</html>

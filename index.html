@@ -388,7 +388,7 @@ button { font-family:inherit; }
 /* 页面脚本：GAMES 数据 → 卡片渲染 / 常玩统计(localStorage) / 搜索弹窗 / 左侧 TAB 滚动联动 */
 
 /* ---------------- 图标 ---------------- */
-var ICO_UNO = '<img class="ico-img" src="uno_single_player/images/addfour2.png" alt="">';
+var ICO_UNO = '<img class="ico-img" src="uno-single-player/images/addfour2.png" alt="">';
 var ICO_UNDERSEA = '<svg class="ico-svg" viewBox="0 0 1054 1024">' +
   '<path d="M59.64 433.76h135.64v288.61H59.64z" fill="#45bab2"/>' +
   '<path d="M560.02 155.46h36.55v148.99H560.02z" fill="#45bab2"/>' +
@@ -475,18 +475,18 @@ var ICO_BOMB = '<svg class="ico-svg" viewBox="0 0 170 152" aria-hidden="true">' 
 /* min/max 用于“按人数搜索”，players 为展示标签 */
 var GAMES = [
   /* —— 单机 —— */
-  { mode:'solo',   name:'狼人真言',   players:'4~10人', min:4, max:10, type:'欢乐聚会猜词', icon:'🐺',    url:'https://werewolf-word.pages.dev/' },
-  { mode:'solo',   name:'夺狗囧事',   players:'2~5人',  min:2, max:5,  type:'吹牛博弈',     icon:'🐶',    url:'https://dog-joker.pages.dev/' },
-  { mode:'solo',   name:'印加宝藏',   players:'3~8人',  min:3, max:8,  type:'赌狗冒险',     icon:'💎',    url:'https://incan-gold.pages.dev/' },
-  { mode:'solo',   name:'捉虫猫日记', players:'2人',    min:2, max:2,  type:'策略竞争',     icon:'🐱',    url:'https://cat-diary-6v8.pages.dev/' },
+  { mode:'solo',   name:'狼人真言',   players:'4~10人', min:4, max:10, type:'欢乐聚会猜词', icon:'🐺',    url:'werewords/index.html' },
+  { mode:'solo',   name:'夺狗囧事',   players:'2~5人',  min:2, max:5,  type:'吹牛博弈',     icon:'🐶',    url:'dog-joker/index.html' },
+  { mode:'solo',   name:'印加宝藏',   players:'3~8人',  min:3, max:8,  type:'赌狗冒险',     icon:'💎',    url:'incan-gold/index.html' },
+  { mode:'solo',   name:'捉虫猫日记', players:'2人',    min:2, max:2,  type:'策略竞争',     icon:'🐱',    url:'cat-diary/index.html' },
   { mode:'solo',   name:'登山家',     players:'2人',    min:2, max:2,  type:'叠棋策略',     icon:'🏔️',    url:'mountaineer/index.html' },
-  { mode:'solo',   name:'UNO',        players:'1人',    min:1, max:1,  type:'手牌管理',     icon:ICO_UNO, url:'uno_single_player/index.html' },
+  { mode:'solo',   name:'UNO',        players:'1人',    min:1, max:1,  type:'手牌管理',     icon:ICO_UNO, url:'uno-single-player/index.html' },
   { mode:'solo',   name:'海底探险',   players:'2~6人',  min:2, max:6,  type:'骰子聚会冒险', icon:ICO_UNDERSEA, url:'undersea-explorer/index.html' },
   { mode:'solo',   name:'弑君者',     players:'1~4人',  min:1, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index.html' },
   { mode:'solo',   name:'月面探险',   players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index.html' },
   { mode:'solo',   name:'无赖勇者',   players:'1人',    min:1, max:1,  type:'单人扑克闯关', icon:'🗡️',    url:'scoundrel/index.html' },
   { mode:'solo',   name:'神探缉凶',   players:'1人',    min:1, max:1,  type:'人机对战推理', icon:'🕵️',   url:'fugitive/index.html' },
-  { mode:'solo',   name:'煞有其时',   players:'1~2人',    min:1, max:2,  type:'策略抽象棋',   icon:'⏳',    url:'that_time_you_killed_me/index.html' },
+  { mode:'solo',   name:'煞有其时',   players:'1~2人',    min:1, max:2,  type:'策略抽象棋',   icon:'⏳',    url:'that-time-you-killed-me/index.html' },
   { mode:'solo',   name:'渗透因子',   players:'1人',    min:1, max:1,  type:'人机合作推理', icon:ICO_INFIL, url:'infiltraitors/index.html' },
   { mode:'solo',   name:'车票收藏家', players:'3~6人',  min:3, max:6,  type:'欢乐竞争博弈',   icon:ICO_TICKET, url:'ticket-collector/index.html' },
   { mode:'solo',   name:'巫师牌',     players:'1人',  min:1, max:1,  type:'人机吃墩博弈',   icon:ICO_WIZ, url:'wizard/index.html' },

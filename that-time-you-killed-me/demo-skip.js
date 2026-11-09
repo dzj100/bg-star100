@@ -9,7 +9,7 @@
    ============================================================ */
 (() => {
   const UI = window.TTYKM_UI, G = window.TTYKM;
-  if (!UI || !G) { console.warn('请先在浏览器打开 that_time_you_killed_me/index.html，再粘贴运行'); return; }
+  if (!UI || !G) { console.warn('请先在浏览器打开 that-time-you-killed-me/index.html，再粘贴运行'); return; }
   const wantAi = !!window.__DEMO_AI;
   const trapped = window.__DEMO_CAUSE === 'trapped';
 

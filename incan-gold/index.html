@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>印加宝藏</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --card-bg: #0f3460;
+  --accent: #e94560;
+  --gold: #f5c518;
+  --text: #eee;
+  --text-dim: #999;
+  --safe: #4caf50;
+  --danger: #f44336;
+  --radius: 12px;
+  --btn-h: 56px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family: -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; overflow-x:hidden; display:flex; flex-direction:column; }
+
+/* Header */
+.header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--surface); position:sticky; top:0; z-index:10; }
+.round-badge { background:var(--accent); padding:4px 12px; border-radius:20px; font-size:14px; font-weight:600; }
+.btn-rules { background:none; border:1px solid rgba(255,255,255,.2); color:var(--text-dim); padding:6px 12px; border-radius:20px; font-size:13px; cursor:pointer; }
+
+/* Main content area */
+.main { flex:1; display:flex; flex-direction:column; padding:16px; gap:16px; }
+
+/* Path area - grid layout, 5 per row */
+.path-section { flex:1; display:flex; flex-direction:column; align-items:center; }
+.path-label { font-size:13px; color:var(--text-dim); margin-bottom:10px; align-self:flex-start; }
+.path-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; width:100%; max-width:400px; }
+.card { aspect-ratio:2/3; background:var(--card-bg); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:26px; border:2px solid rgba(255,255,255,.1); }
+.card .card-val { font-size:12px; font-weight:700; margin-top:2px; }
+.card.hazard { border-color:var(--danger); }
+.card.hazard .card-val { color:var(--danger); }
+.card.relic { border-color:var(--gold); }
+.card.relic .card-val { color:var(--gold); }
+.card.gem { border-color:#4fc3f7; }
+.card.gem .card-val { color:#4fc3f7; }
+.path-empty { color:var(--text-dim); font-size:14px; padding:40px 0; text-align:center; grid-column:1/-1; }
+
+/* Path info */
+.path-info { display:flex; gap:16px; justify-content:center; font-size:14px; color:var(--text-dim); margin-top:10px; }
+.path-info span strong { color:var(--text); }
+
+/* Removed hazards area */
+.removed-area { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.removed-area .label { font-size:13px; color:var(--danger); }
+.removed-cards { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+.removed-card { width:36px; height:48px; background:rgba(244,67,54,.15); border:1px solid var(--danger); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+.removed-card.relic { background:rgba(245,197,24,.15); border-color:var(--gold); }
+
+/* Flip button - inline, not fixed */
+.flip-area { display:flex; justify-content:center; padding:4px 0; }
+.btn { height:var(--btn-h); border:none; border-radius:var(--radius); font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition: transform .1s; padding:0 32px; }
+.btn:active { transform:scale(.97); }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-secondary { background:var(--surface); color:var(--text); border:1px solid rgba(255,255,255,.15); }
+.btn-gold { background:var(--gold); color:#000; }
+.btn-full { width:100%; }
+
+/* Players area - bottom, auto wrap */
+.players-section { padding:0 16px 16px; }
+.players-label { font-size:13px; color:var(--text-dim); margin-bottom:8px; }
+.players-bar { display:flex; flex-wrap:wrap; gap:8px; }
+.player-chip { display:flex; flex-direction:column; align-items:center; padding:8px 4px; background:var(--surface); border-radius:var(--radius); border:2px solid transparent; transition: all .2s; flex:1 1 calc(25% - 8px); min-width:0; max-width:calc(50% - 4px); }
+.player-chip.active { border-color:var(--safe); }
+.player-chip.retreated { border-color:var(--text-dim); opacity:.6; }
+.player-chip .name { font-size:13px; font-weight:600; margin-bottom:2px; white-space:nowrap; }
+.player-chip .score { font-size:18px; font-weight:700; color:var(--gold); }
+.player-chip .earnings { font-size:11px; color:var(--safe); }
+.player-chip .status-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; }
+.player-chip.active .status-dot { background:var(--safe); }
+.player-chip.retreated .status-dot { background:var(--text-dim); }
+
+/* Modal overlay */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+.modal-overlay.show { opacity:1; pointer-events:auto; }
+.modal { background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-width:480px; max-height:80dvh; overflow-y:auto; padding:24px 20px; padding-bottom: max(24px, env(safe-area-inset-bottom)); transform:translateY(100%); transition:transform .25s ease-out; }
+.modal-overlay.show .modal { transform:translateY(0); }
+.modal h2 { font-size:20px; margin-bottom:16px; text-align:center; }
+.modal p { font-size:14px; color:var(--text-dim); margin-bottom:16px; text-align:center; line-height:1.5; }
+
+/* Retreat checkboxes */
+.retreat-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.retreat-item { display:flex; align-items:center; gap:12px; padding:14px; background:var(--card-bg); border-radius:var(--radius); cursor:pointer; }
+.retreat-item input { width:22px; height:22px; accent-color:var(--accent); }
+.retreat-item .r-name { font-size:15px; font-weight:600; flex:1; }
+.retreat-item .r-earn { font-size:13px; color:var(--gold); }
+
+/* Score list */
+.score-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.score-item { display:flex; justify-content:space-between; align-items:center; padding:14px; background:var(--card-bg); border-radius:var(--radius); }
+.score-item .s-name { font-size:15px; font-weight:600; }
+.score-item .s-score { font-size:20px; font-weight:700; color:var(--gold); }
+
+/* Setup form */
+.setup-form { display:flex; flex-direction:column; gap:12px; }
+.setup-form input { height:48px; background:var(--card-bg); border:1px solid rgba(255,255,255,.15); border-radius:var(--radius); padding:0 16px; color:var(--text); font-size:16px; outline:none; }
+.setup-form input:focus { border-color:var(--accent); }
+.player-tags { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.player-tag { display:flex; align-items:center; gap:6px; padding:6px 12px; background:var(--card-bg); border-radius:20px; font-size:14px; }
+.player-tag button { background:none; border:none; color:var(--danger); font-size:18px; cursor:pointer; padding:0 2px; }
+
+/* Hazard notification */
+.hazard-notify { text-align:center; padding:20px; }
+.hazard-notify .h-icon { font-size:48px; margin-bottom:12px; }
+.hazard-notify .h-text { font-size:16px; color:var(--danger); font-weight:600; margin-bottom:8px; }
+.hazard-notify .h-sub { font-size:13px; color:var(--text-dim); }
+
+/* Card reveal animation */
+.reveal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:200; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s; }
+.reveal-overlay.show { opacity:1; pointer-events:auto; }
+.reveal-card { transform:scale(0) rotateY(180deg); transition:transform .6s cubic-bezier(.34,1.56,.64,1), opacity .4s; opacity:0; }
+.reveal-overlay.show .reveal-card { transform:scale(1) rotateY(0deg); opacity:1; }
+.reveal-card-inner { width:120px; height:170px; background:var(--card-bg); border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:52px; border:3px solid rgba(255,255,255,.2); }
+.reveal-card-inner .card-val { font-size:22px; font-weight:700; margin-top:8px; }
+.reveal-card-inner.hazard { border-color:var(--danger); }
+.reveal-card-inner.hazard .card-val { color:var(--danger); }
+.reveal-card-inner.relic { border-color:var(--gold); }
+.reveal-card-inner.relic .card-val { color:var(--gold); }
+.reveal-card-inner.gem { border-color:#4fc3f7; }
+.reveal-card-inner.gem .card-val { color:#4fc3f7; }
+
+/* Detail table */
+.detail-table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px; }
+.detail-table th { text-align:left; padding:8px 6px; color:var(--text-dim); border-bottom:1px solid rgba(255,255,255,.1); font-weight:600; white-space:nowrap; }
+.detail-table td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:top; }
+.detail-table .dt-name { font-weight:600; white-space:nowrap; }
+.detail-table .dt-score { color:var(--gold); font-weight:700; font-size:15px; }
+.detail-table .dt-gems { color:#4fc3f7; }
+.detail-table .dt-relics { color:var(--gold); }
+.detail-table .dt-hazard { color:var(--danger); }
+
+/* Rules modal */
+.rules-content { font-size:14px; line-height:1.8; color:var(--text); }
+.rules-content h3 { font-size:15px; color:var(--gold); margin:14px 0 6px; }
+.rules-content h3:first-child { margin-top:0; }
+.rules-content ul { padding-left:18px; margin:4px 0; }
+.rules-content li { margin-bottom:2px; }
+.rules-content .tag { display:inline-block; padding:1px 6px; border-radius:4px; font-size:12px; font-weight:600; margin-right:4px; }
+.rules-content .tag-gem { background:rgba(79,195,247,.2); color:#4fc3f7; }
+.rules-content .tag-hazard { background:rgba(244,67,54,.2); color:var(--danger); }
+.rules-content .tag-relic { background:rgba(245,197,24,.2); color:var(--gold); }
+
+/* Landing page */
+.landing { position:fixed; inset:0; background:var(--bg); z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
+.landing.hidden { display:none; }
+.landing-title { font-size:36px; font-weight:800; color:var(--gold); text-align:center; letter-spacing:2px; }
+.landing-subtitle { font-size:14px; color:var(--text-dim); margin-top:-12px; }
+.landing-footer { position: absolute; bottom: 10px; color: #555; font-size: .75rem; }
+
+/* Utility */
+.hidden { display:none !important; }
+.fade-in { animation: fadeIn .3s; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+</style>
+</head>
+<body>
+
+<!-- Landing Page -->
+<div class="landing" id="landingPage">
+  <button class="btn-rules" onclick="document.getElementById('rulesModal').classList.add('show')" style="position:absolute;top:12px;right:16px;">📖 规则</button>
+  <div class="landing-title">💎印加宝藏💎</div>
+  <div class="landing-subtitle">线下发牌助手(3~8人)</div>
+  <button class="btn btn-primary" onclick="showSetupFromLanding()" style="padding:0 48px;margin-top:35px;">开始游戏</button>
+  <div class="landing-footer">@imStar100</div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="round-badge" id="roundBadge">第 1 / 5 轮</div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn-rules" onclick="confirmReset()">🔄 重置</button>
+    <button class="btn-rules" onclick="document.getElementById('rulesModal').classList.add('show')">📖 规则</button>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="main">
+  <!-- Path -->
+  <div class="path-section">
+    <div class="path-label">探险路径</div>
+    <div class="path-grid" id="pathCards">
+      <div class="path-empty">等待翻牌...</div>
+    </div>
+    <div class="path-info" id="pathInfo"></div>
+  </div>
+
+  <!-- Removed cards -->
+  <div class="removed-area hidden" id="removedArea">
+    <div class="label">已移除的卡牌</div>
+    <div class="removed-cards" id="removedCards"></div>
+  </div>
+
+  <!-- Flip button -->
+  <div class="flip-area" id="flipArea">
+    <button class="btn btn-primary" id="btnFlip" onclick="flipCard()">翻开下一张牌</button>
+  </div>
+</div>
+
+<!-- Players -->
+<div class="players-section">
+  <div class="players-label">玩家状态</div>
+  <div class="players-bar" id="playersBar"></div>
+</div>
+
+<!-- Card Reveal Animation -->
+<div class="reveal-overlay" id="revealOverlay">
+  <div class="reveal-card" id="revealCard"></div>
+</div>
+
+<!-- Modal: Retreat selection -->
+<div class="modal-overlay" id="retreatModal" onclick="if(event.target===this)closeRetreatModal()">
+  <div class="modal">
+    <h2>谁要返回营地？</h2>
+    <p>勾选本次撤退的玩家，未勾选则继续深入</p>
+    <div class="retreat-list" id="retreatList"></div>
+    <button class="btn btn-primary" onclick="confirmRetreat()" style="width:100%;">确认</button>
+  </div>
+</div>
+
+<!-- Modal: Round end scores / Failure -->
+<div class="modal-overlay" id="scoreModal" onclick="if(event.target===this && pendingFailure)closeFailureModal()">
+  <div class="modal">
+    <h2 id="scoreTitle">本轮结束</h2>
+    <div id="scoreOverview">
+      <div class="score-list" id="scoreList"></div>
+    </div>
+    <div id="scoreDetail" class="hidden"></div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-gold" id="btnNextRound" onclick="nextRound()" style="flex:1;">开始下一轮</button>
+      <button class="btn btn-secondary" id="btnScoreToggle" onclick="toggleScoreDetail('score')" style="flex:0 0 auto;padding:0 16px;font-size:13px;border:none;">明细</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Hazard removed notification -->
+<div class="modal-overlay" id="hazardModal">
+  <div class="modal">
+    <div class="hazard-notify" id="hazardNotify"></div>
+    <button class="btn btn-primary" onclick="closeHazardModal()" style="width:100%;">开始探险</button>
+  </div>
+</div>
+
+<!-- Modal: Game over -->
+<div class="modal-overlay" id="gameOverModal">
+  <div class="modal">
+    <h2>游戏结束！</h2>
+    <div id="finalOverview">
+      <div class="score-list" id="finalScores"></div>
+    </div>
+    <div id="finalDetail" class="hidden"></div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-gold" onclick="restartGame()" style="flex:1;">重新开始</button>
+      <button class="btn btn-secondary" id="btnFinalToggle" onclick="toggleScoreDetail('final')" style="flex:0 0 auto;padding:0 16px;font-size:13px;border:none;">明细</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rules -->
+<div class="modal-overlay" id="rulesModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2>游戏规则</h2>
+    <div class="rules-content">
+      <h3>🎯 游戏目标</h3>
+      <p>共进行5轮探险，累计获得最多宝石和神器的玩家获胜。</p>
+
+      <h3>💎 宝石卡（15张）</h3>
+      <ul>
+        <li>翻开后按当前<span class="tag tag-gem">深入中</span>玩家数均分</li>
+        <li>除不尽的余数留在探险路径上</li>
+      </ul>
+
+      <h3>⚖️ 神器卡（5张：5、7、8、10、12）</h3>
+      <ul>
+        <li>每轮开始时从剩余神器中随机加入1张到牌堆</li>
+        <li>翻开后留在路径上，不自动分配</li>
+        <li><strong>仅1人</strong>撤退时，该玩家获得路径上所有神器</li>
+        <li>多人同时撤退时，神器留在路径上不处理</li>
+      </ul>
+
+      <h3>💥 灾难卡（5类×3张）</h3>
+      <ul>
+        <li>蜘蛛🕷️、毒蛇🐍、火焰🔥、落石🪨、僵尸🧟</li>
+        <li>同类灾难出现<strong>第2张</strong>时 → 探险失败</li>
+        <li>失败后：所有深入玩家本轮收益清零</li>
+        <li>移除1张该灾难卡 + 路径上未领取的神器</li>
+      </ul>
+
+      <h3>🏕️ 返回营地</h3>
+      <ul>
+        <li>每次翻牌后可选择撤退的玩家</li>
+        <li>撤退玩家均分路径上的余数宝石</li>
+        <li>本轮已分配的宝石 + 余数 + 神器一起转入背包</li>
+      </ul>
+
+      <h3>🔄 轮次结束</h3>
+      <ul>
+        <li>所有人撤退或探险失败后本轮结束</li>
+        <li>未领取的神器从游戏中移除</li>
+        <li>路径上其他卡牌回收至牌堆并洗混</li>
+        <li>被移除的灾难卡和神器展示在页面上</li>
+      </ul>
+
+      <h3>📦 牌堆构成</h3>
+      <p>宝石15张 + 灾难15张 = 30张，每轮再随机加入1张神器</p>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('rulesModal').classList.remove('show')" style="width:100%;margin-top:16px;">知道了</button>
+  </div>
+</div>
+
+<!-- Modal: Setup -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal">
+    <h2>设置玩家</h2>
+    <div class="setup-form">
+      <div class="player-tags" id="setupTags"></div>
+      <input type="text" id="playerNameInput" placeholder="输入玩家名称后回车添加" maxlength="8">
+      <button class="btn btn-primary" onclick="startGame()" id="btnStart">开始游戏（至少3人）</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === Constants ===
+const GEM_VALUES = [1,1,2,2,3,3,4,4,5,5,7,7,9,11,13];
+const HAZARD_TYPES = ['spider','snake','fire','rock','zombie'];
+const HAZARD_EMOJI = { spider:'🕷️', snake:'🐍', fire:'🔥', rock:'🪨', zombie:'🧟' };
+const HAZARD_NAME = { spider:'蜘蛛', snake:'毒蛇', fire:'火焰', rock:'落石', zombie:'僵尸' };
+const RELIC_VALUES = [5,7,8,10,12]; // 神器
+const TOTAL_ROUNDS = 5;
+const STORAGE_KEY = 'incan-gold-state';
+
+// === State ===
+let state = null;
+let setupPlayers = [];
+let pendingSettle = false; // true after flip, waiting for settle click
+let pendingFailure = null; // hazard type string if failure pending, null otherwise
+
+// === Deck ===
+function createDeck() {
+  const deck = [];
+  GEM_VALUES.forEach(v => deck.push({ type:'gem', value:v }));
+  HAZARD_TYPES.forEach(t => { for(let i=0;i<3;i++) deck.push({ type:'hazard', hazard:t }); });
+  return shuffle(deck);
+}
+
+function drawRelicToDeck() {
+  if(state.relicPool.length === 0) return;
+  const idx = Math.floor(Math.random() * state.relicPool.length);
+  const value = state.relicPool.splice(idx, 1)[0];
+  state.deck.push({ type:'relic', value });
+  state.deck = shuffle(state.deck);
+  console.log(`[牌堆] 第${state.round}轮加入神器(${value})，剩余神器池: [${state.relicPool.join(', ')}]`);
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+// === Init ===
+function initState(players) {
+  const s = {
+    players: players.map(n => ({ name:n, backpack:0, roundEarnings:0, inExpedition:true, gems:[], relics:[], hazardCount:0, roundGems:[], roundRelics:[] })),
+    deck: createDeck(),
+    relicPool: [...RELIC_VALUES],
+    path: [],
+    pathGems: 0,
+    pathRelics: [],
+    hazardsOnPath: {},
+    removedHazards: [],
+    removedRelics: [],
+    round: 1,
+    phase: 'explore',
+    pendingRemovedHazards: []
+  };
+  state = s;
+  drawRelicToDeck();
+  return s;
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(s && s.players && s.players.length >= 3) return s;
+  } catch(e) {}
+  return null;
+}
+
+// === Setup ===
+const nameInput = document.getElementById('playerNameInput');
+nameInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter') addSetupPlayer();
+});
+
+function addSetupPlayer() {
+  const name = nameInput.value.trim();
+  if(!name || setupPlayers.includes(name)) return;
+  if(setupPlayers.length >= 8) return;
+  setupPlayers.push(name);
+  nameInput.value = '';
+  renderSetupTags();
+}
+
+function removeSetupPlayer(idx) {
+  setupPlayers.splice(idx, 1);
+  renderSetupTags();
+}
+
+function renderSetupTags() {
+  const el = document.getElementById('setupTags');
+  el.innerHTML = setupPlayers.map((n,i) =>
+    `<div class="player-tag">${n}<button onclick="removeSetupPlayer(${i})">×</button></div>`
+  ).join('');
+  document.getElementById('btnStart').disabled = setupPlayers.length < 3;
+  document.getElementById('btnStart').style.opacity = setupPlayers.length < 3 ? '.5' : '1';
+}
+
+function startGame() {
+  if(setupPlayers.length < 3) return;
+  state = initState(setupPlayers);
+  pendingSettle = false;
+  pendingFailure = null;
+  saveState();
+  document.getElementById('setupModal').classList.remove('show');
+  render();
+}
+
+function resetGame() {
+  localStorage.removeItem(STORAGE_KEY);
+  state = null;
+  setupPlayers = [];
+  document.getElementById('gameOverModal').classList.remove('show');
+  document.getElementById('setupModal').classList.remove('show');
+  document.getElementById('landingPage').classList.remove('hidden');
+}
+
+function restartGame() {
+  const names = state ? state.players.map(p => p.name) : [];
+  localStorage.removeItem(STORAGE_KEY);
+  state = null;
+  setupPlayers = names;
+  document.getElementById('gameOverModal').classList.remove('show');
+  renderSetupTags();
+  document.getElementById('setupModal').classList.add('show');
+}
+
+function confirmReset() {
+  if(confirm('确定要重新开始新一局游戏吗？当前进度将丢失。')) {
+    resetGame();
+  }
+}
+
+function showSetupFromLanding() {
+  document.getElementById('landingPage').classList.add('hidden');
+  renderSetupTags();
+  document.getElementById('setupModal').classList.add('show');
+}
+
+// === Logging ===
+function logPlayerChange(playerName, field, oldVal, newVal, context) {
+  console.log(`[玩家变动] ${playerName} | ${field}: ${oldVal} → ${newVal} | ${context}`);
+}
+
+// === Card Reveal Animation ===
+function getCardHTML(c, large) {
+  const cls = large ? 'reveal-card-inner' : 'card';
+  if(c.type === 'gem') return `<div class="${cls} gem"><span>💎</span><span class="card-val">${c.value}</span></div>`;
+  if(c.type === 'hazard') return `<div class="${cls} hazard"><span>${HAZARD_EMOJI[c.hazard]}</span><span class="card-val">${HAZARD_NAME[c.hazard]}</span></div>`;
+  if(c.type === 'relic') return `<div class="${cls} relic"><span>⚖️</span><span class="card-val">${c.value}</span></div>`;
+}
+
+function showRevealAndApply(card, activeCount) {
+  const overlay = document.getElementById('revealOverlay');
+  const revealCard = document.getElementById('revealCard');
+  revealCard.innerHTML = getCardHTML(card, true);
+  overlay.classList.add('show');
+
+  setTimeout(() => {
+    overlay.classList.remove('show');
+
+    // Apply card effects
+    if(card.type === 'gem') {
+      const perPlayer = Math.floor(card.value / activeCount);
+      const remainder = card.value % activeCount;
+      state.pathGems += remainder;
+      console.log(`[翻牌] 💎宝石${card.value} | ${activeCount}人深入 | 每人+${perPlayer} | 余数${remainder}(路径累计:${state.pathGems})`);
+      state.players.forEach(p => {
+        if(p.inExpedition) {
+          const old = p.roundEarnings;
+          p.roundEarnings += perPlayer;
+          if(perPlayer > 0) p.roundGems.push(perPlayer);
+          logPlayerChange(p.name, '临时收益', old, p.roundEarnings, `翻出宝石${card.value}`);
+        }
+      });
+    } else if(card.type === 'hazard') {
+      const h = card.hazard;
+      state.hazardsOnPath[h] = (state.hazardsOnPath[h] || 0) + 1;
+      if(state.hazardsOnPath[h] >= 2) {
+        saveState();
+        pendingFailure = h;
+        render();
+        return; // wait for user to click failure button
+      }
+    } else if(card.type === 'relic') {
+      state.pathRelics.push(card.value);
+    }
+
+    saveState();
+    pendingSettle = true;
+    render();
+  }, 900);
+}
+
+// === Core: Flip Card ===
+function flipCard() {
+  if(!state || state.phase !== 'explore' || state.deck.length === 0) return;
+  const activeCount = state.players.filter(p => p.inExpedition).length;
+  if(activeCount === 0) return;
+  const card = state.deck.pop();
+  state.path.push(card);
+  showRevealAndApply(card, activeCount);
+}
+
+function settleExpedition() {
+  if(!pendingSettle) return;
+  pendingSettle = false;
+  render();
+  showRetreatModal();
+}
+
+function closeRetreatModal() {
+  document.getElementById('retreatModal').classList.remove('show');
+  pendingSettle = true;
+  render();
+}
+
+function confirmFailure() {
+  if(!pendingFailure) return;
+  const hazardType = pendingFailure;
+  pendingFailure = null;
+  triggerExpeditionFailure(hazardType);
+}
+
+function closeFailureModal() {
+  document.getElementById('scoreModal').classList.remove('show');
+  pendingFailure = state.hazardsOnPath && Object.entries(state.hazardsOnPath).find(([k,v]) => v >= 2)?.[0] || null;
+  render();
+}
+
+// === Retreat ===
+function showRetreatModal() {
+  const active = state.players.filter(p => p.inExpedition);
+  if(active.length === 0) {
+    endRound(false);
+    return;
+  }
+  const list = document.getElementById('retreatList');
+  list.innerHTML = active.map((p, i) => {
+    const idx = state.players.indexOf(p);
+    return `<label class="retreat-item">
+      <input type="checkbox" data-idx="${idx}">
+      <span class="r-name">${p.name}</span>
+      <span class="r-earn">+${p.roundEarnings}</span>
+    </label>`;
+  }).join('');
+  document.getElementById('retreatModal').classList.add('show');
+}
+
+function confirmRetreat() {
+  const checks = document.querySelectorAll('#retreatList input[type=checkbox]:checked');
+  const retreatingIndices = Array.from(checks).map(c => parseInt(c.dataset.idx));
+
+  if(retreatingIndices.length > 0) {
+    // Distribute remaining path gems among retreating players
+    if(state.pathGems > 0 && retreatingIndices.length > 0) {
+      const perRetreater = Math.floor(state.pathGems / retreatingIndices.length);
+      const remainder = state.pathGems % retreatingIndices.length;
+      console.log(`[撤退结算] 路径余数${state.pathGems} | ${retreatingIndices.length}人撤退 | 每人+${perRetreater} | 剩余${remainder}`);
+      state.pathGems = remainder;
+      retreatingIndices.forEach(idx => {
+        const old = state.players[idx].roundEarnings;
+        state.players[idx].roundEarnings += perRetreater;
+        if(perRetreater > 0) state.players[idx].roundGems.push(perRetreater);
+        logPlayerChange(state.players[idx].name, '临时收益', old, state.players[idx].roundEarnings, '路径余数分配');
+      });
+    }
+
+    // Relic: only if exactly 1 player retreats
+    if(retreatingIndices.length === 1 && state.pathRelics.length > 0) {
+      const relicTotal = state.pathRelics.reduce((a,b) => a+b, 0);
+      const old = state.players[retreatingIndices[0]].roundEarnings;
+      state.players[retreatingIndices[0]].roundEarnings += relicTotal;
+      state.players[retreatingIndices[0]].roundRelics.push(...state.pathRelics);
+      logPlayerChange(state.players[retreatingIndices[0]].name, '临时收益', old, state.players[retreatingIndices[0]].roundEarnings, `获得神器${state.pathRelics.join('+')}=${relicTotal}`);
+      state.pathRelics = [];
+    }
+
+    // Move earnings to backpack
+    retreatingIndices.forEach(idx => {
+      const p = state.players[idx];
+      const oldBp = p.backpack;
+      const earned = p.roundEarnings;
+      p.backpack += earned;
+      p.gems.push(...p.roundGems);
+      p.relics.push(...p.roundRelics);
+      p.roundEarnings = 0;
+      p.roundGems = [];
+      p.roundRelics = [];
+      p.inExpedition = false;
+      logPlayerChange(p.name, '背包', oldBp, p.backpack, `撤退结算 +${earned}`);
+      console.log(`[撤退] ${p.name} 返回营地 | 本轮收益${earned}已转入背包`);
+    });
+  }
+
+  document.getElementById('retreatModal').classList.remove('show');
+
+  // Check if all players retreated
+  const stillIn = state.players.filter(p => p.inExpedition);
+  if(stillIn.length === 0) {
+    endRound(false);
+  } else {
+    saveState();
+    render();
+  }
+}
+
+// === Expedition Failure ===
+function triggerExpeditionFailure(hazardType) {
+  // All active players lose round earnings
+  state.players.forEach(p => {
+    if(p.inExpedition) {
+      const old = p.roundEarnings;
+      p.roundEarnings = 0;
+      p.roundGems = [];
+      p.roundRelics = [];
+      p.hazardCount++;
+      p.inExpedition = false;
+      logPlayerChange(p.name, '临时收益', old, 0, `探险失败(${HAZARD_NAME[hazardType]})，收益清零`);
+    }
+  });
+  console.log(`[探险失败] 💥 ${HAZARD_NAME[hazardType]}重复出现！所有深入玩家本轮收益清零`);
+
+  // Unretrieved relics on path are discarded (removed from game)
+  if(state.pathRelics.length > 0) {
+    console.log(`[探险失败] 路径上${state.pathRelics.length}张未领取神器被移除: [${state.pathRelics.join(', ')}]`);
+    state.removedRelics.push(...state.pathRelics);
+    state.pathRelics = [];
+  }
+
+  // Record the duplicated hazard for next-round notification
+  state.pendingRemovedHazards.push(hazardType);
+
+  // From path: remove 1 copy of the duplicated hazard + all relics (already removed), return rest to deck
+  let hazardRemoved = false;
+  const recycleCards = [];
+  for(const c of state.path) {
+    if(c.type === 'relic') continue; // relics already removed from game
+    if(c.type === 'hazard' && c.hazard === hazardType && !hazardRemoved) {
+      hazardRemoved = true; // skip this one (remove from game)
+      console.log(`[探险失败] 移除1张${HAZARD_NAME[hazardType]}灾难卡`);
+      continue;
+    }
+    recycleCards.push(c);
+  }
+
+  // Return recycled cards to deck and reshuffle
+  state.deck.push(...recycleCards);
+  state.deck = shuffle(state.deck);
+  console.log(`[牌堆] ${recycleCards.length}张卡牌回收至牌堆并重新洗混，当前牌堆${state.deck.length}张`);
+
+  saveState();
+  render();
+  endRound(true);
+}
+
+// === Round End ===
+function endRound(failed) {
+  // Normal round end: remove unretrieved relics, return other path cards to deck
+  if(!failed && state.path.length > 0) {
+    if(state.pathRelics.length > 0) {
+      console.log(`[轮次结束] ${state.pathRelics.length}张未领取神器被移除: [${state.pathRelics.join(', ')}]`);
+      state.removedRelics.push(...state.pathRelics);
+      state.pathRelics = [];
+    }
+    const recycleCards = state.path.filter(c => c.type !== 'relic');
+    state.deck.push(...recycleCards);
+    state.deck = shuffle(state.deck);
+    console.log(`[轮次结束] ${recycleCards.length}张路径卡牌回收至牌堆并重新洗混，当前牌堆${state.deck.length}张`);
+  }
+
+  state.phase = 'round-end';
+  saveState();
+  render();
+
+  const modal = document.getElementById('scoreModal');
+  const title = document.getElementById('scoreTitle');
+  title.textContent = failed ? `💥 探险失败！第 ${state.round} 轮结束` : `第 ${state.round} 轮结束`;
+
+  const list = document.getElementById('scoreList');
+  list.innerHTML = state.players.map(p =>
+    `<div class="score-item">
+      <span class="s-name">${p.name}</span>
+      <span class="s-score">${p.backpack}</span>
+    </div>`
+  ).join('');
+
+  const btn = document.getElementById('btnNextRound');
+  // Reset toggle state
+  scoreDetailMode.score = false;
+  document.getElementById('scoreOverview').classList.remove('hidden');
+  document.getElementById('scoreDetail').classList.add('hidden');
+  document.getElementById('btnScoreToggle').textContent = '明细';
+
+  if(state.round >= TOTAL_ROUNDS) {
+    btn.textContent = '查看最终结果';
+    btn.onclick = showGameOver;
+  } else {
+    btn.textContent = '开始下一轮';
+    btn.onclick = nextRound;
+  }
+
+  modal.classList.add('show');
+}
+
+function nextRound() {
+  document.getElementById('scoreModal').classList.remove('show');
+  state.round++;
+  state.path = [];
+  state.pathGems = 0;
+  state.pathRelics = [];
+  state.hazardsOnPath = {};
+  pendingSettle = false;
+  pendingFailure = null;
+  state.players.forEach(p => {
+    p.roundEarnings = 0;
+    p.roundGems = [];
+    p.roundRelics = [];
+    p.inExpedition = true;
+  });
+  drawRelicToDeck();
+  state.phase = 'explore';
+
+  // Show removed hazards notification if any
+  if(state.pendingRemovedHazards.length > 0) {
+    const newRemoved = [...state.pendingRemovedHazards];
+    state.removedHazards.push(...newRemoved);
+    state.pendingRemovedHazards = [];
+    saveState();
+    render();
+    showHazardNotification(newRemoved);
+  } else {
+    saveState();
+    render();
+  }
+}
+
+function showHazardNotification(justRemoved) {
+  const notify = document.getElementById('hazardNotify');
+  const types = [...new Set(justRemoved)];
+  notify.innerHTML = types.map(t =>
+    `<div class="h-icon">${HAZARD_EMOJI[t]}</div>
+     <div class="h-text">${HAZARD_NAME[t]} 已从牌堆移除</div>
+     <div class="h-sub">上轮探险中重复出现的灾难</div>`
+  ).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,.1);margin:16px 0">');
+  document.getElementById('hazardModal').classList.add('show');
+}
+
+function closeHazardModal() {
+  document.getElementById('hazardModal').classList.remove('show');
+}
+
+function showGameOver() {
+  document.getElementById('scoreModal').classList.remove('show');
+  state.phase = 'game-over';
+  saveState();
+
+  const list = document.getElementById('finalScores');
+  list.innerHTML = state.players.map(p =>
+    `<div class="score-item">
+      <span class="s-name">${p.name}</span>
+      <span class="s-score">${p.backpack}</span>
+    </div>`
+  ).join('');
+
+  // Reset toggle state
+  document.getElementById('finalOverview').classList.remove('hidden');
+  document.getElementById('finalDetail').classList.add('hidden');
+  document.getElementById('btnFinalToggle').textContent = '明细';
+
+  document.getElementById('gameOverModal').classList.add('show');
+}
+
+function buildDetailTable(players) {
+  const gemSum = p => p.gems.reduce((a,b) => a+b, 0);
+  return `<table class="detail-table">
+    <tr><th>玩家</th><th>得分</th><th>宝石</th><th>神器</th><th>灾难</th></tr>
+    ${players.map(p => `<tr>
+      <td class="dt-name">${p.name}</td>
+      <td class="dt-score">${p.backpack}</td>
+      <td class="dt-gems">${gemSum(p)}</td>
+      <td class="dt-relics">${p.relics.length > 0 ? p.relics.join(', ') : '-'}</td>
+      <td class="dt-hazard">${p.hazardCount}</td>
+    </tr>`).join('')}
+  </table>`;
+}
+
+let scoreDetailMode = { score: false, final: false };
+
+function toggleScoreDetail(which) {
+  scoreDetailMode[which] = !scoreDetailMode[which];
+  const isDetail = scoreDetailMode[which];
+  const overviewEl = document.getElementById(which === 'score' ? 'scoreOverview' : 'finalOverview');
+  const detailEl = document.getElementById(which === 'score' ? 'scoreDetail' : 'finalDetail');
+  const btn = document.getElementById(which === 'score' ? 'btnScoreToggle' : 'btnFinalToggle');
+
+  if(isDetail) {
+    detailEl.innerHTML = buildDetailTable(state.players);
+    overviewEl.classList.add('hidden');
+    detailEl.classList.remove('hidden');
+    btn.textContent = '概览';
+  } else {
+    overviewEl.classList.remove('hidden');
+    detailEl.classList.add('hidden');
+    btn.textContent = '明细';
+  }
+}
+
+// === Render ===
+function render() {
+  if(!state) return;
+
+  // Round badge
+  document.getElementById('roundBadge').textContent = `第 ${state.round} / ${TOTAL_ROUNDS} 轮`;
+
+  // Players
+  const bar = document.getElementById('playersBar');
+  bar.innerHTML = state.players.map(p => {
+    const cls = p.inExpedition ? 'active' : 'retreated';
+    const statusText = p.inExpedition ? '深入中' : '已撤退';
+    return `<div class="player-chip ${cls}">
+      <span class="name">${p.name}</span>
+      <span class="score">${p.backpack}</span>
+      ${p.inExpedition && p.roundEarnings > 0 ? `<span class="earnings">+${p.roundEarnings}</span>` : ''}
+      <div class="status-dot" title="${statusText}"></div>
+    </div>`;
+  }).join('');
+
+  // Path cards
+  const pathEl = document.getElementById('pathCards');
+  if(state.path.length === 0) {
+    pathEl.innerHTML = '<div class="path-empty">等待翻牌...</div>';
+  } else {
+    pathEl.innerHTML = state.path.map(c => {
+      if(c.type === 'gem') return `<div class="card gem"><span>💎</span><span class="card-val">${c.value}</span></div>`;
+      if(c.type === 'hazard') return `<div class="card hazard"><span>${HAZARD_EMOJI[c.hazard]}</span><span class="card-val">${HAZARD_NAME[c.hazard]}</span></div>`;
+      if(c.type === 'relic') return `<div class="card relic"><span>⚖️</span><span class="card-val">${c.value}</span></div>`;
+    }).join('');
+  }
+
+  // Path info
+  const info = document.getElementById('pathInfo');
+  const relicText = state.pathRelics.length > 0 ? state.pathRelics.join('+') + '=' + state.pathRelics.reduce((a,b)=>a+b,0) : '无';
+  info.innerHTML = `<span>余数宝石: <strong>${state.pathGems}</strong></span><span>神器: <strong>${relicText}</strong></span>`;
+
+  // Removed cards (hazards + relics)
+  const removedArea = document.getElementById('removedArea');
+  const hasRemoved = state.removedHazards.length > 0 || state.removedRelics.length > 0;
+  if(hasRemoved) {
+    removedArea.classList.remove('hidden');
+    const hazardHTML = state.removedHazards.map(t =>
+      `<div class="removed-card">${HAZARD_EMOJI[t]}</div>`
+    ).join('');
+    const relicHTML = state.removedRelics.map(v =>
+      `<div class="removed-card relic" style="flex-direction:column;gap:1px"><span>⚖️</span><span style="font-size:10px;color:var(--gold)">${v}</span></div>`
+    ).join('');
+    document.getElementById('removedCards').innerHTML = hazardHTML + relicHTML;
+  } else {
+    removedArea.classList.add('hidden');
+  }
+
+  // Flip / Settle / Failure button
+  const flipArea = document.getElementById('flipArea');
+  const btnFlip = document.getElementById('btnFlip');
+  if(state.phase === 'explore') {
+    flipArea.classList.remove('hidden');
+    if(pendingFailure) {
+      btnFlip.textContent = `💥 本次探险失败`;
+      btnFlip.className = 'btn';
+      btnFlip.style.background = 'var(--danger)';
+      btnFlip.style.color = '#fff';
+      btnFlip.disabled = false;
+      btnFlip.onclick = confirmFailure;
+    } else if(pendingSettle) {
+      btnFlip.textContent = '本次探险结算';
+      btnFlip.className = 'btn btn-gold';
+      btnFlip.style.background = '';
+      btnFlip.style.color = '';
+      btnFlip.disabled = false;
+      btnFlip.onclick = settleExpedition;
+    } else {
+      btnFlip.textContent = state.deck.length > 0 ? `翻开下一张牌 (${state.deck.length})` : '牌堆已空';
+      btnFlip.className = 'btn btn-primary';
+      btnFlip.style.background = '';
+      btnFlip.style.color = '';
+      btnFlip.disabled = state.deck.length === 0;
+      btnFlip.onclick = flipCard;
+    }
+  } else {
+    flipArea.classList.add('hidden');
+    pendingSettle = false;
+    pendingFailure = null;
+  }
+}
+
+// === Boot ===
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = loadState();
+  if(saved) {
+    state = saved;
+    document.getElementById('landingPage').classList.add('hidden');
+    if(state.phase === 'game-over') {
+      render();
+      showGameOver();
+    } else {
+      render();
+    }
+  }
+  // No cache: landing page is visible by default, do nothing
+});
+</script>
+</body>
+</html>

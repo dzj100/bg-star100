@@ -11,19 +11,19 @@
 | 🐙 深渊回响 | 深海克苏鲁合作肉鸽卡牌构筑 | `abyss-echo/` |
 | 🗡️ 无赖勇者 | 1人 单人扑克闯关 | `scoundrel/` |
 | 🕵️ 神探缉凶 | 1人 人机对战推理 | `fugitive/` |
-| ⏳ 煞有其时 | 2人 时空推挤悖论棋 | `that_time_you_killed_me/` |
+| ⏳ 煞有其时 | 2人 时空推挤悖论棋 | `that-time-you-killed-me/` |
 | 🏔️ 登山家 | 2人叠棋策略 | `mountaineer/` |
 | 🐠 海底探险 | 2~6人骰子聚会冒险 | `undersea-explorer/` |
-| 🃏 UNO | 1人手牌管理 | `uno_single_player/` |
+| 🃏 UNO | 1人手牌管理 | `uno-single-player/` |
 | 🕶️ 渗透因子 | 1人 人机协作推理缉凶 | `infiltraitors/` |
 | 🎫 车票收藏家 | 3~6人 传手机抢票收藏 | `ticket-collector/` |
 | 🧙 巫师牌 | 3~6人 吃墩预测博弈（人机） | `wizard/` |
 | 🌴 棕榈岛 | 1人 卡牌循环构筑 | `palm-island/` |
 | 🧊 流冰航路 | 1人 单人冰山航路解谜 / 2~4人联机合作 | `frozen-passage/` |
-| 🐺 狼人真言 | 4~10人欢乐聚会猜词 | 外部部署 |
-| 🐶 夺狗囧事 | 2~5人吹牛博弈 | 外部部署 |
-| 💎 印加宝藏 | 3~8人赌狗冒险 | 外部部署 |
-| 🐱 捉虫猫日记 | 2人策略竞争 | 外部部署 |
+| 🐺 狼人真言 | 4~10人欢乐聚会猜词 | `werewords/` |
+| 🐶 夺狗囧事 | 2~5人吹牛博弈 | `dog-joker/` |
+| 💎 印加宝藏 | 3~8人赌狗冒险 | `incan-gold/` |
+| 🐱 捉虫猫日记 | 2人策略竞争 | `cat-diary/` |
 
 **联机对战版**（基于 Supabase Realtime）：
 - 弑君者OL — `regicide/index_ol.html`
