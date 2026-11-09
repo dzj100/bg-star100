@@ -112,15 +112,31 @@
     function pageInfo() {
       var path = location.pathname || '/';
       var segs = path.split('/').filter(function (x) { return x; });
-      var file = segs.length ? segs[segs.length - 1] : 'index.html';
-      var home = segs.length === 0 || (segs.length === 1 && /^index\.html$/i.test(file));
-      if (home) return { home: true };
-      if (!/^index(_ol)?\.html$/i.test(file)) return null;
-      var game = overrideGame || (segs.length >= 2 ? segs[segs.length - 2] : '');
+      if (!segs.length) return { home: true };
+
+      // Cloudflare Pages 会把 index.html 重写成目录式 URL：
+      //   /wizard/index.html   -> /wizard/
+      //   /regicide/index_ol.html -> /regicide/index_ol
+      var last = segs[segs.length - 1];
+      var isIndex = /^index(\.html)?$/i.test(last);
+      var isIndexOl = /^index_ol(\.html)?$/i.test(last);
+
+      if (segs.length === 1 && isIndex) return { home: true };
+
+      var game = '';
+      if (isIndex || isIndexOl) {
+        if (segs.length < 2) return null;
+        game = segs[segs.length - 2];
+      } else if (segs.length === 1) {
+        game = last;
+      } else {
+        return null;
+      }
       if (!game) return null;
+      if (overrideGame) game = overrideGame;
       var online = overrideMode
         ? overrideMode === 'online'
-        : (/index_ol\.html$/i.test(file) || game === 'take-time' || game === 'bomb-busters');
+        : (isIndexOl || game === 'take-time' || game === 'bomb-busters');
       return { home: false, game: game, mode: online ? 'online' : 'solo' };
     }
     function currentGame() {
