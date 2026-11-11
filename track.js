@@ -47,7 +47,11 @@
       if (!DEBUG) return;
       try { console.log.apply(console, ['[track]'].concat([].slice.call(arguments))); } catch (e) {}
     }
-    function http() { return /^https?:$/.test(location.protocol || ''); }
+    function http() {
+      // 只在 pages.dev 域名下上报，避免本地调试/自动化测试污染真实数据
+      var host = location.hostname || '';
+      return /^https?:$/.test(location.protocol || '') && /(^|\.)pages\.dev$/i.test(host);
+    }
     function nowISO() {
       try { return new Date().toISOString(); } catch (e) { return ''; }
     }
@@ -233,26 +237,25 @@
       }
     }
     function onlineRound() {
-      var r = readJSON(store('session'), ROUND_KEY);
+      // 存 localStorage：刷新、关闭浏览器、短时间离开后回来都接同一局
+      var r = readJSON(store('local'), ROUND_KEY);
       return r && r.ts && Date.now() - r.ts < ROUND_MAX ? r : null;
     }
     function onlineStart(players) {
       try {
         if (!http()) return;
-        var cur = onlineRound();
         var game = currentGame();
-        if (!cur) {
-          writeJSON(store('session'), ROUND_KEY, { ts: Date.now(), game: game });
-          log('round start', game);
-        }
-        enqueue('online_start', { players: Number(players) || 0 }, (cur && cur.game) || game);
+        // 房主真正开始新局时重置起点；刷新/重连不会调用这里
+        writeJSON(store('local'), ROUND_KEY, { ts: Date.now(), game: game });
+        enqueue('online_start', { players: Number(players) || 0 }, game);
+        log('round start', game);
       } catch (e) {}
     }
     function onlineEnd(result) {
       try {
         var cur = onlineRound();
         if (!cur) return;
-        del(store('session'), ROUND_KEY);
+        del(store('local'), ROUND_KEY);
         enqueue('online_end', {
           result: result || 'done',
           ms: Math.max(0, Math.min(Date.now() - cur.ts, ROUND_MAX))
@@ -312,7 +315,7 @@
     try {
       window.addEventListener('pagehide', function () {
         try {
-          if (onlineRound()) onlineEnd('left');
+          // 关闭/刷新都不结算：时长以游戏真正结束为准，刷新后仍可接上原起点
           flush(true);
         } catch (e) {}
       });

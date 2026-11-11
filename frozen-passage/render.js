@@ -2384,6 +2384,14 @@
     var prevPhase = S ? S.phase : null;
     var prevPending = S && S.pending ? S.pending.type : null;
     var my = mySeat();
+    /* 卡住由上一家交棒时算一次，副本失真会让本端"手牌全无解却停在放置阶段"
+       → 当前玩家按自己手牌复算，保证总有物品/宣告失败的出口 */
+    var corrected = false;
+    if (next.phase === 'place' && next.currentSeat === my && !F.hasAnyLegalPlacement(next)) {
+      next.phase = 'stuck';
+      next.lossHint = true;
+      corrected = true;
+    }
     S = next;
     UI.screen = 'game';
     if (UI.selectedCardId && F.handForSeat(next, my).indexOf(UI.selectedCardId) < 0) {
@@ -2392,6 +2400,10 @@
     render();
     animateChanges(prev, next);
     syncOnlineSheet(prevPhase, prevPending, my);
+    /* 推一份纠正后的快照，避免房间记录与各端长期停在错误的放置阶段 */
+    if (corrected && typeof window._olPushState === 'function') {
+      setTimeout(function () { window._olPushState(); }, 0);
+    }
     return true;
   }
 

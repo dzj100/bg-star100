@@ -494,6 +494,14 @@
     return false;
   }
 
+  /* 按当前手牌双向校正 place / stuck：物品换牌可能让手牌从有解变无解，反之亦然 */
+  function refreshPhase(state) {
+    if (state.phase !== 'place' && state.phase !== 'stuck') return state.phase;
+    state.phase = hasAnyLegalPlacement(state) ? 'place' : 'stuck';
+    if (state.phase === 'stuck') state.lossHint = true;
+    return state.phase;
+  }
+
   /* ---------------- 物品选项 ---------------- */
 
   /* 使用因纽特智慧后才会变为合法的落点（依赖紧邻同数字） */
@@ -841,7 +849,7 @@
     next.wisdom = true;
     pushLog(next, { turn: next.turn, type: 'inuit' }, meta.seat);
     setLastAction(next, { type: 'inuit', turn: next.turn }, meta.seat);
-    if (next.phase === 'stuck') next.phase = 'place';
+    refreshPhase(next);
     bump(next);
     return { ok: true, state: next };
   }
@@ -915,7 +923,7 @@
       turn: next.turn
     }, meta.seat);
 
-    if (next.phase === 'stuck' && hasAnyLegalPlacement(next)) next.phase = 'place';
+    refreshPhase(next);
     bump(next);
     return { ok: true, state: next };
   }
@@ -964,7 +972,7 @@
       turn: next.turn
     }, meta.seat);
 
-    if (next.phase === 'stuck' && hasAnyLegalPlacement(next)) next.phase = 'place';
+    refreshPhase(next);
     bump(next);
     return { ok: true, state: next };
   }
@@ -1289,6 +1297,7 @@
     canPlace: canPlace,
     legalPlacements: legalPlacements,
     hasAnyLegalPlacement: hasAnyLegalPlacement,
+    refreshPhase: refreshPhase,
     inuitPlacements: inuitPlacements,
     canUseInuit: canUseInuit,
     logOptions: logOptions,

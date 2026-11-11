@@ -1373,6 +1373,35 @@ test('手牌为空轮到该玩家时判负 no-hand', function () {
   assert.strictEqual(s.lossReason, 'no-hand');
 });
 
+test('雪橇把唯一可行牌换走后应立即进入 stuck', function () {
+  var s = online(['A', 'B'], 701, 'expert');
+  setItems(s, ['sled']);
+  var cur = s.currentSeat;
+  // 只留 r5-3：左邻 blue-2、右邻 blue-8，目标正面黑色 → 当前只能放黑 3~7
+  s.board.slots.forEach(function (slot) { slot.cardId = 'blue-9'; });
+  FP.slotByPos(s, 5, 3).cardId = null;
+  put(s, 5, 2, 'blue-2');
+  put(s, 5, 4, 'blue-8');
+  setGoals(s, ['blue', 'red', 'black', 'red', 'blue']);
+  s.players[cur].hand = ['black-5', 'red-1'];
+  s.hand = ['black-5', 'red-1'];
+  s.supply = ['red-4', 'black-2'];
+  s.draw = ['red-9', 'blue-2', 'black-3'];
+  s.phase = 'place';
+  s.wisdom = false;
+
+  var legal = FP.legalPlacements(s, 'black-5').map(function (p) { return p.slotId; });
+  assert.deepStrictEqual(legal, ['r5-3']);
+  var r = FP.useSled(s, 'black-5', 'red-4');
+  assert.ok(r.ok, r.message);
+  s = r.state;
+  assert.deepStrictEqual(s.hand, ['red-1', 'red-4']);
+  assert.strictEqual(FP.hasAnyLegalPlacement(s), false);
+  assert.strictEqual(s.phase, 'stuck', '换牌后无解应转入卡住');
+  assert.ok(FP.declareLoss(s, cur).ok, '卡住后当前玩家可以宣告失败');
+  assertMirror(s);
+});
+
 test('联机因纽特/雪橇/航海日志只作用于当前玩家', function () {
   var s = online(['A', 'B'], 605);
   setItems(s, ['inuit']);
