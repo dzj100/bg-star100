@@ -24,6 +24,7 @@
 | 🐶 夺狗囧事 | 2~5人吹牛博弈 | `dog-joker/` |
 | 💎 印加宝藏 | 3~8人赌狗冒险 | `incan-gold/` |
 | 🐱 捉虫猫日记 | 2人策略竞争 | `cat-diary/` |
+| 🏮 大宋百商图 | 1~4人资源管理 | `dasong-merchants/` |
 
 **联机对战版**（基于 Supabase Realtime）：
 - 弑君者OL — `regicide/index_ol.html`

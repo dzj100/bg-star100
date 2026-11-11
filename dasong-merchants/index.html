@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#e8dabd">
+<meta name="description" content="大宋百商图 — 清地、置业、买菜待客，在汴京经营一条属于自己的商业街。1~4 人模拟经营桌游在线助手。">
+<title>大宋百商图 · 汴京商街</title>
+<link rel="stylesheet" href="style.css?v=20261110l">
+</head>
+<body>
+<div class="scene" aria-hidden="true">
+  <svg class="scene-svg" viewBox="0 0 1200 520" preserveAspectRatio="xMidYMax slice">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f7efdc" stop-opacity=".55"/>
+        <stop offset="1" stop-color="#f7efdc" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7e9a74" stop-opacity=".22"/>
+        <stop offset="1" stop-color="#7e9a74" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="520" fill="url(#sky)"/>
+    <path d="M0 360 C120 300 210 318 300 276 C380 238 430 258 510 300 C590 342 650 322 740 280 C830 238 900 250 990 300 C1070 344 1140 336 1200 312 L1200 520 L0 520Z" fill="url(#hill)"/>
+    <path d="M0 402 C150 360 260 378 360 352 C470 324 560 344 680 372 C800 400 900 386 1020 356 C1100 336 1160 340 1200 352 L1200 520 L0 520Z" fill="#c9b48e" opacity=".18"/>
+    <g class="water" fill="none" stroke="#5e8388" stroke-opacity=".22" stroke-width="2">
+      <path d="M70 486 C140 478 200 486 268 480 C336 474 372 484 430 480"/>
+      <path d="M760 492 C830 484 890 492 952 486 C1014 480 1060 488 1130 484"/>
+    </g>
+    <g class="bridge" fill="none" stroke="#6b5a45" stroke-opacity=".34" stroke-width="2">
+      <path d="M270 452 C380 330 520 300 640 300 C760 300 900 330 1010 452"/>
+      <path d="M300 452 C400 352 520 326 640 326 C760 326 880 352 980 452"/>
+      <path d="M320 436 L960 436" stroke-dasharray="3 12" stroke-opacity=".5"/>
+      <path d="M356 410 L924 410M398 382 L882 382M452 356 L828 356M516 336 L764 336" stroke-opacity=".2"/>
+      <g stroke="#a9513b" stroke-opacity=".32">
+        <path d="M330 436 L330 458M470 436 L470 458M610 436 L610 458M750 436 L750 458M890 436 L890 458"/>
+        <path d="M316 424 C420 316 530 294 640 294 C750 294 880 318 984 424"/>
+      </g>
+    </g>
+    <g class="pagoda" fill="none" stroke="#6b5a45" stroke-opacity=".28" stroke-width="1.6">
+      <path d="M150 452 L150 330M128 330 L172 330M120 352 L180 352M126 376 L174 376M124 400 L176 400M118 424 L182 424"/>
+      <path d="M120 330 L150 296 L180 330M126 310 L150 286 L174 310"/>
+      <path d="M108 352 L192 352M112 376 L188 376M110 400 L190 400M106 424 L194 424" stroke-opacity=".5"/>
+    </g>
+    <g class="lantern lantern-left" transform="translate(92 116)">
+      <path d="M0 -34 L0 0" stroke="#6b5a45" stroke-opacity=".3"/>
+      <ellipse cx="0" cy="26" rx="22" ry="27" fill="#a9513b" opacity=".4"/>
+      <ellipse cx="0" cy="26" rx="22" ry="27" fill="none" stroke="#6b5a45" stroke-opacity=".3"/>
+      <path d="M-14 6 Q0 0 14 6M-17 26 Q0 20 17 26M-14 46 Q0 52 14 46" fill="none" stroke="#6b5a45" stroke-opacity=".25"/>
+      <path d="M0 53 L0 70M-5 70 L5 70" stroke="#6b5a45" stroke-opacity=".3"/>
+    </g>
+    <g class="lantern lantern-right" transform="translate(1108 168)">
+      <path d="M0 -34 L0 0" stroke="#6b5a45" stroke-opacity=".3"/>
+      <ellipse cx="0" cy="26" rx="22" ry="27" fill="#a9513b" opacity=".34"/>
+      <ellipse cx="0" cy="26" rx="22" ry="27" fill="none" stroke="#6b5a45" stroke-opacity=".28"/>
+      <path d="M-14 6 Q0 0 14 6M-17 26 Q0 20 17 26M-14 46 Q0 52 14 46" fill="none" stroke="#6b5a45" stroke-opacity=".22"/>
+      <path d="M0 53 L0 70M-5 70 L5 70" stroke="#6b5a45" stroke-opacity=".26"/>
+    </g>
+  </svg>
+</div>
+
+<main id="app">
+  <section id="landingScreen" class="screen landing-screen" aria-label="大宋百商图首页"></section>
+  <section id="setupScreen" class="screen setup-screen" aria-label="游戏设置" hidden></section>
+  <section id="gameScreen" class="screen game-screen" aria-label="大宋百商图对局" hidden></section>
+</main>
+
+<div id="modalRoot" class="modal-mask" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="game.js?v=20261110c"></script>
+<script src="render.js?v=20261110l"></script>
+<script src="../track.js?v=20261111"></script>
+</body>
+</html>
