@@ -161,6 +161,7 @@
     canBuild: canBuild,
     currentCustomer: currentCustomer,
     marketSize: marketSize,
+    customerMenuCost: customerMenuCost,
     buyMenu: buyMenu,
     clearAndReserve: clearAndReserve,
     buildShop: buildShop,

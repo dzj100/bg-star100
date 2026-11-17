@@ -37,6 +37,8 @@
     eventOpen: false,
     logOpen: false,
     openBlocks: { resources: false, victory: false },
+    deckIndex: 0,
+    advanceAfterEvents: false,
     lastOptions: null
   };
 
@@ -107,6 +109,7 @@
     UI.resultShown = false;
     UI.eventOpen = false;
     UI.logOpen = false;
+    UI.deckIndex = 0;
     if (UI.modal) closeModal();
     render();
     window.scrollTo(0, 0);
@@ -173,6 +176,49 @@
       if (effect.type === 'extra_menu_cost') return '客人多吃 ' + effect.value + ' 道';
       return '';
     }).filter(Boolean).join(' ');
+  }
+
+  function ruleMenuCost(card) {
+    return card.purchaseCost == null ? '不可购买' : card.purchaseCost + ' 铜';
+  }
+
+  function ruleMenuIncome(card) {
+    if (card.income.type === 'fixed') return card.income.value + ' 铜';
+    if (card.income.type === 'dice_plus') return '1 骰 +' + card.income.value;
+    return '—';
+  }
+
+  function ruleShopIncome(shop) {
+    var base = shop.baseIncome;
+    if (base.type === 'fixed') return base.value + ' 铜';
+    if (base.type === 'dice') return '1 骰';
+    if (base.type === 'built_shop_count') return '= 已建店铺数';
+    if (base.type === 'consumed_menu_count_plus') return '= 本次吃菜数 +' + base.value;
+    return '—';
+  }
+
+  function ruleShopExtra(shop) {
+    var parts = (shop.builtShopBonuses || []).map(function (bonus) {
+      var target = DSM.shopById[bonus.targetShopId];
+      return target ? target.name + ' +' + bonus.incomeBonus : '';
+    }).filter(Boolean);
+    var effect = shopEffectText(shop);
+    if (effect) parts.push(effect);
+    return parts.length ? parts.join('、') : '—';
+  }
+
+  function ruleTable(headers, rows) {
+    return '<div class="rule-table-wrap"><table class="rule-table">' +
+      '<thead><tr>' + headers.map(function (text) { return '<th>' + text + '</th>'; }).join('') + '</tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function ruleSection(no, title, lead, inner) {
+    return '<section class="rule-sec">' +
+      '<h3><span class="rule-sec-no">' + no + '</span>' + title + '</h3>' +
+      (lead ? '<p class="rule-sec-lead">' + lead + '</p>' : '') +
+      inner +
+    '</section>';
   }
 
   /* ------------------------------ 首页：无边界 · 散点小品 ------------------------------ */
@@ -671,6 +717,7 @@
   }
 
   function renderLanding() {
+    destroyDeckSwiper();
     var saved = savedGame();
     landingEl.innerHTML = '' +
       '<div class="landing">' +
@@ -738,6 +785,7 @@
 /* ------------------------------ 设置页 ------------------------------ */
 
   function renderSetup() {
+    destroyDeckSwiper();
     var c = UI.config;
     var count = c.playerCount;
     var html = '' +
@@ -838,13 +886,99 @@
 
   /* ------------------------------ 对局页 ------------------------------ */
 
+  var deckSwiper = null;
+  var deckMq = window.matchMedia ? window.matchMedia('(max-width: 920px)') : null;
+
+  function deckTab(index, label) {
+    var active = UI.deckIndex === index;
+    return '<button type="button" class="deck-tab' + (active ? ' active' : '') + '" data-action="deck-tab" data-deck="' + index + '" role="tab" aria-selected="' + (active ? 'true' : 'false') + '" aria-controls="deck-panel-' + index + '"' + (active ? '' : ' tabindex="-1"') + '>' + label + '</button>';
+  }
+
+  function syncDeckTabs(index) {
+    var tabs = gameEl.querySelectorAll('.deck-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      var active = i === index;
+      tabs[i].classList.toggle('active', active);
+      tabs[i].setAttribute('aria-selected', active ? 'true' : 'false');
+      tabs[i].tabIndex = active ? 0 : -1;
+    }
+  }
+
+  function destroyDeckSwiper() {
+    if (deckSwiper) {
+      try { deckSwiper.destroy(true, true); } catch (error) { /* ignore */ }
+      deckSwiper = null;
+    }
+    var clones = gameEl.querySelectorAll('.deck-clone');
+    for (var i = 0; i < clones.length; i++) {
+      if (clones[i].parentNode) clones[i].parentNode.removeChild(clones[i]);
+    }
+  }
+
+  function deckClone(slide) {
+    var clone = slide.cloneNode(true);
+    clone.classList.add('deck-clone');
+    clone.removeAttribute('id');
+    clone.removeAttribute('role');
+    clone.setAttribute('aria-hidden', 'true');
+    clone.setAttribute('inert', '');
+    return clone;
+  }
+
+  function deckRealIndex(index) {
+    return (index + 2) % 3;
+  }
+
+  function initDeckSwiper() {
+    destroyDeckSwiper();
+    var deck = gameEl.querySelector('.deck-swiper');
+    if (!deck) return;
+    UI.deckIndex = Math.max(0, Math.min(2, UI.deckIndex || 0));
+    syncDeckTabs(UI.deckIndex);
+    if (!deckMq || !deckMq.matches || !window.Swiper) return;
+    var wrapper = deck.querySelector('.swiper-wrapper');
+    if (!wrapper || wrapper.children.length !== 3) return;
+    var first = wrapper.firstElementChild;
+    var last = wrapper.lastElementChild;
+    wrapper.insertBefore(deckClone(last), first);
+    wrapper.appendChild(deckClone(first));
+    deckSwiper = new window.Swiper(deck, {
+      slidesPerView: 1,
+      spaceBetween: 10,
+      autoHeight: true,
+      speed: 280,
+      initialSlide: UI.deckIndex + 1,
+      touchStartPreventDefault: false,
+      on: {
+        slideChange: function () {
+          UI.deckIndex = deckRealIndex(this.realIndex);
+          syncDeckTabs(UI.deckIndex);
+        },
+        slideChangeTransitionEnd: function () {
+          if (this.realIndex === 4) this.slideTo(1, 0);
+          else if (this.realIndex === 0) this.slideTo(3, 0);
+        }
+      }
+    });
+  }
+
+  if (deckMq) {
+    var onDeckBreakpoint = function () {
+      if (UI.screen === 'game') initDeckSwiper();
+    };
+    if (deckMq.addEventListener) deckMq.addEventListener('change', onDeckBreakpoint);
+    else if (deckMq.addListener) deckMq.addListener(onDeckBreakpoint);
+  }
+
   function renderGame() {
     var game = DSM.state;
     if (!game) { UI.screen = 'setup'; renderSetup(); return; }
+    destroyDeckSwiper();
     var p = game.players[game.currentPlayerIndex];
     var phase = game.phase;
     var next = DSM.nextClearableLand(p);
     var buildable = DSM.canBuild(p);
+    var builtShopIds = DSM.builtShopIds(p);
     var preview = phase === 'phase3' ? DSM.previewServe() : null;
 
     var html = '' +
@@ -879,9 +1013,8 @@
             '<div class="cash-pill">' + coin(18) + '<strong>' + p.cash + '</strong><span>铜钱</span></div>' +
           '</div>' +
           '<div class="resource-row">' +
-            resourceCell('雅阁', p.prep.length, compositionText(p.prep), '牌库') +
-            resourceCell('后厨', p.kitchen.length, compositionText(p.kitchen), '弃牌堆') +
-            resourceCell('弃菜', p.abandoned.length, '本局已弃', '移出') +
+            resourceCell('雅阁', p.prep.length, compositionText(p.prep), '牌库', 'prep') +
+            resourceCell('后厨', p.kitchen.length, compositionText(p.kitchen), '弃牌堆', 'kitchen') +
           '</div>' +
           '<div class="sub-head"><h3>自家地契</h3><span>' + (next ? '下一块：第 ' + next.index + ' 块 · 清地 ' + next.clearCost + ' 铜钱' : '八块地已全部清理') + '</span></div>' +
           '<div class="land-grid">' +
@@ -889,15 +1022,20 @@
               return landTile(land, index, next);
             }).join('') +
           '</div>' +
-          (buildable.length ?
-            '<div class="build-row"><span class="build-label">待修建 ' + buildable.length + ' 间</span><button type="button" class="btn btn-small btn-outline" data-action="build">去修建</button></div>' :
-            '<div class="build-row empty"><span class="build-label">暂无待修建店铺</span></div>') +
         '</section>' +
 
-        '<div class="right-col">' +
-          '<section class="panel customer-panel">' +
+        '<div class="info-deck">' +
+          '<div class="deck-tabs" role="tablist" aria-label="经营信息">' +
+            deckTab(0, '候客区') +
+            deckTab(1, '店铺展示区') +
+            deckTab(2, '菜单行情') +
+          '</div>' +
+          '<div class="right-col deck-swiper swiper">' +
+            '<div class="swiper-wrapper">' +
+              '<div class="swiper-slide" id="deck-panel-0" role="tabpanel">' +
+                '<section class="panel customer-panel">' +
             '<div class="panel-head"><h2>候客区</h2><span class="panel-note">当前客人必招待</span></div>' +
-            '<div class="customer-list' + (game.customerMarket.length >= 5 ? ' dense' : '') + '" style="--cust-slots:' + Math.max(4, game.customerMarket.length) + '">' +
+            '<div class="customer-list">' +
               game.customerMarket.map(function (card, index) {
                 var customer = DSM.customerById[card.id];
                 if (!customer) return '';
@@ -910,14 +1048,20 @@
                   '<span class="customer-seal">' + sealChar(customer.name) + '</span>' +
                   '<span class="customer-name">' + esc(customer.name) + '</span>' +
                   '<span class="customer-cost">吃 ' + customer.menuCost + ' 道</span>' +
-                  '<span class="customer-shops">' + customer.visitShopIds.map(function (id) { return esc(DSM.shopById[id].name); }).join(' · ') + '</span>' +
+                  '<span class="customer-shops">' + customer.visitShopIds.map(function (id) {
+                    var shop = DSM.shopById[id];
+                    if (!shop) return '';
+                    var name = esc(shop.name);
+                    return builtShopIds.indexOf(id) >= 0 ? '<span class="shop-owned">' + name + '</span>' : name;
+                  }).join(' · ') + '</span>' +
                 '</button>';
               }).join('') +
             '</div>' +
             '<p class="panel-tip">按序号排队，首位必招待；付 1 铜钱可跳过。</p>' +
-          '</section>' +
-
-          '<section class="panel shop-panel">' +
+                '</section>' +
+              '</div>' +
+              '<div class="swiper-slide" id="deck-panel-1" role="tabpanel">' +
+                '<section class="panel shop-panel">' +
             '<div class="panel-head"><h2>店铺展示区</h2><span class="panel-note">清地时认购</span></div>' +
             '<div class="shop-list">' +
               game.shopMarket.map(function (card) {
@@ -932,8 +1076,9 @@
               }).join('') +
             '</div>' +
           '</section>' +
-
-          '<section class="panel menu-panel">' +
+              '</div>' +
+              '<div class="swiper-slide" id="deck-panel-2" role="tabpanel">' +
+                '<section class="panel menu-panel">' +
             '<div class="panel-head"><h2>菜单行情</h2><span class="panel-note">四品菜只随事件获得</span></div>' +
             '<div class="menu-list">' +
               DSM.MENU_CARDS.map(function (card) {
@@ -948,6 +1093,9 @@
               }).join('') +
             '</div>' +
           '</section>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
 
@@ -976,6 +1124,7 @@
     landingEl.hidden = true;
     document.body.classList.remove('is-landing');
     if (UI.screen !== 'game') UI.screen = 'game';
+    initDeckSwiper();
     setTimeout(scheduleModal, 40);
   }
 
@@ -984,12 +1133,11 @@
     return comp.list.length ? comp.list.map(function (item) { return item.count + ' ' + item.name; }).join(' · ') : '空';
   }
 
-  function resourceCell(label, value, detail, tag) {
-    return '<div class="res-cell">' +
-      '<div class="res-top"><span>' + label + '</span><small>' + tag + '</small></div>' +
-      '<strong>' + value + '</strong>' +
+  function resourceCell(label, value, detail, tag, pile) {
+    return '<button type="button" class="res-cell" data-action="inspect-pile" data-pile="' + pile + '" aria-label="查看' + label + '菜品组成">' +
+      '<span class="res-top"><span>' + label + '</span><small>' + tag + '</small><strong>' + value + '</strong></span>' +
       '<p>' + esc(detail) + '</p>' +
-    '</div>';
+    '</button>';
   }
 
   function landTile(land, index, next) {
@@ -998,19 +1146,19 @@
     else if (land.cleared) classes.push('reserved');
     else classes.push('uncleared');
     if (next && next.id === land.id && !land.cleared) classes.push('next');
+    var shop = DSM.shopById[land.shopId || land.reservedShopId];
+    if (shop) classes.push('inspectable');
     var body;
     if (land.shopId) {
-      var shop = DSM.shopById[land.shopId];
       body = '<span class="land-shop">' + esc(shop.name) + '</span><span class="land-note">' + shopIncomeText(shop) + '</span>';
     } else if (land.cleared) {
-      var reserved = DSM.shopById[land.reservedShopId];
-      body = '<span class="land-shop">' + (reserved ? esc(reserved.name) : '空地') + '</span>' +
-        '<span class="land-note">' + (reserved ? '待建 ' + reserved.buildCost + ' 铜' : '未认购') + '</span>';
+      body = '<span class="land-shop">' + (shop ? esc(shop.name) : '空地') + '</span>' +
+        '<span class="land-note">' + (shop ? '待建 ' + shop.buildCost + ' 铜' : '未认购') + '</span>';
     } else {
       body = '<span class="land-cost">' + (land.clearCost === 0 ? '免费' : '清地 ' + land.clearCost) + '</span>' +
         '<span class="land-note">未清理</span>';
     }
-    return '<div class="' + classes.join(' ') + '">' +
+    return '<div class="' + classes.join(' ') + '"' + (shop ? ' data-action="inspect-land" data-land="' + index + '"' : '') + '>' +
       '<span class="land-no">' + CN_NUM[index] + '</span>' +
       (land.shopId ? '<span class="land-house">' + house(20) + '</span>' : '') +
       '<div class="land-body">' + body + '</div>' +
@@ -1094,27 +1242,98 @@
   }
 
   function openRules() {
-    var body = '' +
-      '<div class="rule-list">' +
-        '<div class="rule-item"><b>目标</b><p>率先同时达成「' + victoryLine() + '」的玩家获胜。</p></div>' +
-        '<div class="rule-item"><b>购买</b><p>每回合二选一：买 1 张菜单，或按顺序清 1 块地并认购展示区 1 家店铺（展示区无牌时只能清地）。修建已认购的店铺不占行动，可修任意多间。</p></div>' +
-        '<div class="rule-item"><b>备菜</b><p>可花 3 铜钱从后厨弃 1 张菜（可不弃），用于精简牌库。</p></div>' +
-        '<div class="rule-item"><b>招待</b><p>必须招待候客区首位客人，或付 1 铜钱跳过（最后一位不能跳）。被跳过的客人会带着这笔钱，谁招待归谁。</p></div>' +
-        '<div class="rule-item"><b>吃菜</b><p>客人按牌面吃掉若干张雅阁菜品；雅阁空了会把后厨洗回雅阁。被吃掉的菜按品级产生收益：四品 1、三品 2、二品 3、一品 1 骰 +2。</p></div>' +
-        '<div class="rule-item"><b>逛店</b><p>客人随后会去他能去的已建店铺消费，每家店、每份都产生收益；店铺联动与事件加成照常结算。</p></div>' +
-        '<div class="rule-item"><b>事件</b><p>事件牌混在客人牌堆中，抽到立即生效。长期公告会持续影响全场，直到被新公告替换。</p></div>' +
-        '<div class="rule-item"><b>选址</b><p>清地费依次为 0 / 2 / 3 / 4 / 7 / 8 / 9 / 10 铜钱；土地必须按顺序清理。</p></div>' +
-      '</div>';
-    openModal('rules', '玩法要诀', body, '<button type="button" class="btn btn-primary" data-action="close-modal">知道了</button>');
+    var flowRows = [
+      ['购买', '二选一：买 1 张菜单；或按顺序清 1 块地，并从展示区认购 1 家店铺。', '每回合行动只能二选一；修建已认购的店铺不占行动，铜钱够就能一次修多间。'],
+      ['备菜', '可花 3 铜钱从后厨弃 1 张菜，用来精简牌库。', '每回合最多弃 1 张，也可以直接跳过。'],
+      ['招待', '招待候客区首位客人，或付 1 铜钱跳过当前客人。', '最后一位客人必须招待；跳过的铜钱留在客人身上，谁招待归谁。'],
+      ['交接', '结算收益，客人进弃牌堆，候客区补满，然后交给下一位掌柜。', '所有玩家都行动过一次，即完成一轮。']
+    ].map(function (row) {
+      return '<tr><td><b>' + row[0] + '</b></td><td>' + row[1] + '</td><td>' + row[2] + '</td></tr>';
+    }).join('');
+
+    var settleSteps = [
+      '<b>吃菜</b>：客人按牌面吃掉若干张雅阁菜品；雅阁不足时把后厨洗回雅阁继续消耗（每次最多回洗一次）。',
+      '<b>菜品收益</b>：被吃掉的菜按品级结算——四品 1、三品 2、二品 3、一品 1 骰 +2 铜钱。',
+      '<b>逛店收益</b>：客人会去他能去的每家已建店铺消费；同种店铺每多一间，就多结算一次。',
+      '<b>联动与公告</b>：店铺联动加成、长期公告的加减成照常结算。',
+      '<b>随身铜钱</b>：之前跳过客人留下的铜钱一并入账。'
+    ].map(function (text) { return '<li>' + text + '</li>'; }).join('');
+
+    var menuRows = DSM.MENU_CARDS.map(function (card) {
+      return '<tr><td><b>' + card.name + '</b></td><td>' + card.count + ' 张</td><td>' + ruleMenuCost(card) + '</td><td>' + ruleMenuIncome(card) + '</td></tr>';
+    }).join('');
+
+    var shopRows = DSM.SHOPS.map(function (shop) {
+      return '<tr><td><b>' + esc(shop.name) + '</b></td><td>' + shop.buildCost + ' 铜</td><td>' + ruleShopIncome(shop) + '</td><td>' + ruleShopExtra(shop) + '</td></tr>';
+    }).join('');
+
+    var costGroups = {};
+    DSM.CUSTOMERS.forEach(function (customer) {
+      (costGroups[customer.menuCost] = costGroups[customer.menuCost] || []).push(customer);
+    });
+    var customerRows = Object.keys(costGroups).sort(function (a, b) { return Number(a) - Number(b); }).map(function (cost) {
+      var list = costGroups[cost];
+      var groupHead = '<tr class="rule-group"><th colspan="2">吃 ' + cost + ' 道菜 · ' + list.length + ' 位</th></tr>';
+      var rows = list.map(function (customer) {
+        var shops = customer.visitShopIds.map(function (id) {
+          return DSM.shopById[id] ? esc(DSM.shopById[id].name) : '';
+        }).filter(Boolean).join('、');
+        return '<tr><td><b>' + esc(customer.name) + '</b></td><td>' + shops + '</td></tr>';
+      }).join('');
+      return groupHead + rows;
+    }).join('');
+
+    var eventRows = DSM.EVENTS.map(function (event) {
+      return '<tr><td><b>' + esc(event.name) + '</b></td><td class="rule-nowrap">' + (event.eventType === 'persistent' ? '长期公告' : '即时') + '</td>' +
+        '<td>' + esc(event.notice) + (event.note ? '<small>' + esc(event.note) + '</small>' : '') + '</td></tr>';
+    }).join('');
+
+    var glossary = [
+      ['雅阁', '手牌中的菜品区，招待时从这里吃菜。'],
+      ['后厨', '新买的菜先放这里；雅阁不足时洗回雅阁，备菜阶段从这里弃菜。'],
+      ['候客区', '等待招待的客人队列，默认 4 位，按编号从左往右招待。'],
+      ['展示区', '可供认购的店铺牌，固定保留 4 张。'],
+      ['认购', '清地时选定的店铺，此时尚未产生收益。'],
+      ['修建', '支付建造费把认购的店铺落成，之后才产生收益。'],
+      ['联动', '建成某店后，其关联店铺每次结算额外加钱。'],
+      ['随身铜钱', '跳过客人留下的 1 铜钱，谁招待这位客人就归谁。'],
+      ['清地费', '按地块顺序支付 0 / 2 / 3 / 4 / 7 / 8 / 9 / 10 铜钱，必须从左往右清理。']
+    ].map(function (item) {
+      return '<p class="rule-term"><b>' + item[0] + '</b>' + item[1] + '</p>';
+    }).join('');
+
+    var body = '<div class="rule-book">' +
+      '<div class="rule-hero">' +
+        '<p class="rule-intro">1~4 位掌柜同屏轮流经营：从一条荒地起步，买菜单、清地置业、招待客人赚取铜钱，率先同时达成「' + victoryLine() + '」的掌柜获胜。</p>' +
+        '<div class="rule-chips"><span>1~4 人</span><span>同屏轮流</span><span>约 45 分钟</span></div>' +
+        '<p class="rule-note">起始铜钱与菜牌可在设置页调整；第 2 / 3 / 4 位玩家分别多 1 / 2 / 3 铜钱作为后手补偿。</p>' +
+      '</div>' +
+      ruleSection('壹', '经营流程', '每回合依次经历三个阶段，然后交给下一位掌柜。',
+        ruleTable(['阶段', '怎么进行', '要点'], flowRows)) +
+      ruleSection('贰', '招待结算', '招待一位客人后，按以下顺序结算收益：',
+        '<ol class="rule-steps">' + settleSteps + '</ol>') +
+      ruleSection('叁', '菜品卡', '购买阶段花铜钱买入后放入后厨；四品菜不可购买，只能由开局发放或事件获得。',
+        ruleTable(['品级', '牌数', '购买价', '单张收益'], menuRows)) +
+      ruleSection('肆', '房屋卡', '清地时认购，支付建造费后才落成并产生收益。联动：建成该店后，其列出的店铺每次结算额外加钱，可叠加。',
+        ruleTable(['店铺', '建造费', '基础收益', '联动 · 特殊'], shopRows)) +
+      ruleSection('伍', '客人卡', '客人只会去下列「已建」店铺消费；没有建成的店铺不结算。',
+        ruleTable(['客人', '会去的店铺'], customerRows)) +
+      ruleSection('陆', '事件卡', '事件牌混在客人牌堆中，补位抽到即宣读生效。即时事件结算后进弃牌堆；长期公告持续影响全场，直到被新公告替换。',
+        ruleTable(['事件', '类型', '效果'], eventRows)) +
+      ruleSection('柒', '名词解释', '牌面与流程中出现的说法：',
+        '<div class="rule-glossary">' + glossary + '</div>') +
+    '</div>';
+    openModal('rules', '玩法规则', body, '<button type="button" class="btn btn-primary" data-action="close-modal">知道了</button>', { wide: true });
   }
 
   function victoryLine() {
     var game = DSM.state;
-    if (!game) return '50 铜钱 + 8 间店铺';
+    var cash = game ? game.victory.cash : UI.config.victoryCash;
+    var shops = game ? game.victory.shops : UI.config.victoryShops;
     var parts = [];
-    if (game.victory.cash) parts.push(game.victory.cash + ' 铜钱');
-    if (game.victory.shops) parts.push(game.victory.shops + ' 间店铺');
-    return parts.join(' + ');
+    if (cash) parts.push(cash + ' 铜钱');
+    if (shops) parts.push(shops + ' 间店铺');
+    return parts.join(' + ') || '8 间店铺';
   }
 
   function openBuyMenu() {
@@ -1202,6 +1421,30 @@
     openModal('discard', '备菜弃牌', body, '<button type="button" class="btn btn-ghost" data-action="close-modal">不弃了</button>');
   }
 
+  function openPile(kind) {
+    var game = DSM.state;
+    if (!game) return;
+    var p = game.players[game.currentPlayerIndex];
+    var isPrep = kind !== 'kitchen';
+    var cards = isPrep ? p.prep : p.kitchen;
+    var comp = DSM.composition(cards);
+    var body = '<p class="modal-lead">' + (isPrep
+        ? '雅阁是招待客人时吃菜的牌库，吃空后会把后厨的菜洗回雅阁。'
+        : '新买的菜先放入后厨；雅阁不足时会洗回雅阁，备菜阶段也可花 3 铜钱从这里弃菜。') + '</p>' +
+      '<div class="pile-summary">共 <b>' + comp.total + '</b> 张菜品</div>' +
+      '<div class="pile-list">' +
+        (comp.list.length ? comp.list.map(function (item) {
+          var card = DSM.menuById['dish_rank_' + item.rank];
+          return '<div class="pile-row">' +
+            '<span class="rank-seal rank-' + item.rank + '">' + item.rank + '</span>' +
+            '<span class="pile-main"><b>' + card.name + '</b><small>' + rankIncome(card) + '</small></span>' +
+            '<span class="pile-count">' + item.count + ' 张</span>' +
+          '</div>';
+        }).join('') : '<p class="empty-note">这里还没有菜品。</p>') +
+      '</div>';
+    openModal('pile', isPrep ? '雅阁' : '后厨', body, '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
+  }
+
   function openServeChoice(preview) {
     var body = '<p class="modal-lead">【门可罗雀】生效中：' + esc(preview.customerName) + ' 只会去其中一家店铺消费。</p>' +
       '<div class="reserve-list">' +
@@ -1226,9 +1469,12 @@
     }
     var breakdown = (summary.menuParts || []).map(function (part) {
       return '<li><span>' + esc(part.label) + '</span><b>+' + part.value + '</b></li>';
-    }).concat((summary.shopResults || []).map(function (item) {
+    }).concat((summary.menuDice || []).map(function (die) {
+      var rollText = die.bonus ? '骰 ' + die.roll + ' + ' + die.bonus : '骰 ' + die.roll;
+      return '<li><span>' + esc(die.label) + '（' + rollText + '）</span><b>+' + die.value + '</b></li>';
+    })).concat((summary.shopResults || []).map(function (item) {
       return '<li class="shop-break"><span>' + esc(item.shopName) + ' ' + item.parts.map(function (p) { return esc(p.label) + '+' + p.value; }).join('、') + '</span><b>+' + item.total + '</b></li>';
-    })).join('');
+    })).concat(summary.tip ? ['<li><span>随身</span><b>+' + summary.tip + '</b></li>'] : []).join('');
 
     var body = '' +
       '<div class="summary-hero">' +
@@ -1343,13 +1589,14 @@
     openModal('player', '掌柜详情', body, '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
   }
 
-  function openShop(uid) {
-    var game = DSM.state;
-    var card = game.shopMarket.filter(function (item) { return item.uid === uid; })[0];
-    if (!card) return;
-    var shop = DSM.shopById[card.id];
+  function shopDetailBody(shop, status) {
     var effect = shopEffectText(shop);
-    var body = '<div class="shop-detail">' +
+    var note = status === 'built'
+      ? '已建成，基础收益与联动加成均已生效。'
+      : status === 'reserved'
+        ? '已认购但尚未修建，支付 ' + shop.buildCost + ' 铜钱建成后才会产生收益。'
+        : '清地时可以从展示区认购这家店铺，建造后才会产生收益。';
+    return '<div class="shop-detail">' +
         '<span class="shop-detail-seal">' + sealChar(shop.name) + '</span>' +
         '<h3>' + esc(shop.name) + '</h3>' +
         '<div class="detail-stats">' +
@@ -1358,9 +1605,69 @@
         '</div>' +
         (shopBonusText(shop) ? '<p class="detail-line">联动：' + esc(shopBonusText(shop)) + '</p>' : '') +
         (effect ? '<p class="detail-line">效果：' + esc(effect) + '</p>' : '') +
-        '<p class="tiny">清地时可以从展示区认购这家店铺，建造后才会产生收益。</p>' +
+        '<p class="tiny">' + note + '</p>' +
       '</div>';
-    openModal('shop', '店铺详情', body, '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
+  }
+
+  function openShop(uid) {
+    var game = DSM.state;
+    var card = game.shopMarket.filter(function (item) { return item.uid === uid; })[0];
+    if (!card) return;
+    var shop = DSM.shopById[card.id];
+    openModal('shop', '店铺详情', shopDetailBody(shop, 'market'), '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
+  }
+
+  function openLandShop(index) {
+    var game = DSM.state;
+    if (!game) return;
+    var land = game.players[game.currentPlayerIndex].lands[index];
+    if (!land) return;
+    var shop = DSM.shopById[land.shopId || land.reservedShopId];
+    if (!shop) return;
+    var status = land.shopId ? 'built' : 'reserved';
+    openModal('shop', '店铺详情', shopDetailBody(shop, status), '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
+  }
+
+  function openCustomer(uid) {
+    var game = DSM.state;
+    if (!game) return;
+    var index = -1;
+    var card = null;
+    game.customerMarket.forEach(function (item, i) {
+      if (item.uid === uid) { card = item; index = i; }
+    });
+    if (!card) return;
+    var customer = DSM.customerById[card.id];
+    if (!customer) return;
+    var p = game.players[game.currentPlayerIndex];
+    var cost = DSM.customerMenuCost(p, customer);
+    var owned = DSM.builtShopIds(p);
+    var statusText = index < game.focusIndex
+      ? '已跳过，随身 +' + (card.tip || 0)
+      : index === game.focusIndex
+        ? (game.phase === 'phase3' ? '当前待招待' : '下一位待招待')
+        : '排队中';
+    var effects = (cost.effects || []).map(function (effect) {
+      return effect.label + (effect.amount >= 0 ? '+' : '') + effect.amount;
+    }).join('，');
+    var body = '<div class="shop-detail customer-detail">' +
+        '<span class="shop-detail-seal">' + sealChar(customer.name) + '</span>' +
+        '<h3>' + esc(customer.name) + '</h3>' +
+        '<div class="detail-stats">' +
+          '<span>吃菜 <b>' + cost.total + ' 道</b></span>' +
+          (card.tip ? '<span>随身 <b>' + coin(13) + card.tip + '</b></span>' : '') +
+        '</div>' +
+        '<p class="detail-line">会去：' + customer.visitShopIds.map(function (id) {
+          var shop = DSM.shopById[id];
+          if (!shop) return '';
+          return owned.indexOf(id) >= 0 ? '<span class="shop-owned">' + esc(shop.name) + '</span>' : esc(shop.name);
+        }).join(' · ') + '</p>' +
+        (effects ? '<p class="detail-line">加成：基础 ' + cost.base + ' 道，' + esc(effects) + '</p>' : '') +
+        '<p class="detail-line">状态：' + statusText + '（候客区第 ' + (index + 1) + ' 位）</p>' +
+        '<p class="tiny">招待时消耗 ' + cost.total + ' 道菜，菜品与客人所访店铺共同产生收益。' +
+          (card.tip ? '随身铜钱会在招待后一并入账。' : '') + '</p>' +
+      '</div>';
+    openModal('customer', '客人详情', body, '<button type="button" class="btn btn-ghost" data-action="close-modal">收起</button>');
   }
 
   function animateDice(root) {
@@ -1386,8 +1693,8 @@
   function scheduleModal() {
     var game = DSM.state;
     if (!game || UI.screen !== 'game' || UI.modal) return;
-    if (game.eventQueue.length) { openEvent(); return; }
     if (game.pendingSummary && UI.summaryShown !== game.pendingSummary.id) { openSummary(game.pendingSummary); return; }
+    if (game.eventQueue.length) { openEvent(); return; }
     if (game.phase === 'over' && !UI.resultShown) { openResult(); }
   }
 
@@ -1422,6 +1729,8 @@
     UI.resultShown = false;
     UI.eventOpen = false;
     UI.logOpen = false;
+    UI.deckIndex = 0;
+    UI.advanceAfterEvents = false;
     if (UI.modal) closeModal();
     render();
     window.scrollTo(0, 0);
@@ -1436,6 +1745,8 @@
     UI.resultShown = false;
     UI.eventOpen = false;
     UI.logOpen = false;
+    UI.deckIndex = 0;
+    UI.advanceAfterEvents = false;
     if (UI.modal) closeModal();
     render();
     window.scrollTo(0, 0);
@@ -1461,6 +1772,13 @@
       closeModal();
       UI.resultShown = false;
       setTimeout(scheduleModal, 30);
+      return;
+    }
+    if (game.eventQueue.length) {
+      if (game.pendingSummary) UI.summaryShown = game.pendingSummary.id;
+      UI.advanceAfterEvents = true;
+      closeModal();
+      render();
       return;
     }
     var result = DSM.nextTurn();
@@ -1538,9 +1856,23 @@
       case 'inspect-shop':
         openShop(el.dataset.uid);
         break;
-      case 'inspect-customer':
-        toast('招待时才会结算这位客人');
+      case 'inspect-land':
+        openLandShop(Number(el.dataset.land));
         break;
+      case 'inspect-customer':
+        openCustomer(el.dataset.uid);
+        break;
+      case 'inspect-pile':
+        openPile(el.dataset.pile);
+        break;
+      case 'deck-tab': {
+        var deckIndex = Number(el.dataset.deck);
+        if (isNaN(deckIndex)) break;
+        UI.deckIndex = Math.max(0, Math.min(2, deckIndex));
+        if (deckSwiper) deckSwiper.slideTo(UI.deckIndex + 1);
+        else syncDeckTabs(UI.deckIndex);
+        break;
+      }
       case 'buy':
         if (game && game.phase === 'phase1') openBuyMenu();
         break;
@@ -1636,6 +1968,11 @@
         DSM.acknowledgeEvent();
         closeModal();
         UI.eventOpen = false;
+        if (!game.eventQueue.length && UI.advanceAfterEvents) {
+          UI.advanceAfterEvents = false;
+          handleNextTurn();
+          break;
+        }
         render();
         break;
       }
