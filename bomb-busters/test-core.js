@@ -634,33 +634,59 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   includes(html, '具体是哪几条保密', 'X选Y 保密提示');
 
   g.openMissionSheet();
-  const sheet = g.document.getElementById('sheetContent').innerHTML;
+  let sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'mission-tabs', '抽屉应有关卡区间 tab');
+  includes(sheet, 'data-testid="mission-tab-4"');
+  includes(sheet, 'data-testid="mission-tab-10"');
+  includes(sheet, 'data-testid="mission-tab-20"');
+  includes(sheet, '>4~9<');
+  includes(sheet, '>10~19<');
+  includes(sheet, '>20~30<');
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="6"', '抽屉应列出全部 15 关');
-  includes(sheet, 'data-mission-id="7"', '抽屉应包含 #10');
-  includes(sheet, 'data-mission-id="8"', '抽屉应包含 #11');
-  includes(sheet, 'data-mission-id="9"', '抽屉应包含 #12');
-  includes(sheet, 'data-mission-id="10"', '抽屉应包含 #13');
-  includes(sheet, 'data-mission-id="11"', '抽屉应包含 #14');
-  includes(sheet, 'data-mission-id="12"', '抽屉应包含 #15');
-  includes(sheet, 'data-mission-id="13"', '抽屉应包含 #16');
-  includes(sheet, 'data-mission-id="14"', '抽屉应包含 #17');
-  includes(sheet, 'data-mission-id="15"', '抽屉应包含 #18');
+  includes(sheet, 'data-mission-id="1"', '默认展示当前关卡所在区间 #4~#9');
+  includes(sheet, 'data-mission-id="6"');
+  assert(!sheet.includes('data-mission-id="7"'), '默认不展示其他区间的关卡');
+  includes(sheet, 'mi-tag current', '当前关卡应有标记');
+  includes(sheet, '>#5<');
+  includes(sheet, '实地练习第二天');
+
+  g.showMissionTab(1);
+  sheet = g.document.getElementById('sheetContent').innerHTML;
+  for (const id of [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
+    includes(sheet, `data-mission-id="${id}"`, `#10~#19 区间应包含 mission-id ${id}`);
+  }
+  assert(!sheet.includes('data-mission-id="6"'), '#10~#19 区间不应展示 #4~#9');
   includes(sheet, 'Новосибирск', '抽屉应包含 #15 名称');
   includes(sheet, '这很合理', '抽屉应包含 #16 名称');
   includes(sheet, '匹诺曹', '抽屉应包含 #17 名称');
   includes(sheet, '蝙蝠之友', '抽屉应包含 #18 名称');
-  includes(sheet, 'mi-tag current', '当前关卡应有标记');
-  includes(sheet, '>#8<');
-  includes(sheet, '最终测试');
-  includes(sheet, '>#9<');
-  includes(sheet, '轻重缓急');
+  includes(sheet, '深入虎穴', '抽屉应包含 #19 名称');
   includes(sheet, '>#10<');
   includes(sheet, '困境');
   includes(sheet, '>#11<');
   includes(sheet, '又蓝又红');
   includes(sheet, '>#12<');
   includes(sheet, '失踪的装备');
+
+  g.showMissionTab(2);
+  sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-mission-id="17"', '#20~#30 区间应包含 #20');
+  includes(sheet, 'data-mission-id="18"', '#20~#30 区间应包含 #21');
+  assert(!sheet.includes('data-mission-id="16"'), '#20~#30 区间不应展示 #19');
+  includes(sheet, '大灰狼', '抽屉应包含 #20 名称');
+  includes(sheet, '烤鸭危机', '抽屉应包含 #21 名称');
+  includes(sheet, '>#20<');
+  includes(sheet, '>#21<');
+
+  g.showMissionTab(0);
+  sheet = g.document.getElementById('sheetContent').innerHTML;
+  includes(sheet, 'data-mission-id="1"', '可切回 #4~#9');
+  includes(sheet, 'data-mission-id="6"');
+  assert(!sheet.includes('data-mission-id="7"'));
+  includes(sheet, '>#8<');
+  includes(sheet, '最终测试');
+  includes(sheet, '>#9<');
+  includes(sheet, '轻重缓急');
 });
 
 await t('#9 选关卡片：显示“3 个蓝线数字顺序剪线”追加规则', () => {
@@ -1940,7 +1966,7 @@ await t('双重探测器未命中：失误 +1，对方自选非红牌放置身�
   const missLog = S.log.find(l => l.msg.includes('未命中'));
   assert(missLog, '未命中应记入日志');
   includes(missLog.msg, 'P1 的相邻 2 张手牌', '未命中日志应含目标玩家');
-  includes(missLog.msg, '「有蓝色 11」', '未命中日志应含发起方猜测数字');
+  includes(missLog.msg, '「蓝色 11」', '未命中日志应含发起方猜测数字');
   assert(S.pending && S.pending.type === 'scanMark', '两张可标记 → 待选择');
   eq(S.currentSeat, 1);
   assert(g.resolveScanMark(b.id).ok);
@@ -2502,7 +2528,7 @@ await t('稳定剂 × 双重探测器：先开稳定再启动探测器，扫描�
   const protectedLog = S.log.find(l => l.msg.includes('未命中'));
   assert(protectedLog, '稳定剂保护下仍应记录扫描结果');
   includes(protectedLog.msg, 'P1 的相邻 2 张手牌');
-  includes(protectedLog.msg, '「有蓝色 11」');
+  includes(protectedLog.msg, '「蓝色 11」');
   assert(S.pending && S.pending.type === 'scanMark');
   assert(g.resolveScanMark(a.id).ok);
   eq(S.equipment[0].used, true, '扫描结算时消耗');
@@ -3585,13 +3611,252 @@ await t('#18 选关卡片：追加规则文案与同步', () => {
   includes(sheet, '指定行动者限剪该数字');
 });
 
-await t('#16/#17/#18 本关规则抽屉：特殊说明可渲染', () => {
+/* ──────────────────────────── #19 深入虎穴 ──────────────────────────── */
+
+await t('#19 深入虎穴：3 人局 51 张 / 1 红 + 黄 3选2 / 10 分钟倒计时', () => {
+  const g = dealMission(16, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 16);
+  eq(boardTotals(g), 51, '48 蓝 + 1 红 + 2 黄（实际入库）');
+  eq(S.phase, 'mark', '本关正常进行开局标记');
+  eq(handWireNums(g).red.length, 1);
+  eq(handWireNums(g).yellow.length, 2);
+  eq(S.board.yellowNums.length, 3);
+  eq(S.board.yellowMark, 'hollow');
+  eq(S.board.yellowNote, '3选2');
+  assert(!S.freeCut, '本关不继承自由剪线');
+  eq(S.board.timeLimitSec, 600);
+  const left = S.board.deadline - Date.now();
+  assert(left > 595000 && left <= 600000, '截止时间应约为 10 分钟后');
+  assert(S.log.some(l => l.msg.includes('倒计时 10 分钟')), '应记录倒计时开始');
+});
+
+await t('#19 2 人局无特殊规则；标记阶段倒计时归零判负，标记阶段展示倒计时', () => {
+  const g = dealMission(16, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 51, '2 人局与 3~5 人相同');
+  eq(S.board.timeLimitSec, 600);
+  const g2 = loadGameWithRender();
+  g2.window._olPendingChallenge = { missionId: 16 };
+  g2.dealGame(['A', 'B', 'C']);
+  includes(g2._markViewHTML(), 'data-testid="countdown"', '标记阶段应显示倒计时');
+  S.board.deadline = Date.now() - 1;
+  assert(g.timeoutGameIfNeeded());
+  eq(S.phase, 'over');
+  eq(S.result.reason, 'boom-timeout');
+  assert(S.log.some(l => l.msg.includes('倒计时结束')));
+});
+
+await t('#19 选关卡片：倒计时文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(16).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#19 深入虎穴');
+  includes(html, '3 条黄导线（3选2）');
+  includes(html, '10 分钟倒计时');
+  includes(html, '超时');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 16 }));
+});
+
+/* ──────────────────────────── #20 大灰狼 ──────────────────────────── */
+
+await t('#20 大灰狼：3 人局 52 张 / 每份 1 张 X 固定最右 / 排除对讲机', () => {
+  const g = dealMission(17, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 17);
+  eq(boardTotals(g), 52, '48 蓝 + 2 红 + 2 黄');
+  eq(handWireNums(g).red.length, 2);
+  eq(handWireNums(g).yellow.length, 2);
+  eq(S.phase, 'mark');
+  assert(S.wolf, '应启用 X 标记');
+  let xCount = 0;
+  for (const p of S.players) for (const sh of p.shares) {
+    const xs = sh.filter(c => c.x);
+    eq(xs.length, 1, '每份恰好 1 张 X');
+    assert(sh[sh.length - 1].x, 'X 应固定在该份最右侧');
+    const rest = sh.slice(0, -1);
+    for (let i = 1; i < rest.length; i++) assert(rest[i].num >= rest[i - 1].num, '其余牌仍升序');
+    xCount += xs.length;
+  }
+  eq(xCount, 4, '3 人局共 4 份，队长 2 份 → 2 张 X');
+  assert(S.equipment.every(e => e.no !== 2), '不会抽到对讲机');
+  const MISSIONS = ev(g, 'MISSIONS');
+  eq(g.missionSetup(MISSIONS[17], 3).excludeEquip[0], 2);
+  assert(S.log.some(l => l.msg.includes('大灰狼') && l.msg.includes('【X】')), '应记录 X 规则');
+});
+
+await t('#20 2 人局：54 张 / 红 3选2 / 黄 4 / 每份 1 张 X', () => {
+  const g = dealMission(17, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 54, '48 蓝 + 2 红 + 4 黄');
+  eq(handWireNums(g).red.length, 2);
+  eq(handWireNums(g).yellow.length, 4);
+  eq(S.board.redNums.length, 3);
+  eq(S.board.redNote, '3选2');
+  eq(S.board.redMark, 'hollow');
+  let xCount = 0;
+  for (const p of S.players) for (const sh of p.shares) xCount += sh.filter(c => c.x).length;
+  eq(xCount, 4, '4 份手牌各 1 张 X');
+});
+
+await t('#20 X 牌：探测器/便利贴/＝/≠/X-Y射线不可选中；剪线与失误落标不受限', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), ownX = C('blue', 5, { x: true }), own9 = C('blue', 9), own8 = C('blue', 8);
+  const tx = C('blue', 7, { x: true }), t8 = C('blue', 8), t9 = C('blue', 9);
+  const eqs = [1, 4, 5, 8, 10, 12].map(no => ({ no, unlocked: true, used: false }));
+  const S = use(g, sc(2, [[[own7, ownX, own9, own8]], [[tx, t8, t9]]], { equipment: eqs }));
+
+  assert(!g.useStickyNote(ownX.id).ok, '便利贴不能选 X');
+  assert(!g.useNeqTag(0, ownX.id, own9.id).ok, '≠ 不能选 X');
+  assert(!g.useEqTag(0, ownX.id, own9.id).ok, '＝ 不能选 X');
+  assert(!g.doRayCut(1, tx.id, { kind: 'blue', num: 7 }, { kind: 'blue', num: 8 }, own7.id, own8.id).ok, 'X/Y 射线不能选 X');
+
+  S.scanMode = { count: 2, src: 'skill', by: 0 };
+  assert(!g.doScan([tx.id, t8.id], 7, own7.id, 'skill').ok, '双重/三重探测器不能选含 X 的相邻组');
+
+  const g2 = loadGame();
+  const own7b = C('blue', 7), txb = C('blue', 7, { x: true });
+  use(g2, sc(2, [[[own7b]], [[txb]]]));
+  const hit = g2.doPairCut(1, txb.id, { kind: 'blue', num: 7 }, own7b.id);
+  assert(hit.ok && hit.hit, '双人剪线可以指向 X');
+  assert(txb.revealed && own7b.revealed, '命中后 X 正常公开');
+
+  const g3 = loadGame();
+  const own9b = C('blue', 9), txb2 = C('blue', 7, { x: true });
+  const S3 = use(g3, sc(2, [[[own9b]], [[txb2]]]));
+  const miss = g3.doPairCut(1, txb2.id, { kind: 'blue', num: 9 }, own9b.id);
+  assert(miss.ok && !miss.hit);
+  eq(S3.failures, 1);
+  eq(txb2.fail && txb2.fail.num, 7, '失误落标可以落在 X 上');
+});
+
+await t('#20 超级探测器/通用雷达忽略 X', () => {
+  const g = loadGame();
+  const own7 = C('blue', 7), own8 = C('blue', 8), tx7 = C('blue', 7, { x: true }), t8 = C('blue', 8);
+  const S = use(g, sc(2, [[[own7, own8]], [[tx7, t8]]], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  const miss = g.doSuperScan(1, 0, 7, own7.id);
+  assert(miss.ok && !miss.hit, '仅 X 持有该数字时应判未命中');
+  eq(S.failures, 1);
+
+  const g2 = loadGame();
+  const own7b = C('blue', 7), own8b = C('blue', 8), tx7b = C('blue', 7, { x: true }), t8b = C('blue', 8);
+  const S2 = use(g2, sc(2, [[[own7b, own8b]], [[tx7b, t8b]]], { equipment: [{ no: 5, unlocked: true, used: false }] }));
+  const hit = g2.doSuperScan(1, 0, 8, own8b.id);
+  assert(hit.ok && hit.hit, '非 X 牌命中正常');
+  eq(S2.pending.cards.length, 1);
+  eq(S2.pending.cards[0], t8b.id, '命中选择不包含 X');
+
+  const g3 = loadGame();
+  const own9 = C('blue', 9), tx7c = C('blue', 7, { x: true }), t8c = C('blue', 8);
+  const S3 = use(g3, sc(2, [[[own9]], [[tx7c, t8c]]], { equipment: [{ no: 8, unlocked: true, used: false }] }));
+  assert(g3.useRadar(7).ok);
+  eq(S3.radar.rows[1].per[0], false, '雷达统计不计 X');
+  eq(S3.radar.rows[1].per[0], false);
+});
+
+await t('#20 X 标记渲染与选关文案', () => {
+  const g = loadGameWithRender();
+  const x = C('blue', 7, { x: true });
+  use(g, sc(2, [[[x]], [[C('blue', 8)]]]));
+  includes(g._cardMarkersHTML(x, null, 0), 'marker-x', '应渲染 X 标记');
+
+  const g2 = loadGame();
+  g2.window._olIsHost = () => true;
+  assert(g2.selectMission(17).ok);
+  const html = g2.waitingExtrasHTML();
+  includes(html, '#20 大灰狼');
+  includes(html, '【X】');
+  includes(html, '对讲机');
+  eq(JSON.stringify(g2._olGetPendingChallenge()), JSON.stringify({ missionId: 17 }));
+});
+
+/* ──────────────────────────── #21 烤鸭危机 ──────────────────────────── */
+
+await t('#21 烤鸭危机：3 人局 49 张 / 2 选 1 红 / 无黄 / 奇偶标记', () => {
+  const g = dealMission(18, ['A', 'B', 'C']);
+  const S = st(g);
+  eq(S.missionId, 18);
+  eq(boardTotals(g), 49, '48 蓝 + 1 红');
+  eq(S.board.redNums.length, 2);
+  eq(handWireNums(g).red.length, 1);
+  eq(handWireNums(g).yellow.length, 0);
+  eq(S.board.redMark, 'hollow');
+  eq(S.board.redNote, '2选1');
+  assert(S.parityMarks, '应启用奇/偶标记');
+  eq(S.phase, 'mark');
+  assert(S.log.some(l => l.msg.includes('奇') && l.msg.includes('偶')), '应记录奇偶规则');
+});
+
+await t('#21 2 人局：50 张 / 2 红全部入库', () => {
+  const g = dealMission(18, ['A', 'B']);
+  const S = st(g);
+  eq(boardTotals(g), 50, '48 蓝 + 2 红');
+  eq(handWireNums(g).red.length, 2);
+  eq(S.board.redMark, 'solid');
+  eq(handWireNums(g).yellow.length, 0);
+});
+
+await t('#21 开局标记/便利贴/失误落标只显示奇偶，日志不泄露数字', () => {
+  const g = loadGameWithRender();
+  const b7 = C('blue', 7);
+  const S = use(g, sc(2, [[[b7]], [[C('blue', 8)]]])); 
+  S.parityMarks = true;
+  S.phase = 'mark';
+  assert(g.placeInfoToken(b7.id).ok);
+  eq(b7.info.num, 7, '内部仍记录真实数字');
+  assert(S.log.some(l => l.msg.includes('信息标记：奇')), '日志应显示奇');
+  assert(!S.log.some(l => l.msg.includes('蓝色 7')), '日志不得泄露真实数字');
+  includes(g._cardMarkersHTML(b7, null, 0), '📌 奇');
+
+  const g2 = loadGameWithRender();
+  const b8 = C('blue', 8);
+  const S2 = use(g2, sc(2, [[[b8]], [[C('blue', 9)]]], { equipment: [{ no: 4, unlocked: true, used: false }] }));
+  S2.parityMarks = true;
+  assert(g2.useStickyNote(b8.id).ok);
+  assert(S2.log.some(l => l.msg.includes('便利贴') && l.msg.includes('偶')));
+  assert(!S2.log.some(l => l.msg.includes('蓝色 8')));
+  includes(g2._cardMarkersHTML(b8, null, 0), '📌 偶');
+
+  const g3 = loadGameWithRender();
+  const own9 = C('blue', 9), target8 = C('blue', 8);
+  const S3 = use(g3, sc(2, [[[own9]], [[target8]]]));
+  S3.parityMarks = true;
+  const miss = g3.doPairCut(1, target8.id, { kind: 'blue', num: 9 }, own9.id);
+  assert(miss.ok && !miss.hit);
+  eq(target8.fail && target8.fail.num, 8);
+  includes(g3._cardMarkersHTML(target8, null, 0), '🔖 偶', '剪线失误标只显示奇偶');
+
+  const g4 = loadGameWithRender();
+  const scanCard = C('blue', 8);
+  const S4 = use(g4, sc(2, [[[C('blue', 9)]], [[scanCard]]]));
+  S4.parityMarks = true;
+  g4._placeScanMark(scanCard, 1, 0, 'skill');
+  assert(S4.log.some(l => l.msg.includes('信息标记：偶')), '探测失误落标同样只显示奇偶');
+  includes(g4._cardMarkersHTML(scanCard, null, 0), '🔖 偶');
+});
+
+await t('#21 选关卡片：奇偶文案与同步', () => {
+  const g = loadGame();
+  g.window._olIsHost = () => true;
+  assert(g.selectMission(18).ok);
+  const html = g.waitingExtrasHTML();
+  includes(html, '#21 烤鸭危机');
+  includes(html, '奇');
+  includes(html, '偶');
+  eq(JSON.stringify(g._olGetPendingChallenge()), JSON.stringify({ missionId: 18 }));
+});
+
+await t('#16~#21 本关规则抽屉：特殊说明可渲染', () => {
   const expect = {
     13: ['4/4', '剪线顺序'],
     14: ['匹诺曹', '错误信息标记'],
     15: ['蝙蝠之友', '通用雷达', '指定'],
+    16: ['深入虎穴', '10 分钟', '倒计时'],
+    17: ['大灰狼', '【X】', '对讲机'],
+    18: ['烤鸭危机', '【奇】', '【偶】'],
   };
-  for (const id of [13, 14, 15]) {
+  for (const id of [13, 14, 15, 16, 17, 18]) {
     const g = loadGameWithRender();
     g.window._olPendingChallenge = { missionId: id };
     g.dealGame(['A', 'B', 'C']);

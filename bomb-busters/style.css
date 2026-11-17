@@ -259,6 +259,28 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .we-switch:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(37, 50, 78, .18); }
 
 /* 选关抽屉 */
+.mission-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.mission-tabs::-webkit-scrollbar { display: none; }
+.mission-tab {
+  flex: 0 0 auto;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: .78rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.mission-tab.active { background: var(--gold); border-color: var(--ink); }
+.mission-tab:active { transform: translateY(1px); }
 .mission-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .mission-item {
   display: flex;
@@ -957,6 +979,7 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .marker-neq { background: #6d28d9; color: #f3e8ff; border-color: #4c1d95; }
 .marker-eqp { background: #0f766e; color: #ccfbf1; border-color: #115e59; }
 .marker-walkie { background: #e0f2fe; color: #075985; border-color: #38bdf8; }
+.marker-x { background: #374151; color: #fef3c7; border-color: #111827; letter-spacing: .02em; }
 
 /* 配对卡上的徽章让位给 ≠/＝ 横条，落到牌面顶部 */
 .card.neq-l > .markers,

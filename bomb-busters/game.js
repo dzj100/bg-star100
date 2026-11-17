@@ -167,6 +167,34 @@ const MISSIONS = {
     },
     bat: true,
   },
+  16: {
+    id: 16, name: '#19 深入虎穴',
+    setup: {
+      standard: { red: { draw: 1, use: 1 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+      two:      { red: { draw: 1, use: 1 }, yellow: { draw: 3, use: 2, note: '3选2' } },
+    },
+    timerSec: 600,
+    marks: { yellow: 'hollow' },
+  },
+  17: {
+    id: 17, name: '#20 大灰狼',
+    setup: {
+      standard: { red: { draw: 2, use: 2 }, yellow: { draw: 2, use: 2 } },
+      two:      { red: { draw: 3, use: 2, note: '3选2' }, yellow: { draw: 4, use: 4 } },
+    },
+    wolf: true,
+    excludeEquip: [2],
+    marks: { red: 'hollow' },
+  },
+  18: {
+    id: 18, name: '#21 烤鸭危机',
+    setup: {
+      standard: { red: { draw: 2, use: 1, note: '2选1' }, yellow: { draw: 0, use: 0 } },
+      two:      { red: { draw: 2, use: 2 }, yellow: { draw: 0, use: 0 } },
+    },
+    parity: true,
+    marks: { red: 'hollow' },
+  },
 };
 
 /** 按人数展开关卡的开局参数 */
@@ -195,6 +223,8 @@ function missionSetup(mission, pCount) {
     equipChain: !!mission.equipChain,
     liar: !!mission.liar,
     bat: !!mission.bat,
+    wolf: !!mission.wolf,
+    parity: !!mission.parity,
   };
 }
 
@@ -355,6 +385,17 @@ function hiddenYellowCount(seat) {
   return hiddenCards(seat).filter(c => c.kind === 'yellow').length;
 }
 
+/** #21：奇/偶文案（信息标记只显示奇偶的关卡使用） */
+function _parityText(num) { return num % 2 === 1 ? '奇' : '偶'; }
+
+/** 信息标记的公开文案：#21 只显示奇/偶，其余关卡显示真实数字 */
+function _markerText(num) {
+  return (S && S.parityMarks) ? _parityText(num) : `蓝色 ${num}`;
+}
+
+/** #20：该牌是否带【X】标记（道具不可选中） */
+function _isXCard(card) { return !!(card && card.x); }
+
 function blueRevealedCount(num) {
   let n = 0;
   _eachCard(c => { if (c.kind === 'blue' && c.num === num && c.revealed) n++; });
@@ -380,7 +421,7 @@ function _radarRowsFor(num) {
   return S.players.map((p, seat) => ({
     seat,
     per: (p.shares || []).map(sh => sh.some(c =>
-      c.kind === 'blue' && c.num === num && !c.revealed && !isRedLikeCard(c))),
+      c.kind === 'blue' && c.num === num && !c.revealed && !isRedLikeCard(c) && !c.x)),
   }));
 }
 
@@ -748,6 +789,17 @@ function dealGame(names, missionId) {
     });
   }
 
+  // #20：每一份手牌随机 1 张不参与排序，固定钉在该份最右侧并标记【X】
+  if (setup.wolf) {
+    shares.forEach(sh => {
+      if (!sh.length) return;
+      const i = Math.floor(Math.random() * sh.length);
+      const [pinned] = sh.splice(i, 1);
+      pinned.x = true;
+      sh.push(pinned);
+    });
+  }
+
   // 道具：12 张抽 N 张上桌（锁定）；#10 排除咖啡瓶、#11 排除与视红数字相同的道具
   let eqPool = Array.from({ length: 12 }, (_, i) => i + 1);
   if (setup.excludeEquip.length) eqPool = eqPool.filter(n => setup.excludeEquip.indexOf(n) < 0);
@@ -825,6 +877,8 @@ function dealGame(names, missionId) {
     expert: setup.expert,            // #14：队长为高危拆弹专家（双人剪线失误即爆、禁用稳定剂）
     equipChain: setup.equipChain ? { target: chainTarget, stopped: false } : null,  // #15：道具隐藏 + 链式解锁目标
     liarSeat: setup.liar ? captainSeat : null,       // #17：匹诺曹座位
+    wolf: !!setup.wolf,                              // #20：每份 1 张【X】牌，道具不可选中
+    parityMarks: !!setup.parity,                     // #21：信息标记只显示奇/偶
     bat: setup.bat ? {                               // #18：蝙蝠之友自动揭示状态
       queue: shuffle(BLUE_NUMS),                     // 待揭示数字队列
       revealed: [],                                  // 已揭示数字（本局累计）
@@ -926,6 +980,12 @@ function dealGame(names, missionId) {
   if (setup.bat) {
     addLog('🦇 蝙蝠之友：本局不能进行蓝线信息标记，每回合开始自动揭示数字并触发【通用雷达】', 'warn');
   }
+  if (setup.wolf) {
+    addLog('🐺 大灰狼：每份手牌随机 1 张被标记【X】并固定在最右侧；所有道具都不能对其使用', 'warn');
+  }
+  if (setup.parity) {
+    addLog('🦆 烤鸭危机：本局信息标记只显示【奇】/【偶】', 'warn');
+  }
   if (setup.bat) _batTurnStart(captainSeat);
   saveStateDirect();
   _seenEquipRev = 0;                    // 新一局：道具锁版本重新计数
@@ -975,7 +1035,7 @@ function placeInfoToken(cardId) {
   card.info = { num: card.num };
   S.ready[seat] = true;
   S.markAt[seat] = card.id;
-  addLog(`📌 ${S.players[seat].name} 放置了信息标记：蓝色 ${card.num}`);
+  addLog(`📌 ${S.players[seat].name} 放置了信息标记：${_markerText(card.num)}`);
 
   if (S.ready.every(Boolean)) {
     S.phase = 'play';
@@ -1371,6 +1431,7 @@ function _planScan(cardIds, num, ownCardId, src) {
 
   const targetCards = loc.idxs.map(i => S.players[targetSeat].shares[loc.si][i]);
   if (targetCards.some(c => c.revealed)) return { ok: false, msg: '只能扫描未公开的牌' };
+  if (targetCards.some(_isXCard)) return { ok: false, msg: '带有【X】标记的手牌不能被探测器选中' };
 
   if (!(Number.isInteger(num) && num >= 1 && num <= 12)) return { ok: false, msg: '无效的数字' };
   if (hiddenBlueCount(actor, num) === 0) return { ok: false, msg: `你没有未公开的蓝色 ${num}` };
@@ -1478,7 +1539,7 @@ function resolveScanMark(cardId) {
 function _placeScanMark(card, targetSeat, fromSeat, src) {
   if (isRedLikeCard(card)) return;
   card.fail = card.kind === 'blue' ? { type: 'blue', num: card.num } : { type: 'yellow' };
-  addLog(`🔖 ${S.players[targetSeat].name} 放置信息标记：${card.fail.type === 'blue' ? '蓝色 ' + card.fail.num : '黄色'}`);
+  addLog(`🔖 ${S.players[targetSeat].name} 放置信息标记：${card.fail.type === 'blue' ? _markerText(card.fail.num) : '黄色'}`);
   // 探测器类皆为「本回合行动」：标记落定即结束回合
   endTurn(fromSeat);
 }
@@ -1504,6 +1565,7 @@ function useNeqTag(shareIdx, cardId1, cardId2) {
   if (i1 < 0 || i2 < 0 || Math.abs(i1 - i2) !== 1) return { ok: false, msg: '须为同一份内相邻的 2 张牌' };
   const c1 = share[Math.min(i1, i2)];
   const c2 = share[Math.max(i1, i2)];
+  if (_isXCard(c1) || _isXCard(c2)) return { ok: false, msg: '带有【X】标记的手牌不能被【≠】选中' };
   if (c1.neq || c2.neq) return { ok: false, msg: '该牌已有【≠】标签' };
   if (c1.num === c2.num) return { ok: false, msg: '两张牌编号相同，无法标记' };
   if (c1.kind !== 'blue' && c2.kind !== 'blue') return { ok: false, msg: '至少需含 1 张蓝色导线' };
@@ -1763,11 +1825,11 @@ function useStickyNote(cardId) {
   if (card.kind !== 'blue') return { ok: false, msg: '只能标记蓝色导线' };
   if (card.revealed) return { ok: false, msg: '只能标记未公开的导线' };
   if (card.info) return { ok: false, msg: '该牌已有信息标记' };
-
+  if (_isXCard(card)) return { ok: false, msg: '带有【X】标记的手牌不能被便利贴选中' };
   card.info = { num: card.num };
   g.eq.used = true;
   _releaseEquipLock();
-  addLog(`📃 ${S.players[actor].name} 使用便利贴，标记：蓝色 ${card.num}`, 'good');
+  addLog(`📃 ${S.players[actor].name} 使用便利贴，标记：${_markerText(card.num)}`, 'good');
   saveStateDirect();
   _render();
   return { ok: true };
@@ -1803,7 +1865,7 @@ function _planSuperScan(toSeat, shareIdx, num, ownCardId) {
       || own.kind !== 'blue' || own.num !== num || isRedLikeCard(own)) {
     return { ok: false, msg: '自选牌须为同数字的未公开蓝导线' };
   }
-  const matched = hidden.filter(c => c.kind === 'blue' && c.num === num && !isRedLikeCard(c));
+  const matched = hidden.filter(c => c.kind === 'blue' && c.num === num && !isRedLikeCard(c) && !c.x);
   return {
     ok: true, actor, toSeat, shareIdx, targetCards: hidden, count: hidden.length,
     num, ownCardId, eq5: g.eq, matched, label: `蓝色 ${num}`, hit: matched.length > 0, src: 'eq5',
@@ -1901,7 +1963,7 @@ function useRadar(num) {
   const rows = [];
   for (let s = 0; s < S.pCount; s++) {
     const per = (S.players[s].shares || []).map(sh =>
-      sh.some(c => !c.revealed && c.kind === 'blue' && c.num === num && !isRedLikeCard(c)));
+      sh.some(c => !c.revealed && c.kind === 'blue' && c.num === num && !isRedLikeCard(c) && !c.x));
     rows.push({ seat: s, per });
   }
   S.radar = { num, rows, by: actor };
@@ -1996,6 +2058,7 @@ function _planRayCut(toSeat, cardId, a, b, ownAId, ownBId) {
   const card = _findCardById(cardId);
   if (!card || !_isInShares(card, S.players[toSeat].shares)) return { ok: false, msg: '无效的目标牌' };
   if (card.revealed) return { ok: false, msg: '只能猜测未公开的牌' };
+  if (_isXCard(card)) return { ok: false, msg: '带有【X】标记的手牌不能被 X/Y 射线选中' };
 
   const na = _normGuessOpt(a);
   const nb = _normGuessOpt(b);
@@ -2098,6 +2161,7 @@ function useEqTag(shareIdx, cardId1, cardId2) {
   if (i1 < 0 || i2 < 0 || Math.abs(i1 - i2) !== 1) return { ok: false, msg: '须为同一份内相邻的 2 张牌' };
   const c1 = share[Math.min(i1, i2)];
   const c2 = share[Math.max(i1, i2)];
+  if (_isXCard(c1) || _isXCard(c2)) return { ok: false, msg: '带有【X】标记的手牌不能被【＝】选中' };
   if (c1.eqp || c2.eqp) return { ok: false, msg: '该牌已有【＝】标签' };
   if (c1.revealed && c2.revealed) return { ok: false, msg: '至少需含 1 张未公开导线' };
 
@@ -2467,17 +2531,51 @@ function _missionTexts(mission) {
   return { std, two };
 }
 
+/** 选关抽屉的关卡区间 tab（按展示编号 #4~#9 / #10~#19 / #20~#30 分组） */
+const MISSION_TAB_RANGES = [[4, 9], [10, 19], [20, 30]];
+let _missionTabIdx = 0;
+
+function _missionCodeNum(mission) {
+  const n = Number((_missionMeta(mission).code || '').replace('#', ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function _missionTabIndexForCode(code) {
+  const i = MISSION_TAB_RANGES.findIndex(([a, b]) => code >= a && code <= b);
+  return i < 0 ? 0 : i;
+}
+
 /** 房主：展开关卡列表抽屉 */
 function openMissionSheet() {
   if (!isHost()) { showToast('只有房主可以切换关卡'); return; }
   const content = document.getElementById('sheetContent');
   const ov = document.getElementById('sheetOverlay');
   if (!content || !ov) return;
+  _missionTabIdx = _missionTabIndexForCode(_missionCodeNum(currentMission()));
+  content.innerHTML = _missionSheetHTML();
+  ov.classList.add('show');
+}
+
+/** 抽屉内切换关卡区间 tab（只重绘抽屉，不收起） */
+function showMissionTab(idx) {
+  if (idx < 0 || idx >= MISSION_TAB_RANGES.length) return;
+  _missionTabIdx = idx;
+  const content = document.getElementById('sheetContent');
+  if (content) content.innerHTML = _missionSheetHTML();
+}
+
+function _missionSheetHTML() {
   const current = currentMissionId();
   const prog = loadProgress();
+  const [rangeStart, rangeEnd] = MISSION_TAB_RANGES[_missionTabIdx];
+  const tabs = MISSION_TAB_RANGES.map(([a, b], i) => `<button type="button"
+      class="mission-tab${i === _missionTabIdx ? ' active' : ''}"
+      data-testid="mission-tab-${a}" onclick="showMissionTab(${i})">${a}~${b}</button>`).join('');
   const items = Object.keys(MISSIONS).map(key => {
     const m = MISSIONS[key];
     const meta = _missionMeta(m);
+    const code = _missionCodeNum(m);
+    if (code < rangeStart || code > rangeEnd) return '';
     const { std, two } = _missionTexts(m);
     const selected = m.id === current;
     const passed = !!(prog[m.id] && prog[m.id].passed);
@@ -2491,6 +2589,9 @@ function openMissionSheet() {
     if (m.equipChain) extras.push('🔧 道具隐藏并上锁，目标数字 4 根蓝线全公开自动解锁');
     if (m.liar) extras.push('🤥 队长为匹诺曹（2 个假标记、禁用技能与道具）');
     if (m.bat) extras.push('🦇 每回合自动揭示数字并触发雷达，指定行动者限剪该数字');
+    if (m.timerSec && !m.freeCut) extras.push(`⌛ ${Math.round(m.timerSec / 60)} 分钟倒计时`);
+    if (m.wolf) extras.push('🐺 每份随机 1 张【X】牌，所有道具不可选中');
+    if (m.parity) extras.push('🦆 信息标记只显示奇/偶');
     return `<button type="button" class="mission-item${selected ? ' selected' : ''}"
         data-mission-id="${m.id}" data-testid="mission-item-${m.id}"
         onclick="selectMission(${m.id})">
@@ -2503,11 +2604,11 @@ function openMissionSheet() {
       <span class="mi-desc">3~5 人：${std}${two !== std ? ` ｜ 2 人：${two}` : ''}${extras.length ? ` ｜ ${extras.join(' ｜ ')}` : ''}</span>
     </button>`;
   }).join('');
-  content.innerHTML = `
+  return `
     <div class="sheet-head"><span>🗂 选择关卡</span><button class="sheet-close" onclick="closeSheet()">✕</button></div>
     <div class="sheet-sub">点选关卡后，同步给房间内成员</div>
-    <div class="mission-list">${items}</div>`;
-  ov.classList.add('show');
+    <div class="mission-tabs">${tabs}</div>
+    <div class="mission-list">${items || '<div class="sheet-empty">该区间暂无已实现的关卡</div>'}</div>`;
 }
 
 /** 房主点选关卡：收起抽屉 → 本地刷新卡片 → 上报房间（其余成员经 Realtime/轮询同步） */
@@ -2546,6 +2647,9 @@ function waitingExtrasHTML() {
       ${mission.liar ? '<div class="we-line">本关追加：队长成为「匹诺曹」，不能自行标记、不能使用双重探测器或任何道具；系统在其手牌放置 2 个错误信息标记</div>' : ''}
       ${mission.bat ? '<div class="we-line">本关追加：没有开局信息标记；每回合开始自动揭示数字 N 并同步触发【通用雷达】，当前玩家指定 1 名持有未公开蓝色 N 的玩家（可为自己）执行本回合行动，行动者只能剪 N；结算后从当前玩家下一位继续。仅红手则不揭示、只公开红线</div>' : ''}
       ${mission.freeCut ? `<div class="we-line">本关追加：发牌即开始 ${Math.round((mission.timerSec || 0) / 60)} 分钟倒计时（2 人局 ${Math.round((mission.timerSecTwo || mission.timerSec || 0) / 60)} 分钟），超时失败；自由剪线（须等待上一位完成，3 人及以上不能连续剪线）</div>` : ''}
+      ${mission.timerSec && !mission.freeCut ? `<div class="we-line">本关追加：发牌即开始 ${Math.round((mission.timerSec || 0) / 60)} 分钟倒计时，超时仍未公开全部导线即失败</div>` : ''}
+      ${mission.wolf ? '<div class="we-line">本关追加：每份手牌随机 1 张被标记【X】并固定在最右侧；所有道具不能以【X】标记的导线为目标；剪线与标记落标不受限制</div>' : ''}
+      ${mission.parity ? '<div class="we-line">本关追加：所有信息标记（开局标记、剪线失误等）只显示【奇】/【偶】</div>' : ''}
       ${mission.excludeEquip && mission.excludeEquip.length ? `<div class="we-line">本局不出现的道具：${mission.excludeEquip.map(n => (EQUIPMENT_LIB[n] || {}).name || ('道具 ' + n)).join('、')}</div>` : ''}
       ${mission.redBlueCount ? `<div class="we-line">本关追加：随机 ${mission.redBlueCount} 个数字的蓝导线视为红色导线，只能在手中只剩这些牌时通过「公开红线」公开；对应数字道具不会出现${mission.twoCaptainNoMark ? '；2 人局队长不能进行蓝线信息标记' : ''}</div>` : ''}
       ${mission.equipLocks ? '<div class="we-line">本关追加：每张道具额外 🔒 一个数字，需原数字导线公开 ≥2 且锁数字公开 ≥2 才解锁</div>' : ''}

@@ -70,7 +70,7 @@ const rules = await p1.evaluate(() => {
   };
 });
 if (!rules.text.includes('胜利条件') || !rules.text.includes('双重探测器')) throw new Error('规则弹层内容缺失');
-if (!rules.text.includes('跳过开局标记')) throw new Error('规则弹层缺少开局标记例外说明');
+if (!rules.text.includes('公开标记自己 1 张蓝色导线')) throw new Error('规则弹层缺少开局标记说明');
 if (rules.tableCount !== 3) throw new Error('规则表格数量异常: ' + rules.tableCount);
 if (rules.rows.join(',') !== '4,4,12') throw new Error('规则表格行数异常: ' + rules.rows.join(','));
 if (rules.heads.join('|') !== '人数手牌分配|行动说明|道具效果') throw new Error('规则表头异常: ' + rules.heads.join('|'));
@@ -125,18 +125,30 @@ if (await p2.evaluate(() => !!document.querySelector('[data-testid="mission-swit
 }
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
-const missionCount = await p1.evaluate(() => document.querySelectorAll('#sheetContent .mission-item').length);
-if (missionCount !== 15) throw new Error('关卡抽屉应列出 15 关，得到 ' + missionCount);
-for (const id of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
-  if (!(await p1.evaluate(n => !!document.querySelector(`[data-testid="mission-item-${n}"]`), id))) {
-    throw new Error('关卡抽屉应包含 mission-item-' + id);
+const missionTabs = await p1.evaluate(() => [...document.querySelectorAll('#sheetContent .mission-tab')].map(el => el.textContent.trim()));
+if (missionTabs.join('|') !== '4~9|10~19|20~30') throw new Error('关卡抽屉 tab 异常: ' + missionTabs.join('|'));
+const tabRanges = [
+  { start: 4, ids: [1, 2, 3, 4, 5, 6] },
+  { start: 10, ids: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16] },
+  { start: 20, ids: [17, 18] },
+];
+const tabTexts = [];
+for (const t of tabRanges) {
+  await p1.click(`[data-testid="mission-tab-${t.start}"]`);
+  await p1.waitForTimeout(150);
+  const ids = await p1.evaluate(() => [...document.querySelectorAll('#sheetContent .mission-item')].map(el => Number(el.dataset.missionId)));
+  if (ids.join(',') !== t.ids.join(',')) {
+    throw new Error(`关卡 tab ${t.start} 展示的关卡异常: ${ids.join(',')}`);
   }
+  tabTexts.push((await p1.textContent('#sheetContent')).replace(/\s+/g, ' '));
 }
-const sheetText = (await p1.textContent('#sheetContent')).replace(/\s+/g, ' ');
-for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备', '#13 红色警报', '#14 高危拆弹专家', '#15 Новосибирск任务', '#16 这很合理', '#17 匹诺曹', '#18 蝙蝠之友']) {
+const sheetText = tabTexts.join(' ');
+for (const kw of ['#9 轻重缓急', '#10 困境', '#11 又蓝又红', '#12 失踪的装备', '#13 红色警报', '#14 高危拆弹专家', '#15 Новосибирск任务', '#16 这很合理', '#17 匹诺曹', '#18 蝙蝠之友', '#19 深入虎穴', '#20 大灰狼', '#21 烤鸭危机']) {
   if (!sheetText.includes(kw)) throw new Error('关卡抽屉缺少 ' + kw);
 }
 await p1.screenshot({ path: SHOTS + '/e2e-4b-mission-sheet.png' });
+await p1.click('[data-testid="mission-tab-4"]');
+await p1.waitForTimeout(150);
 await p1.click('[data-testid="mission-item-2"]');
 await p1.waitForTimeout(500);
 if (await p1.evaluate(() => document.getElementById('sheetOverlay').classList.contains('show'))) {
@@ -158,6 +170,8 @@ console.log('成员同步 #5 OK');
 // 再切 #9：等候室应显示顺序剪线追加规则
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await p1.click('[data-testid="mission-tab-4"]');
+await p1.waitForTimeout(150);
 await p1.click('[data-testid="mission-item-6"]');
 const host9 = await waitEval(p1, () => {
   const el = document.querySelector('.waiting-extras');
@@ -172,21 +186,26 @@ await waitEval(p2, () => {
 }, '成员同步收到 #9 选关');
 console.log('成员同步 #9 OK');
 
-// #10~#15：追加规则文案与成员同步
+// #10~#21：追加规则文案与成员同步
 const specials = [
-  { id: 7, name: '#10 困境', kws: ['15 分钟倒计时', '自由剪线', '咖啡瓶'] },
-  { id: 8, name: '#11 又蓝又红', kws: ['视为红色导线', '队长不能进行蓝线信息标记'] },
-  { id: 9, name: '#12 失踪的装备', kws: ['额外 🔒 一个数字', '锁数字公开 ≥2'] },
-  { id: 10, name: '#13 红色警报', kws: ['3 根红色导线', '系统随机标记每人 1 张蓝线', '剪所有红色导线', '否则立即爆炸判负'] },
-  { id: 11, name: '#14 高危拆弹专家', kws: ['双人剪线时若失误', '不能使用【稳定剂】', '3 条黄导线（3选2）'] },
-  { id: 12, name: '#15 Новосибирск任务', kws: ['3 条红导线（3选1）', '道具区的牌全部隐藏并锁上', '4 根蓝色导线全部公开', '道具全部解锁或蓝线全部公开时停止'] },
-  { id: 13, name: '#16 这很合理', kws: ['3 条黄导线（3选2）', '4/4 全部公开', '违者立即爆炸'] },
-  { id: 14, name: '#17 匹诺曹', kws: ['2 个错误信息标记', '不能使用双重探测器或任何道具', '3 条红导线（3选2）'] },
-  { id: 15, name: '#18 蝙蝠之友', kws: ['自动揭示数字 N', '同步触发【通用雷达】', '指定 1 名持有未公开蓝色 N', '仅红手'] },
+  { id: 7, tab: 10, name: '#10 困境', kws: ['15 分钟倒计时', '自由剪线', '咖啡瓶'] },
+  { id: 8, tab: 10, name: '#11 又蓝又红', kws: ['视为红色导线', '队长不能进行蓝线信息标记'] },
+  { id: 9, tab: 10, name: '#12 失踪的装备', kws: ['额外 🔒 一个数字', '锁数字公开 ≥2'] },
+  { id: 10, tab: 10, name: '#13 红色警报', kws: ['3 根红色导线', '系统随机标记每人 1 张蓝线', '剪所有红色导线', '否则立即爆炸判负'] },
+  { id: 11, tab: 10, name: '#14 高危拆弹专家', kws: ['双人剪线时若失误', '不能使用【稳定剂】', '3 条黄导线（3选2）'] },
+  { id: 12, tab: 10, name: '#15 Новосибирск任务', kws: ['3 条红导线（3选1）', '道具区的牌全部隐藏并锁上', '4 根蓝色导线全部公开', '道具全部解锁或蓝线全部公开时停止'] },
+  { id: 13, tab: 10, name: '#16 这很合理', kws: ['3 条黄导线（3选2）', '4/4 全部公开', '违者立即爆炸'] },
+  { id: 14, tab: 10, name: '#17 匹诺曹', kws: ['2 个错误信息标记', '不能使用双重探测器或任何道具', '3 条红导线（3选2）'] },
+  { id: 15, tab: 10, name: '#18 蝙蝠之友', kws: ['自动揭示数字 N', '同步触发【通用雷达】', '指定 1 名持有未公开蓝色 N', '仅红手'] },
+  { id: 16, tab: 10, name: '#19 深入虎穴', kws: ['3 条黄导线（3选2）', '10 分钟倒计时', '超时'] },
+  { id: 17, tab: 20, name: '#20 大灰狼', kws: ['【X】', '超级探测器与通用雷达忽略 X', '对讲机'] },
+  { id: 18, tab: 20, name: '#21 烤鸭危机', kws: ['2 条红导线（2选1）', '【奇】/【偶】', '真实数字'] },
 ];
 for (const m of specials) {
   await p1.click('[data-testid="mission-switch"]');
   await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+  await p1.click(`[data-testid="mission-tab-${m.tab}"]`);
+  await p1.waitForTimeout(150);
   await p1.click(`[data-testid="mission-item-${m.id}"]`);
   const hostCard = await waitEval(p1, (name) => {
     const el = document.querySelector('.waiting-extras');
@@ -205,6 +224,8 @@ for (const m of specials) {
 // 切回 #4：后续用例沿用默认关卡的开局牌数
 await p1.click('[data-testid="mission-switch"]');
 await p1.waitForSelector('#sheetOverlay.show', { timeout: 5000 });
+await p1.click('[data-testid="mission-tab-4"]');
+await p1.waitForTimeout(150);
 await p1.click('[data-testid="mission-item-1"]');
 await waitEval(p2, () => {
   const el = document.querySelector('#online .waiting-extras');

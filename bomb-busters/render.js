@@ -298,15 +298,16 @@ function _missionSpecialRulesHTML(mission, pCount) {
     blocks.push(`<h3>⏱ 剪线顺序</h3>
       <p>开局随机抽出 ${setup.orderCount} 个蓝色数字作为剪线顺序${order.length ? `：<b>${order.join(' → ')}</b>` : ''}。必须按该顺序公开蓝色导线，前一个数字公开 ${needText} 后才能公开下一个；违反顺序立即爆炸。</p>`);
   }
-  if (setup.freeCut) {
+  if (setup.timerSec) {
     const mins = Math.round((mission.timerSec || 0) / 60);
     const mins2 = Math.round((mission.timerSecTwo || mission.timerSec || 0) / 60);
-    blocks.push(`<h3>⌛ 倒计时与自由剪线</h3>
-      <p>从发牌后可查看手牌开始 ${mins} 分钟倒计时（2 人局 ${mins2} 分钟）；归零时仍有导线未公开即失败。任意玩家均可剪线，但同一时间只能一人操作；3 人及以上时，刚剪过线的玩家不能连续再剪。</p>`);
-    if (setup.excludeEquip.length) {
-      const names = setup.excludeEquip.map(n => `【${EQUIPMENT_LIB[n] ? EQUIPMENT_LIB[n].name : n}】`).join('、');
-      blocks.push(`<p>本关不会抽到 ${names}，抽到会重抽。</p>`);
-    }
+    const timeText = mins === mins2 ? `${mins} 分钟` : `${mins} 分钟（2 人局 ${mins2} 分钟）`;
+    blocks.push(`<h3>⌛ 倒计时${setup.freeCut ? '与自由剪线' : ''}</h3>
+      <p>从发牌后可查看手牌开始 ${timeText} 倒计时，标记阶段同样计时；归零时仍有导线未公开即失败${setup.freeCut ? '。任意玩家均可剪线，但同一时间只能一人操作；3 人及以上时，刚剪过线的玩家不能连续再剪' : ''}。</p>`);
+  }
+  if (setup.excludeEquip.length) {
+    const names = setup.excludeEquip.map(n => `【${EQUIPMENT_LIB[n] ? EQUIPMENT_LIB[n].name : n}】`).join('、');
+    blocks.push(`<p>本关不会抽到 ${names}。</p>`);
   }
   if (setup.redBlueCount) {
     const nums = (S && S.board && Array.isArray(S.board.redBlueNums)) ? S.board.redBlueNums : [];
@@ -356,6 +357,17 @@ function _missionSpecialRulesHTML(mission, pCount) {
       <p>每回合开始系统从 1~12 洗混队列中揭示一个数字 N，并同步触发一次【通用雷达】。回合玩家指定 1 名持有未公开蓝色 N 的玩家（可为自己）执行剪线行动，行动者只能对 N 进行双人/单人剪线；结算后从回合玩家的下一位继续。</p>
       <p>若当前玩家手上只剩红色导线时，本回合不触发雷达，只能公开红色导线。</p>`);
   }
+  if (setup.wolf) {
+    blocks.push(`<h3>🐺 大灰狼</h3>
+      <p>每份手牌随机 1 张不参与排序，固定钉在该份最右侧并公开标记【X】。</p>
+      <p>【X】牌不能被任何道具选中或探测：双重/三重探测器不能选择包含 X 的相邻组；超级探测器与通用雷达忽略 X；便利贴、＝、≠、X/Y 射线不能以 X 为目标。双人剪线、开局信息标记、失误落标不受限制。</p>
+      <p>本局不会出现【对讲机】。</p>`);
+  }
+  if (setup.parity) {
+    blocks.push(`<h3>🦆 烤鸭危机</h3>
+      <p>本局所有信息标记只显示【奇】/【偶】：开局标记、便利贴、双人剪线失误标记，以及探测器/射线失误落下的身份标记，均只公开该蓝线的奇偶。</p>
+      <p>标记以外的信息仍为真实数字：命中后公开的牌面、探测器命中/未命中日志、雷达结果都不受影响。</p>`);
+  }
   return blocks.join('');
 }
 
@@ -382,7 +394,9 @@ function showMissionRules() {
       ? '本局跳过开局信息标记，发牌后由队长直接开始。'
       : (setup.liar
         ? '本局跳过匹诺曹的开局信息标记，其余玩家正常标记。'
-        : '开局每人必须公开标记 1 张自己的蓝色导线。'));
+        : (setup.parity
+          ? '开局每人必须公开标记 1 张自己的蓝色导线（本关只宣告奇/偶）。'
+          : '开局每人必须公开标记 1 张自己的蓝色导线。')));
   el.innerHTML = `
     <h2>📜 ${_esc(meta.code)} ${_esc(meta.name)}</h2>
     <div class="rules-scroll">
@@ -391,7 +405,7 @@ function showMissionRules() {
       ${hidden}
       ${_missionSpecialRulesHTML(mission, pCount)}
       <h3>🎯 胜利条件</h3>
-      <p>全场所有导线全部公开即拆弹成功${setup.freeCut ? '；倒计时内未完成则失败' : ''}。</p>
+      <p>全场所有导线全部公开即拆弹成功${setup.timerSec ? '；倒计时内未完成则失败' : ''}。</p>
       <h3>🔁 回合与行动</h3>
       <p>每回合可使用已解锁道具（每张限 1 次），并执行 1 次行动：${actionLine}。${markLine}</p>
       <h3>💥 失误</h3>
@@ -892,8 +906,14 @@ function _isWalkieSwapped(card) {
 function _cardMarkersHTML(card, share, idx) {
   let span = '';
   let out = '';
-  if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${_fmtNum(card.info.num)}</span>`;
-  if (card.fail) out += `<span class="marker marker-fail" title="信息标记">${card.fail.type === 'blue' ? '🔖 ' + _fmtNum(card.fail.num) : '🔖 黄'}</span>`;
+  if (card.x) out += `<span class="marker marker-x" title="X：本牌不能被任何道具选中">✕</span>`;
+  if (card.info) out += `<span class="marker marker-info" title="信息标记">📌 ${S.parityMarks ? _parityText(card.info.num) : _fmtNum(card.info.num)}</span>`;
+  if (card.fail) {
+    const failText = card.fail.type === 'blue'
+      ? (S.parityMarks ? _parityText(card.fail.num) : _fmtNum(card.fail.num))
+      : '黄';
+    out += `<span class="marker marker-fail" title="信息标记">🔖 ${failText}</span>`;
+  }
   if (_isWalkieSwapped(card)) out += `<span class="marker marker-walkie" title="经对讲机交换的牌">⇄</span>`;
   const pairCls = _pairSpanCls(card, share, idx);
   if (pairCls.includes('neq-l')) span += `<span class="neq-span" title="编号不同">≠</span>`;
@@ -984,20 +1004,20 @@ function _ownCardSelectable(seat, card) {
   const lock = _equipLockActive();
   if (lock) {
     if (!_equipLockOwnedBy(mySeat()) || seat !== lock.seat) return false;
-    if (_ui.mode === 'neq') return lock.no === 1;
+    if (_ui.mode === 'neq') return lock.no === 1 && !card.x;
     if (_ui.mode === 'sticky') {
-      return lock.no === 4 && card.kind === 'blue' && !card.revealed && !card.info;
+      return lock.no === 4 && card.kind === 'blue' && !card.revealed && !card.info && !card.x;
     }
-    if (_ui.mode === 'eqtag') return lock.no === 12;
+    if (_ui.mode === 'eqtag') return lock.no === 12 && !card.x;
     return false;
   }
   if (!_myTurn()) return false;
   if (seat !== _actorSeat()) return false;
   if (_ui.mode === 'alert') return !card.revealed;         // #13 可选自己任意未公开牌
-  if (_ui.mode === 'neq') return true;                    // ≠ 标签可含已公开牌
-  if (_ui.mode === 'walkie-card') return !card.revealed;
-  if (_ui.mode === 'sticky') return card.kind === 'blue' && !card.revealed && !card.info;
-  if (_ui.mode === 'eqtag') return true;                  // ＝ 标签可含已公开牌
+  if (_ui.mode === 'neq') return !card.x;                  // ≠ 标签可含已公开牌
+  if (_ui.mode === 'walkie-card') return !card.revealed && !card.x;
+  if (_ui.mode === 'sticky') return card.kind === 'blue' && !card.revealed && !card.info && !card.x;
+  if (_ui.mode === 'eqtag') return !card.x;                // ＝ 标签可含已公开牌
   return false;
 }
 
@@ -1838,10 +1858,10 @@ function _markConfirmSheetHTML() {
   <div class="sheet-body">
     <div class="sheet-sub">你选中了自己手牌中的这张蓝色导线：</div>
     <div class="pick-card">
-      <span class="pc-num">蓝色 ${card.num}</span>
+      <span class="pc-num">${S.parityMarks ? `奇/偶标记：${_parityText(card.num)}` : `蓝色 ${card.num}`}</span>
       <span class="pc-pos">第${loc.si + 1}份 · 第${loc.idx + 1}张</span>
     </div>
-    <div class="sheet-sub">确认后将立即向全场宣告其数字，且不可撤销。</div>
+    <div class="sheet-sub">确认后将立即向全场宣告其${S.parityMarks ? '奇偶' : '数字'}，且不可撤销。</div>
     <button class="btn-full btn-primary" data-testid="mark-confirm" onclick="onMarkConfirm()">确认标记</button>
     <button class="btn-full btn-secondary" data-testid="mark-cancel" onclick="closeSheet()">取消</button>
   </div>`;
@@ -2103,6 +2123,7 @@ function onEnemyCardClick(cardId) {
     const card = _findCardById(cardId);
     if (!loc || loc.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
     if (!card || card.revealed) { showToast('只能选择未公开的牌'); return; }
+    if (_isXCard(card)) { showToast('带有【X】标记的手牌不能被 X/Y 射线选中'); return; }
     _ui.targetSeat = loc.seat;
     _ui.targetCardId = cardId;
     _ui.rayOpts = []; _ui.rayOwn = { a: null, b: null };
@@ -2191,6 +2212,7 @@ function _scanSelect(cardId) {
   const found = _locateCardAnywhere(cardId);
   if (!found) return;
   if (found.seat === _actorSeat()) { showToast('请选择其他玩家的牌'); return; }
+  if (_isXCard(_findCardById(cardId))) { showToast('带有【X】标记的手牌不能被探测器选中'); return; }
   const entry = { id: cardId, seat: found.seat, si: found.si, idx: found.idx };
   const cur = _ui.scanSel;
   if (cur.length === 0) {
@@ -2221,6 +2243,7 @@ function _scanSelect(cardId) {
 function _neqSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
   if (!found || found.seat !== _equipFlowSeat()) return;
+  if (_isXCard(_findCardById(cardId))) { showToast('带有【X】标记的手牌不能被【≠】选中'); return; }
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);
@@ -2254,6 +2277,7 @@ function _neqSelect(seat, cardId) {
 function _eqtagSelect(seat, cardId) {
   const found = _locateCardAnywhere(cardId);
   if (!found || found.seat !== _equipFlowSeat()) return;
+  if (_isXCard(_findCardById(cardId))) { showToast('带有【X】标记的手牌不能被【＝】选中'); return; }
   const i = _ui.scanSel.findIndex(x => x.id === cardId);
   if (i >= 0) {
     _ui.scanSel.splice(i, 1);
