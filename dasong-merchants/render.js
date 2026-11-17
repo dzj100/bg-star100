@@ -7,6 +7,7 @@
   var esc = DSM.escapeHtml;
 
   var SETUP_KEY = 'dsm:setup:v1';
+  var GAME_KEY = 'dsm:game:v1';
   var DEFAULTS = {
     playerCount: 2,
     startingCash: 5,
@@ -15,6 +16,15 @@
     victoryCash: 50,
     victoryShops: 8,
     names: ['', '', '', '']
+  };
+
+  var BLOCK_SUMMARY = {
+    resources: function (c) {
+      return '铜钱 ' + c.startingCash + ' · 四品菜 ' + c.startingLowMenus + ' · 三品菜 ' + c.startingMidMenus;
+    },
+    victory: function (c) {
+      return '铜钱 ' + c.victoryCash + ' · 房屋 ' + c.victoryShops;
+    }
   };
 
   var UI = {
@@ -26,6 +36,7 @@
     resultShown: false,
     eventOpen: false,
     logOpen: false,
+    openBlocks: { resources: false, victory: false },
     lastOptions: null
   };
 
@@ -50,6 +61,58 @@
     try { localStorage.setItem(SETUP_KEY, JSON.stringify(UI.config)); } catch (error) { /* ignore */ }
   }
 
+  /* 对局存档：state 为纯数据，整体序列化即可 */
+  function saveGame() {
+    if (!DSM.state) return;
+    if (DSM.state.phase === 'over') { clearGame(); return; }
+    try {
+      localStorage.setItem(GAME_KEY, JSON.stringify({
+        v: 1,
+        at: Date.now(),
+        options: UI.lastOptions,
+        state: DSM.state
+      }));
+    } catch (error) { /* ignore */ }
+  }
+
+  function loadGame() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(GAME_KEY) || 'null');
+      if (saved && saved.v === 1 && saved.state && Array.isArray(saved.state.players) && saved.state.players.length) {
+        return saved;
+      }
+    } catch (error) { /* ignore */ }
+    return null;
+  }
+
+  function clearGame() {
+    try { localStorage.removeItem(GAME_KEY); } catch (error) { /* ignore */ }
+  }
+
+  /* 未打完的存档；已结束的对局在下次进入时直接作废 */
+  function savedGame() {
+    var saved = loadGame();
+    if (!saved) return null;
+    if (saved.state.phase === 'over') { clearGame(); return null; }
+    return saved;
+  }
+
+  function resumeGame() {
+    var saved = savedGame();
+    if (!saved) return false;
+    DSM.state = saved.state;
+    if (saved.options) UI.lastOptions = saved.options;
+    UI.screen = 'game';
+    UI.summaryShown = null;
+    UI.resultShown = false;
+    UI.eventOpen = false;
+    UI.logOpen = false;
+    if (UI.modal) closeModal();
+    render();
+    window.scrollTo(0, 0);
+    return true;
+  }
+
   function toast(message) {
     if (!toastEl) return;
     toastEl.textContent = message;
@@ -70,9 +133,9 @@
   function house(size) {
     var s = size || 18;
     return '<svg class="house" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" aria-hidden="true">' +
-      '<path d="M3 11 12 4l9 7" fill="none" stroke="#7f3a2b" stroke-width="1.8" stroke-linejoin="round"/>' +
-      '<path d="M5.5 10.5V20h13v-9.5" fill="#f3e7d0" stroke="#7f3a2b" stroke-width="1.4"/>' +
-      '<rect x="10" y="13" width="4" height="7" fill="#7f3a2b" opacity=".72"/>' +
+      '<path d="M3 11 12 4l9 7" fill="none" stroke="#6f2b1f" stroke-width="1.8" stroke-linejoin="round"/>' +
+      '<path d="M5.5 10.5V20h13v-9.5" fill="#f3e7d0" stroke="#6f2b1f" stroke-width="1.4"/>' +
+      '<rect x="10" y="13" width="4" height="7" fill="#6f2b1f" opacity=".72"/>' +
       '</svg>';
   }
 
@@ -112,576 +175,557 @@
     }).filter(Boolean).join(' ');
   }
 
-  /* ------------------------------ 首页 ------------------------------ */
+  /* ------------------------------ 首页：无边界 · 散点小品 ------------------------------ */
 
-  function scenePerson(x, y, robe, hat) {
-    var hatSVG = hat === 'straw'
-      ? '<ellipse cx="0" cy="-25" rx="8.2" ry="1.7" fill="#cba05c" stroke="#8a6544" stroke-width=".9"/>' +
-        '<path d="M-5.6 -25.4 Q0 -30.8 5.6 -25.4 Z" fill="#d3aa66" stroke="#8a6544" stroke-width=".8"/>'
-      : '<path d="M-5.2 -25 Q0 -28.8 5.2 -25 L5.2 -23.8 L-5.2 -23.8 Z" fill="#4a3a28"/>';
-    return '<g transform="translate(' + x + ' ' + y + ')">' +
-      '<path d="M-3.6 -19 L3.6 -19 L4.6 -13 L6.6 -1 L-6.6 -1 L-4.6 -13 Z" fill="' + robe + '" stroke="#4a3b2c" stroke-opacity=".45" stroke-width=".9"/>' +
-      '<path d="M-4.2 -12.8 L4.2 -12.8" stroke="#4a3b2c" stroke-opacity=".28" stroke-width=".8"/>' +
-      '<path d="M-3.6 -18.4 L-6.6 -10.4 M3.6 -18.4 L6.6 -10.4" stroke="' + robe + '" stroke-width="1.6" stroke-linecap="round"/>' +
-      '<circle cx="0" cy="-22.4" r="3" fill="#e8c9a6" stroke="#4a3b2c" stroke-opacity=".4" stroke-width=".8"/>' +
-      hatSVG +
+  var LND_SERIF = "'Songti SC', 'STSong', 'Noto Serif CJK SC', 'SimSun', serif";
+
+  function lndLantern(x, y, s) {
+    s = s || 1;
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">' +
+      '<path d="M0 -16 L0 0" stroke="#6b5a45" stroke-opacity=".55" stroke-width="1.1"/>' +
+      '<path d="M-6.5 0 L6.5 0" stroke="#b98a45" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<ellipse cx="0" cy="10.5" rx="8" ry="10.5" fill="#b03f2c" stroke="#6f2b1f" stroke-width="1.1"/>' +
+      '<path d="M-5 2 Q0 -1 5 2 M-6.8 10.5 Q0 7 6.8 10.5 M-5 19 Q0 22 5 19" fill="none" stroke="#e8c98c" stroke-opacity=".5" stroke-width=".8"/>' +
+      '<path d="M0 1 L0 20" stroke="#e8c98c" stroke-opacity=".22" stroke-width=".7"/>' +
+      '<path d="M-6.5 20.5 L6.5 20.5" stroke="#b98a45" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M0 20.5 L0 26 M-3 26 L3 26" stroke="#b98a45" stroke-width="1.1"/>' +
       '</g>';
   }
 
-  function landingHeroHTML() {
+  function lndVase(x, y, s, tone) {
+    var fill = tone === 'blue' ? '#dfeef0' : '#dcebe4';
+    var line = tone === 'blue' ? '#4f7d84' : '#4f6f64';
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + (s || 1) + ')">' +
+      '<ellipse cx="0" cy="40" rx="15" ry="4" fill="#8a6544" opacity=".14"/>' +
+      '<path d="M-8 -24 L8 -24 L8 -16 C8 -10 18 -3 18 12 C18 30 8 40 0 40 C-8 40 -18 30 -18 12 C-18 -3 -8 -10 -8 -16 Z" fill="' + fill + '" stroke="' + line + '" stroke-width="1.2"/>' +
+      '<ellipse cx="0" cy="-24" rx="8" ry="2.6" fill="' + fill + '" stroke="' + line + '" stroke-width="1"/>' +
+      '<path d="M-13 4 Q0 0 13 4 M-16 20 Q0 14 16 20" fill="none" stroke="' + line + '" stroke-opacity=".55" stroke-width=".9"/>' +
+      '<path d="M-7 -2 q4 -4 7 0 q3 4 7 0" fill="none" stroke="' + line + '" stroke-opacity=".7" stroke-width="1"/>' +
+      '</g>';
+  }
+
+  function lndTeaPot(x, y, s) {
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + (s || 1) + ')">' +
+      '<ellipse cx="0" cy="10" rx="16" ry="4" fill="#8a6544" opacity=".16"/>' +
+      '<path d="M-13 0 C-15 9 -8 14 0 14 C8 14 15 9 13 0 C11 -6 -11 -6 -13 0 Z" fill="#dcebe4" stroke="#4f6f64" stroke-width="1.2"/>' +
+      '<path d="M12 2 Q21 2 21 -6" fill="none" stroke="#4f6f64" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<path d="M-13 2 Q-21 2 -19 -4" fill="none" stroke="#4f6f64" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<ellipse cx="0" cy="-5" rx="7.5" ry="2.6" fill="#b9d2c9" stroke="#4f6f64" stroke-width=".9"/>' +
+      '<circle cx="0" cy="-8" r="1.7" fill="#b03f2c"/>' +
+      '<path d="M-6 2 Q0 -1 6 2" stroke="#5e8388" stroke-opacity=".55" stroke-width="1" fill="none"/>' +
+      '</g>';
+  }
+
+  function lndSilkBolt(x, y, s, color, rot) {
+    return '<g transform="translate(' + x + ' ' + y + ') rotate(' + (rot || 0) + ') scale(' + (s || 1) + ')">' +
+      '<rect x="-20" y="-7" width="40" height="14" rx="7" fill="' + color + '" stroke="#6f2b1f" stroke-opacity=".45" stroke-width=".9"/>' +
+      '<ellipse cx="-20" cy="0" rx="4" ry="7" fill="#f3e6cd" stroke="#8a6544" stroke-width=".8"/>' +
+      '<ellipse cx="20" cy="0" rx="4" ry="7" fill="#f3e6cd" stroke="#8a6544" stroke-width=".8"/>' +
+      '<path d="M-12 -4 Q0 -7 12 -4 M-12 4 Q0 7 12 4" stroke="#fff" stroke-opacity=".28" stroke-width="1.2" fill="none"/>' +
+      '</g>';
+  }
+
+  function lndHzWalkerHTML(cls) {
+    return '<g class="lnd-hz-walker' + (cls ? ' ' + cls : '') + '">' +
+      '<ellipse cx="0" cy="0" rx="4.4" ry="1.3" fill="#5a4630" opacity=".26"/>' +
+      '<path d="M-3.4 0 L-2.4 -12 Q0 -13.6 2.4 -12 L3.4 0 Z" fill="#6b5a45"/>' +
+      '<path d="M-2.2 -11 Q-4.6 -8 -4.8 -5" stroke="#6b5a45" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
+      '<circle cx="0" cy="-15.2" r="2.5" fill="#6b5a45"/>' +
+      '<path d="M-3.7 -16.6 H3.7" stroke="#4a3a28" stroke-width="1.3" stroke-linecap="round"/>' +
+      '</g>';
+  }
+
+  function lndHzBoatHTML() {
+    return '<g class="lnd-hz-boat">' +
+      '<path d="M-33 4 Q0 13 33 4 L26 11 Q0 16 -26 11 Z" fill="#6b5a45"/>' +
+      '<path d="M-33 4 Q-38 3 -41 -1" stroke="#6b5a45" stroke-width="2.4" stroke-linecap="round" fill="none"/>' +
+      '<path d="M33 4 Q38 3 41 -1" stroke="#6b5a45" stroke-width="2.4" stroke-linecap="round" fill="none"/>' +
+      '<path d="M-17 3 Q-13 -9 0 -9 Q13 -9 17 3 Z" fill="#5a4630"/>' +
+      '<path d="M-15 2 Q0 6 15 2" stroke="#e8c98c" stroke-opacity=".32" stroke-width="1" fill="none"/>' +
+      '<path d="M18 -12 Q22 -15 26 -12 L24 -9 H20 Z" fill="#8a6a42"/>' +
+      '<circle cx="22" cy="-7.4" r="2" fill="#5a4630"/>' +
+      '<path d="M22 -7 L20 2" stroke="#5a4630" stroke-width="2" stroke-linecap="round"/>' +
+      '<path d="M26 -1 L44 8" stroke="#7a5634" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M-30 12 Q0 16 30 12" stroke="#5f827c" stroke-opacity=".2" stroke-width="1.4" fill="none"/>' +
+      '</g>';
+  }
+
+  function lndHzLampHTML(cls) {
+    return '<g class="lnd-hz-lamp' + (cls ? ' ' + cls : '') + '">' +
+      '<ellipse cx="0" cy="1" rx="6.5" ry="2" fill="#b03f2c" opacity=".3"/>' +
+      '<path d="M-5.5 0 Q-4 -4.4 0 -4.4 Q4 -4.4 5.5 0 Z" fill="#e8c98c"/>' +
+      '<path d="M-5.5 0 Q0 2.4 5.5 0" stroke="#b03f2c" stroke-width="1.1" fill="none"/>' +
+      '<circle cx="0" cy="-5.2" r="1.5" fill="#f6d99a"/>' +
+      '</g>';
+  }
+
+  function lndHzFlagHTML(x, y, ch, cls) {
+    return '<g transform="translate(' + x + ' ' + y + ')">' +
+      '<g class="lnd-hz-flag' + (cls ? ' ' + cls : '') + '">' +
+      '<path d="M0 0 V-30" stroke="#7a5634" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M0 -28 H15 V-4 H0 Z" fill="#b03f2c" stroke="#6f2b1f" stroke-width=".7"/>' +
+      '<text x="7.5" y="-11" text-anchor="middle" font-family="' + LND_SERIF + '" font-size="8.4" font-weight="700" fill="#fdf2d8">' + ch + '</text>' +
+      '</g>' +
+      '</g>';
+  }
+
+  function lndHzDefs(p) {
+    return '<defs>' +
+      '<linearGradient id="' + p + 'HzSun" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#eab873" stop-opacity=".5"/><stop offset=".5" stop-color="#f0d296" stop-opacity=".16"/><stop offset="1" stop-color="#f0d296" stop-opacity="0"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="' + p + 'HzRiver" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#9fc4b4" stop-opacity=".62"/><stop offset=".6" stop-color="#a9cbbb" stop-opacity=".4"/><stop offset="1" stop-color="#c6d8cd" stop-opacity=".1"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="' + p + 'HzHill" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#7d987e" stop-opacity=".3"/><stop offset="1" stop-color="#7d987e" stop-opacity="0"/>' +
+      '</linearGradient>' +
+      '<radialGradient id="' + p + 'HzWinGlow" cx="50%" cy="50%" r="50%">' +
+      '<stop offset="0" stop-color="#f4d79a" stop-opacity=".5"/><stop offset="1" stop-color="#f4d79a" stop-opacity="0"/>' +
+      '</radialGradient>' +
+      '<filter id="' + p + 'HzBlur" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="14"/></filter>' +
+      '</defs>';
+  }
+
+  function lndHzPagodaHTML() {
+    return '<g class="lnd-hz-pagoda" opacity=".4" fill="#6b7d66">' +
+      '<path d="M196 338 H236 L232 310 H200 Z"/>' +
+      '<path d="M188 312 Q216 302 244 312 L240 316 Q216 308 192 316 Z"/>' +
+      '<path d="M200 310 H232 L229 286 H203 Z"/>' +
+      '<path d="M193 288 Q216 279 239 288 L236 292 Q216 284 196 292 Z"/>' +
+      '<path d="M204 286 H228 L226 264 H206 Z"/>' +
+      '<path d="M198 266 Q216 258 234 266 L231 270 Q216 263 201 270 Z"/>' +
+      '<path d="M208 264 H224 L223 246 H209 Z"/>' +
+      '<path d="M202 248 Q216 241 230 248 L228 251 Q216 245 204 251 Z"/>' +
+      '<path d="M216 246 V226" stroke="#6b7d66" stroke-width="2"/>' +
+      '</g>';
+  }
+
+  function lndHzTownHTML(p, shops) {
+    shops = shops || 4;
+    var body =
+      '<path d="M1260 340 V314 H1330 V340 Z"/><path d="M1252 316 L1295 300 L1338 316 L1334 320 L1295 306 L1256 320 Z"/>' +
+      '<path d="M1332 340 V302 H1412 V340 Z"/><path d="M1324 304 L1372 284 L1420 304 L1416 309 L1372 291 L1328 309 Z"/>' +
+      '<path d="M1414 340 V318 H1472 V340 Z"/><path d="M1406 320 L1443 306 L1480 320 L1476 324 L1443 312 L1410 324 Z"/>';
+    var wins =
+      '<rect class="lnd-hz-lit" x="1272" y="322" width="7" height="9" rx="1" opacity=".42"/>' +
+      '<rect x="1290" y="322" width="7" height="9" rx="1" opacity=".26"/>' +
+      '<rect class="lnd-hz-lit lnd-hz-lit--b" x="1348" y="314" width="8" height="10" rx="1" opacity=".48"/>' +
+      '<rect x="1368" y="314" width="8" height="10" rx="1" opacity=".3"/>' +
+      '<rect x="1390" y="314" width="8" height="10" rx="1" opacity=".24"/>' +
+      '<rect class="lnd-hz-lit" x="1432" y="326" width="7" height="8" rx="1" opacity=".36"/>';
+    var glow = '<ellipse cx="1352" cy="330" rx="30" ry="10" fill="url(#' + p + 'HzWinGlow)"/>';
+    var flags = lndHzFlagHTML(1298, 320, '酒') +
+      lndHzFlagHTML(1378, 306, '茶', 'lnd-hz-flag--b') +
+      (shops === 3 ? lndHzFlagHTML(1438, 314, '布', 'lnd-hz-flag--c') : lndHzFlagHTML(1490, 310, '布', 'lnd-hz-flag--c'));
+    if (shops !== 3) {
+      body += '<path d="M1470 340 V306 H1560 V340 Z"/><path d="M1462 308 L1515 288 L1568 308 L1564 313 L1515 295 L1466 313 Z"/>';
+      wins += '<rect class="lnd-hz-lit lnd-hz-lit--b" x="1500" y="316" width="8" height="10" rx="1" opacity=".44"/>' +
+        '<rect x="1524" y="316" width="8" height="10" rx="1" opacity=".26"/>';
+      glow += '<ellipse cx="1504" cy="332" rx="26" ry="9" fill="url(#' + p + 'HzWinGlow)"/>';
+    }
+    return '<g class="lnd-hz-town" opacity=".36" fill="#6b7d66">' + body + '</g>' +
+      '<g class="lnd-hz-wins" fill="#e7b865">' + wins + '</g>' +
+      '<g class="lnd-hz-glow" opacity=".5">' + glow + '</g>' + flags;
+  }
+
+  function lndHzBridgeHTML() {
+    var posts = '';
+    var xs = [624, 700, 776, 852, 928, 978];
+    var ys = [348, 316, 292, 292, 320, 346];
+    for (var i = 0; i < xs.length; i++) {
+      posts += '<path d="M' + xs[i] + ' ' + (ys[i] + 4) + ' L' + xs[i] + ' ' + (ys[i] + 26) + '"/>';
+    }
+    return '<g class="lnd-hz-bridge" opacity=".55">' +
+      '<path d="M560 372 Q800 210 1040 372 L1040 386 Q800 232 560 386 Z" fill="#b08a5c"/>' +
+      '<path d="M560 372 Q800 210 1040 372" stroke="#8a6a42" stroke-width="2.4"/>' +
+      '<path d="M592 356 Q800 218 1008 356" stroke="#8a6a42" stroke-opacity=".5" stroke-width="1.2"/>' +
+      '<g stroke="#8a6a42" stroke-width="1.1" opacity=".5">' + posts + '</g>' +
+      '</g>';
+  }
+
+  function lndHzWillowLeftHTML() {
+    return '<g class="lnd-hz-willow-left" opacity=".32" stroke="#5f7a58" stroke-linecap="round">' +
+      '<path d="M36 460 C 44 404 40 356 56 314" stroke-width="5" stroke="#5a4630" opacity=".8"/>' +
+      '<path d="M56 320 C 30 330 18 350 10 376" stroke-width="1.4"/>' +
+      '<path d="M56 320 C 50 350 46 380 48 414" stroke-width="1.4"/>' +
+      '<path d="M58 318 C 76 340 86 366 92 396" stroke-width="1.4"/>' +
+      '<path d="M58 318 C 90 326 110 342 122 364" stroke-width="1.4"/>' +
+      '<g stroke="none" fill="#6f8f5f" opacity=".5">' +
+      '<ellipse cx="16" cy="362" rx="7" ry="3" transform="rotate(-34 16 362)"/>' +
+      '<ellipse cx="26" cy="382" rx="7" ry="3" transform="rotate(-18 26 382)"/>' +
+      '<ellipse cx="46" cy="396" rx="7" ry="3" transform="rotate(-6 46 396)"/>' +
+      '<ellipse cx="70" cy="382" rx="8" ry="3" transform="rotate(24 70 382)"/>' +
+      '<ellipse cx="92" cy="362" rx="7" ry="3" transform="rotate(34 92 362)"/>' +
+      '<ellipse cx="106" cy="342" rx="7" ry="3" transform="rotate(28 106 342)"/>' +
+      '</g>' +
+      '</g>';
+  }
+
+  function lndHzWillowRightHTML() {
+    return '<g class="lnd-hz-willow-right" opacity=".3" stroke="#5f7a58" stroke-linecap="round">' +
+      '<path d="M1564 460 C 1556 404 1560 356 1544 314" stroke-width="5" stroke="#5a4630" opacity=".8"/>' +
+      '<path d="M1544 320 C 1570 330 1582 350 1590 376" stroke-width="1.4"/>' +
+      '<path d="M1544 320 C 1550 350 1554 380 1552 414" stroke-width="1.4"/>' +
+      '<path d="M1542 318 C 1524 340 1514 366 1508 396" stroke-width="1.4"/>' +
+      '<path d="M1542 318 C 1510 326 1490 342 1478 364" stroke-width="1.4"/>' +
+      '<g stroke="none" fill="#6f8f5f" opacity=".5">' +
+      '<ellipse cx="1584" cy="362" rx="7" ry="3" transform="rotate(34 1584 362)"/>' +
+      '<ellipse cx="1574" cy="382" rx="7" ry="3" transform="rotate(18 1574 382)"/>' +
+      '<ellipse cx="1554" cy="396" rx="7" ry="3" transform="rotate(6 1554 396)"/>' +
+      '<ellipse cx="1530" cy="382" rx="8" ry="3" transform="rotate(-24 1530 382)"/>' +
+      '<ellipse cx="1508" cy="362" rx="7" ry="3" transform="rotate(-34 1508 362)"/>' +
+      '<ellipse cx="1494" cy="342" rx="7" ry="3" transform="rotate(-28 1494 342)"/>' +
+      '</g>' +
+      '</g>';
+  }
+
+  function landingHorizonHTML() {
+    return '<svg class="lnd-horizon-svg lnd-horizon-svg--wide" viewBox="0 0 1600 460" preserveAspectRatio="xMidYMax slice" fill="none" aria-hidden="true">' +
+      lndHzDefs('lnd') +
+
+      '<circle cx="1330" cy="250" r="86" fill="url(#lndHzSun)"/>' +
+      '<circle cx="1330" cy="250" r="17" fill="#e0b070" opacity=".22"/>' +
+      '<circle cx="1330" cy="250" r="11" fill="#d99a5a" opacity=".24"/>' +
+
+      '<path d="M0 300 C 160 264 300 282 430 292 C 560 302 650 268 790 278 C 930 288 1030 262 1180 276 C 1330 290 1470 272 1600 284 L1600 380 L0 380 Z" fill="url(#lndHzHill)"/>' +
+      '<path d="M0 326 C 180 302 320 316 470 322 C 620 328 720 304 880 314 C 1040 324 1160 302 1320 314 C 1440 322 1530 312 1600 318 L1600 390 L0 390 Z" fill="#6f8a72" opacity=".14"/>' +
+
+      '<g class="lnd-mist-a"><ellipse cx="420" cy="332" rx="300" ry="20" fill="#fffaf0" opacity=".5" filter="url(#lndHzBlur)"/></g>' +
+      '<g class="lnd-mist-b"><ellipse cx="1120" cy="340" rx="260" ry="16" fill="#fffaf0" opacity=".45" filter="url(#lndHzBlur)"/></g>' +
+
+      '<g class="lnd-hz-cloud lnd-hz-cloud--a" fill="#fffaf0" opacity=".5" filter="url(#lndHzBlur)">' +
+      '<ellipse cx="330" cy="236" rx="130" ry="13"/><ellipse cx="412" cy="226" rx="86" ry="10"/>' +
+      '</g>' +
+      '<g class="lnd-hz-cloud lnd-hz-cloud--b" fill="#fffaf0" opacity=".45" filter="url(#lndHzBlur)">' +
+      '<ellipse cx="1230" cy="246" rx="150" ry="12"/><ellipse cx="1320" cy="236" rx="80" ry="9"/>' +
+      '</g>' +
+
+      '<g opacity=".42">' +
+      '<path d="M0 336 H1600 V352 H0 Z" fill="#c9b48e" opacity=".5"/>' +
+      '<path d="M0 336 H1600" stroke="#8f7b58" stroke-width="2"/>' +
+      '<path d="M0 330 H1600" stroke="#b5a07a" stroke-width="6" stroke-dasharray="16 22" opacity=".55"/>' +
+      '</g>' +
+
+      lndHzPagodaHTML() +
+      lndHzTownHTML('lnd') +
+      lndHzBridgeHTML() +
+
+      '<g opacity=".75">' +
+      '<g transform="translate(560 372)">' + lndHzWalkerHTML('lnd-hz-walker--a') + '</g>' +
+      '<g transform="translate(560 372)">' + lndHzWalkerHTML('lnd-hz-walker--b') + '</g>' +
+      '<g transform="translate(640 328)">' + lndHzWalkerHTML('lnd-hz-walker--still lnd-hz-walker--still-b') + '</g>' +
+      '<g transform="translate(884 299)">' + lndHzWalkerHTML('lnd-hz-walker--still') + '</g>' +
+      '</g>' +
+
+      '<path d="M0 372 C 220 360 380 376 560 370 C 800 362 1000 378 1600 366 L1600 460 L0 460 Z" fill="url(#lndHzRiver)"/>' +
+      '<g stroke="#fdf6e4" stroke-opacity=".42" stroke-width="1.6" stroke-linecap="round">' +
+      '<path d="M640 394 h44"/><path d="M700 406 h32"/><path d="M1150 392 h50"/><path d="M1216 404 h30"/>' +
+      '</g>' +
+      '<g stroke="#5f827c" stroke-opacity=".18" stroke-width="1.2" stroke-linecap="round">' +
+      '<path d="M240 400 q20 -4 40 0"/><path d="M420 420 q22 -4 44 0"/><path d="M920 408 q20 -4 40 0"/><path d="M1360 414 q22 -4 44 0"/>' +
+      '</g>' +
+
+      '<g opacity=".78">' +
+      '<g transform="translate(700 420) scale(1.06)">' + lndHzBoatHTML() + '</g>' +
+      '<g transform="translate(392 432) scale(.7)" opacity=".55">' + lndHzBoatHTML() + '</g>' +
+      '<g transform="translate(944 430) scale(.92)">' + lndHzBoatHTML() + '</g>' +
+      '</g>' +
+      '<g opacity=".72">' +
+      '<g transform="translate(760 446)">' + lndHzLampHTML() + '</g>' +
+      '<g transform="translate(880 438) scale(.85)">' + lndHzLampHTML('lnd-hz-lamp--b') + '</g>' +
+      '<g transform="translate(1010 452) scale(.95)">' + lndHzLampHTML('lnd-hz-lamp--c') + '</g>' +
+      '</g>' +
+      '<g stroke="#e7b865" stroke-opacity=".15" stroke-linecap="round" stroke-width="3">' +
+      '<path d="M1352 374 v9"/><path d="M1504 376 v7"/>' +
+      '</g>' +
+
+      lndHzWillowLeftHTML() +
+      lndHzWillowRightHTML() +
+
+      '<g class="lnd-hz-birds" stroke="#a08a62" stroke-opacity=".55" stroke-linecap="round">' +
+      '<path class="lnd-hz-bird" stroke-width="1.5" d="M236 198 q5 -6.2 10 0 q5 -6.2 10 0"/>' +
+      '<path class="lnd-hz-bird lnd-hz-bird--b" stroke-width="1.3" d="M282 184 q4.4 -5.6 8.8 0 q4.4 -5.6 8.8 0"/>' +
+      '<path class="lnd-hz-bird lnd-hz-bird--c" stroke-width="1.2" d="M322 202 q4 -5 8 0 q4 -5 8 0"/>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  /* 竖构图长卷：窄屏用，塔 / 酒楼茶楼 / 虹桥 都在画内 */
+  function landingHorizonTallHTML() {
+    return '<svg class="lnd-horizon-svg lnd-horizon-svg--tall" viewBox="0 0 800 520" preserveAspectRatio="xMidYMax slice" fill="none" aria-hidden="true">' +
+      lndHzDefs('m') +
+
+      '<circle cx="600" cy="246" r="82" fill="url(#mHzSun)"/>' +
+      '<circle cx="600" cy="246" r="15" fill="#e0b070" opacity=".22"/>' +
+      '<circle cx="600" cy="246" r="10" fill="#d99a5a" opacity=".24"/>' +
+
+      '<path d="M0 312 C 90 286 170 296 250 304 C 340 313 400 290 480 298 C 570 307 640 286 730 296 C 760 300 785 298 800 300 L800 392 L0 392 Z" fill="url(#mHzHill)"/>' +
+      '<path d="M0 336 C 110 316 200 326 300 330 C 400 334 470 318 570 324 C 670 330 740 316 800 322 L800 400 L0 400 Z" fill="#6f8a72" opacity=".14"/>' +
+
+      '<g class="lnd-mist-a"><ellipse cx="250" cy="342" rx="190" ry="14" fill="#fffaf0" opacity=".5" filter="url(#mHzBlur)"/></g>' +
+      '<g class="lnd-mist-b"><ellipse cx="630" cy="346" rx="170" ry="12" fill="#fffaf0" opacity=".45" filter="url(#mHzBlur)"/></g>' +
+
+      '<g class="lnd-hz-cloud lnd-hz-cloud--a" fill="#fffaf0" opacity=".5" filter="url(#mHzBlur)">' +
+      '<ellipse cx="238" cy="180" rx="86" ry="10"/><ellipse cx="302" cy="172" rx="58" ry="8"/>' +
+      '</g>' +
+      '<g class="lnd-hz-cloud lnd-hz-cloud--b" fill="#fffaf0" opacity=".45" filter="url(#mHzBlur)">' +
+      '<ellipse cx="552" cy="154" rx="96" ry="9"/><ellipse cx="616" cy="146" rx="54" ry="7"/>' +
+      '</g>' +
+
+      '<g opacity=".42">' +
+      '<path d="M0 366 H800 V382 H0 Z" fill="#c9b48e" opacity=".5"/>' +
+      '<path d="M0 366 H800" stroke="#8f7b58" stroke-width="2"/>' +
+      '<path d="M0 360 H800" stroke="#b5a07a" stroke-width="6" stroke-dasharray="14 20" opacity=".55"/>' +
+      '</g>' +
+
+      '<g transform="translate(96 366) translate(-188 -338)">' + lndHzPagodaHTML() + '</g>' +
+      '<g transform="translate(440 366) scale(1.12) translate(-1252 -340)">' + lndHzTownHTML('m', 3) + '</g>' +
+      '<g transform="translate(158 374) scale(.58) translate(-560 -372)">' + lndHzBridgeHTML() + '</g>' +
+
+      '<g opacity=".75">' +
+      '<g transform="translate(297 327) scale(.95)">' + lndHzWalkerHTML('lnd-hz-walker--still') + '</g>' +
+      '<g transform="translate(236 338) scale(.85)">' + lndHzWalkerHTML('lnd-hz-walker--still lnd-hz-walker--still-b') + '</g>' +
+      '<g transform="translate(358 341) scale(.9)">' + lndHzWalkerHTML('lnd-hz-walker--still') + '</g>' +
+      '</g>' +
+
+      '<path d="M0 374 C 140 366 250 380 400 374 C 560 367 690 380 800 370 L800 520 L0 520 Z" fill="url(#mHzRiver)"/>' +
+      '<g stroke="#fdf6e4" stroke-opacity=".42" stroke-width="1.6" stroke-linecap="round">' +
+      '<path d="M300 410 h44"/><path d="M520 404 h34"/><path d="M660 426 h40"/>' +
+      '</g>' +
+      '<g stroke="#5f827c" stroke-opacity=".18" stroke-width="1.2" stroke-linecap="round">' +
+      '<path d="M180 432 q20 -4 40 0"/><path d="M430 444 q22 -4 44 0"/><path d="M620 458 q20 -4 40 0"/>' +
+      '</g>' +
+
+      '<g opacity=".78">' +
+      '<g transform="translate(330 436) scale(.92)">' + lndHzBoatHTML() + '</g>' +
+      '<g transform="translate(556 454) scale(.78)">' + lndHzBoatHTML() + '</g>' +
+      '<g transform="translate(168 462) scale(.55)" opacity=".55">' + lndHzBoatHTML() + '</g>' +
+      '</g>' +
+      '<g opacity=".72">' +
+      '<g transform="translate(420 470)">' + lndHzLampHTML() + '</g>' +
+      '<g transform="translate(492 460) scale(.85)">' + lndHzLampHTML('lnd-hz-lamp--b') + '</g>' +
+      '<g transform="translate(640 480) scale(.95)">' + lndHzLampHTML('lnd-hz-lamp--c') + '</g>' +
+      '</g>' +
+      '<g stroke="#e7b865" stroke-opacity=".15" stroke-linecap="round" stroke-width="3">' +
+      '<path d="M596 380 v9"/><path d="M668 382 v7"/>' +
+      '</g>' +
+
+      '<g transform="translate(26 520) scale(.92) translate(-56 -460)">' + lndHzWillowLeftHTML() + '</g>' +
+      '<g transform="translate(796 520) scale(.92) translate(-1564 -460)">' + lndHzWillowRightHTML() + '</g>' +
+
+      '<g class="lnd-hz-birds" stroke="#a08a62" stroke-opacity=".55" stroke-linecap="round">' +
+      '<path class="lnd-hz-bird" stroke-width="1.5" d="M206 176 q4.6 -5.8 9.2 0 q4.6 -5.8 9.2 0"/>' +
+      '<path class="lnd-hz-bird lnd-hz-bird--b" stroke-width="1.3" d="M250 162 q4.2 -5.2 8.4 0 q4.2 -5.2 8.4 0"/>' +
+      '<path class="lnd-hz-bird lnd-hz-bird--c" stroke-width="1.2" d="M288 180 q3.8 -4.8 7.6 0 q3.8 -4.8 7.6 0"/>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  function landingPropsHTML() {
     return '' +
-      '<div class="landing-hero" aria-hidden="true">' +
-      '<svg class="hero-scene" viewBox="0 0 720 420" fill="none">' +
 
-        '<defs>' +
-          '<linearGradient id="sceneFadeX" x1="0" y1="0" x2="1" y2="0">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity="0"/>' +
-            '<stop offset=".045" stop-color="#fff"/>' +
-            '<stop offset=".955" stop-color="#fff"/>' +
-            '<stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
-          '</linearGradient>' +
-          '<linearGradient id="sceneFadeY" x1="0" y1="0" x2="0" y2="1">' +
-            '<stop offset="0" stop-color="#fff"/>' +
-            '<stop offset=".97" stop-color="#fff"/>' +
-            '<stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
-          '</linearGradient>' +
-          '<mask id="sceneMaskX" maskUnits="userSpaceOnUse" x="0" y="0" width="720" height="420"><rect width="720" height="420" fill="url(#sceneFadeX)"/></mask>' +
-          '<mask id="sceneMaskY" maskUnits="userSpaceOnUse" x="0" y="0" width="720" height="420"><rect width="720" height="420" fill="url(#sceneFadeY)"/></mask>' +
-          '<linearGradient id="sceneWater" x1="0" y1="0" x2="0" y2="1">' +
-            '<stop offset="0" stop-color="#a9c4bc" stop-opacity=".5"/>' +
-            '<stop offset=".55" stop-color="#8fb4ac" stop-opacity=".6"/>' +
-            '<stop offset="1" stop-color="#6f9a93" stop-opacity=".66"/>' +
-          '</linearGradient>' +
-          '<linearGradient id="sceneBank" x1="0" y1="0" x2="1" y2="0">' +
-            '<stop offset="0" stop-color="#c9b48c" stop-opacity=".5"/>' +
-            '<stop offset="1" stop-color="#c9b48c" stop-opacity=".8"/>' +
-          '</linearGradient>' +
-          '<linearGradient id="sceneEaveL" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">' +
-            '<stop offset="0" stop-color="#9d9889"/>' +
-            '<stop offset="1" stop-color="#c6bfad"/>' +
-          '</linearGradient>' +
-          '<linearGradient id="sceneEaveR" x1="0" y1="0" x2="0" y2="80" gradientUnits="userSpaceOnUse">' +
-            '<stop offset="0" stop-color="#9d9889"/>' +
-            '<stop offset="1" stop-color="#c6bfad"/>' +
-          '</linearGradient>' +
-          '<filter id="sceneSoft" x="-20%" y="-80%" width="140%" height="260%">' +
-            '<feGaussianBlur stdDeviation="5"/>' +
-          '</filter>' +
-        '</defs>' +
-
-        /* 天光、淡云、雁阵 */
-        '<circle cx="596" cy="72" r="54" fill="#e8c98c" opacity=".09"/>' +
-        '<circle cx="596" cy="72" r="25" fill="#e6c47f" opacity=".28"/>' +
-        '<g mask="url(#sceneMaskX)">' +
-          '<ellipse cx="330" cy="92" rx="150" ry="9" fill="#fbf6ea" opacity=".5" filter="url(#sceneSoft)"/>' +
-          '<ellipse cx="530" cy="124" rx="120" ry="7" fill="#fbf6ea" opacity=".4" filter="url(#sceneSoft)"/>' +
-          '<ellipse cx="140" cy="138" rx="110" ry="6" fill="#fbf6ea" opacity=".35" filter="url(#sceneSoft)"/>' +
-        '</g>' +
-        '<g fill="none" stroke="#c4ae83" stroke-opacity=".48" stroke-linecap="round">' +
-          '<path stroke-width="1.3" d="M186 84 C 198 70 220 68 234 78 C 244 70 264 72 270 84"/>' +
-          '<path stroke-width="1.1" d="M232 78 C 242 82 250 82 258 78"/>' +
-          '<path stroke-width="1.1" d="M352 96 C 362 90 374 89 382 93 C 388 89 398 90 402 96"/>' +
-        '</g>' +
-        '<g fill="none" stroke="#6b5a45" stroke-opacity=".35" stroke-linecap="round">' +
-          '<path stroke-width="1.5" d="M483 62 q4.6 -5.6 9.2 0 q4.6 -5.6 9.2 0"/>' +
-          '<path stroke-width="1.35" d="M458 47 q4.2 -5.2 8.4 0 q4.2 -5.2 8.4 0"/>' +
-          '<path stroke-width="1.25" d="M433 37 q3.8 -4.7 7.6 0 q3.8 -4.7 7.6 0"/>' +
-          '<path stroke-width="1.15" d="M409 31 q3.4 -4.2 6.8 0 q3.4 -4.2 6.8 0"/>' +
-          '<path stroke-width="1.35" d="M458 77 q4.2 -5.2 8.4 0 q4.2 -5.2 8.4 0"/>' +
-          '<path stroke-width="1.25" d="M433 87 q3.8 -4.7 7.6 0 q3.8 -4.7 7.6 0"/>' +
-          '<path stroke-width="1.15" d="M409 93 q3.4 -4.2 6.8 0 q3.4 -4.2 6.8 0"/>' +
-        '</g>' +
-
-        /* 左上探入的飞檐 */
-        '<g>' +
-          '<path d="M180 26 C 156 34 120 46 88 57 C 56 68 24 76 0 80" stroke="#4a4438" stroke-opacity=".22" stroke-width="8" stroke-linecap="round"/>' +
-          '<path d="M0 0 L146 0 C 158 8 170 18 180 26 C 156 34 120 46 88 57 C 56 68 24 76 0 80 Z" fill="url(#sceneEaveL)"/>' +
-          '<g stroke="#5f574b" stroke-opacity=".34" stroke-width=".9">' +
-            '<path d="M10 75 L14 10M36 70 L41 6M62 64 L67 3M88 56 L93 0M114 46 L119 0M140 34 L144 0M164 31 L167 8"/>' +
-          '</g>' +
-          '<path d="M4 44 C 40 36 82 24 122 10" stroke="#5f574b" stroke-opacity=".18" stroke-width="1"/>' +
-          '<path d="M147 1 C 159 9 170 18 178 24" stroke="#4f463a" stroke-opacity=".45" stroke-width="1.2" stroke-linecap="round"/>' +
-          '<path d="M180 26 C 156 34 120 46 88 57 C 56 68 24 76 0 80" stroke="#4f463a" stroke-width="3.8" stroke-linecap="round"/>' +
-          '<path d="M179 24.2 C 155 32.2 119 44.2 87 55.2 C 55 66.2 23 74 1 78" stroke="#ddd6c3" stroke-opacity=".65" stroke-width="1.3"/>' +
-          '<path d="M180 28 C 156 36 120 48 88 59 C 56 70 24 78 0 82" stroke="#6a6557" stroke-width="3.4" stroke-dasharray="0 15" stroke-linecap="round"/>' +
-          '<path d="M180 26 C 186 22 190 14 189 6" stroke="#4f463a" stroke-width="2.2" stroke-linecap="round"/>' +
-          '<g stroke="#4f463a" stroke-opacity=".4" stroke-width="1.1" stroke-linecap="round">' +
-            '<path d="M20 82 L17 88M56 71 L53 77M92 60 L89 66M128 46 L125 52M158 38 L155 44"/>' +
-          '</g>' +
-        '</g>' +
-        '<g>' +
-          '<path d="M104 50 L104 64" stroke="#6b5a45" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M97.6 64 L110.4 64" stroke="#8d3f2f" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<ellipse cx="104" cy="72" rx="6.4" ry="7.6" fill="#b1543f" stroke="#8d3f2f" stroke-width=".8"/>' +
-          '<path d="M104 64.6 L104 79.4" stroke="#e0b273" stroke-opacity=".35" stroke-width=".9"/>' +
-          '<path d="M97.6 80 L110.4 80" stroke="#8d3f2f" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<path d="M104 80 L104 87" stroke="#c4a25a" stroke-width="1.2" stroke-linecap="round"/>' +
-        '</g>' +
-
-        /* 右上探入的飞檐 */
-        '<g>' +
-          '<path d="M540 26 C 564 34 600 46 632 57 C 664 68 696 76 720 80" stroke="#4a4438" stroke-opacity=".22" stroke-width="8" stroke-linecap="round"/>' +
-          '<path d="M720 0 L574 0 C 562 8 550 18 540 26 C 564 34 600 46 632 57 C 664 68 696 76 720 80 Z" fill="url(#sceneEaveR)"/>' +
-          '<g stroke="#5f574b" stroke-opacity=".34" stroke-width=".9">' +
-            '<path d="M710 75 L706 10M684 70 L679 6M658 64 L653 3M632 56 L627 0M606 46 L601 0M580 34 L576 0M556 31 L553 8"/>' +
-          '</g>' +
-          '<path d="M716 44 C 680 36 638 24 598 10" stroke="#5f574b" stroke-opacity=".18" stroke-width="1"/>' +
-          '<path d="M573 1 C 561 9 550 18 542 24" stroke="#4f463a" stroke-opacity=".45" stroke-width="1.2" stroke-linecap="round"/>' +
-          '<path d="M540 26 C 564 34 600 46 632 57 C 664 68 696 76 720 80" stroke="#4f463a" stroke-width="3.8" stroke-linecap="round"/>' +
-          '<path d="M541 24.2 C 565 32.2 601 44.2 633 55.2 C 665 66.2 697 74 719 78" stroke="#ddd6c3" stroke-opacity=".65" stroke-width="1.3"/>' +
-          '<path d="M540 28 C 564 36 600 48 632 59 C 664 70 696 78 720 82" stroke="#6a6557" stroke-width="3.4" stroke-dasharray="0 15" stroke-linecap="round"/>' +
-          '<path d="M540 26 C 534 22 530 14 531 6" stroke="#4f463a" stroke-width="2.2" stroke-linecap="round"/>' +
-          '<g stroke="#4f463a" stroke-opacity=".4" stroke-width="1.1" stroke-linecap="round">' +
-            '<path d="M700 82 L703 88M664 71 L667 77M628 60 L631 66M592 46 L595 52M562 38 L565 44"/>' +
-          '</g>' +
-        '</g>' +
-        '<g>' +
-          '<path d="M650 62 L650 76" stroke="#6b5a45" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M643.6 76 L656.4 76" stroke="#8d3f2f" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<ellipse cx="650" cy="84" rx="6.4" ry="7.6" fill="#b1543f" stroke="#8d3f2f" stroke-width=".8"/>' +
-          '<path d="M650 76.6 L650 91.4" stroke="#e0b273" stroke-opacity=".35" stroke-width=".9"/>' +
-          '<path d="M643.6 92 L656.4 92" stroke="#8d3f2f" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<path d="M650 92 L650 99" stroke="#c4a25a" stroke-width="1.2" stroke-linecap="round"/>' +
-        '</g>' +
-
-        /* 远山、对岸街市、河水 */
-        '<g mask="url(#sceneMaskX)"><g mask="url(#sceneMaskY)">' +
-          '<path d="M0 224 C 54 202 104 208 156 218 C 214 229 258 196 316 204 C 372 212 414 194 470 204 C 526 214 570 198 626 208 C 668 215 700 206 720 210 L720 300 L0 300 Z" fill="#a3b79b" opacity=".12"/>' +
-          '<ellipse cx="360" cy="244" rx="380" ry="10" fill="#f7f1e2" opacity=".4" filter="url(#sceneSoft)"/>' +
-          '<path d="M0 246 C 70 216 130 224 190 232 C 250 240 300 218 360 224 C 430 231 490 214 550 222 C 610 230 670 218 720 224 L720 300 L0 300Z" fill="#a3b79b" opacity=".2"/>' +
-          '<path d="M0 268 C 80 252 150 262 220 266 C 300 270 360 252 440 258 C 520 264 590 250 660 258 C 690 261 706 258 720 256 L720 302 L0 302Z" fill="#7e9a74" opacity=".15"/>' +
-          '<path d="M0 290 C 80 288 160 292 240 290 C 320 288 400 292 480 290 C 560 288 640 292 720 290 L720 300 L0 300 Z" fill="#d8c39c" opacity=".45"/>' +
-
-          /* 对岸树影（衬在屋后） */
-          '<g fill="#7d9a72" opacity=".42">' +
-            '<ellipse cx="282" cy="260" rx="16" ry="12"/><ellipse cx="270" cy="268" rx="10" ry="8"/><ellipse cx="294" cy="268" rx="10" ry="7"/>' +
-            '<ellipse cx="532" cy="262" rx="13" ry="10"/><ellipse cx="521" cy="269" rx="8" ry="6"/>' +
-            '<ellipse cx="604" cy="254" rx="18" ry="13"/><ellipse cx="590" cy="264" rx="10" ry="7"/><ellipse cx="618" cy="264" rx="9" ry="6"/>' +
-          '</g>' +
-          '<g stroke="#5d6b50" stroke-opacity=".5" stroke-width="1.6" stroke-linecap="round">' +
-            '<path d="M282 262 L282 298"/><path d="M532 264 L532 298"/><path d="M604 258 L604 298"/>' +
-          '</g>' +
-
-          /* 对岸小铺 */
-          '<g>' +
-            '<path d="M198 298 L256 298 L256 276 L198 278 Z" fill="#efe3c8" stroke="#8a7550" stroke-opacity=".28" stroke-width="1"/>' +
-            '<path d="M190 278 C 204 266 236 264 264 274 L262 281 C 244 274 218 274 202 283 L196 281 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M196 281 C 214 274 242 274 262 281" stroke="#3f4a3c" stroke-opacity=".5" stroke-width="2.4"/>' +
-            '<path d="M205 270 C 221 264 242 264 256 271" stroke="#8b9682" stroke-opacity=".45" stroke-width="1"/>' +
-            '<path d="M190 278 Q185 277 183 273 M264 274 Q268 273 270 269" stroke="#46503f" stroke-width="1.2" stroke-linecap="round"/>' +
-            '<path d="M196 281 C 214 274 242 274 262 281" stroke="#46503f" stroke-opacity=".35" stroke-width="1"/>' +
-            '<path d="M206 286 L226 286 L226 298 L206 298 Z" fill="#e6d6b6" stroke="#8a6544" stroke-opacity=".35" stroke-width=".8"/>' +
-            '<rect x="238" y="282" width="9" height="15" fill="#b1543f" opacity=".85"/>' +
-            '<path d="M300 298 L352 298 L352 284 L300 286 Z" fill="#efe3c8" stroke="#8a7550" stroke-opacity=".28" stroke-width="1"/>' +
-            '<path d="M292 286 C 306 274 336 272 360 282 L358 289 C 338 281 314 281 300 290 L296 288 Z" fill="#66715f" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M298 289 C 316 282 340 282 358 288" stroke="#3f4a3c" stroke-opacity=".45" stroke-width="2.2"/>' +
-            '<path d="M306 280 C 320 274 340 274 352 280" stroke="#8b9682" stroke-opacity=".42" stroke-width="1"/>' +
-            '<path d="M292 286 Q287 285 285 281 M360 282 Q363 281 365 277" stroke="#46503f" stroke-width="1.1" stroke-linecap="round"/>' +
-            '<path d="M298 290 L356 288 L356 294 L298 296 Z" fill="#c9a05a" opacity=".5"/>' +
-            '<path d="M306 290 L306 295 M318 290 L318 295 M330 290 L330 295 M342 289 L342 294" stroke="#f3e8d1" stroke-opacity=".6" stroke-width="2"/>' +
-            '<path d="M312 292 L324 292 L324 298 L312 298 Z" fill="#6b5236"/>' +
-            '<path d="M362 298 L414 298 L414 266 L362 268 Z" fill="#efe3c8" stroke="#8a7550" stroke-opacity=".28" stroke-width="1"/>' +
-            '<path d="M354 268 C 370 256 400 252 422 264 L420 271 C 400 262 374 262 360 274 L356 272 Z" fill="#556252" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M360 272 C 378 264 402 264 420 271" stroke="#3f4a3c" stroke-opacity=".5" stroke-width="2.4"/>' +
-            '<path d="M368 262 C 384 256 404 256 416 261" stroke="#8b9682" stroke-opacity=".45" stroke-width="1"/>' +
-            '<path d="M354 268 Q349 267 347 263 M422 264 Q426 263 428 259" stroke="#46503f" stroke-width="1.1" stroke-linecap="round"/>' +
-            '<path d="M370 276 L384 276 L384 288 L370 288 Z" fill="#f9f2e2" stroke="#8a6544" stroke-opacity=".45" stroke-width=".8"/>' +
-            '<path d="M392 276 L406 276 L406 288 L392 288 Z" fill="#f9f2e2" stroke="#8a6544" stroke-opacity=".45" stroke-width=".8"/>' +
-            '<rect x="398" y="266" width="9" height="13" fill="#b1543f" opacity=".85"/>' +
-            '<path d="M468 298 L520 298 L520 282 L468 284 Z" fill="#efe3c8" stroke="#8a7550" stroke-opacity=".28" stroke-width="1"/>' +
-            '<path d="M460 284 C 474 272 504 270 528 280 L526 287 C 506 278 480 278 466 288 L462 286 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M466 287 C 482 280 506 280 526 287" stroke="#3f4a3c" stroke-opacity=".45" stroke-width="2.2"/>' +
-            '<path d="M474 276 C 488 270 508 270 520 276" stroke="#8b9682" stroke-opacity=".42" stroke-width="1"/>' +
-            '<path d="M460 284 Q455 283 453 279 M528 280 Q531 279 533 275" stroke="#46503f" stroke-width="1.1" stroke-linecap="round"/>' +
-            '<path d="M466 288 L524 284 L524 291 L466 295 Z" fill="#c9a05a" opacity=".45"/>' +
-            '<path d="M474 288 L474 294 M486 287 L486 293 M498 287 L498 293 M510 286 L510 292" stroke="#f3e8d1" stroke-opacity=".55" stroke-width="2"/>' +
-            '<path d="M480 296 L494 296 L494 298 L480 298 Z" fill="#6b5236"/>' +
-            '<path d="M544 298 L590 298 L590 286 L544 288 Z" fill="#efe3c8" stroke="#8a7550" stroke-opacity=".28" stroke-width="1"/>' +
-            '<path d="M536 288 C 550 278 576 276 598 284 L596 290 C 578 283 556 284 544 292 L540 291 Z" fill="#66715f" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M542 290 C 556 285 578 285 596 290" stroke="#3f4a3c" stroke-opacity=".45" stroke-width="2.2"/>' +
-            '<path d="M550 281 C 564 277 580 277 592 281" stroke="#8b9682" stroke-opacity=".42" stroke-width="1"/>' +
-            '<path d="M536 288 Q531 287 529 283 M598 284 Q601 283 603 279" stroke="#46503f" stroke-width="1.1" stroke-linecap="round"/>' +
-            '<path d="M552 292 L566 292 L566 298 L552 298 Z" fill="#e6d6b6" stroke="#8a6544" stroke-opacity=".3" stroke-width=".8"/>' +
-          '</g>' +
-
-          /* 对岸小塔 */
-          '<g>' +
-            '<path d="M432 298 L454 298 L452 290 L434 290 Z" fill="#e6d6b6" stroke="#8a7550" stroke-opacity=".35" stroke-width=".9"/>' +
-            '<path d="M435 290 L451 290 L449 278 L437 278 Z" fill="#f0e2c4" stroke="#8a7550" stroke-opacity=".3" stroke-width=".8"/>' +
-            '<path d="M424 279 Q434 273 443 273 Q452 273 462 279 L460 282 Q452 277 443 277 Q434 277 426 282 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M424 279 Q420 277 419 272 M462 279 Q466 277 467 272" fill="none" stroke="#46503f" stroke-width="1" stroke-linecap="round"/>' +
-            '<path d="M438 278 L448 278 L447 268 L439 268 Z" fill="#f0e2c4" stroke="#8a7550" stroke-opacity=".3" stroke-width=".8"/>' +
-            '<path d="M427 269 Q436 264 443 264 Q450 264 459 269 L457 272 Q450 267 443 267 Q436 267 429 272 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M427 269 Q423 267 422 263 M459 269 Q463 267 464 263" fill="none" stroke="#46503f" stroke-width="1" stroke-linecap="round"/>' +
-            '<path d="M440 268 L446 268 L445 259 L441 259 Z" fill="#f0e2c4" stroke="#8a7550" stroke-opacity=".3" stroke-width=".8"/>' +
-            '<path d="M431 260 Q437 256 443 256 Q449 256 455 260 L453 262 Q449 258 443 258 Q437 258 433 262 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M431 260 Q428 258 427 255 M455 260 Q458 258 459 255" fill="none" stroke="#46503f" stroke-width="1" stroke-linecap="round"/>' +
-            '<path d="M441 259 L445 259 L445 251 L441 251 Z" fill="#f0e2c4" stroke="#8a7550" stroke-opacity=".3" stroke-width=".8"/>' +
-            '<path d="M434 252 Q438 249 443 248 Q448 249 452 252 L450 254 Q447 251 443 250 Q439 251 436 254 Z" fill="#5f6b5c" stroke="#46503f" stroke-width="1"/>' +
-            '<path d="M434 252 Q431 250 430 247 M452 252 Q455 250 456 247" fill="none" stroke="#46503f" stroke-width="1" stroke-linecap="round"/>' +
-            '<path d="M442 250 L444 250 L444 244 L442 244 Z" fill="#f0e2c4"/>' +
-            '<path d="M443 244 L443 233" stroke="#8a6544" stroke-opacity=".8" stroke-width="1"/>' +
-            '<circle cx="443" cy="231.6" r="2.1" fill="#b1543f"/>' +
-          '</g>' +
-
-          /* 对岸灯火 */
-          '<g fill="#b1543f" opacity=".85">' +
-            '<circle cx="209" cy="285" r="1.7"/><circle cx="344" cy="291" r="1.6"/>' +
-            '<circle cx="382" cy="279" r="1.7"/><circle cx="486" cy="291" r="1.6"/>' +
-            '<circle cx="556" cy="295" r="1.5"/>' +
-          '</g>' +
-
-          '<path d="M0 298 C 90 294 180 300 270 297 C 360 294 440 299 540 296 C 620 294 680 297 720 295 L720 420 L0 420 Z" fill="url(#sceneWater)"/>' +
-          '<ellipse cx="330" cy="318" rx="330" ry="10" fill="#f7f1e2" opacity=".45" filter="url(#sceneSoft)"/>' +
-          '<ellipse cx="560" cy="340" rx="200" ry="7" fill="#f7f1e2" opacity=".35" filter="url(#sceneSoft)"/>' +
-          '<ellipse cx="378" cy="336" rx="168" ry="13" fill="#5f827c" opacity=".16" filter="url(#sceneSoft)"/>' +
-          '<g stroke="#b1543f" stroke-opacity=".12" stroke-width="3" stroke-linecap="round">' +
-            '<path d="M302 328 q22 4 44 0"/><path d="M356 342 q26 4 52 0"/><path d="M422 332 q20 4 40 0"/>' +
-          '</g>' +
-          '<g stroke="#5f8b86" stroke-opacity=".25" stroke-width="1.3" stroke-linecap="round">' +
-            '<path d="M90 340 q14 -4 28 0"/><path d="M196 352 q16 -4 32 0"/>' +
-            '<path d="M300 336 q12 -3 24 0"/><path d="M408 366 q16 -4 32 0"/>' +
-            '<path d="M520 352 q14 -4 28 0"/><path d="M612 386 q16 -4 32 0"/>' +
-            '<path d="M120 392 q18 -4 36 0"/><path d="M356 396 q16 -4 32 0"/>' +
-            '<path d="M664 340 q12 -3 24 0"/><path d="M250 382 q14 -4 28 0"/>' +
-          '</g>' +
-          '<g stroke="#7d9a72" stroke-opacity=".35" stroke-width="1.2" stroke-linecap="round">' +
-            '<path d="M88 300 l1 -6 M92 300 l3 -5"/><path d="M280 297 l1 -5 M284 297 l3 -4"/>' +
-            '<path d="M620 296 l1 -5 M624 296 l3 -4"/>' +
-          '</g>' +
-
-          /* 远处小船 */
-          '<g stroke="#5c3d22" stroke-opacity=".7" stroke-width="1">' +
-            '<path d="M296 316 q12 7 26 2 l3 3 q-15 6 -31 -1 Z" fill="#8a5a34"/>' +
-            '<path d="M314 306 L314 316" stroke-width="1.2"/>' +
-            '<path d="M314 306 L322 310 L314 313 Z" fill="#e9dcc0" stroke="none"/>' +
-            '<path d="M482 324 q10 6 22 2 l2 2 q-13 5 -27 -1 Z" fill="#8a5a34"/>' +
-          '</g>' +
-
-          /* 莲叶、水禽 */
-          '<g fill="#6f8f5f" opacity=".5">' +
-            '<ellipse cx="500" cy="366" rx="9" ry="4"/>' +
-            '<ellipse cx="517" cy="374" rx="7" ry="3.4"/>' +
-            '<ellipse cx="479" cy="380" rx="8" ry="3.4"/>' +
-            '<ellipse cx="392" cy="366" rx="7" ry="3.2"/>' +
-          '</g>' +
-          '<path d="M509 360 q4 -9 8 0 q-4 6 -8 0Z" fill="#d98f8a" opacity=".8"/>' +
-          '<path d="M487 375 q3 -7 6 0 q-3 5 -6 0Z" fill="#d98f8a" opacity=".7"/>' +
-          '<g stroke="#6b5a45" stroke-opacity=".5" stroke-width="1">' +
-            '<ellipse cx="552" cy="368" rx="7.5" ry="4.2" fill="#f7f2e4"/>' +
-            '<circle cx="558.5" cy="363.5" r="2.6" fill="#f7f2e4"/>' +
-            '<path d="M561 363.5 l4 1 l-4 1.6Z" fill="#d98f4a" stroke="none"/>' +
-            '<ellipse cx="538" cy="375" rx="4.6" ry="2.8" fill="#f7f2e4"/>' +
-            '<circle cx="541.5" cy="372.4" r="1.8" fill="#f7f2e4"/>' +
-          '</g>' +
-        '</g></g>' +
-
-        /* 虹桥：桥面 */
-        '<path d="M150 296 Q375 68 600 288 L600 308 Q375 88 150 316 Z" fill="#d2ab74" stroke="#7a5634" stroke-opacity=".55" stroke-width="1.4"/>' +
-        '<path d="M150 296 Q375 68 600 288 L600 292 Q375 73 150 301 Z" fill="#8a6544" opacity=".16"/>' +
-        '<path d="M150 306 Q375 78 600 298" stroke="#b9905c" stroke-opacity=".45" stroke-width="1"/>' +
-        '<path d="M150 296 Q375 68 600 288" stroke="#8a6544" stroke-opacity=".68" stroke-width="1.6"/>' +
-        '<path d="M150 316 Q375 88 600 308" stroke="#7a5634" stroke-opacity=".32" stroke-width="1.4"/>' +
-        '<g stroke="#8a6544" stroke-opacity=".28" stroke-width="1">' +
-          '<path d="M218 241 L218 249M263 213 L263 221M308 195 L308 203M353 185 L353 193M398 184 L398 192M443 192 L443 200M488 209 L488 217M533 235 L533 243"/>' +
-        '</g>' +
-        '<g stroke="#b9905c" stroke-opacity=".3" stroke-width=".9">' +
-          '<path d="M180 270 L180 280M240 231 L240 242M300 203 L300 214M360 188 L360 199M420 189 L420 200M480 207 L480 218M540 240 L540 251"/>' +
-        '</g>' +
-
-        /* 朱漆栏杆 */
-        '<path d="M150 285 Q375 57 600 277 L600 288 Q375 68 150 296 Z" fill="#b1543f" fill-opacity=".94"/>' +
-        '<path d="M150 285 Q375 57 600 277" stroke="#7f3a2b" stroke-width="2.2"/>' +
-        '<path d="M150 288 Q375 61 600 280" stroke="#d3876a" stroke-opacity=".35" stroke-width="1.2"/>' +
-        '<path d="M150 290 Q375 62 600 282" stroke="#7f3a2b" stroke-opacity=".35" stroke-width="1"/>' +
-        '<g stroke="#9b4232" stroke-opacity=".5" stroke-width="1">' +
-          '<path d="M162 274.7 L162 283.2M173 264.4 L173 272.9M184 254.6 L184 263.1M206 236.7 L206 245.2M217 228.5 L217 237.0M228 220.9 L228 229.4M250 207.3 L250 215.8M261 201.3 L261 209.8M272 195.8 L272 204.3M283 190.9 L283 199.4M294 186.5 L294 195.0M305 182.6 L305 191.1M316 179.3 L316 187.8M327 176.5 L327 185.0M338 174.2 L338 182.7M349 172.5 L349 181.0M360 171.3 L360 179.8M371 170.6 L371 179.1M382 170.5 L382 179.0M393 170.9 L393 179.4M404 171.8 L404 180.3M415 173.3 L415 181.8M426 175.3 L426 183.8M437 177.9 L437 186.4M448 181.0 L448 189.5M459 184.6 L459 193.1M470 188.8 L470 197.3M481 193.5 L481 202.0M492 198.7 L492 207.2M503 204.5 L503 213.0M514 210.8 L514 219.3M525 217.6 L525 226.1M536 225.0 L536 233.5M547 232.9 L547 241.4M558 241.3 L558 249.8M569 250.3 L569 258.8M580 259.8 L580 268.3"/>' +
-        '</g>' +
-        '<g stroke="#8f3529" stroke-opacity=".85" stroke-width="1.6">' +
-          '<path d="M195 244 L195 260M240 212 L240 228M285 189 L285 205M330 174 L330 190M375 169 L375 185M420 173 L420 189M465 185 L465 201M510 207 L510 223M555 238 L555 254"/>' +
-        '</g>' +
-        '<g fill="#d8ae62" opacity=".95">' +
-          '<circle cx="195" cy="244" r="1.5"/><circle cx="240" cy="212" r="1.5"/><circle cx="285" cy="189" r="1.5"/>' +
-          '<circle cx="330" cy="174" r="1.5"/><circle cx="375" cy="169" r="1.5"/><circle cx="420" cy="173" r="1.5"/>' +
-          '<circle cx="465" cy="185" r="1.5"/><circle cx="510" cy="207" r="1.5"/><circle cx="555" cy="238" r="1.5"/>' +
-        '</g>' +
-
-        /* 桥上：花轿 */
-        '<g transform="translate(375 180) scale(.68)">' +
-          scenePerson(-44, 3, '#6d8ba0', 'straw') +
-          scenePerson(44, 3, '#7b8f6a', 'straw') +
-          '<path d="M-40 -16 L42 -16" stroke="#7a5634" stroke-width="2.6" stroke-linecap="round"/>' +
-          '<path d="M-22 -33 Q0 -50 22 -33 L19 -31 L-19 -31 Z" fill="#6f8f72" stroke="#4a5f4e" stroke-width="1.2"/>' +
-          '<path d="M-22 -33 Q-26 -35 -27 -38 M22 -33 Q26 -35 27 -38" stroke="#4a5f4e" stroke-width="1.2" stroke-linecap="round"/>' +
-          '<circle cx="0" cy="-45" r="2" fill="#d8ae62"/>' +
-          '<rect x="-19" y="-33" width="38" height="17" fill="#b1543f" stroke="#7f3a2b" stroke-width="1.2"/>' +
-          '<rect x="-11" y="-29.5" width="22" height="10" rx="1" fill="#f7efdc" stroke="#8a6544" stroke-width=".9"/>' +
-          '<path d="M0 -29.5 L0 -19.5 M-11 -24.5 L11 -24.5" stroke="#8a6544" stroke-opacity=".6" stroke-width=".8"/>' +
-          '<path d="M-20 -16 L20 -16" stroke="#7f3a2b" stroke-width="1.6"/>' +
-          '<path d="M-17 -16 L-17 -11 M17 -16 L17 -11" stroke="#d8ae62" stroke-width="1.3"/>' +
-        '</g>' +
-
-        /* 桥上：纸鸢 */
-        '<g class="scene-kite">' +
-          '<path d="M280 130 C 300 142 318 156 332 172" stroke="#6b5a45" stroke-opacity=".42" stroke-width=".9"/>' +
-          '<path d="M280 130 C 286 139 276 146 282 155 C 287 162 279 168 284 176" stroke="#8d3f2f" stroke-opacity=".55" stroke-width="1"/>' +
-          '<path d="M284 141 l4 -2.2 l2.2 4 l-4 2.2 Z" fill="#c9704f" opacity=".75"/>' +
-          '<path d="M281 158 l4 -2.2 l2.2 4 l-4 2.2 Z" fill="#c9704f" opacity=".75"/>' +
-          '<path d="M280 94 L295 112 L280 130 L265 112 Z" fill="#c9704f" stroke="#8d3f2f" stroke-width="1"/>' +
-          '<path d="M280 94 L280 130 M265 112 L295 112" stroke="#f6e8ce" stroke-opacity=".8" stroke-width="1.1"/>' +
-          '<path d="M280 94 L295 112 L280 112 Z" fill="#d8875f" opacity=".45"/>' +
-        '</g>' +
-
-        /* 桥上：行人 */
-        '<g transform="translate(330 185) scale(.66)">' + scenePerson(0, 0, '#7b8f9a', 'straw') + '</g>' +
-        '<g transform="translate(420 184) scale(.66)">' + scenePerson(0, 0, '#8a6f8f', 'cap') + '</g>' +
-        '<g transform="translate(240 223) scale(.66)">' + scenePerson(0, 0, '#b98a5a', 'straw') + '</g>' +
-        '<g transform="translate(510 218) scale(.7)">' + scenePerson(0, 0, '#7b8f6a', 'cap') + '</g>' +
-
-        /* 桥上：骑马人 */
-        '<g transform="translate(465 196) scale(.72)">' +
-          '<ellipse cx="-1" cy="-16.5" rx="17" ry="7.5" fill="#96682f" stroke="#4a3b2c" stroke-opacity=".55" stroke-width="1.1"/>' +
-          '<path d="M-12 -21 L-24 -32 L-31 -31 L-32 -25 L-22 -14 Z" fill="#96682f" stroke="#4a3b2c" stroke-opacity=".55" stroke-width="1.1"/>' +
-          '<path d="M-29 -33 Q-38 -33 -41 -27 L-40 -23 Q-36 -21 -32 -24 L-27 -28 Z" fill="#96682f" stroke="#4a3b2c" stroke-opacity=".55" stroke-width="1.1"/>' +
-          '<path d="M-29 -33 L-30 -38" stroke="#4a3b2c" stroke-opacity=".6" stroke-width="1.2" stroke-linecap="round"/>' +
-          '<circle cx="-37" cy="-27.6" r=".9" fill="#3b3126"/>' +
-          '<path d="M-12 -10 L-13 0 M-7 -9 L-7 0 M5 -9 L5 0 M11 -10 L13 0" stroke="#6b5a45" stroke-opacity=".8" stroke-width="2" stroke-linecap="round"/>' +
-          '<path d="M15 -20 Q24 -18 22 -8 Q26 -10 27 -16" stroke="#6b5a45" stroke-opacity=".7" stroke-width="1.8" stroke-linecap="round" fill="none"/>' +
-          '<path d="M-8 -22 L4 -22 L3 -14 L-7 -14 Z" fill="#b1543f" stroke="#7f3a2b" stroke-width=".9"/>' +
-          '<path d="M-5 -35 L1 -35 L2 -24 L-6 -24 Z" fill="#7f8f6a" stroke="#4a3b2c" stroke-opacity=".4" stroke-width=".9"/>' +
-          '<circle cx="-2" cy="-38.4" r="3.1" fill="#e8c9a6" stroke="#4a3b2c" stroke-opacity=".45" stroke-width=".8"/>' +
-          '<path d="M-7.2 -40.6 Q-2 -44.6 3.2 -40.6 L3.2 -39.4 L-7.2 -39.4 Z" fill="#4a3a28"/>' +
-          '<path d="M-5 -31 L-10 -26 M2 -31 L7 -27" stroke="#4a3b2c" stroke-opacity=".5" stroke-width="1.4" stroke-linecap="round"/>' +
-          '<path d="M-9 -27 Q-20 -26 -30 -24" stroke="#6b5a45" stroke-opacity=".5" stroke-width="1"/>' +
-        '</g>' +
-
-        /* 左岸石埠 */
-        '<path d="M0 304 L150 298 C 176 298 194 306 206 320 C 226 344 238 374 246 420 L0 420 Z" fill="#dcc7a0" opacity=".78"/>' +
-        '<path d="M0 304 L150 298 C 176 298 194 306 206 320 C 226 344 238 374 246 420" stroke="#8a7550" stroke-opacity=".32" stroke-width="1.4"/>' +
-        '<path d="M162 310 L172 320 M176 318 L188 330 M190 330 L204 344" stroke="#8a7550" stroke-opacity=".3" stroke-width="1.2"/>' +
-        '<path d="M40 352 L40 420 M96 356 L96 420 M150 360 L150 420 M196 372 L196 420" stroke="#8a7550" stroke-opacity=".14" stroke-width="1"/>' +
-
-        /* 左岸水阁 */
-        '<g>' +
-          '<path d="M-12 270 C 2 250 16 234 32 228 L112 228 C 126 234 140 250 152 268 L144 280 C 130 262 118 252 110 250 L34 250 C 20 254 4 266 -4 280 Z" fill="#8a8478" stroke="#4f463a" stroke-width="1.2"/>' +
-          '<path d="M-4 280 C 4 266 20 254 34 250 L110 250 C 118 252 130 262 144 280" stroke="#4f463a" stroke-opacity=".55" stroke-width="2.4"/>' +
-          '<path d="M-12 270 C 2 250 16 234 32 228 L112 228 C 126 234 140 250 152 268" stroke="#b3ab9b" stroke-opacity=".5" stroke-width="1.2"/>' +
-          '<path d="M-12 270 Q-16 267 -15 262 M152 268 Q156 265 155 260" fill="none" stroke="#4f463a" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<path d="M30 226 L114 226" stroke="#4f463a" stroke-width="2.6"/>' +
-          '<path d="M30 226 Q20 226 16 222 M114 226 Q124 226 128 222" stroke="#4f463a" stroke-width="1.8" stroke-linecap="round"/>' +
-          '<g stroke="#5f574b" stroke-opacity=".45" stroke-width="1">' +
-            '<path d="M40 230 Q36 240 32 248"/><path d="M58 230 Q56 240 54 248"/><path d="M76 230 Q75 240 75 248"/>' +
-            '<path d="M94 230 Q95 240 97 248"/><path d="M108 230 Q111 239 114 246"/>' +
-          '</g>' +
-          '<path d="M4 250 L138 250 L138 330 L4 330 Z" fill="#f3e8d1" stroke="#6b5a45" stroke-opacity=".32" stroke-width="1.2"/>' +
-          '<path d="M4 250 L138 250 L138 258 L4 258 Z" fill="#4a3b2c" opacity=".12"/>' +
-          '<rect x="4" y="250" width="5" height="84" fill="#a9513b"/>' +
-          '<rect x="132" y="250" width="5" height="84" fill="#a9513b"/>' +
-          '<rect x="26" y="262" width="52" height="40" fill="#f9f2e2" stroke="#8a6544" stroke-width="1.4"/>' +
-          '<path d="M26 275 L78 275 M26 289 L78 289 M43 262 L43 302 M60 262 L60 302" stroke="#8a6544" stroke-opacity=".7" stroke-width="1"/>' +
-          '<rect x="96" y="252" width="26" height="64" fill="#b1543f" stroke="#7f3a2b" stroke-width="1.2"/>' +
-          '<path d="M96 252 L122 252" stroke="#7a5634" stroke-width="2"/>' +
-          '<path d="M100 256 L118 256" stroke="#e8c98c" stroke-opacity=".5" stroke-width=".8"/>' +
-          '<text x="109" y="294" font-family="Songti SC, STSong, SimSun, serif" font-size="17" font-weight="700" fill="#f7efdc" text-anchor="middle">酒</text>' +
-          '<path d="M-6 330 L146 330 L146 338 L-6 338 Z" fill="#8a5a34" stroke="#6b4a2a" stroke-width="1"/>' +
-          '<g stroke="#7a5634" stroke-width="1.6">' +
-            '<path d="M-4 320 L146 320 M-4 318 L-4 330 M20 318 L20 330 M44 318 L44 330 M68 318 L68 330 M92 318 L92 330 M116 318 L116 330 M146 318 L146 330"/>' +
-          '</g>' +
-          '<path d="M8 338 L134 338 L134 420 L8 420 Z" fill="#ecdfc6" stroke="#6b5a45" stroke-opacity=".28" stroke-width="1.2"/>' +
-          '<path d="M8 338 L134 338 L134 346 L8 346 Z" fill="#4a3b2c" opacity=".12"/>' +
-          '<rect x="18" y="350" width="40" height="34" fill="#4a3b2c" opacity=".55"/>' +
-          '<path d="M18 364 L58 364 M18 376 L58 376" stroke="#8a6544" stroke-opacity=".3" stroke-width="1"/>' +
-          '<path d="M12 342 L64 342 L60 354 L16 354 Z" fill="#e4d0a4" stroke="#8a6544" stroke-width="1"/>' +
-          '<path d="M20 343 L23 353 M29 343 L31 353 M38 343 L39 353 M47 343 L47 353 M56 343 L54 353" stroke="#b1543f" stroke-opacity=".45" stroke-width="2"/>' +
-          '<rect x="14" y="382" width="48" height="7" fill="#8a5a34" stroke="#6b4a2a" stroke-width="1"/>' +
-          '<path d="M14 382 L62 382" stroke="#b98a5a" stroke-width="1.3"/>' +
-          '<path d="M22 375 q-2 4 0 7 h7 q2 -3 0 -7 Z" fill="#cba86a" stroke="#8a6544" stroke-width=".8"/>' +
-          '<path d="M35 374 q-2 4 0 8 h8 q2 -4 0 -8 Z" fill="#d9b878" stroke="#8a6544" stroke-width=".8"/>' +
-          '<path d="M50 375 q-2 4 0 7 h6 q2 -3 0 -7 Z" fill="#cba86a" stroke="#8a6544" stroke-width=".8"/>' +
-          '<path d="M22 374 L29 374 M35 373 L43 373 M50 374 L56 374" stroke="#7a5634" stroke-opacity=".55" stroke-width="1"/>' +
-          '<rect x="70" y="356" width="30" height="64" fill="#6b5236" stroke="#7f3a2b" stroke-width="1.4"/>' +
-          '<path d="M85 356 L85 420" stroke="#4a3b2c" stroke-opacity=".4" stroke-width="1"/>' +
-          '<circle cx="92" cy="388" r="1.4" fill="#d8ae62"/>' +
-          '<rect x="106" y="352" width="24" height="32" fill="#f9f2e2" stroke="#8a6544" stroke-width="1.2"/>' +
-          '<path d="M106 368 L130 368 M118 352 L118 384" stroke="#8a6544" stroke-opacity=".65" stroke-width="1"/>' +
-          '<path d="M16 256 L16 262" stroke="#7a5634" stroke-width="1.2"/>' +
-          '<ellipse cx="16" cy="269" rx="5.4" ry="7" fill="#b1543f" stroke="#7f3a2b" stroke-width="1"/>' +
-          '<path d="M12 262 L20 262 M12 276 L20 276" stroke="#d8ae62" stroke-width="1.4"/>' +
-          '<path d="M16 276 L16 282 M13 282 L19 282" stroke="#d8ae62" stroke-width="1.2"/>' +
-          '<path d="M144 268 L144 274" stroke="#7a5634" stroke-width="1.2"/>' +
-          '<ellipse cx="144" cy="281" rx="5" ry="6.4" fill="#b1543f" stroke="#7f3a2b" stroke-width="1"/>' +
-          '<path d="M140 274 L148 274 M140 288 L148 288" stroke="#d8ae62" stroke-width="1.3"/>' +
-          '<path d="M144 288 L144 293" stroke="#d8ae62" stroke-width="1.1"/>' +
-        '</g>' +
-
-        /* 岸边垂柳 */
-        '<g>' +
-          '<ellipse cx="196" cy="350" rx="26" ry="6.5" fill="#8a7550" opacity=".13"/>' +
-          '<path d="M204 352 C 198 330 192 308 186 290 C 183 281 181 275 179 268" fill="none" stroke="#6b4a2a" stroke-opacity=".85" stroke-width="5.2" stroke-linecap="round"/>' +
-          '<path d="M182 286 C 168 278 156 274 146 276 M184 282 C 198 272 210 268 220 270 M188 292 C 178 288 168 288 160 292" fill="none" stroke="#6b4a2a" stroke-opacity=".65" stroke-width="2.2" stroke-linecap="round"/>' +
-          '<g fill="#6f8f5f" opacity=".42">' +
-            '<ellipse cx="152" cy="268" rx="10" ry="6"/><ellipse cx="164" cy="262" rx="11" ry="6.5"/>' +
-            '<ellipse cx="178" cy="258" rx="12" ry="7"/><ellipse cx="192" cy="258" rx="11" ry="6.5"/>' +
-            '<ellipse cx="206" cy="262" rx="10" ry="6"/><ellipse cx="218" cy="268" rx="7" ry="5"/>' +
-            '<ellipse cx="172" cy="272" rx="8" ry="5"/><ellipse cx="200" cy="272" rx="8" ry="5"/>' +
-          '</g>' +
-          '<g fill="none" stroke="#5f7f52" stroke-opacity=".5" stroke-width="1.5" stroke-linecap="round">' +
-            '<path d="M148 274 C 142 300 134 322 128 336"/>' +
-            '<path d="M156 266 C 152 298 150 326 150 348"/>' +
-            '<path d="M170 261 C 168 296 168 326 169 354"/>' +
-            '<path d="M184 259 C 185 298 186 328 186 352"/>' +
-            '<path d="M198 261 C 202 294 206 320 209 340"/>' +
-            '<path d="M212 266 C 220 288 226 302 231 312"/>' +
-          '</g>' +
-          '<g fill="#6f8f5f" opacity=".33">' +
-            '<ellipse cx="140" cy="298" rx="5" ry="17" transform="rotate(-9 140 298)"/>' +
-            '<ellipse cx="151" cy="310" rx="6" ry="21" transform="rotate(-3 151 310)"/>' +
-            '<ellipse cx="163" cy="314" rx="6.5" ry="24"/>' +
-            '<ellipse cx="176" cy="316" rx="7" ry="26"/>' +
-            '<ellipse cx="190" cy="312" rx="6.5" ry="23"/>' +
-            '<ellipse cx="203" cy="298" rx="5.5" ry="19" transform="rotate(5 203 298)"/>' +
-            '<ellipse cx="214" cy="284" rx="4.5" ry="14" transform="rotate(9 214 284)"/>' +
-          '</g>' +
-          '<g fill="#5f7f52" opacity=".2">' +
-            '<ellipse cx="170" cy="298" rx="3" ry="14"/><ellipse cx="186" cy="296" rx="3" ry="13"/>' +
-          '</g>' +
-        '</g>' +
-
-        /* 放鞭炮的孩童 */
-        '<g transform="translate(222 360) scale(.92)">' +
-          scenePerson(0, 0, '#bf5f45', 'straw') +
-        '</g>' +
-        '<path d="M226 346 L234 338" stroke="#bf5f45" stroke-width="2.6" stroke-linecap="round"/>' +
-        '<path d="M230 343 L252 298" stroke="#b98a45" stroke-width="1.9" stroke-linecap="round"/>' +
-        '<g class="scene-crackers" stroke-linecap="round">' +
-          '<path d="M252 300 L253 347" stroke="#7f3a2b" stroke-opacity=".5" stroke-width="1"/>' +
-          '<g stroke="#7f3a2b" stroke-width="1">' +
-            '<rect x="247" y="302" width="10" height="11" rx="1.8" fill="#bf5f45"/>' +
-            '<rect x="248" y="313" width="10" height="11" rx="1.8" fill="#a9513b"/>' +
-            '<rect x="247" y="324" width="10" height="11" rx="1.8" fill="#bf5f45"/>' +
-            '<rect x="248" y="335" width="10" height="11" rx="1.8" fill="#a9513b"/>' +
-          '</g>' +
-          '<path d="M253 346 L253 352 M249 352 L257 352" stroke="#b98a45" stroke-width="1.6"/>' +
-          '<path d="M258 338 l3 -3 M259 340 l5 0" stroke="#d8ae62" stroke-width="1.1"/>' +
-        '</g>' +
-
-        /* 右岸石埠 */
-        '<path d="M620 300 C 660 296 690 297 720 294 L720 420 L620 420 Z" fill="#dcc7a0" opacity=".78"/>' +
-        '<path d="M620 300 C 660 296 690 297 720 294" stroke="#8a7550" stroke-opacity=".32" stroke-width="1.4"/>' +
-        '<path d="M640 304 L640 420 M676 302 L676 420" stroke="#8a7550" stroke-opacity=".14" stroke-width="1"/>' +
-
-        /* 右岸茶铺 */
-        '<g>' +
-          '<path d="M622 288 L720 276 L720 420 L622 420 Z" fill="#f3e8d1" stroke="#6b5a45" stroke-opacity=".3" stroke-width="1.2"/>' +
-          '<path d="M612 294 C 640 272 666 252 694 240 L720 234 L720 254 L696 260 C 668 272 642 294 620 312 Z" fill="#8a8478" stroke="#4f463a" stroke-width="1.2"/>' +
-          '<path d="M620 312 C 642 294 668 272 696 260 L720 254" stroke="#4f463a" stroke-opacity=".55" stroke-width="2.4"/>' +
-          '<path d="M612 294 C 640 272 666 252 694 240 L720 234" stroke="#b3ab9b" stroke-opacity=".5" stroke-width="1.2"/>' +
-          '<path d="M612 294 Q606 291 604 285" stroke="#4f463a" stroke-width="1.6" stroke-linecap="round"/>' +
-          '<path d="M694 240 L720 234" stroke="#4f463a" stroke-width="2.4"/>' +
-          '<g stroke="#5f574b" stroke-opacity=".4" stroke-width="1">' +
-            '<path d="M640 272 Q634 282 628 292"/><path d="M664 261 Q658 272 652 282"/>' +
-            '<path d="M688 251 Q684 260 678 270"/><path d="M710 244 Q708 251 704 260"/>' +
-          '</g>' +
-          '<path d="M622 288 L720 276 L720 286 L622 298 Z" fill="#4a3b2c" opacity=".1"/>' +
-          '<rect x="628" y="290" width="5" height="130" fill="#a9513b"/>' +
-          '<rect x="702" y="278" width="5" height="142" fill="#a9513b"/>' +
-          '<rect x="636" y="302" width="40" height="28" fill="#f9f2e2" stroke="#8a6544" stroke-width="1.3"/>' +
-          '<path d="M636 316 L676 316 M656 302 L656 330" stroke="#8a6544" stroke-opacity=".65" stroke-width="1"/>' +
-          '<rect x="630" y="350" width="36" height="32" fill="#4a3b2c" opacity=".55"/>' +
-          '<path d="M630 364 L666 364 M630 376 L666 376" stroke="#8a6544" stroke-opacity=".3" stroke-width="1"/>' +
-          '<path d="M626 342 L672 340 L668 352 L630 354 Z" fill="#e4d0a4" stroke="#8a6544" stroke-width="1"/>' +
-          '<path d="M634 343 L636 353 M644 343 L645 353 M654 342 L654 352 M664 342 L662 352" stroke="#b1543f" stroke-opacity=".45" stroke-width="2"/>' +
-          '<rect x="628" y="382" width="40" height="7" fill="#8a5a34" stroke="#6b4a2a" stroke-width="1"/>' +
-          '<path d="M628 382 L668 382" stroke="#b98a5a" stroke-width="1.3"/>' +
-          '<path d="M638 374 q-2 4 0 8 h7 q2 -4 0 -8 Z" fill="#cba86a" stroke="#8a6544" stroke-width=".8"/>' +
-          '<ellipse cx="655" cy="377.4" rx="7" ry="4.6" fill="#c46a4a" stroke="#8a3f2c" stroke-width=".8"/>' +
-          '<path d="M648 374 Q655 371 662 374" fill="none" stroke="#8a3f2c" stroke-width=".9"/>' +
-          '<path d="M662 376 Q667 376 667 379" fill="none" stroke="#c46a4a" stroke-width="1.3"/>' +
-          '<path d="M655 371 L655 368" stroke="#8a3f2c" stroke-width="1"/>' +
-          '<path d="M649 366 Q652 362 649 358 M659 367 Q662 363 659 358" fill="none" stroke="#f7f1e2" stroke-opacity=".65" stroke-width="1.1"/>' +
-          '<rect x="690" y="346" width="26" height="74" fill="#6b5236" stroke="#7f3a2b" stroke-width="1.3"/>' +
-          '<path d="M703 346 L703 420" stroke="#4a3b2c" stroke-opacity=".4" stroke-width="1"/>' +
-          '<circle cx="711" cy="384" r="1.4" fill="#d8ae62"/>' +
-          '<path d="M640 292 L640 298" stroke="#7a5634" stroke-width="1.2"/>' +
-          '<ellipse cx="640" cy="305" rx="5" ry="6.4" fill="#b1543f" stroke="#7f3a2b" stroke-width="1"/>' +
-          '<path d="M636 299 L644 299 M636 311 L644 311" stroke="#d8ae62" stroke-width="1.3"/>' +
-          '<path d="M640 311 L640 316" stroke="#d8ae62" stroke-width="1.1"/>' +
-          '<path d="M690 290 L690 298" stroke="#7a5634" stroke-width="1.2"/>' +
-          '<path d="M688 290 L716 290 L716 296 L688 296 Z" fill="#7a5634"/>' +
-          '<rect x="692" y="296" width="20" height="62" fill="#b1543f" stroke="#7f3a2b" stroke-width="1.2"/>' +
-          '<path d="M696 300 L708 300" stroke="#e8c98c" stroke-opacity=".5" stroke-width=".8"/>' +
-          '<text x="702" y="332" font-family="Songti SC, STSong, SimSun, serif" font-size="15" font-weight="700" fill="#f7efdc" text-anchor="middle">茶</text>' +
-          '<path d="M676 392 L690 390 L690 398 L676 400 Z" fill="#b98a5a" stroke="#7a5634" stroke-width="1"/>' +
-          '<ellipse cx="683" cy="390" rx="4" ry="2.4" fill="#d9b878" stroke="#8a6544" stroke-width=".8"/>' +
-        '</g>' +
-
-        /* 右岸木栈台 */
-        '<g>' +
-          '<path d="M508 342 L624 336 L624 354 L508 360 Z" fill="#b98a5a" stroke="#7a5634" stroke-width="1.2"/>' +
-          '<path d="M530 341 L530 358 M556 340 L556 357 M582 339 L582 356 M608 338 L608 355" stroke="#8a6544" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M514 358 L514 404 M548 356 L548 402 M586 355 L586 401 M618 354 L618 400" stroke="#7a5634" stroke-width="2.4" stroke-linecap="round"/>' +
-          '<path d="M514 404 q6 3 12 0 M548 402 q6 3 12 0 M586 401 q6 3 12 0 M618 400 q6 3 12 0" stroke="#5f8b86" stroke-opacity=".4" stroke-width="1.2"/>' +
-        '</g>' +
-        '<g>' +
-          '<path d="M522 316 Q566 272 610 316 Q602 310 594 316 Q586 308 578 316 Q570 308 562 316 Q554 308 546 316 Q538 308 522 316 Z" fill="#bf5a42" stroke="#7f3a2b" stroke-width="1.4"/>' +
-          '<path d="M566 294 L534 313 M566 294 L546 314 M566 294 L566 314 M566 294 L586 314 M566 294 L598 313" stroke="#a04a35" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M566 316 L566 344" stroke="#7a5634" stroke-width="2.2"/>' +
-          '<circle cx="566" cy="292" r="2.2" fill="#d8ae62"/>' +
-          scenePerson(570, 344, '#6d8ba0', 'cap') +
-          '<ellipse cx="534" cy="343" rx="9" ry="4.4" fill="#c9a05a" stroke="#8a6544" stroke-width="1"/>' +
-          '<ellipse cx="534" cy="339.6" rx="9" ry="3.6" fill="#d9b878" stroke="#8a6544" stroke-width="1"/>' +
-          '<path d="M528 338 L540 338 M529 342 L539 342" stroke="#9a6a3e" stroke-opacity=".7" stroke-width="1"/>' +
-          '<ellipse cx="548" cy="349" rx="8" ry="4" fill="#c9a05a" stroke="#8a6544" stroke-width="1"/>' +
-          '<rect x="600" y="336" width="20" height="15" fill="#b98a5a" stroke="#7a5634" stroke-width="1"/>' +
-          '<path d="M600 341 L620 341 M600 346 L620 346" stroke="#8a6544" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M604 336 Q612 329 620 336 Z" fill="#b1543f" stroke="#7f3a2b" stroke-width=".9"/>' +
-        '</g>' +
-
-        /* 乌篷船 */
-        '<g class="scene-boat-a">' +
-          '<path d="M278 388 Q334 412 420 384 L428 390 Q356 420 270 394 Z" fill="#8a5a34" stroke="#4a3b2c" stroke-opacity=".6" stroke-width="1.4"/>' +
-          '<path d="M283 391 Q336 406 417 387" stroke="#5c3d22" stroke-opacity=".38" stroke-width="1.5"/>' +
-          '<path d="M274 397 Q336 416 424 391" stroke="#4a3b2c" stroke-opacity=".25" stroke-width="1.4"/>' +
-          '<path d="M310 388 Q310 356 340 352 L370 352 Q400 356 400 388 Z" fill="#6f8f72" stroke="#4a5f4e" stroke-width="1.2"/>' +
-          '<path d="M318 388 Q320 362 340 357 M332 388 Q333 360 350 355 M348 388 Q350 360 366 355 M380 388 Q382 362 392 358" stroke="#5a7a5c" stroke-opacity=".5" stroke-width="1"/>' +
-          '<path d="M302 387 L412 387" stroke="#5c3d22" stroke-opacity=".45" stroke-width="1.2"/>' +
-          '<path d="M288 382 Q288 370 292 366" stroke="#7a5634" stroke-width="1.6"/>' +
-          '<ellipse cx="291" cy="369" rx="4.6" ry="5.6" fill="#b1543f" stroke="#7f3a2b" stroke-width=".9"/>' +
-          '<path d="M291 375 L291 379" stroke="#d8ae62" stroke-width="1.2"/>' +
-          scenePerson(422, 384, '#8a6f5f', 'straw') +
-          '<path d="M426 382 L448 410" stroke="#6b5a45" stroke-opacity=".75" stroke-width="1.8" stroke-linecap="round"/>' +
-        '</g>' +
-
-        /* 小舟 */
-        '<g class="scene-boat-b">' +
-          '<path d="M452 396 Q496 414 538 392 L544 397 Q500 420 444 401 Z" fill="#9a6a3e" stroke="#4a3b2c" stroke-opacity=".6" stroke-width="1.3"/>' +
-          '<path d="M457 399 Q498 413 534 394" stroke="#6b4a2a" stroke-opacity=".35" stroke-width="1.4"/>' +
-          '<path d="M462 396 L536 393" stroke="#6b4a2a" stroke-opacity=".4" stroke-width="1"/>' +
-          '<path d="M474 394 L486 388 L498 392 L486 397 Z" fill="#c9a05a" stroke="#7a5634" stroke-width="1"/>' +
-          scenePerson(536, 389, '#8a6f5f', 'straw') +
-          '<path d="M540 386 L518 414" stroke="#6b5a45" stroke-opacity=".75" stroke-width="1.7" stroke-linecap="round"/>' +
-        '</g>' +
-
+      /* 钱串 */
+      '<svg class="lnd-prop lnd-prop--coin" viewBox="0 0 140 210" aria-hidden="true">' +
+      '<defs><radialGradient id="lndPropCoin" cx="36%" cy="30%" r="76%"><stop offset="0" stop-color="#f0d79a"/><stop offset=".55" stop-color="#d8ae62"/><stop offset="1" stop-color="#9a6a2e"/></radialGradient></defs>' +
+      '<path d="M70 8 V186" stroke="#a9513b" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>' +
+      '<g transform="rotate(-8 70 74)"><circle cx="70" cy="74" r="30" fill="url(#lndPropCoin)" stroke="#8a5f2a" stroke-width="2.4"/><circle cx="70" cy="74" r="23" fill="none" stroke="#f4dda6" stroke-width="1.6" opacity=".7"/><rect x="60" y="64" width="20" height="20" rx="2.5" fill="#8a5f2a"/><circle cx="56" cy="56" r="4" fill="#fff" opacity=".4"/></g>' +
+      '<g transform="rotate(7 70 126)"><circle cx="70" cy="126" r="26" fill="url(#lndPropCoin)" stroke="#8a5f2a" stroke-width="2.2"/><rect x="61" y="117" width="18" height="18" rx="2" fill="#8a5f2a"/><circle cx="58" cy="112" r="3.4" fill="#fff" opacity=".36"/></g>' +
+      '<g transform="rotate(-5 70 170)"><circle cx="70" cy="170" r="21" fill="url(#lndPropCoin)" stroke="#8a5f2a" stroke-width="2"/><rect x="63" y="163" width="14" height="14" rx="2" fill="#8a5f2a"/></g>' +
+      '<path d="M70 190 V198" stroke="#a9513b" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M70 197 C64 203 58 207 52 208 M70 197 C76 203 82 207 88 208" stroke="#a9513b" stroke-width="2" stroke-linecap="round"/>' +
       '</svg>' +
+
+      /* 纸鸢 */
+      '<svg class="lnd-prop lnd-prop--kite" viewBox="0 0 120 170" aria-hidden="true">' +
+      '<path d="M60 14 L98 54 L60 94 L22 54 Z" fill="#bf5f45" stroke="#6f2b1f" stroke-width="1.6"/>' +
+      '<path d="M60 14 V94 M22 54 H98" stroke="#f3e6cd" stroke-opacity=".6" stroke-width="1.4"/>' +
+      '<path d="M60 94 C56 116 66 128 60 150" stroke="#8a6544" stroke-width="1.3"/>' +
+      '<path d="M57 108 L48 104 M63 122 L72 118" stroke="#b03f2c" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<path d="M60 150 C58 158 61 164 60 168" stroke="#8a6544" stroke-width="1" opacity=".6"/>' +
+      '</svg>' +
+
+      /* 灯笼 */
+      '<svg class="lnd-prop lnd-prop--lantern" viewBox="0 0 120 150" aria-hidden="true">' +
+      '<path d="M60 0 V44" stroke="#6b5a45" stroke-width="1.6" opacity=".55"/>' +
+      lndLantern(60, 76, 2.2) +
+      '</svg>' +
+
+      /* 茶壶 */
+      '<svg class="lnd-prop lnd-prop--tea" viewBox="0 0 190 170" aria-hidden="true">' +
+      '<ellipse cx="95" cy="150" rx="64" ry="8" fill="#8a6544" opacity=".12"/>' +
+      '<ellipse cx="95" cy="142" rx="54" ry="12" fill="#f6ebd6" stroke="#b98a45" stroke-width="1.4"/>' +
+      lndTeaPot(88, 120, 2.05) +
+      '<g class="lnd-steam" stroke="#b9a88c" stroke-linecap="round">' +
+      '<path d="M74 96 Q68 84 74 72" stroke-width="2.2" opacity=".55"/>' +
+      '<path d="M88 92 Q94 78 88 64" stroke-width="2" opacity=".4"/>' +
+      '</g>' +
+      '<ellipse cx="146" cy="136" rx="10" ry="3.4" fill="#e6f1ec" stroke="#4f6f64" stroke-width="1"/>' +
+      '<ellipse cx="160" cy="140" rx="8" ry="3" fill="#e6f1ec" stroke="#4f6f64" stroke-width="1"/>' +
+      '</svg>' +
+
+      '<svg class="lnd-spark lnd-spark--1" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 14.4 9.6 22.5 12 14.4 14.4 12 22.5 9.6 14.4 1.5 12 9.6 9.6Z" fill="#d8ae62" stroke="#8a5f2a" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+      '<svg class="lnd-spark lnd-spark--2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 14.4 9.6 22.5 12 14.4 14.4 12 22.5 9.6 14.4 1.5 12 9.6 9.6Z" fill="#f3e6cd" stroke="#b98a45" stroke-width="1.4" stroke-linejoin="round"/></svg>' +
+      '<svg class="lnd-spark lnd-spark--3" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="#b03f2c" opacity=".7"/></svg>' +
+      '<svg class="lnd-spark lnd-spark--4" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="#d8ae62" opacity=".75"/></svg>';
+  }
+
+  function landingShoresHTML() {
+    return '' +
+      /* 近岸：左芦苇坡 */
+      '<svg class="lnd-shore lnd-shore--l" viewBox="0 0 300 150" preserveAspectRatio="xMinYMax meet" aria-hidden="true">' +
+      '<path d="M-8 150 V88 H58 C 96 92 130 110 166 128 C 196 143 232 149 268 150 Z" fill="#7f9375" opacity=".2"/>' +
+      '<path d="M-8 88 H58 C 96 92 130 110 166 128 C 196 143 232 149 268 150" stroke="#6f8266" stroke-opacity=".3" stroke-width="1.6" fill="none"/>' +
+      '<g stroke="#5f7a58" stroke-linecap="round" fill="none" opacity=".4">' +
+      '<path d="M14 88 C 9 64 16 46 24 30" stroke-width="2.4"/>' +
+      '<path d="M30 88 C 31 62 39 45 50 31" stroke-width="2.2"/>' +
+      '<path d="M45 88 C 50 68 59 55 72 45" stroke-width="2"/>' +
+      '<path d="M56 88 C 66 74 80 66 96 61" stroke-width="1.7"/>' +
+      '</g>' +
+      '<g fill="#5f7a58" opacity=".34">' +
+      '<ellipse cx="24" cy="26" rx="2.6" ry="7" transform="rotate(-12 24 26)"/>' +
+      '<ellipse cx="51" cy="27" rx="2.4" ry="6.4" transform="rotate(8 51 27)"/>' +
+      '<ellipse cx="74" cy="42" rx="2.2" ry="5.6" transform="rotate(22 74 42)"/>' +
+      '<ellipse cx="98" cy="59" rx="2" ry="5" transform="rotate(34 98 59)"/>' +
+      '</g>' +
+      '<path d="M86 132 q14 -8 28 -1 q-12 9 -28 1 Z" fill="#6f8266" opacity=".3"/>' +
+      '<g fill="#6f8f5f" opacity=".36">' +
+      '<ellipse cx="132" cy="138" rx="19" ry="5.6"/>' +
+      '<ellipse cx="164" cy="146" rx="13" ry="4"/>' +
+      '<ellipse cx="196" cy="149" rx="9" ry="3"/>' +
+      '</g>' +
+      '</svg>' +
+      /* 近岸：右石阶与酒坛货箱 */
+      '<svg class="lnd-shore lnd-shore--r" viewBox="0 0 300 150" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">' +
+      '<path d="M308 150 V88 H236 C 200 92 168 110 132 128 C 102 143 66 149 30 150 Z" fill="#7f9375" opacity=".2"/>' +
+      '<path d="M308 88 H236 C 200 92 168 110 132 128 C 102 143 66 149 30 150" stroke="#6f8266" stroke-opacity=".3" stroke-width="1.6" fill="none"/>' +
+      '<g opacity=".34">' +
+      '<rect x="230" y="72" width="34" height="17" rx="2" fill="#8a6a44" stroke="#6b4f31" stroke-width="1.2"/>' +
+      '<path d="M231 76 H263 M231 85 H263 M241 73 V88 M254 73 V88" stroke="#6b4f31" stroke-width="1" opacity=".7"/>' +
+      '</g>' +
+      '<g transform="translate(276 88) scale(.95)" opacity=".42">' +
+      '<ellipse cx="0" cy="4" rx="13" ry="4" fill="#5a4630" opacity=".2"/>' +
+      '<path d="M-10 -10 C-14 -2 -15 2 0 6 C15 2 14 -2 10 -10 Z" fill="#8a5a34" stroke="#5a3a20" stroke-width="1.1"/>' +
+      '<path d="M-10 -10 H10" stroke="#5a3a20" stroke-width="1.6"/>' +
+      '<path d="M-6 -15 H6 L8 -10 H-8 Z" fill="#c2604a" stroke="#7a3124" stroke-width="1"/>' +
+      '</g>' +
+      '<g stroke="#5f7a58" stroke-linecap="round" fill="none" opacity=".4">' +
+      '<path d="M292 88 C 296 64 289 46 281 32" stroke-width="2.4"/>' +
+      '<path d="M276 88 C 275 62 267 46 256 33" stroke-width="2.2"/>' +
+      '<path d="M262 88 C 257 68 248 56 236 47" stroke-width="1.9"/>' +
+      '</g>' +
+      '<g fill="#5f7a58" opacity=".34">' +
+      '<ellipse cx="281" cy="28" rx="2.6" ry="7" transform="rotate(12 281 28)"/>' +
+      '<ellipse cx="255" cy="29" rx="2.4" ry="6.4" transform="rotate(-8 255 29)"/>' +
+      '<ellipse cx="234" cy="44" rx="2.2" ry="5.6" transform="rotate(-22 234 44)"/>' +
+      '</g>' +
+      '<g fill="#6f8f5f" opacity=".36">' +
+      '<ellipse cx="176" cy="138" rx="17" ry="5.2"/>' +
+      '<ellipse cx="146" cy="147" rx="11" ry="3.6"/>' +
+      '</g>' +
+      '</svg>';
+  }
+
+  function lndDeedIcon(kind) {
+    if (kind === 'land') {
+      return '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">' +
+        '<path d="M9 51 H55" stroke="#6d5d49" stroke-width="1.8" stroke-linecap="round" opacity=".5"/>' +
+        '<path d="M14 51 V37 M50 51 V37" stroke="#8a6544" stroke-width="2" stroke-linecap="round"/>' +
+        '<path d="M14 39 C24 44 40 44 50 39" stroke="#b98a45" stroke-width="1.4" stroke-dasharray="3 3"/>' +
+        '<path d="M27 51 V37 L32 32 L37 37 V51 Z" fill="#f6ebd6" stroke="#8a6544" stroke-width="1.8" stroke-linejoin="round"/>' +
+        '<path d="M30 41 H34" stroke="#a9513b" stroke-width="2" stroke-linecap="round"/>' +
+        '<path d="M21 51 q2 -6 0 -10 M43 51 q-2 -6 0 -10" stroke="#5d7d58" stroke-width="1.4" stroke-linecap="round"/>' +
+        '</svg>';
+    }
+    if (kind === 'shop') {
+      return '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">' +
+        '<path d="M11 52 H53" stroke="#6d5d49" stroke-width="1.8" stroke-linecap="round" opacity=".5"/>' +
+        '<path d="M17 52 V29 H47 V52" stroke="#6d5d49" stroke-width="1.8"/>' +
+        '<path d="M13 29 Q22 17 32 15 Q42 17 51 29" fill="#f6ebd6" stroke="#8a6544" stroke-width="1.8" stroke-linejoin="round"/>' +
+        '<path d="M13 29 Q9 30 7 26 M51 29 Q55 30 57 26" stroke="#8a6544" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M25 52 V41 H39 V52" fill="#f3e6cd" stroke="#8a6544" stroke-width="1.6"/>' +
+        '<path d="M28 44 H36" stroke="#b03f2c" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<path d="M20 35 H23 M41 35 H44" stroke="#5e8388" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M48 26 V20" stroke="#7a5634" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<path d="M48 20 H58 V30 H48 Z" fill="#b03f2c" stroke="#6f2b1f" stroke-width="1"/>' +
+        '</svg>';
+    }
+    return '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">' +
+      '<circle cx="23" cy="20" r="6" fill="#f6ebd6" stroke="#6d5d49" stroke-width="1.8"/>' +
+      '<path d="M17.5 17.5 H28.5" stroke="#4a3a28" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M13 48 Q13 32 23 32 Q33 32 33 48" fill="#f3e6cd" stroke="#6d5d49" stroke-width="1.8" stroke-linejoin="round"/>' +
+      '<path d="M23 38 V44" stroke="#a9513b" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<path d="M42 50 H59" stroke="#6d5d49" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>' +
+      '<path d="M45 42 H55 V45.5 Q55 49.5 50 49.5 Q45 49.5 45 45.5 Z" fill="#e6f1ec" stroke="#4f6f64" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '<path d="M55.4 43 Q58.8 44 55.4 47" stroke="#4f6f64" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<path d="M50 39 q-2.2 -3 0 -6 q2.2 -3 0 -6" stroke="#b9a88c" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>' +
+      '</svg>';
+  }
+
+  function lndDeedHTML(stamp, icon, title, note) {
+    return '<div class="lnd-deed" role="listitem">' +
+      '<span class="lnd-deed-icon" aria-hidden="true">' + lndDeedIcon(icon) + '</span>' +
+      '<span class="lnd-deed-body"><b><i class="lnd-deed-stamp">' + stamp + '</i>' + title + '</b>' +
+      '<small>' + note + '</small></span>' +
       '</div>';
   }
 
   function renderLanding() {
+    var saved = savedGame();
     landingEl.innerHTML = '' +
       '<div class="landing">' +
-        '<div class="landing-head">' +
-          '<div class="landing-seal" aria-hidden="true">汴</div>' +
-          '<p class="landing-eyebrow">汴京 · 虹桥商街</p>' +
-          '<h1 class="landing-title">大宋百商图</h1>' +
-          '<p class="landing-sub">清地置业，买菜待客，<br>把一条冷清街巷经营成你的钱袋子。</p>' +
-          '<div class="landing-tags"><span>1~4 人</span><span>同屏轮流</span><span>约 45 分钟</span></div>' +
-        '</div>' +
-        landingHeroHTML() +
-        '<div class="landing-btns">' +
-          '<button type="button" class="btn btn-primary btn-lg" data-action="landing-start">开始游戏</button>' +
-          '<button type="button" class="btn btn-ghost" data-action="rules">查看规则</button>' +
-        '</div>' +
-        '<p class="landing-credit">@imStar100</p>' +
+      '<div class="lnd-paper" aria-hidden="true"></div>' +
+      '<div class="lnd-horizon" aria-hidden="true">' + landingHorizonHTML() + landingHorizonTallHTML() + '</div>' +
+      '<div class="lnd-props" aria-hidden="true">' + landingPropsHTML() + landingShoresHTML() + '</div>' +
+      '<header class="lnd-top">' +
+      '<div class="lnd-brand">' +
+      '<span class="lnd-seal" aria-hidden="true">汴</span>' +
+      '<span class="lnd-brand-text"><b>大宋百商图</b><small>汴京商街 · 模拟经营</small></span>' +
+      '</div>' +
+      '<div class="lnd-top-right">' +
+      '<span class="lnd-top-meta">1~4 人 · 同屏热座</span>' +
+      '<button type="button" class="lnd-rules-btn" data-action="rules">' +
+      '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 5.6A2.6 2.6 0 0 1 7.1 3H11v15.5H7.1a2.6 2.6 0 0 0-2.6 2.6V5.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M19.5 5.6A2.6 2.6 0 0 0 16.9 3H13v15.5h3.9a2.6 2.6 0 0 1 2.6 2.6V5.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+      '<span>玩法</span>' +
+      '</button>' +
+      '</div>' +
+      '</header>' +
+      '<main class="lnd-main">' +
+      '<div class="lnd-content">' +
+      '<section class="lnd-copy">' +
+      '<p class="lnd-eyebrow">汴京 · 虹桥商街</p>' +
+      '<div class="lnd-title-wrap">' +
+      '<h1 class="lnd-title">大宋百商图</h1>' +
+      '<aside class="lnd-colophon" aria-hidden="true">' +
+      '<span class="lnd-colophon-text">汴京风华</span>' +
+      '<span class="lnd-colophon-text">百肆争流</span>' +
+      '<span class="lnd-colophon-seal">商</span>' +
+      '</aside>' +
+      '</div>' +
+      '<p class="lnd-tagline">清地置业，买菜待客，<br><em>把一条冷清街巷，经营成你的钱袋子。</em></p>' +
+      '<div class="lnd-tags">' +
+      '<span><b>1~4</b> 人</span><span>同屏轮流</span><span>约 <b>45</b> 分钟</span><span>无需注册</span>' +
+      '</div>' +
+      '</section>' +
+      '<div class="lnd-actions">' +
+      '<button type="button" class="lnd-cta" data-action="landing-start">' +
+      '<span class="lnd-cta-seal" aria-hidden="true">商</span>' +
+      '<span class="lnd-cta-text"><b>' + (saved ? '继续经营' : '开始经营') + '</b></span>' +
+      '<span class="lnd-cta-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+      '</button>' +
+      (saved ? '<button type="button" class="lnd-newgame" data-action="landing-new">新开一局</button>' : '') +
+      '<div class="lnd-flow" aria-label="一局三步：清地、置业、待客">' +
+      '<span class="lnd-flow-label" aria-hidden="true">一局三步 · 白手起家</span>' +
+      '<div class="lnd-deeds" role="list">' +
+      lndDeedHTML('壹', 'land', '清地', '清出荒地 · 立下标界') +
+      lndDeedHTML('贰', 'shop', '置业', '认购店铺 · 挂上招牌') +
+      lndDeedHTML('叁', 'guest', '待客', '备好菜式 · 迎来送往') +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</main>' +
+      '<footer class="lnd-foot"><span class="lnd-foot-line" aria-hidden="true"></span><span>@imStar100</span><span class="lnd-foot-line" aria-hidden="true"></span></footer>' +
       '</div>';
     landingEl.hidden = false;
     setupEl.hidden = true;
@@ -690,6 +734,8 @@
   }
 
   /* ------------------------------ 设置页 ------------------------------ */
+
+/* ------------------------------ 设置页 ------------------------------ */
 
   function renderSetup() {
     var c = UI.config;
@@ -723,24 +769,20 @@
           '</div>' +
         '</section>' +
 
-        '<section class="setup-block">' +
-          '<div class="block-head"><h2>起始资源</h2><span>后位玩家多 1 铜钱</span></div>' +
+        setBlock('resources', '起始资源', '后位玩家多 1 铜钱',
           '<div class="stepper-grid">' +
             stepper('startingCash', '起始铜钱', c.startingCash, 0, 20) +
             stepper('startingLowMenus', '初始四品菜', c.startingLowMenus, 0, 8) +
             stepper('startingMidMenus', '初始三品菜', c.startingMidMenus, 0, 8) +
           '</div>' +
-          '<p class="tiny">默认每人 6 张四品菜、2 张三品菜，洗混后放入雅阁。</p>' +
-        '</section>' +
+          '<p class="tiny">默认每人 6 张四品菜、2 张三品菜，洗混后放入雅阁。</p>') +
 
-        '<section class="setup-block">' +
-          '<div class="block-head"><h2>胜利条件</h2><span>同时满足</span></div>' +
+        setBlock('victory', '胜利条件', '同时满足',
           '<div class="stepper-grid two">' +
             stepper('victoryCash', '铜钱数', c.victoryCash, 0, 200) +
             stepper('victoryShops', '房屋数', c.victoryShops, 0, 8) +
           '</div>' +
-          '<p class="tiny">任意一项为 0 则不计入；两项都为 0 时按 8 间店铺计算。</p>' +
-        '</section>' +
+          '<p class="tiny">任意一项为 0 则不计入；两项都为 0 时按 8 间店铺计算。</p>') +
 
         '<div class="setup-actions">' +
           '<button type="button" class="btn btn-primary btn-lg" data-action="start">开张营业</button>' +
@@ -760,6 +802,27 @@
     gameEl.hidden = true;
     landingEl.hidden = true;
     document.body.classList.remove('is-landing');
+  }
+
+  function setBlock(key, title, note, body) {
+    var open = !!UI.openBlocks[key];
+    return '<section class="setup-block setup-fold' + (open ? ' is-open' : '') + '">' +
+      '<div class="block-head">' +
+        '<h2>' + title + '</h2>' +
+        '<span class="block-note">' + note + '</span>' +
+        '<span class="block-summary">' + BLOCK_SUMMARY[key](UI.config) + '</span>' +
+        '<button type="button" class="block-edit" data-action="toggle-block" data-block="' + key + '"' +
+          ' aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="block-' + key + '"' +
+          ' aria-label="' + (open ? '收起' : '编辑') + title + '">' +
+          '<svg class="block-edit-icon block-edit-icon--edit" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+          '<path d="M4.5 19.5h4L19 9a2.1 2.1 0 0 0-3-3L5.5 16.5v3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>' +
+          '<path d="M14.6 7.4l2.9 2.9" stroke="currentColor" stroke-width="1.7"/></svg>' +
+          '<svg class="block-edit-icon block-edit-icon--done" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+          '<path d="M6 14.6l6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="block-body" id="block-' + key + '">' + body + '</div>' +
+      '</section>';
   }
 
   function stepper(field, label, value, min, max) {
@@ -786,7 +849,7 @@
 
     var html = '' +
       '<header class="topbar">' +
-        '<a class="back-btn" href="../index.html" aria-label="返回合集">‹</a>' +
+        '<button type="button" class="back-btn" data-action="game-home" aria-label="返回首页">‹</button>' +
         '<div class="top-title">' +
           '<h1>大宋百商图</h1>' +
           '<p>第 <b>' + game.round + '</b> 轮 · <b>' + esc(p.name) + '</b> 的回合</p>' +
@@ -1257,7 +1320,7 @@
       }).join('') + '</div>';
     openModal('result', '结算', body,
       '<button type="button" class="btn btn-primary" data-action="play-again">再来一局</button>' +
-      '<a class="btn btn-ghost" href="../index.html">返回合集</a>', { dismissible: false });
+      '<button type="button" class="btn btn-ghost" data-action="game-home">返回首页</button>', { dismissible: false });
     UI.resultShown = true;
   }
 
@@ -1411,12 +1474,23 @@
     var game = DSM.state;
     switch (action) {
       case 'landing-start':
+        if (resumeGame()) break;
+        UI.screen = 'setup';
+        renderSetup();
+        break;
+      case 'landing-new':
         UI.screen = 'setup';
         renderSetup();
         break;
       case 'landing-back':
         UI.screen = 'landing';
         renderLanding();
+        break;
+      case 'game-home':
+        UI.screen = 'landing';
+        if (UI.modal) closeModal();
+        render();
+        window.scrollTo(0, 0);
         break;
       case 'player-count':
         UI.config.playerCount = Number(el.dataset.count);
@@ -1433,6 +1507,17 @@
         input.value = value;
         UI.config[field] = value;
         saveConfig();
+        break;
+      }
+      case 'toggle-block': {
+        var blockKey = el.dataset.block;
+        var block = el.closest('.setup-block');
+        var open = !block.classList.contains('is-open');
+        UI.openBlocks[blockKey] = open;
+        block.classList.toggle('is-open', open);
+        el.setAttribute('aria-expanded', open ? 'true' : 'false');
+        el.setAttribute('aria-label', (open ? '收起' : '编辑') + block.querySelector('h2').textContent);
+        block.querySelector('.block-summary').textContent = BLOCK_SUMMARY[blockKey](UI.config);
         break;
       }
       case 'start':
@@ -1606,7 +1691,7 @@
   function render() {
     if (UI.screen === 'landing') { renderLanding(); return; }
     if (UI.screen === 'setup' || !DSM.state) renderSetup();
-    else renderGame();
+    else { renderGame(); saveGame(); }
   }
 
   render();
