@@ -637,25 +637,30 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
   let sheet = g.document.getElementById('sheetContent').innerHTML;
   includes(sheet, 'mission-tabs', '抽屉应有关卡区间 tab');
   includes(sheet, 'data-testid="mission-tab-4"');
-  includes(sheet, 'data-testid="mission-tab-10"');
+  includes(sheet, 'data-testid="mission-tab-9"');
   includes(sheet, 'data-testid="mission-tab-20"');
-  includes(sheet, '>4~9<');
-  includes(sheet, '>10~19<');
+  includes(sheet, '>4~8<');
+  includes(sheet, '>9~19<');
   includes(sheet, '>20~30<');
   includes(sheet, 'data-testid="mission-item-2"', '抽屉应包含关卡列表项');
-  includes(sheet, 'data-mission-id="1"', '默认展示当前关卡所在区间 #4~#9');
-  includes(sheet, 'data-mission-id="6"');
-  assert(!sheet.includes('data-mission-id="7"'), '默认不展示其他区间的关卡');
+  includes(sheet, 'data-mission-id="1"', '默认展示当前关卡所在区间 #4~#8');
+  includes(sheet, 'data-mission-id="5"');
+  assert(!sheet.includes('data-mission-id="6"'), '默认不展示其他区间的关卡');
   includes(sheet, 'mi-tag current', '当前关卡应有标记');
   includes(sheet, '>#5<');
   includes(sheet, '实地练习第二天');
+  includes(sheet, '>#8<');
+  includes(sheet, '最终测试');
 
   g.showMissionTab(1);
   sheet = g.document.getElementById('sheetContent').innerHTML;
-  for (const id of [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
-    includes(sheet, `data-mission-id="${id}"`, `#10~#19 区间应包含 mission-id ${id}`);
+  for (const id of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
+    includes(sheet, `data-mission-id="${id}"`, `#9~#19 区间应包含 mission-id ${id}`);
   }
-  assert(!sheet.includes('data-mission-id="6"'), '#10~#19 区间不应展示 #4~#9');
+  assert(!sheet.includes('data-mission-id="5"'), '#9~#19 区间不应展示 #4~#8');
+  assert(!sheet.includes('data-mission-id="17"'), '#9~#19 区间不应展示 #20~#30');
+  includes(sheet, '>#9<');
+  includes(sheet, '轻重缓急');
   includes(sheet, 'Новосибирск', '抽屉应包含 #15 名称');
   includes(sheet, '这很合理', '抽屉应包含 #16 名称');
   includes(sheet, '匹诺曹', '抽屉应包含 #17 名称');
@@ -680,13 +685,11 @@ await t('选关同步：_olGetPendingChallenge 返回当前关卡；selectMissio
 
   g.showMissionTab(0);
   sheet = g.document.getElementById('sheetContent').innerHTML;
-  includes(sheet, 'data-mission-id="1"', '可切回 #4~#9');
-  includes(sheet, 'data-mission-id="6"');
-  assert(!sheet.includes('data-mission-id="7"'));
+  includes(sheet, 'data-mission-id="1"', '可切回 #4~#8');
+  includes(sheet, 'data-mission-id="5"');
+  assert(!sheet.includes('data-mission-id="6"'));
   includes(sheet, '>#8<');
   includes(sheet, '最终测试');
-  includes(sheet, '>#9<');
-  includes(sheet, '轻重缓急');
 });
 
 await t('#9 选关卡片：显示“3 个蓝线数字顺序剪线”追加规则', () => {

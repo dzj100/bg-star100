@@ -2531,8 +2531,8 @@ function _missionTexts(mission) {
   return { std, two };
 }
 
-/** 选关抽屉的关卡区间 tab（按展示编号 #4~#9 / #10~#19 / #20~#30 分组） */
-const MISSION_TAB_RANGES = [[4, 9], [10, 19], [20, 30]];
+/** 选关抽屉的关卡区间 tab（按展示编号 #4~#8 / #9~#19 / #20~#30 分组） */
+const MISSION_TAB_RANGES = [[4, 8], [9, 19], [20, 30]];
 let _missionTabIdx = 0;
 
 function _missionCodeNum(mission) {
