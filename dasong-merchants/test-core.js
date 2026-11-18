@@ -262,6 +262,21 @@ test('事件：候客区数量变化与替换', () => {
   assert.strictEqual(game.activeEvent.id, 'lantern_festival');
 });
 
+test('事件：即时事件会取消长期公告', () => {
+  const game = fresh({ startingCash: 10 });
+  clearMarketOfEvents();
+  buildOn(game, 0, 'tea_house');
+  DSM._triggerEvent('lantern_festival');
+  assert.strictEqual(game.activeEvent.id, 'lantern_festival');
+  assert.strictEqual(DSM.marketSize(), 6);
+  DSM._triggerEvent('taxes');
+  assert.strictEqual(game.activeEvent, null);
+  assert.strictEqual(DSM.marketSize(), 4);
+  assert.strictEqual(game.customerMarket.length, 4);
+  assert.strictEqual(player().cash, 8);
+  assert.ok(game.log.some((line) => line.indexOf('长期公告【张灯结彩】因【苛捐杂税】失效') >= 0));
+});
+
 test('事件：门可罗雀需要选择一家店铺生效', () => {
   const game = fresh({ startingCash: 100 });
   clearMarketOfEvents();

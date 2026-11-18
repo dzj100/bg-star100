@@ -442,6 +442,7 @@
       if (event.eventType === 'persistent') {
         setActiveEvent(event);
       } else {
+        cancelActiveEvent(event);
         applyInstantEvent(event);
       }
     } finally {
@@ -456,6 +457,11 @@
     if (old && old.effect && old.effect.type === 'customer_market_size') {
       trimMarketTo(RULES.baseCustomerMarket, 'tail');
     }
+    if (!event) {
+      if (game.customerMarket.length < RULES.baseCustomerMarket) fillCustomerMarket(false);
+      clampFocus();
+      return;
+    }
     game.activeEvent = event;
     if (event.effect && event.effect.type === 'customer_market_size') {
       trimMarketTo(event.effect.value, event.id === 'snow_cover' ? 'front' : 'tail');
@@ -465,6 +471,14 @@
       if (game.customerMarket.length < RULES.baseCustomerMarket) fillCustomerMarket(false);
     }
     clampFocus();
+  }
+
+  function cancelActiveEvent(nextEvent) {
+    var game = G.state;
+    var old = game.activeEvent;
+    if (!old) return;
+    setActiveEvent(null);
+    log('长期公告【' + old.name + '】因【' + nextEvent.name + '】失效。');
   }
 
   function applyInstantEvent(event) {

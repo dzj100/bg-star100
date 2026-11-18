@@ -528,6 +528,10 @@
       '<g transform="translate(96 366) translate(-188 -338)">' + lndHzPagodaHTML() + '</g>' +
       '<g transform="translate(440 366) scale(1.12) translate(-1252 -340)">' + lndHzTownHTML('m', 3) + '</g>' +
       '<g transform="translate(158 374) scale(.58) translate(-560 -372)">' + lndHzBridgeHTML() + '</g>' +
+      '<g transform="translate(158 374) scale(.58) translate(-560 -372)" opacity=".75">' +
+      '<g transform="translate(560 372)">' + lndHzWalkerHTML('lnd-hz-walker--a') + '</g>' +
+      '<g transform="translate(560 372)">' + lndHzWalkerHTML('lnd-hz-walker--b') + '</g>' +
+      '</g>' +
 
       '<g opacity=".75">' +
       '<g transform="translate(297 327) scale(.95)">' + lndHzWalkerHTML('lnd-hz-walker--still') + '</g>' +
@@ -751,7 +755,7 @@
       '</div>' +
       '<p class="lnd-tagline">清地置业，买菜待客，<br><em>把一条冷清街巷，经营成你的钱袋子。</em></p>' +
       '<div class="lnd-tags">' +
-      '<span><b>1~4</b> 人</span><span>同屏轮流</span><span>约 <b>45</b> 分钟</span><span>无需注册</span>' +
+      '<span><b>1~4</b> 人</span><span>同屏轮流</span><span>约 <b>45</b> 分钟</span>' +
       '</div>' +
       '</section>' +
       '<div class="lnd-actions">' +
@@ -946,7 +950,9 @@
       slidesPerView: 1,
       spaceBetween: 10,
       autoHeight: true,
-      speed: 280,
+      speed: 260,
+      threshold: 5,
+      resistanceRatio: 0.75,
       initialSlide: UI.deckIndex + 1,
       touchStartPreventDefault: false,
       on: {
@@ -1318,7 +1324,7 @@
         ruleTable(['店铺', '建造费', '基础收益', '联动 · 特殊'], shopRows)) +
       ruleSection('伍', '客人卡', '客人只会去下列「已建」店铺消费；没有建成的店铺不结算。',
         ruleTable(['客人', '会去的店铺'], customerRows)) +
-      ruleSection('陆', '事件卡', '事件牌混在客人牌堆中，补位抽到即宣读生效。即时事件结算后进弃牌堆；长期公告持续影响全场，直到被新公告替换。',
+      ruleSection('陆', '事件卡', '事件牌混在客人牌堆中，补位抽到即宣读生效。即时事件结算后进弃牌堆；长期公告持续影响全场，直到被新的长期公告或即时事件取代。',
         ruleTable(['事件', '类型', '效果'], eventRows)) +
       ruleSection('柒', '名词解释', '牌面与流程中出现的说法：',
         '<div class="rule-glossary">' + glossary + '</div>') +

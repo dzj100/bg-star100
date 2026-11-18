@@ -1519,7 +1519,7 @@ body.is-landing .scene-svg { display: none; }
   transform: translateX(-50%);
   z-index: 50;
   width: min(1180px, calc(100% - 20px));
-  padding: 9px 13px calc(9px + env(safe-area-inset-bottom));
+  padding: 9px 13px calc(9px + env(safe-area-inset-bottom, 0px));
   border-radius: 16px;
   border: 1px solid #cdb890;
   background: linear-gradient(180deg, rgba(253, 248, 236, .98), rgba(243, 233, 212, .98));
@@ -1569,9 +1569,7 @@ body.is-landing .scene-svg { display: none; }
   background: rgba(58, 44, 28, .48);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: fadeIn .16s ease;
 }
-@keyframes fadeIn { from { opacity: .4; } to { opacity: 1; } }
 
 .sheet {
   width: min(520px, 100%);
@@ -1589,7 +1587,7 @@ body.is-landing .scene-svg { display: none; }
   animation: sheetIn .22s cubic-bezier(.2, .9, .3, 1);
 }
 .sheet.wide { width: min(700px, 100%); }
-@keyframes sheetIn { from { transform: translateY(16px) scale(.985); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes sheetIn { from { transform: translateY(16px) scale(.985); } to { transform: none; } }
 .sheet-head {
   display: flex;
   align-items: center;
@@ -2081,8 +2079,12 @@ body.is-landing .scene-svg { display: none; }
   }
   .deck-tab:focus-visible { outline: 2px solid rgba(169, 81, 59, .35); outline-offset: 1px; }
   .right-col { display: block; width: 100%; min-width: 0; }
-  .right-col .swiper-wrapper { display: flex; }
-  .right-col .swiper-slide { height: auto; }
+  .right-col .swiper-wrapper { display: flex; will-change: transform; }
+  .right-col .swiper-slide { height: auto; backface-visibility: hidden; }
+  .right-col.swiper { touch-action: pan-y; }
+  .topbar, .dock, .modal-mask { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .topbar { background: rgba(243, 233, 213, .98); }
+  .modal-mask { background: rgba(58, 44, 28, .56); }
   .shop-list { grid-template-columns: 1fr 1fr; }
 }
 
@@ -2114,7 +2116,7 @@ body.is-landing .scene-svg { display: none; }
   .customer-shops { -webkit-line-clamp: 2; }
   .panel-tip { display: none; }
   .log-list.collapsed li:nth-child(n+4) { display: none; }
-  .dock { bottom: 0; width: 100%; border-radius: 16px 16px 0 0; border-left: none; border-right: none; border-bottom: none; padding-left: 10px; padding-right: 10px; }
+  .dock { bottom: 0; width: 100%; border-radius: 16px 16px 0 0; border-left: none; border-right: none; border-bottom: none; padding-left: 10px; padding-right: 10px; padding-bottom: max(20px, calc(9px + env(safe-area-inset-bottom, 0px))); }
   .dock-hint { font-size: .6rem; }
   .dock-actions { gap: 6px; }
   .dock-actions .btn { font-size: .76rem; padding-left: 4px; padding-right: 4px; min-height: 39px; }
