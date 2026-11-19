@@ -225,7 +225,34 @@ test('雅阁不足时后厨洗回雅阁继续吃', () => {
   const result = DSM.serveCustomer();
   assert.strictEqual(result.summary.spentCount, 4);
   assert.strictEqual(result.summary.missed, 0);
-  assert.strictEqual(player().prep.length, 0);
+  // 吃空后 4 张（含本餐已吃的 2 张）洗回雅阁，再吃 2 张
+  assert.strictEqual(player().prep.length, 2);
+  assert.strictEqual(player().kitchen.length, 2);
+});
+
+test('雅阁吃空时本餐已吃的菜一起洗回雅阁', () => {
+  const game = fresh({ startingCash: 100 });
+  clearMarketOfEvents();
+  buildOn(game, 0, 'cuju_field');
+  game.customerMarket = [{ uid: 'cust_test', kind: 'customer', id: 'huashi', tip: 0 }];
+  game.focusIndex = 0;
+  game.phase = 'phase3';
+  player().prep = ['dish_rank_1', 'dish_rank_3', 'dish_rank_2'];
+  player().kitchen = ['dish_rank_4', 'dish_rank_4', 'dish_rank_4', 'dish_rank_4'];
+  const result = DSM.serveCustomer();
+  // 画师 3 + 蹴鞠场 2 = 5 道
+  assert.strictEqual(result.summary.cost.total, 5);
+  assert.strictEqual(result.summary.spentCount, 5);
+  assert.strictEqual(result.summary.missed, 0);
+  // 第 4 道前：后厨 7 张（4 张后厨 + 已吃的一/二/三品）洗回雅阁，再吃 2 张
+  assert.strictEqual(player().prep.length, 5);
+  assert.strictEqual(player().kitchen.length, 2);
+  const all = DSM.composition(player().prep.concat(player().kitchen));
+  assert.strictEqual(all.byRank[1], 1);
+  assert.strictEqual(all.byRank[2], 1);
+  assert.strictEqual(all.byRank[3], 1);
+  assert.strictEqual(all.byRank[4], 4);
+  assert.ok(game.log.some((line) => line.indexOf('洗牌回到雅阁') >= 0));
 });
 
 test('事件：苛捐杂税按店铺收 2 铜钱', () => {

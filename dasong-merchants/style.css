@@ -1306,7 +1306,15 @@ body.is-landing .scene-svg { display: none; }
   font-size: .8rem;
   color: rgba(45, 35, 25, .32);
 }
-.land-house { position: absolute; top: 4px; right: 4px; opacity: .9; }
+.land-house {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.land-house .house { display: block; width: 30%; height: 30%; }
 .land-body { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; flex-direction: column; gap: 1px; }
 .land-shop { font-family: var(--serif); font-size: .78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .land-cost { font-family: var(--serif); font-size: .82rem; font-weight: 700; color: var(--ink-soft); }
@@ -2046,6 +2054,14 @@ body.is-landing .scene-svg { display: none; }
 
 @media (max-width: 920px) {
   .setup-cards { grid-template-columns: 1fr; }
+  .land-house {
+    inset: auto;
+    top: 3px;
+    right: 4px;
+    display: block;
+    width: 45%;
+  }
+  .land-house .house { width: 100%; height: auto; }
   .board { grid-template-columns: 1fr; grid-template-areas: "side" "merchant"; }
   .info-deck { grid-area: side; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .deck-tabs {

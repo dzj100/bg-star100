@@ -142,6 +142,100 @@
       '</svg>';
   }
 
+  var SHOP_ICONS = {
+    yinzi_shop:
+      '<path d="M3.8 10.2h16.4c0 4.8-3.4 8-8.2 8s-8.2-3.2-8.2-8z" fill="#cfe0d6" stroke="#6f907c" stroke-width=".9" stroke-linejoin="round"/>' +
+      '<ellipse cx="12" cy="10.2" rx="8.2" ry="2.1" fill="#8a5d38"/>' +
+      '<ellipse cx="12" cy="10.4" rx="7.1" ry="1.6" fill="#d9bf85"/>' +
+      '<circle cx="9.4" cy="10.3" r=".5" fill="#a98145"/><circle cx="13.6" cy="10.6" r=".45" fill="#a98145"/><circle cx="11.8" cy="9.9" r=".35" fill="#b08b55"/>' +
+      '<path d="M6.2 14.4c1.6 1.4 3.6 2.1 5.8 2.1s4.2-.7 5.8-2.1" fill="none" stroke="#f6ead0" stroke-width=".5" opacity=".7"/>',
+    guasi_shop:
+      '<path d="M8.4 3.2h7.2l4.2 4.2v7.2l-4.2 4.2H8.4l-4.2-4.2V7.4z" fill="#4f5368" stroke="#3f4254" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<circle cx="12" cy="11" r="5.6" fill="#f6ead0" stroke="#3f4254" stroke-width=".5"/>' +
+      '<path d="M12 5.4a2.8 2.8 0 0 1 0 5.6 2.8 2.8 0 0 0 0 5.6z" fill="#4f5368"/>' +
+      '<circle cx="12" cy="8.2" r=".8" fill="#f6ead0"/><circle cx="12" cy="13.8" r=".8" fill="#4f5368"/>' +
+      '<path d="M9.3 5.8h1.2M13.5 5.8h1.2M15.9 8.3v1.2M15.9 12.5v1.2M13.5 16.2h1.2M9.3 16.2h1.2M8.1 12.5v1.2M8.1 8.3v1.2" stroke="#c9b68f" stroke-width=".5" stroke-linecap="round"/>',
+    guanpu_shop:
+      '<circle cx="12" cy="12" r="8.6" fill="#6b4a2f" stroke="#4f3421" stroke-width=".8"/>' +
+      '<circle cx="12" cy="12" r="7.2" fill="#f6ead0" stroke="#8a6a42" stroke-width=".4"/>' +
+      '<path d="M12 12V4.8A7.2 7.2 0 0 1 17.7 6.9z" fill="#c9a05a"/>' +
+      '<path d="M12 12l5.7-5.1A7.2 7.2 0 0 1 19.2 12z" fill="#b9c4a7"/>' +
+      '<path d="M12 12h7.2a7.2 7.2 0 0 1-2.7 5.7z" fill="#c7a8a8"/>' +
+      '<path d="M12 12l4.5 5.7A7.2 7.2 0 0 1 12 19.2z" fill="#9fb7b1"/>' +
+      '<path d="M12 12v7.2a7.2 7.2 0 0 1-4.5-1.5z" fill="#d7c7a2"/>' +
+      '<path d="M12 12l-4.5 5.7A7.2 7.2 0 0 1 4.8 12z" fill="#b9b0c4"/>' +
+      '<path d="M12 12H4.8a7.2 7.2 0 0 1 1.5-4.5z" fill="#c9a05a"/>' +
+      '<path d="M12 12l-5.7-4.5A7.2 7.2 0 0 1 12 4.8z" fill="#d9c7a5"/>' +
+      '<circle cx="12" cy="12" r="1" fill="#4f3421"/>' +
+      '<path d="M7.2 16.8 16.8 7.2" stroke="#4f3421" stroke-width="1" stroke-linecap="round"/>',
+    cuju_field:
+      '<circle cx="12" cy="12" r="8.2" fill="#c99a5b" stroke="#8a5d38" stroke-width="1"/>' +
+      '<path d="M6.4 7.6c3.2 1.8 6.4 2.4 10 1.4M5.2 12.6c4.8-.2 8.4 1.2 10.8 4.2M14.9 4.6c-1.9 3.4-2.1 6.4-.9 9.6M9 19.6c.9-3.4.9-6-.4-9" fill="none" stroke="#7a4a2a" stroke-width=".9" stroke-dasharray="1.3 1" stroke-linecap="round"/>' +
+      '<path d="M8.2 5.6c.2 1.3.8 2.2 1.8 2.8" fill="none" stroke="#e3c28c" stroke-width=".5" opacity=".8"/>',
+    porcelain_shop:
+      '<path d="M10.2 3.4h3.6c-.9 2-1 3.5-.5 4.8 2.9 1 4.6 3.4 4.6 6.2 0 3.6-2.6 6.2-5.9 6.2s-5.9-2.6-5.9-6.2c0-2.8 1.7-5.2 4.6-6.2.5-1.3.4-2.8-.5-4.8z" fill="#cfe0d6" stroke="#7d9b8b" stroke-width=".9" stroke-linejoin="round"/>' +
+      '<path d="M9.4 10.6c1.8-.8 3.4-.8 5.2 0M8.4 14.2c2.4-1 4.8-1 7.2 0M8.8 17.4c2-.7 4.2-.7 6.4 0" fill="none" stroke="#a8c2b4" stroke-width=".5"/>' +
+      '<path d="M9.2 8.6c-.5 1-.7 2-.6 3.1" fill="none" stroke="#f6ead0" stroke-width=".6" opacity=".8"/>',
+    goulan_wasi:
+      '<g transform="rotate(32 12 12)">' +
+        '<path d="M12 9.4c3.2 0 5.3 2.2 5.3 5.1 0 3-2.1 5.2-5.3 5.2s-5.3-2.2-5.3-5.2c0-2.9 2.1-5.1 5.3-5.1z" fill="#d9b47c" stroke="#7a4a2a" stroke-width=".9"/>' +
+        '<rect x="10.7" y="2.2" width="2.6" height="8" rx=".4" fill="#7a4a2a"/>' +
+        '<path d="M10.7 2.2h2.6l.5-1.2h-3.6z" fill="#5d3a26"/>' +
+        '<path d="M9.6 13.2h4.8M9.2 14.8h5.6M8.9 16.4h6.2" stroke="#8a5d38" stroke-width=".45"/>' +
+        '<path d="M10.3 9.6v5.6M11.4 9.6v7.4M12.6 9.6v7.4M13.7 9.6v5.6" stroke="#f6ead0" stroke-width=".4" opacity=".9"/>' +
+        '<ellipse cx="12" cy="8.4" rx="1.3" ry=".6" fill="#5d3a26"/>' +
+      '</g>',
+    silk_shop:
+      '<path d="M4.2 8.6 15.6 6.6l4.2 7.4-11.6 2.1z" fill="#b5624d" stroke="#8c4634" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<path d="M8.2 16.1l11.6-2.1-2.2 4.6-11.2 1.9z" fill="#a55440" stroke="#8c4634" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<path d="M4.2 8.6c3.2-.3 6.6-.3 10 .1l-.5 1.8c-3.2-.3-6.4-.3-9.6.1z" fill="#d8a08e"/>' +
+      '<path d="M5.4 11.2l6.6 1.1M5.9 13.4l6.6 1.1M12.2 14.9l2.8 4" stroke="#8c4634" stroke-width=".45" opacity=".65"/>',
+    jewelry_shop:
+      '<path d="M4.8 20.6 14.2 8.2" stroke="#a9854f" stroke-width="1.2" stroke-linecap="round"/>' +
+      '<path d="M14.2 8.2 16 5.6" stroke="#c9a05a" stroke-width="1" stroke-linecap="round"/>' +
+      '<g fill="#f7f0dd" stroke="#d8c69a" stroke-width=".35">' +
+        '<circle cx="16.2" cy="4.55" r="1.73"/><circle cx="14.7" cy="6.05" r="1.65"/><circle cx="17.7" cy="6.05" r="1.65"/><circle cx="15.75" cy="7.85" r="1.58"/><circle cx="17.25" cy="7.7" r="1.58"/>' +
+      '</g>' +
+      '<circle cx="16.2" cy="6.2" r=".98" fill="#c9a05a"/>' +
+      '<path d="M18.3 8.6c.5.6.8 1.3.6 2" fill="none" stroke="#c9a05a" stroke-width=".5"/>' +
+      '<circle cx="18.9" cy="11.3" r=".65" fill="#f2dfb8" stroke="#c9a05a" stroke-width=".35"/>',
+    tea_house:
+      '<path d="M5.2 12.2h10.6v2.4c0 2.9-2.4 5-5.3 5s-5.3-2.1-5.3-5z" fill="#8a6a4a" stroke="#5d3a26" stroke-width=".9" stroke-linejoin="round"/>' +
+      '<path d="M5.4 12 5.4 15.1 2.7 13.4z" fill="#8a6a4a" stroke="#5d3a26" stroke-width=".5" stroke-linejoin="round"/>' +
+      '<path d="M15.8 12.9c2 .2 3.4 1.5 3.4 3.1s-1.4 2.9-3.4 3.1" fill="none" stroke="#5d3a26" stroke-width="1" stroke-linecap="round"/>' +
+      '<path d="M9.3 12.2v-1.4h2.6v1.4" fill="#8a6a4a" stroke="#5d3a26" stroke-width=".5"/>' +
+      '<circle cx="10.6" cy="10.2" r=".8" fill="#5d3a26"/>' +
+      '<path d="M7.8 14.8c1.6-.6 3.2-.6 4.8 0" fill="none" stroke="#b08b55" stroke-width=".6" opacity=".8"/>',
+    tavern:
+      '<path d="M8.2 16.4C6.3 15.2 5.0 13.0 4.85 10.6L4.8 7.9C4.78 7.35 5.2 7.0 5.65 7.2 6 7.4 6.1 7.75 6.05 8.2 6 10.1 6.8 11.9 8.3 13.2L9.8 13.6z" fill="#a8c8b5" stroke="#5f8a72" stroke-width=".75" stroke-linejoin="round"/>' +
+      '<path d="M11 4.6h2l.6 2.8c2 .8 3.1 3 3.1 5.6 0 3.6-1.9 6.2-4.7 6.2s-4.7-2.6-4.7-6.2c0-2.6 1.1-4.8 3.1-5.6z" fill="#a8c8b5" stroke="#5f8a72" stroke-width=".9" stroke-linejoin="round"/>' +
+      '<path d="M14.2 7.8c2.6.2 4.2 2 4.2 4.3 0 1.8-1.2 3.3-3 3.9" fill="none" stroke="#5f8a72" stroke-width="1" stroke-linecap="round"/>' +
+      '<path d="M10.7 4.6V3.5h2.6v1.1" fill="#a8c8b5" stroke="#5f8a72" stroke-width=".6"/>' +
+      '<circle cx="12" cy="3" r=".7" fill="#5f8a72"/>' +
+      '<ellipse cx="5.45" cy="7.75" rx=".68" ry=".3" transform="rotate(-18 5.45 7.75)" fill="#3f6b57"/>' +
+      '<path d="M9.6 19.2c1.6.5 3.2.5 4.8 0M9.9 20h4.2" fill="none" stroke="#5f8a72" stroke-width=".7" stroke-linecap="round"/>' +
+      '<path d="M9.4 11.4c1.6-.6 3.4-.6 5 0" fill="none" stroke="#d9e8de" stroke-width=".6" opacity=".85"/>',
+    bookshop:
+      '<path d="M3 6.4c2.8-1.1 5.8-1 9 .6 3.2-1.6 6.2-1.7 9-.6v11.6c-2.8-1.1-5.8-1-9 .6-3.2-1.6-6.2-1.7-9-.6z" fill="#4f5f73" stroke="#3f4a5a" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<path d="M4.2 7.2c2.5-1 5.2-.8 7.8.7 2.6-1.5 5.3-1.7 7.8-.7v10.2c-2.5-1-5.2-.8-7.8.7-2.6-1.5-5.3-1.7-7.8-.7z" fill="#f6ead0" stroke="#8a6a42" stroke-width=".5" stroke-linejoin="round"/>' +
+      '<path d="M12 7.9v10" stroke="#8a6a42" stroke-width=".5"/>' +
+      '<path d="M6 9.4h3.6M6 11h3.6M6 12.6h3.6M6 14.2h2.8M14.4 9.4h3.2M14.4 11h3.2M14.4 12.6h2.6" stroke="#8a6a42" stroke-width=".45" opacity=".75"/>' +
+      '<circle cx="17" cy="14.2" r=".85" fill="#a9513b" opacity=".85"/>',
+    storytelling_stage:
+      '<path d="M11.6 20.6 4.2 9.2Q11.6 2.4 19 9.2z" fill="#f6ead0" stroke="#8a6a42" stroke-width=".85" stroke-linejoin="round"/>' +
+      '<path d="M11.6 20.6V4.2M11.6 20.6 6.4 6.2M11.6 20.6l5.2-8.6M11.6 20.6 4.6 10.4M11.6 20.6l7-4.4" stroke="#b08b55" stroke-width=".45" opacity=".85"/>' +
+      '<path d="M11.6 20.6v1.5" stroke="#5d3a26" stroke-width="1.2" stroke-linecap="round"/>' +
+      '<path d="M8.2 7.4c2.6-.7 4.8-.2 6.6 1.4" fill="none" stroke="#6f2b1f" stroke-width=".6"/>' +
+      '<circle cx="14.6" cy="8.6" r=".45" fill="#a9513b"/>'
+  };
+
+  function shopIcon(shopId, size) {
+    var body = SHOP_ICONS[shopId];
+    if (!body) return house(size);
+    var s = size || 26;
+    return '<svg class="house house--' + shopId + '" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg>';
+  }
+
   function sealChar(name) {
     return (name || '客').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '').slice(0, 1) || '客';
   }
@@ -1166,7 +1260,7 @@
     }
     return '<div class="' + classes.join(' ') + '"' + (shop ? ' data-action="inspect-land" data-land="' + index + '"' : '') + '>' +
       '<span class="land-no">' + CN_NUM[index] + '</span>' +
-      (land.shopId ? '<span class="land-house">' + house(20) + '</span>' : '') +
+      (land.shopId ? '<span class="land-house">' + shopIcon(land.shopId, 26) + '</span>' : '') +
       '<div class="land-body">' + body + '</div>' +
       (land.shopId ? '' : '<span class="land-state">' + (land.cleared ? '认购' : '荒地') + '</span>') +
     '</div>';
@@ -1258,7 +1352,7 @@
     }).join('');
 
     var settleSteps = [
-      '<b>吃菜</b>：客人按牌面吃掉若干张雅阁菜品；雅阁不足时把后厨洗回雅阁继续消耗（每次最多回洗一次）。',
+      '<b>吃菜</b>：客人按牌面吃掉若干张雅阁菜品；雅阁不足时把后厨的菜（含本餐已吃掉的菜）洗回雅阁继续消耗（每次最多回洗一次）。',
       '<b>菜品收益</b>：被吃掉的菜按品级结算——四品 1、三品 2、二品 3、一品 1 骰 +2 铜钱。',
       '<b>逛店收益</b>：客人会去他能去的每家已建店铺消费；同种店铺每多一间，就多结算一次。',
       '<b>联动与公告</b>：店铺联动加成、长期公告的加减成照常结算。',
@@ -1435,7 +1529,7 @@
     var cards = isPrep ? p.prep : p.kitchen;
     var comp = DSM.composition(cards);
     var body = '<p class="modal-lead">' + (isPrep
-        ? '雅阁是招待客人时吃菜的牌库，吃空后会把后厨的菜洗回雅阁。'
+        ? '雅阁是招待客人时吃菜的牌库，吃空后会把后厨的菜（含本餐已吃掉的菜）洗回雅阁。'
         : '新买的菜先放入后厨；雅阁不足时会洗回雅阁，备菜阶段也可花 3 铜钱从这里弃菜。') + '</p>' +
       '<div class="pile-summary">共 <b>' + comp.total + '</b> 张菜品</div>' +
       '<div class="pile-list">' +

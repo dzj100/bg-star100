@@ -703,24 +703,24 @@
 
   function spendMenus(p, count) {
     var spent = [];
-    var recyclable = p.kitchen.slice();
     var recycled = false;
     var missed = 0;
     for (var i = 0; i < count; i += 1) {
-      if (!p.prep.length && !recycled && recyclable.length) {
-        p.prep = shuffle(recyclable);
-        recyclable = [];
+      if (!p.prep.length && !recycled && p.kitchen.length) {
+        p.prep = shuffle(p.kitchen);
+        p.kitchen = [];
         recycled = true;
-        log(p.name + ' 雅阁菜品不足，后厨菜品洗牌回到雅阁继续消耗。');
+        log(p.name + ' 雅阁菜品不足，后厨菜品（含本餐已吃掉的菜）洗牌回到雅阁继续消耗。');
       }
       if (!p.prep.length) {
         missed += 1;
         continue;
       }
       var index = Math.floor(G.rng() * p.prep.length);
-      spent.push(p.prep.splice(index, 1)[0]);
+      var card = p.prep.splice(index, 1)[0];
+      spent.push(card);
+      p.kitchen.push(card);
     }
-    p.kitchen = recycled ? spent.slice() : recyclable.concat(spent);
     return { spent: spent, missed: missed, recycled: recycled };
   }
 
