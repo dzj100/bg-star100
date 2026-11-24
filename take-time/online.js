@@ -722,7 +722,6 @@ async function startOnlineGame() {
     document.getElementById('app').style.display = 'block';
     if (typeof HOOK_render === 'function') HOOK_render();
     await _markPushAndSend(window._getOnlineState(), 'playing');
-    try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
   } catch (e) {
     alert('开始游戏失败: ' + e.message);
   } finally {

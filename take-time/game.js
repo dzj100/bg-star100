@@ -1500,6 +1500,8 @@ function dealGame(names, challenge) {
   const eyeTotal = S.eyeBase + S.eyeBonus;
   addLog(`第${ch.chapter}章·第${ch.test}关 挑战开始：每人${per}张手牌 本关共${eyeTotal}个眼标记`);
   console.log(`[taketime] deal ${n} players x ${per} cards, eyeBase=${S.eyeBase}, eyeBonus=${S.eyeBonus}`);
+  // 每发一局（开始游戏 / 再来一局 / 下一关）都重置结算计时起点
+  try { if (window.BG && window.BG.onlineStart) window.BG.onlineStart(n); } catch (e) {}
   saveState();
   render();
 }
@@ -1824,6 +1826,8 @@ function settle() {
     S.eyeBonus = Math.min(S.eyeBonus + 1, MAX_EYE_BONUS);
     addLog('❌ 未通关，获赠 1 个眼标记（下次挑战本关可用）');
   }
+  // 结算上报：本局起点由 dealGame 的 onlineStart 记录，这里只结算一次（settle 仅房主可调）
+  try { if (window.BG && window.BG.onlineEnd) window.BG.onlineEnd(S.pass ? 'win' : 'lose'); } catch (e) {}
   // 挑战用时（从发牌起算；老存档无 startAt 时按 0 秒兜底）
   const durSec = Math.max(0, Math.floor((Date.now() - (S.startAt || Date.now())) / 1000));
   const durText = durSec < 60 ? `${durSec}秒` : `${Math.floor(durSec / 60)}分${durSec % 60}秒`;

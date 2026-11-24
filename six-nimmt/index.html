@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FFF8EE">
+<meta name="description" content="牛头王 6 nimmt! · 单人牛群挑战——十张手牌、四行围栏，收走最少牛头的人称王。">
+<title>牛头王 · 6 nimmt! 单人挑战</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     内联 SVG 图形库：牛头 / 牛骨 / 王冠 / 牌背纹章
+     全部原创，不使用任何官方卡面、Logo 或外部图片。
+     ============================================================ -->
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="bull-head" viewBox="0 0 64 64" fill="currentColor">
+      <path d="M20.5 24.5C15 24 9.2 20.3 5.5 13.4c6.2-.9 11.2.5 15.2 4.1l3.4 4.6-3.6 2.4z"/>
+      <path d="M43.5 24.5C49 24 54.8 20.3 58.5 13.4c-6.2-.9-11.2.5-15.2 4.1l-3.4 4.6 3.6 2.4z"/>
+      <path d="M18.5 30.2c-4.1-.7-7.3-2.6-9.6-5.6 4.2-1.2 8.1-.4 11.1 2.4l-.6 3.4-.9-.2z"/>
+      <path d="M45.5 30.2c4.1-.7 7.3-2.6 9.6-5.6-4.2-1.2-8.1-.4-11.1 2.4l.6 3.4.9-.2z"/>
+      <path d="M32 16c-8.2 0-14 4.2-15.1 12.1-.9 7.3 2.1 14.2 8.2 18.1 2.1 1.3 4.5 2.2 6.9 2.6 2.4-.4 4.8-1.3 6.9-2.6 6.1-3.9 9.1-10.8 8.2-18.1C46 20.2 40.2 16 32 16z"/>
+      <path d="M27.8 17.3c.4-4.3 1.9-7.4 4.2-9.7 2.3 2.3 3.8 5.4 4.2 9.7h-8.4z"/>
+      <ellipse cx="32" cy="42.7" rx="7.6" ry="5.5" fill="var(--bull-muzzle, rgba(0,0,0,.18))"/>
+      <ellipse cx="29.4" cy="42.2" rx="1.5" ry="1.05" fill="var(--bull-eye, #1d1109)"/>
+      <ellipse cx="34.6" cy="42.2" rx="1.5" ry="1.05" fill="var(--bull-eye, #1d1109)"/>
+      <ellipse cx="25" cy="30.6" rx="2.2" ry="2.9" fill="var(--bull-eye, #1d1109)"/>
+      <ellipse cx="39" cy="30.6" rx="2.2" ry="2.9" fill="var(--bull-eye, #1d1109)"/>
+      <path d="M28.9 47.9a3.6 3.6 0 0 0 6.2 0" fill="none" stroke="var(--bull-eye, #1d1109)" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="bull-hero" viewBox="0 0 64 64">
+      <g fill="#FFD21E" stroke="#4A4752" stroke-width="1.3" stroke-linejoin="round">
+        <path d="M20.5 24.5C15 24 9.2 20.3 5.5 13.4c6.2-.9 11.2.5 15.2 4.1l3.4 4.6-3.6 2.4z"/>
+        <path d="M43.5 24.5C49 24 54.8 20.3 58.5 13.4c-6.2-.9-11.2.5-15.2 4.1l-3.4 4.6 3.6 2.4z"/>
+      </g>
+      <g fill="#FFB3B8" stroke="#4A4752" stroke-width="1.1" stroke-linejoin="round">
+        <path d="M18.5 30.2c-4.1-.7-7.3-2.6-9.6-5.6 4.2-1.2 8.1-.4 11.1 2.4l-.6 3.4-.9-.2z"/>
+        <path d="M45.5 30.2c4.1-.7 7.3-2.6 9.6-5.6-4.2-1.2-8.1-.4-11.1 2.4l.6 3.4.9-.2z"/>
+      </g>
+      <g fill="#FFF8E6" stroke="#4A4752" stroke-width="1.3" stroke-linejoin="round">
+        <path d="M32 16c-8.2 0-14 4.2-15.1 12.1-.9 7.3 2.1 14.2 8.2 18.1 2.1 1.3 4.5 2.2 6.9 2.6 2.4-.4 4.8-1.3 6.9-2.6 6.1-3.9 9.1-10.8 8.2-18.1C46 20.2 40.2 16 32 16z"/>
+        <path d="M27.8 17.3c.4-4.3 1.9-7.4 4.2-9.7 2.3 2.3 3.8 5.4 4.2 9.7h-8.4z"/>
+      </g>
+      <ellipse cx="32" cy="42.7" rx="7.6" ry="5.5" fill="#FFB3B8" stroke="#4A4752" stroke-width="1.1"/>
+      <ellipse cx="29.4" cy="42.2" rx="1.5" ry="1.05" fill="#2F2D36"/>
+      <ellipse cx="34.6" cy="42.2" rx="1.5" ry="1.05" fill="#2F2D36"/>
+      <ellipse cx="25" cy="30.6" rx="2.2" ry="2.9" fill="#2F2D36"/>
+      <ellipse cx="39" cy="30.6" rx="2.2" ry="2.9" fill="#2F2D36"/>
+      <circle cx="25.7" cy="29.5" r=".8" fill="#FFFFFF"/>
+      <circle cx="39.7" cy="29.5" r=".8" fill="#FFFFFF"/>
+      <path d="M28.9 47.9a3.6 3.6 0 0 0 6.2 0" fill="none" stroke="#4A4752" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M25.6 49.2c0 5 3 8.2 6.4 8.2s6.4-3.2 6.4-8.2" fill="none" stroke="#4A4752" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M25.6 49.2c0 5 3 8.2 6.4 8.2s6.4-3.2 6.4-8.2" fill="none" stroke="#FFD21E" stroke-width=".9" stroke-linecap="round"/>
+    </symbol>
+
+    
+    <symbol id="crown" viewBox="0 0 64 48" fill="currentColor" stroke="#4A4752" stroke-width="1.2" stroke-linejoin="round">
+      <path d="M5.5 39.5 9 10.2l13.4 11.6L32 4.2l9.6 17.6L55 10.2l3.5 29.3H5.5z"/>
+      <rect x="7.5" y="39.5" width="49" height="5.6" rx="2.8"/>
+      <circle cx="9" cy="9.4" r="2.8"/>
+      <circle cx="55" cy="9.4" r="2.8"/>
+      <circle cx="32" cy="3.4" r="3.1"/>
+    </symbol>
+
+    <symbol id="card-back-mark" viewBox="0 0 64 64" fill="none">
+      <circle cx="32" cy="32" r="29" stroke="currentColor" stroke-width="2"/>
+      <circle cx="32" cy="32" r="24.4" stroke="currentColor" stroke-width="1" stroke-dasharray="2.4 4.2" opacity=".8"/>
+      <path d="M32 3.2l3.4 5.2L32 13.6l-3.4-5.2 3.4-5.2zM32 50.4l3.4 5.2L32 60.8l-3.4-5.2 3.4-5.2zM3.2 32l5.2-3.4L13.6 32l-5.2 3.4L3.2 32zM50.4 32l5.2-3.4L60.8 32l-5.2 3.4L50.4 32z" fill="currentColor" opacity=".9"/>
+      <g transform="translate(12 13.5) scale(.625)">
+        <path d="M20.5 24.5C15 24 9.2 20.3 5.5 13.4c6.2-.9 11.2.5 15.2 4.1l3.4 4.6-3.6 2.4z" fill="currentColor"/>
+        <path d="M43.5 24.5C49 24 54.8 20.3 58.5 13.4c-6.2-.9-11.2.5-15.2 4.1l-3.4 4.6 3.6 2.4z" fill="currentColor"/>
+        <path d="M32 16c-8.2 0-14 4.2-15.1 12.1-.9 7.3 2.1 14.2 8.2 18.1 2.1 1.3 4.5 2.2 6.9 2.6 2.4-.4 4.8-1.3 6.9-2.6 6.1-3.9 9.1-10.8 8.2-18.1C46 20.2 40.2 16 32 16z" fill="currentColor"/>
+        <path d="M27.8 17.3c.4-4.3 1.9-7.4 4.2-9.7 2.3 2.3 3.8 5.4 4.2 9.7h-8.4z" fill="currentColor"/>
+        <ellipse cx="25" cy="30.6" rx="2.2" ry="2.9" fill="var(--bull-eye, #2a170d)"/>
+        <ellipse cx="39" cy="30.6" rx="2.2" ry="2.9" fill="var(--bull-eye, #2a170d)"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="app">
+
+  <!-- ==========================================================
+       一、封面
+       ========================================================== -->
+  <section id="screen-menu" class="screen menu active">
+    <div class="menu-scene" aria-hidden="true">
+      <svg viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice">
+        <defs>
+          <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#F0C96B" stop-opacity=".34"/>
+            <stop offset="48%" stop-color="#D9A441" stop-opacity=".13"/>
+            <stop offset="100%" stop-color="#D9A441" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="hillFar" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6B4630" stop-opacity=".55"/>
+            <stop offset="100%" stop-color="#3A261A" stop-opacity=".1"/>
+          </linearGradient>
+          <linearGradient id="hillNear" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#332016" stop-opacity=".92"/>
+            <stop offset="100%" stop-color="#1B100B" stop-opacity=".96"/>
+          </linearGradient>
+        </defs>
+        <circle cx="195" cy="176" r="150" fill="url(#sunHalo)"/>
+        <circle cx="195" cy="176" r="48" fill="#E7B665" opacity=".24"/>
+        <circle cx="195" cy="176" r="34" fill="#F0C96B" opacity=".17"/>
+        <g fill="#F6EEDF">
+          <circle cx="54" cy="94" r="1.3" opacity=".32"/>
+          <circle cx="326" cy="122" r="1" opacity=".28"/>
+          <circle cx="282" cy="58" r="1.4" opacity=".22"/>
+          <circle cx="104" cy="52" r="1" opacity=".26"/>
+          <circle cx="352" cy="214" r="1.1" opacity=".18"/>
+        </g>
+        <path d="M0 470C54 438 96 452 138 424c42-28 66-22 104 2 42 26 78 16 148-22v440H0V470z" fill="url(#hillFar)"/>
+        <path d="M0 552c62-36 108-30 154-6 46 24 76 30 128 6 52-24 78-16 108-2v294H0V552z" fill="#2A1A12" opacity=".55"/>
+        <path d="M0 610c70-30 118-22 168 4 50 26 84 20 132-4 34-16 62-16 90-6v240H0V610z" fill="url(#hillNear)"/>
+        <g class="scene-fence" stroke="#100A07" stroke-width="4.5" opacity=".78" stroke-linecap="round">
+          <path d="M-12 690h414M-12 732h414"/>
+          <path d="M22 664v94M94 664v94M166 664v94M238 664v94M310 664v94M382 664v94"/>
+        </g>
+        <g class="scene-fence" stroke="#100A07" stroke-width="2.2" opacity=".5" stroke-linecap="round">
+          <path d="M58 700l-5 26M58 700l5 26M130 700l-5 26M130 700l5 26M202 700l-5 26M202 700l5 26M274 700l-5 26M274 700l5 26M346 700l-5 26M346 700l5 26"/>
+        </g>
+        <g fill="#F0C96B">
+          <circle class="firefly f1" cx="72" cy="596" r="2"/>
+          <circle class="firefly f2" cx="286" cy="566" r="1.6"/>
+          <circle class="firefly f3" cx="338" cy="638" r="2.2"/>
+          <circle class="firefly f4" cx="126" cy="650" r="1.4"/>
+          <circle class="firefly f5" cx="246" cy="614" r="1.8"/>
+        </g>
+      </svg>
+    </div>
+    <div class="menu-vignette" aria-hidden="true"></div>
+
+    <div class="menu-inner">
+      <div class="hero-crownwrap" aria-hidden="true">
+        <svg class="hero-crown" viewBox="0 0 64 48"><use href="#crown"></use></svg>
+      </div>
+      <div class="hero-badge" aria-hidden="true">
+        <span class="hero-halo"></span>
+        <svg class="hero-bull" viewBox="0 0 64 64"><use href="#bull-hero"></use></svg>
+      </div>
+
+      <h1 class="logo">牛头王</h1>
+      <p class="logo-sub">6 nimmt! <span>·</span> 单人牛群挑战</p>
+      <p class="logo-tag">十张手牌 · 四行围栏 · 收走最少牛头的人称王</p>
+
+      <div class="hero-fan" aria-hidden="true">
+        <div class="card bull-2 fan-1">
+          <span class="card-corner">5</span>
+          <span class="card-bulls">
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+          </span>
+          <span class="card-count"><svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>2</span>
+        </div>
+        <div class="card bull-5 fan-2">
+          <span class="card-corner">22</span>
+          <span class="card-bulls">
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+          </span>
+          <span class="card-count"><svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>5</span>
+        </div>
+        <div class="card bull-7 fan-3">
+          <span class="card-corner">55</span>
+          <span class="card-bulls">
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+            <svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>
+          </span>
+          <span class="card-count"><svg class="bull-ico" viewBox="0 0 64 64"><use href="#bull-head"></use></svg>7</span>
+        </div>
+      </div>
+
+      <div class="menu-actions">
+        <button id="btnStart" class="btn btn-primary btn-lg" type="button">开始游戏</button>
+        <button id="btnContinue" class="btn btn-ghost" type="button" hidden>继续上局</button>
+        <button id="btnRules" class="btn btn-ghost" type="button">游戏规则</button>
+      </div>
+
+      <div id="menuStats" class="menu-stats">还没有战绩 · 第一局，从牛栏开始</div>
+    </div>
+
+    <div class="credit">@imStar100</div>
+  </section>
+
+  <!-- ==========================================================
+       二、开局设置
+       ========================================================== -->
+  <section id="screen-setup" class="screen setup">
+    <div class="setup-wrap">
+      <header class="setup-top">
+        <button id="btnSetupBack" class="tb-btn tb-exit" type="button">‹ 返回</button>
+        <div class="setup-heading">
+          <h2>召集牛群</h2>
+          <p>1 名真人牧场主 + 2~9 名 AI 牧牛人</p>
+        </div>
+        <div class="setup-seal" aria-hidden="true">
+          <svg viewBox="0 0 64 64"><use href="#bull-hero"></use></svg>
+        </div>
+      </header>
+
+      <div class="setup-sheet">
+        <label class="field" for="inpName">
+          <span class="field-label">你的名字</span>
+          <input id="inpName" class="inp" type="text" maxlength="8" placeholder="牛来" autocomplete="off" spellcheck="false">
+        </label>
+
+        <div class="field">
+          <div class="field-head">
+            <span class="field-label">AI 对手</span>
+            <span class="field-note">共 <b id="rosterCount">5</b> 位玩家</span>
+          </div>
+          <div id="aiCountSeg" class="seg seg-grid" role="group" aria-label="AI 对手数量">
+            <button type="button" data-ai="2">2</button>
+            <button type="button" data-ai="3">3</button>
+            <button type="button" data-ai="4" class="active">4</button>
+            <button type="button" data-ai="5">5</button>
+            <button type="button" data-ai="6">6</button>
+            <button type="button" data-ai="7">7</button>
+            <button type="button" data-ai="8">8</button>
+            <button type="button" data-ai="9">9</button>
+          </div>
+          <p class="field-hint">你 + AI = 3~10 人 · 人越多，行尾越难猜</p>
+        </div>
+
+        <div class="field roster-field">
+          <div class="field-head">
+            <span class="field-label">入席名单</span>
+            <span class="field-note">你坐 0 号位 · AI 依次入席</span>
+          </div>
+          <div id="roster" class="roster">
+            <div class="roster-empty">
+              <div class="mini-deck" aria-hidden="true">
+                <div class="card-back mini">
+                  <span class="card-back-mark"><svg viewBox="0 0 64 64"><use href="#card-back-mark"></use></svg></span>
+                </div>
+                <div class="card-back mini">
+                  <span class="card-back-mark"><svg viewBox="0 0 64 64"><use href="#card-back-mark"></use></svg></span>
+                </div>
+              </div>
+              <p>牛群还没入席</p>
+              <small>选定人数后，AI 队友会在这里亮出名号</small>
+            </div>
+          </div>
+        </div>
+
+        <footer class="setup-foot">
+          <button id="btnBegin" class="btn btn-primary btn-lg" type="button">开桌 · 第 1 局</button>
+          <p class="foot-note">共 10 局 · 牛头分最低者胜</p>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       三、对局
+       ========================================================== -->
+  <section id="screen-game" class="screen game">
+    <header class="topbar">
+      <button id="btnExit" class="tb-btn tb-exit" type="button" aria-label="退出对局">‹ 退出</button>
+      <div class="tb-mid">
+        <span id="tbTrick" class="tb-trick">第 1 / 10 局</span>
+        <div id="trickDots" class="trick-dots" aria-hidden="true">
+          <span class="dot current"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+      <div class="tb-actions">
+        <button id="btnScores" class="tb-btn" type="button">计分</button>
+        <button id="btnLog" class="tb-btn" type="button">日志</button>
+        <button id="btnHelp" class="tb-btn tb-icon" type="button" aria-label="游戏规则">?</button>
+      </div>
+    </header>
+
+    <div class="game-shell">
+      <div class="board-col">
+        <div id="players" class="players" aria-label="玩家状态"></div>
+
+        <div id="table" class="table">
+          <div class="row" data-row="0">
+            <div class="row-head">
+              <span class="row-title">A</span>
+              <span class="row-bulls">0</span>
+            </div>
+            <div class="row-track"></div>
+          </div>
+          <div class="row" data-row="1">
+            <div class="row-head">
+              <span class="row-title">B</span>
+              <span class="row-bulls">0</span>
+            </div>
+            <div class="row-track"></div>
+          </div>
+          <div class="row" data-row="2">
+            <div class="row-head">
+              <span class="row-title">C</span>
+              <span class="row-bulls">0</span>
+            </div>
+            <div class="row-track"></div>
+          </div>
+          <div class="row" data-row="3">
+            <div class="row-head">
+              <span class="row-title">D</span>
+              <span class="row-bulls">0</span>
+            </div>
+            <div class="row-track"></div>
+          </div>
+        </div>
+
+        <p class="table-hint">行满 5 张时，第 6 张会收走整行 · 比所有行尾都小则自选一行</p>
+
+        <div id="revealTray" class="reveal-tray" aria-label="本局亮牌"></div>
+
+        <div class="hand-zone">
+          <p id="handPrompt" class="hand-prompt">选择一张手牌 · 所有人同时亮牌</p>
+          <div id="hand" class="hand" role="group" aria-label="你的手牌"></div>
+          <div class="hand-actions">
+            <button id="btnLock" class="btn btn-primary lock-btn" type="button" disabled>锁定出牌</button>
+            <p class="hand-hint">数字小的先结算 · 收牌越少越好</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <section class="side-block side-score">
+          <header>
+            <h3>计分榜</h3>
+            <span>牛头分 · 低者领先</span>
+          </header>
+          <div id="scoreboard" class="scoreboard"></div>
+        </section>
+        <section class="side-block side-log">
+          <header>
+            <h3>对局日志</h3>
+            <span>逐张结算</span>
+          </header>
+          <div id="latestLog" class="latest-log">开局后，最新动态会显示在这里</div>
+          <div id="logPanel" class="log-panel"></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ==========================================================
+       四、终局
+       ========================================================== -->
+  <section id="screen-over" class="screen over">
+    <div class="over-inner">
+      <div class="over-emblem" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><use href="#bull-hero"></use></svg>
+      </div>
+      <p class="eyebrow">10 TRICKS · 牛群归栏</p>
+      <h1 id="overTitle" class="over-title">牛群归栏</h1>
+      <p id="overSub" class="over-sub">牛头分最低者称王</p>
+
+      <div id="rankList" class="rank-list"></div>
+      <div id="overStats" class="over-stats"></div>
+
+      <div class="over-actions">
+        <button id="btnAgain" class="btn btn-primary btn-lg" type="button">再来一局</button>
+        <button id="btnChangeSetup" class="btn btn-ghost" type="button">调整人数</button>
+        <button id="btnBackHome" class="btn btn-ghost" type="button">返回首页</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==========================================================
+     五、弹窗
+     ========================================================== -->
+
+<!-- 规则 -->
+<div class="modal" id="modal-rules" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+  <div class="modal-card rules-card">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow">HOW TO PLAY</p>
+        <h2 id="rulesTitle">牛头王 · 规则</h2>
+      </div>
+      <button class="modal-close" type="button" data-close="modal-rules" aria-label="关闭规则">×</button>
+    </header>
+    <div class="modal-body rules-body">
+      <p class="rules-lead">104 张数字牌，四行围栏，十局定胜负。<b>收走的牛头越少越好。</b></p>
+
+      <h3>牛头值</h3>
+      <p>每张牌右下角的牛头数，就是收走它时要付的罚分。</p>
+      <table class="rules-table">
+        <thead>
+          <tr><th>牌面</th><th>牛头</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr class="t-king"><td><b>55</b></td><td><b>7</b></td><td>唯一的牛王</td></tr>
+          <tr class="t-high"><td>11、22、33、44、66、77、88、99</td><td><b>5</b></td><td>11 的倍数（55 除外）</td></tr>
+          <tr class="t-mid"><td>10、20、30 … 100</td><td><b>3</b></td><td>整十</td></tr>
+          <tr class="t-low"><td>5、15、25、35、45、65、75、85、95</td><td><b>2</b></td><td>个位是 5（55 除外）</td></tr>
+          <tr><td>其余所有牌</td><td><b>1</b></td><td>至少 1 个牛头</td></tr>
+        </tbody>
+      </table>
+      <p class="rules-note">判定优先级：55 → 11 的倍数 → 整十 → 个位 5 → 其余。</p>
+
+      <h3>开局</h3>
+      <ul>
+        <li>洗混 104 张，每人发 <b>10 张手牌</b>，仅自己可见。</li>
+        <li>翻开 4 张作为四行的行尾牌，按数字升序从左到右排好。</li>
+        <li>本轮不再摸牌：手上 10 张会在 10 局里全部打完。</li>
+        <li>单人版：你 + 2~9 名 AI，共 3~10 人同桌。</li>
+      </ul>
+
+      <h3>每局流程</h3>
+      <ol>
+        <li>所有玩家<b>同时秘密选择</b> 1 张手牌，背面朝下。</li>
+        <li>全部锁定后同时亮牌。</li>
+        <li>按牌面数字<b>从小到大</b>依次放入场上；每张都即时结算，可能改变后续牌的去向。</li>
+      </ol>
+
+      <h3>落牌判定</h3>
+      <ol>
+        <li>在所有「行尾牌小于这张牌」的行中，选<b>行尾最大</b>的一行，把牌接在行尾。</li>
+        <li>若该行已有 <b>5 张</b>：打出者收走这 5 张（牛头分立即累加），打出的牌成为该行新的第一张。</li>
+        <li>若这张牌比<b>所有行尾都小</b>：打出者必须<b>自选一行</b>，收走该行全部牌，打出的牌成为新行首。</li>
+      </ol>
+      <p class="rules-note">同一局若多人比所有行尾都小，按亮牌升序依次选择，前一个人的选择会改变后一个人的局面。</p>
+
+      <h3>胜负</h3>
+      <ul>
+        <li>10 局打完，统计每人收走的牛头总分。</li>
+        <li><b>总分最低者获胜</b>；并列最低则共享胜利。</li>
+        <li>本版本固定 <b>10 局</b>，不累计多轮，也不做 66 分终局判定。</li>
+      </ul>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn btn-primary" type="button" data-close="modal-rules">知道了</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 选行 -->
+<div class="modal" id="modal-choice" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+  <div class="modal-card choice-card">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow">TAKE A ROW</p>
+        <h2 id="choiceTitle">选择一行</h2>
+        <p id="choiceSub" class="choice-sub">这张牌比所有行尾都小，必须收走一行。</p>
+      </div>
+    </header>
+    <div class="modal-body">
+      <div id="choiceRows" class="choice-rows"></div>
+      <p id="choiceHint" class="choice-hint">数字键 1~4 也可以选择 · 收走整行全部牛头</p>
+    </div>
+  </div>
+</div>
+
+<!-- 计分榜 -->
+<div class="modal" id="modal-scores" role="dialog" aria-modal="true" aria-labelledby="scoresTitle">
+  <div class="modal-card">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow">SCOREBOARD</p>
+        <h2 id="scoresTitle">计分榜</h2>
+      </div>
+      <button class="modal-close" type="button" data-close="modal-scores" aria-label="关闭计分榜">×</button>
+    </header>
+    <div id="scoreModalBody" class="modal-body score-modal-body"></div>
+    <footer class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-close="modal-scores">收起</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 日志 -->
+<div class="modal" id="modal-log" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+  <div class="modal-card log-card">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow">TRICK BY TRICK</p>
+        <h2 id="logTitle">对局日志</h2>
+      </div>
+      <div class="modal-head-actions">
+        <button id="logCopy" class="btn btn-ghost btn-sm" type="button">复制</button>
+        <button id="logClose" class="btn btn-primary btn-sm" type="button" data-close="modal-log">关闭</button>
+      </div>
+    </header>
+    <div id="logModalBody" class="modal-body log-modal-body"></div>
+  </div>
+</div>
+
+<!-- 确认 -->
+<div class="modal" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="modal-card confirm-card">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow">PLEASE CONFIRM</p>
+        <h2 id="confirmTitle">确认</h2>
+      </div>
+    </header>
+    <div class="modal-body">
+      <p id="confirmText" class="confirm-text"></p>
+    </div>
+    <footer class="modal-foot">
+      <button id="confirmCancel" class="btn btn-ghost" type="button">取消</button>
+      <button id="confirmOk" class="btn btn-primary" type="button">确定</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 特效层与轻提示：视口坐标，不接收事件 -->
+<div id="fx" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="game.js"></script>
+<script src="ai.js"></script>
+<script src="render.js"></script>
+</body>
+</html>

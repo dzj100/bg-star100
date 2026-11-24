@@ -427,6 +427,21 @@ var ICO_TICKET = '<svg class="ico-svg" viewBox="0 0 52 30">' +
   '<path d="M43.4 9 a6.6 6.6 0 1 0 0 13.2 a6.6 6.6 0 0 0 0 -13.2 Z" fill="#b55dae"/>' +
   '<path d="M43.4 12.4 l1.15 2.35 2.6 .38 -1.88 1.83 .44 2.58 -2.31 -1.22 -2.31 1.22 .44 -2.58 -1.88 -1.83 2.6 -.38 Z" fill="#f6e9f8"/>' +
 '</svg>';
+/* 牛头王：牧场风格的正面牛头，与游戏内 SVG 卡牌同一套轮廓 */
+var ICO_BULL = '<svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true">' +
+  '<path d="M20.5 24.5C15 24 9.2 20.3 5.5 13.4c6.2-.9 11.2.5 15.2 4.1l3.4 4.6-3.6 2.4z" fill="#7a4217"/>' +
+  '<path d="M43.5 24.5C49 24 54.8 20.3 58.5 13.4c-6.2-.9-11.2.5-15.2 4.1l-3.4 4.6 3.6 2.4z" fill="#7a4217"/>' +
+  '<path d="M18.5 30.2c-4.1-.7-7.3-2.6-9.6-5.6 4.2-1.2 8.1-.4 11.1 2.4l-.6 3.4-.9-.2z" fill="#9a5a1f"/>' +
+  '<path d="M45.5 30.2c4.1-.7 7.3-2.6 9.6-5.6-4.2-1.2-8.1-.4-11.1 2.4l.6 3.4.9-.2z" fill="#9a5a1f"/>' +
+  '<path d="M32 16c-8.2 0-14 4.2-15.1 12.1-.9 7.3 2.1 14.2 8.2 18.1 2.1 1.3 4.5 2.2 6.9 2.6 2.4-.4 4.8-1.3 6.9-2.6 6.1-3.9 9.1-10.8 8.2-18.1C46 20.2 40.2 16 32 16z" fill="#d99a45"/>' +
+  '<path d="M27.8 17.3c.4-4.3 1.9-7.4 4.2-9.7 2.3 2.3 3.8 5.4 4.2 9.7h-8.4z" fill="#f0c16b"/>' +
+  '<ellipse cx="32" cy="42.7" rx="7.6" ry="5.5" fill="#f4d9ac"/>' +
+  '<ellipse cx="29.4" cy="42.2" rx="1.5" ry="1.05" fill="#2a1708"/>' +
+  '<ellipse cx="34.6" cy="42.2" rx="1.5" ry="1.05" fill="#2a1708"/>' +
+  '<ellipse cx="25" cy="30.6" rx="2.2" ry="2.9" fill="#2a1708"/>' +
+  '<ellipse cx="39" cy="30.6" rx="2.2" ry="2.9" fill="#2a1708"/>' +
+  '<path d="M28.9 47.9a3.6 3.6 0 0 0 6.2 0" fill="none" stroke="#2a1708" stroke-width="1.7" stroke-linecap="round"/>' +
+'</svg>';
 /* 巫师牌：金帽 + 四色符文（◆★▲■ 是游戏里的花色记号，颜色与卡面一致）。
    四个符文钉在角上占着版面，帽子小了整个图标就“缩”在中间 —— 帽子单独放大 1.5 倍补回来，
    符文顺带往四角让开一点，免得帽檐顶到 ▲■ 的头顶 */
@@ -493,7 +508,8 @@ var GAMES = [
   { mode:'solo',   name:'巫师牌',     players:'1人',  min:1, max:1,  type:'人机吃墩博弈',   icon:ICO_WIZ, url:'wizard/index.html' },
   { mode:'solo',   name:'棕榈岛',     players:'1人',  min:1, max:1,  type:'单人卡牌构筑',   icon:'🌴',    url:'palm-island/index.html' },
   { mode:'solo',   name:'流冰航路',   players:'1人',  min:1, max:1,  type:'单人策略解谜', icon:'⛵',  url:'frozen-passage/index.html' },
-  { mode:'solo',   name:'大宋百商图', players:'1~4人', min:1, max:4,  type:'订单资源管理', icon:'🏮', url:'dasong-merchants/index.html' },
+  { mode:'solo',   name:'大宋百商图', players:'1~4人', min:1, max:4,  type:'模拟经营管理', icon:'🏮', url:'dasong-merchants/index.html' },
+  { mode:'solo',   name:'牛头王',     players:'1人',  min:1, max:1,  type:'人机手牌博弈',   icon:ICO_BULL, url:'six-nimmt/index.html' },
   /* —— 联机 —— */
   { mode:'online', name:'弑君者OL',   players:'2~4人',  min:2, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index_ol.html' },
   { mode:'online', name:'月面探险OL', players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index_ol.html' },
