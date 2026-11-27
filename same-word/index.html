@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#DDF1F7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="同词相遇 · 2~4 人联机默契猜词。各写一个词，同时揭晓，看谁和谁能想到一起。">
+<title>同词相遇 · Same Word</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23FBF7EC' stroke='%2322301F' stroke-width='4'/%3E%3Cpath d='M6 42 20 24 30 34 40 22 58 42Z' fill='%232F6B4F'/%3E%3Ccircle cx='44' cy='16' r='6' fill='%23F2C14E'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=20261126k">
+</head>
+<body>
+
+<!-- ========== 内联 SVG 符号库 ========== -->
+<svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <defs>
+    <clipPath id="logoClip"><circle cx="60" cy="62" r="47"/></clipPath>
+  </defs>
+
+  <!-- 营地徽章：山峰 + 两枚叠放的对话气泡 -->
+  <symbol id="logo-badge" viewBox="0 0 120 120">
+    <circle cx="60" cy="62" r="55" fill="var(--paper)" stroke="var(--ink)" stroke-width="3.2"/>
+    <circle cx="60" cy="62" r="48" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-dasharray="5 5" opacity=".4"/>
+    <g clip-path="url(#logoClip)">
+      <circle cx="60" cy="36" r="12" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.1"/>
+      <g stroke="var(--sun)" stroke-width="1.9" stroke-linecap="round" opacity=".9">
+        <path d="M60 16v-5"/><path d="M40 22l-4-4"/><path d="M80 22l4-4"/>
+        <path d="M34 40h-5"/><path d="M86 40h5"/>
+      </g>
+      <path d="M4 82 30 44 44 64 60 42 82 68 94 56 116 84v26H4Z" fill="var(--moss)" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M24 51 30 44 36 53Z" fill="var(--paper)"/>
+      <path d="M55 50 60 42 66 51Z" fill="var(--paper)"/>
+      <path d="M4 92 26 70 40 84 56 66 78 88 94 76 116 94v22H4Z" fill="var(--forest)" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M18 79 24 70 30 80Z" fill="var(--paper)" opacity=".92"/>
+      <path d="M70 84 78 74 86 86Z" fill="var(--paper)" opacity=".7"/>
+    </g>
+    <g>
+      <path d="M17 66h40a9 9 0 0 1 9 9v13a9 9 0 0 1-9 9H35l-9 8v-8h-9a9 9 0 0 1-9-9V75a9 9 0 0 1 9-9Z" fill="var(--paper)" stroke="var(--ink)" stroke-width="2.7" stroke-linejoin="round"/>
+      <text x="41" y="89" text-anchor="middle" font-size="19" font-weight="900" fill="var(--ink)">词</text>
+      <path d="M64 71h34a9 9 0 0 1 9 9v12a9 9 0 0 1-9 9h-4v7l-9-7H64a9 9 0 0 1-9-9V80a9 9 0 0 1 9-9Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.7" stroke-linejoin="round"/>
+      <text x="81" y="94" text-anchor="middle" font-size="18" font-weight="900" fill="var(--ink)">词</text>
+    </g>
+  </symbol>
+
+  <!-- 山野场景：太阳、云、两层山脊、湖、小径 -->
+  <symbol id="scene-mountains" viewBox="0 0 480 300">
+    <circle cx="374" cy="64" r="33" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.4"/>
+    <g stroke="var(--sun)" stroke-width="2.4" stroke-linecap="round" opacity=".8">
+      <path d="M374 18v-9"/><path d="M374 120v9"/><path d="M328 64h-9"/><path d="M429 64h9"/>
+      <path d="M341 31l-6-6"/><path d="M407 97l6 6"/><path d="M407 31l6-6"/><path d="M341 97l-6 6"/>
+    </g>
+    <g fill="var(--paper)" stroke="var(--ink)" stroke-width="1.8" opacity=".95">
+      <path d="M64 60c-8 0-12-6-8-12 2-4 7-6 11-4 2-8 12-11 18-6 6-4 14-1 15 5 9-2 16 5 13 12-2 4-6 5-10 5Z"/>
+      <path d="M202 42c-6 0-9-5-6-9 2-3 5-4 8-3 1-6 9-8 13-4 4-3 10-1 11 4 6-1 11 3 9 8-1 3-5 4-8 4Z" opacity=".85"/>
+    </g>
+    <path d="M-10 212 52 138 96 184 150 116 214 196 268 136 330 198 388 148 438 196 490 158V312H-10Z" fill="var(--moss)" opacity=".5"/>
+    <path d="M-10 238 44 176 102 226 156 162 222 228 284 178 340 230 398 188 490 240V312H-10Z" fill="var(--moss)" opacity=".9"/>
+    <path d="M150 116 166 136 150 142 138 130Z" fill="var(--paper)" opacity=".85"/>
+    <path d="M-10 262 60 222 118 258 180 216 244 262 312 218 372 258 430 230 490 258V312H-10Z" fill="var(--forest)"/>
+    <path d="M60 222 118 258 180 216 244 262" fill="none" stroke="var(--forest-d)" stroke-width="2.4" opacity=".45"/>
+    <g fill="var(--forest-d)">
+      <path d="M88 246 96 224 104 246Z"/><path d="M104 252 112 230 120 252Z"/>
+      <path d="M352 244 360 222 368 244Z"/><path d="M368 250 376 228 384 250Z"/>
+      <path d="M196 250 202 236 208 250Z" opacity=".7"/>
+    </g>
+    <ellipse cx="298" cy="284" rx="58" ry="11" fill="var(--lake)" opacity=".92"/>
+    <path d="M262 282h70M278 287h40" stroke="var(--paper)" stroke-width="1.6" stroke-linecap="round" opacity=".45"/>
+    <path d="M140 312c18-22-8-34 22-50 18-10 34-14 52-20" fill="none" stroke="var(--sand)" stroke-width="5.5" stroke-dasharray="1 13" stroke-linecap="round" opacity=".85"/>
+  </symbol>
+
+  <!-- 等高线纹理 -->
+  <symbol id="terrain-lines" viewBox="0 0 400 260">
+    <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <path d="M-20 196c40-28 74-26 110-6s84 22 126 0 90-30 130-8 66 20 94 6"/>
+      <path d="M-20 164c44-32 78-26 112-4s82 22 124-2 88-28 128-8 64 18 96 4" opacity=".85"/>
+      <path d="M-20 132c46-34 80-24 112 0s80 22 122-4 88-26 128-6 64 16 96 2" opacity=".7"/>
+      <path d="M58 110c-22-26 6-54 38-44 10-24 48-22 56 2 26-6 44 18 32 38-8 14-30 16-44 10-16 12-38 12-48 0-16 6-28 2-34-6Z" opacity=".55"/>
+      <path d="M74 100c-14-18 4-36 26-30 8-16 32-14 38 2 18-4 30 12 22 26-6 10-22 10-32 6-12 8-28 8-36 0-8 4-14 2-18-4Z" opacity=".4"/>
+      <path d="M252 92c-16-20 4-42 30-36 8-18 36-16 44 2 20-4 34 14 24 30-8 12-26 12-36 8-12 8-30 8-40 0-8 4-16 2-22-4Z" opacity=".45"/>
+      <path d="M-20 70c50-30 90-18 120 2s76 20 116 0 84-22 118-4 66 16 96 2" opacity=".35"/>
+    </g>
+  </symbol>
+
+  <!-- 松树 -->
+  <symbol id="pine" viewBox="0 0 60 90">
+    <rect x="26" y="66" width="8" height="18" rx="2.5" fill="var(--sand)" stroke="var(--ink)" stroke-width="2.1"/>
+    <path d="M30 38 55 74H5Z" fill="var(--forest)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M30 18 49 51H11Z" fill="var(--forest)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M30 3 43 31H17Z" fill="var(--forest)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M22 45 30 30 34 38" fill="none" stroke="var(--moss)" stroke-width="1.8" stroke-linecap="round" opacity=".9"/>
+    <path d="M15 62 30 44 38 56" fill="none" stroke="var(--moss)" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
+  </symbol>
+
+  <!-- 松树丛 -->
+  <symbol id="tree-cluster" viewBox="0 0 120 90">
+    <ellipse cx="58" cy="84" rx="52" ry="6" fill="var(--moss)" opacity=".35"/>
+    <use href="#pine" x="0" y="14" width="52" height="78"/>
+    <use href="#pine" x="60" y="14" width="52" height="78"/>
+    <use href="#pine" x="30" y="0" width="60" height="90"/>
+  </symbol>
+
+  <!-- 帐篷 -->
+  <symbol id="tent" viewBox="0 0 120 100">
+    <ellipse cx="60" cy="88" rx="48" ry="7" fill="var(--moss)" opacity=".4"/>
+    <path d="M60 14 108 84H12Z" fill="var(--paper)" stroke="var(--ink)" stroke-width="2.9" stroke-linejoin="round"/>
+    <path d="M60 14 108 84H60Z" fill="#EEDFBE"/>
+    <path d="M60 14V84" stroke="var(--ink)" stroke-width="1.6" opacity=".35" stroke-dasharray="4 4"/>
+    <path d="M44 84 60 48 76 84Z" fill="var(--forest-d)"/>
+    <path d="M51 84 60 61 69 84Z" fill="var(--sun)"/>
+    <path d="M12 84 2 96M108 84l10 12" stroke="var(--ink)" stroke-width="2.1" stroke-linecap="round"/>
+    <circle cx="4" cy="96" r="2.4" fill="var(--ink)"/><circle cx="116" cy="96" r="2.4" fill="var(--ink)"/>
+    <path d="M60 14V2l13 4-13 4Z" fill="var(--clay)" stroke="var(--ink)" stroke-width="1.9" stroke-linejoin="round"/>
+    <path d="M22 70l-4 14M98 70l4 14" stroke="var(--paper)" stroke-width="1.9" stroke-linecap="round" opacity=".8"/>
+  </symbol>
+
+  <!-- 木牌路标 -->
+  <symbol id="trail-sign" viewBox="0 0 120 100">
+    <ellipse cx="60" cy="94" rx="34" ry="5" fill="var(--moss)" opacity=".4"/>
+    <rect x="55" y="34" width="10" height="58" rx="3" fill="var(--sand)" stroke="var(--ink)" stroke-width="2.4"/>
+    <path d="M10 18h62v20H38l-9 9v-9H10a5 5 0 0 1-5-5V23a5 5 0 0 1 5-5Z" fill="var(--sand)" stroke="var(--ink)" stroke-width="2.7" stroke-linejoin="round"/>
+    <path d="M48 52h62a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5H76v9l-9-9H48Z" fill="#F0DFB4" stroke="var(--ink)" stroke-width="2.7" stroke-linejoin="round"/>
+    <g stroke="var(--ink)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M28 28h16m-6-5 6 5-6 5"/>
+      <path d="M92 64H76m6-5-6 5 6 5"/>
+    </g>
+    <circle cx="16" cy="28" r="2.2" fill="var(--ink)"/>
+    <circle cx="104" cy="64" r="2.2" fill="var(--ink)"/>
+    <path d="M38 86c-4-6-10-6-12 0M80 88c4-7 10-7 13 0" fill="none" stroke="var(--forest)" stroke-width="2.1" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 指南针 -->
+  <symbol id="compass" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="43" fill="var(--paper)" stroke="var(--ink)" stroke-width="2.9"/>
+    <circle cx="50" cy="50" r="34" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="3 4" opacity=".45"/>
+    <g stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" opacity=".7">
+      <path d="M50 12v6M50 82v6M12 50h6M82 50h6"/>
+      <path d="M23 23l4 4M73 73l4 4M77 23l-4 4M27 73l-4 4" opacity=".5"/>
+    </g>
+    <text x="50" y="26" text-anchor="middle" font-size="9" font-weight="900" fill="var(--clay)" letter-spacing="1">N</text>
+    <g class="compass-needle">
+      <path d="M50 22 60 50 50 78 40 50Z" fill="var(--forest)" stroke="var(--ink)" stroke-width="1.9" stroke-linejoin="round"/>
+      <path d="M50 22 60 50H50Z" fill="var(--clay)"/>
+    </g>
+    <circle cx="50" cy="50" r="4.2" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.8"/>
+  </symbol>
+
+  <!-- 营地旗 -->
+  <symbol id="flag" viewBox="0 0 80 100">
+    <rect x="20" y="10" width="5" height="80" rx="2.5" fill="var(--sand)" stroke="var(--ink)" stroke-width="2.1"/>
+    <path d="M25 14h42l-11 13 11 13H25Z" fill="var(--clay)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M33 24h20M33 31h13" stroke="var(--paper)" stroke-width="1.8" stroke-linecap="round" opacity=".75"/>
+    <ellipse cx="42" cy="92" rx="26" ry="5" fill="var(--moss)" opacity=".4"/>
+    <path d="M14 92c4-6 9-6 12 0M52 94c4-7 10-7 13 0" fill="none" stroke="var(--forest)" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 号码布 -->
+  <symbol id="bib" viewBox="0 0 100 110">
+    <path d="M14 8h72a8 8 0 0 1 8 8v80a8 8 0 0 1-8 8H14a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8Z" fill="var(--paper)" stroke="var(--ink)" stroke-width="3.2"/>
+    <path d="M20 22h60v64H20Z" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".45"/>
+    <circle cx="17" cy="13" r="4.2" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.9"/>
+    <circle cx="83" cy="13" r="4.2" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.9"/>
+    <path d="M24 96h52" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" opacity=".45"/>
+  </symbol>
+
+  <!-- 哨子 -->
+  <symbol id="whistle" viewBox="0 0 64 64">
+    <path d="M6 26h24l9 6h13a10 10 0 0 1 10 10v2a10 10 0 0 1-10 10H39l-10-6H6a6 6 0 0 1-6-6V32a6 6 0 0 1 6-6Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.4"/>
+    <circle cx="19" cy="38" r="5.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.9"/>
+    <path d="M48 22c0-5 4-9 9-9M52 12c0-3 2-5 5-5" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round" opacity=".65"/>
+    <path d="M10 26v-6h16" fill="none" stroke="var(--ink)" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- 登山靴 + 脚印 -->
+  <symbol id="boot" viewBox="0 0 100 80">
+    <path d="M18 12h28v26c0 6 4 9 12 11l22 5c7 2 10 5 10 11v6H18Z" fill="var(--clay)" stroke="var(--ink)" stroke-width="2.7" stroke-linejoin="round"/>
+    <path d="M46 16v36" stroke="var(--ink)" stroke-width="1.6" opacity=".35" stroke-dasharray="4 3"/>
+    <path d="M26 24h14M26 32h14M26 40h14" stroke="var(--paper)" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M12 71h80v7H12Z" fill="var(--forest-d)" stroke="var(--ink)" stroke-width="2.1"/>
+    <path d="M62 44c6 3 9 7 9 12" fill="none" stroke="var(--sun)" stroke-width="1.9" stroke-linecap="round" opacity=".8"/>
+    <g fill="var(--forest)" opacity=".55">
+      <ellipse cx="15" cy="64" rx="5" ry="7" transform="rotate(-14 15 64)"/>
+      <ellipse cx="30" cy="58" rx="4" ry="6" transform="rotate(-14 30 58)"/>
+    </g>
+  </symbol>
+
+  <!-- 撞词印章 -->
+  <symbol id="stamp-match" viewBox="0 0 160 160">
+    <g transform="rotate(-8 80 80)">
+      <circle cx="80" cy="80" r="64" fill="none" stroke="var(--clay)" stroke-width="5.5" stroke-dasharray="96 9 38 8 58 7"/>
+      <circle cx="80" cy="80" r="51" fill="none" stroke="var(--clay)" stroke-width="2.4"/>
+      <path d="M80 22l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="var(--clay)"/>
+      <text x="80" y="75" text-anchor="middle" font-size="33" font-weight="900" letter-spacing="2" fill="var(--clay)">撞上啦</text>
+      <text x="80" y="98" text-anchor="middle" font-size="11" font-weight="800" letter-spacing="4" fill="var(--clay)">SAME WORD</text>
+      <text x="80" y="117" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="2" fill="var(--clay)" opacity=".8">营地认证</text>
+    </g>
+    <g fill="var(--clay)" opacity=".35">
+      <circle cx="22" cy="38" r="2.6"/><circle cx="138" cy="52" r="2"/><circle cx="132" cy="126" r="3"/>
+      <circle cx="30" cy="120" r="1.8"/><circle cx="118" cy="18" r="1.6"/>
+    </g>
+  </symbol>
+
+  <!-- 全员同频印章 -->
+  <symbol id="stamp-all" viewBox="0 0 160 160">
+    <g transform="rotate(-7 80 80)">
+      <circle cx="80" cy="80" r="64" fill="none" stroke="var(--lake)" stroke-width="5.5" stroke-dasharray="100 8 40 9 52 8"/>
+      <circle cx="80" cy="80" r="51" fill="none" stroke="var(--lake)" stroke-width="2.4"/>
+      <path d="M80 21l4 8 8 4-8 4-4 8-4-8-8-4 8-4Z" fill="var(--lake)"/>
+      <text x="80" y="76" text-anchor="middle" font-size="30" font-weight="900" letter-spacing="1" fill="var(--lake)">全员同频</text>
+      <text x="80" y="99" text-anchor="middle" font-size="11" font-weight="800" letter-spacing="4" fill="var(--lake)">ALL SAME</text>
+      <text x="80" y="117" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="2" fill="var(--lake)" opacity=".8">营地认证</text>
+    </g>
+  </symbol>
+
+  <!-- 同频认证印章 -->
+  <symbol id="stamp-agree" viewBox="0 0 160 160">
+    <g transform="rotate(-8 80 80)">
+      <circle cx="80" cy="80" r="64" fill="none" stroke="var(--forest)" stroke-width="5.5" stroke-dasharray="94 9 36 8 60 7"/>
+      <circle cx="80" cy="80" r="51" fill="none" stroke="var(--forest)" stroke-width="2.4"/>
+      <path d="M80 21l3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="var(--forest)"/>
+      <text x="80" y="76" text-anchor="middle" font-size="29" font-weight="900" letter-spacing="1" fill="var(--forest)">意思一样</text>
+      <text x="80" y="99" text-anchor="middle" font-size="11" font-weight="800" letter-spacing="4" fill="var(--forest)">SAME VIBE</text>
+      <text x="80" y="117" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="2" fill="var(--forest)" opacity=".8">双方认证</text>
+    </g>
+    <g fill="var(--forest)" opacity=".35">
+      <circle cx="24" cy="34" r="2.6"/><circle cx="136" cy="58" r="2"/><circle cx="128" cy="128" r="3"/>
+    </g>
+  </symbol>
+
+  <!-- 小岩羊 · 思考 -->
+  <symbol id="mascot-goat" viewBox="0 0 120 120">
+    <g stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M44 38C36 22 22 20 18 30c-4 10 6 20 20 18" fill="var(--sand)"/>
+      <path d="M76 38C84 22 98 20 102 30c4 10-6 20-20 18" fill="var(--sand)"/>
+      <ellipse cx="25" cy="62" rx="14" ry="8" transform="rotate(-18 25 62)" fill="var(--sand)"/>
+      <ellipse cx="95" cy="62" rx="14" ry="8" transform="rotate(18 95 62)" fill="var(--sand)"/>
+      <path d="M60 33c19 0 31 13 31 30 0 10-2 18-6 24-6 9-14 14-25 14s-19-5-25-14c-4-6-6-14-6-24 0-17 12-30 31-30Z" fill="var(--paper)"/>
+      <ellipse cx="60" cy="83" rx="17" ry="12" fill="var(--sand)" stroke-width="2.1"/>
+      <circle cx="54" cy="81" r="2" fill="var(--ink)" stroke="none"/>
+      <circle cx="66" cy="81" r="2" fill="var(--ink)" stroke="none"/>
+      <path d="M56 89c2 2 6 2 8 0" fill="none" stroke-width="1.8"/>
+      <circle cx="48" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
+      <circle cx="72" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
+      <path d="M42 54h10M68 54h10" stroke-width="1.8" opacity=".55"/>
+      <path d="M60 96v10" stroke-width="3.2"/>
+    </g>
+    <g fill="var(--paper)" stroke="var(--ink)" stroke-width="1.6">
+      <circle cx="98" cy="24" r="6"/><circle cx="109" cy="13" r="3.4"/>
+    </g>
+  </symbol>
+
+  <!-- 小岩羊 · 欢呼 -->
+  <symbol id="mascot-goat-cheer" viewBox="0 0 120 120">
+    <g stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M44 38C36 22 22 20 18 30c-4 10 6 20 20 18" fill="var(--sand)"/>
+      <path d="M76 38C84 22 98 20 102 30c4 10-6 20-20 18" fill="var(--sand)"/>
+      <ellipse cx="25" cy="62" rx="14" ry="8" transform="rotate(-24 25 62)" fill="var(--sand)"/>
+      <ellipse cx="95" cy="62" rx="14" ry="8" transform="rotate(24 95 62)" fill="var(--sand)"/>
+      <path d="M60 33c19 0 31 13 31 30 0 10-2 18-6 24-6 9-14 14-25 14s-19-5-25-14c-4-6-6-14-6-24 0-17 12-30 31-30Z" fill="var(--paper)"/>
+      <ellipse cx="60" cy="82" rx="18" ry="13" fill="var(--sand)" stroke-width="2.1"/>
+      <path d="M52 84c3 6 13 6 16 0" fill="var(--clay)" stroke-width="1.8"/>
+      <path d="M60 90v5" stroke-width="1.6"/>
+      <path d="M43 61c3-4 8-4 11 0M66 61c3-4 8-4 11 0" fill="none" stroke-width="2.2"/>
+      <path d="M60 96v10" stroke-width="3.2"/>
+      <path d="M30 96c-4-5-10-5-13 0M90 96c-4-5-10-5-13 0" fill="none" stroke="var(--forest)" stroke-width="2.1"/>
+    </g>
+    <g fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6">
+      <path d="M102 24l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z"/>
+      <path d="M16 22l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6Z"/>
+    </g>
+  </symbol>
+
+  <!-- 小岩羊 · 迷路 -->
+  <symbol id="mascot-goat-lost" viewBox="0 0 120 120">
+    <g stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M44 38C36 22 22 20 18 30c-4 10 6 20 20 18" fill="var(--sand)"/>
+      <path d="M76 38C84 22 98 20 102 30c4 10-6 20-20 18" fill="var(--sand)"/>
+      <ellipse cx="25" cy="62" rx="14" ry="8" transform="rotate(-18 25 62)" fill="var(--sand)"/>
+      <ellipse cx="95" cy="62" rx="14" ry="8" transform="rotate(18 95 62)" fill="var(--sand)"/>
+      <path d="M60 33c19 0 31 13 31 30 0 10-2 18-6 24-6 9-14 14-25 14s-19-5-25-14c-4-6-6-14-6-24 0-17 12-30 31-30Z" fill="var(--paper)"/>
+      <ellipse cx="60" cy="84" rx="16" ry="11" fill="var(--sand)" stroke-width="2.1"/>
+      <path d="M54 86c2-2 4-2 6 0s4 2 6 0" fill="none" stroke-width="1.6"/>
+      <path d="M43 59c2 3 4 4 6 1 2-3 4-2 6 1M66 59c2 3 4 4 6 1 2-3 4-2 6 1" fill="none" stroke-width="1.9"/>
+      <path d="M60 96v10" stroke-width="3.2"/>
+    </g>
+    <g stroke="var(--clay)" stroke-width="3.2" fill="none" stroke-linecap="round">
+      <path d="M100 32c0-7 12-7 12 0 0 5-6 5-6 9"/>
+      <circle cx="106" cy="48" r="1.6" fill="var(--clay)" stroke="none"/>
+    </g>
+    <g fill="var(--moss)" opacity=".5">
+      <ellipse cx="26" cy="102" rx="10" ry="4"/>
+    </g>
+  </symbol>
+
+  <!-- 彩带形状 -->
+  <symbol id="confetti-leaf" viewBox="0 0 24 24">
+    <path d="M20 4C10 4 4 9 4 15c0 2 2 4 4 4 6 0 12-6 12-15Z" fill="currentColor" stroke="none"/>
+    <path d="M6 18C9 13 13 9 18 6" fill="none" stroke="rgba(34,48,31,.35)" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="confetti-flag" viewBox="0 0 24 24">
+    <path d="M4 3h16l-4 6 4 6H4Z" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="confetti-dot" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="confetti-star" viewBox="0 0 24 24">
+    <path d="M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6Z" fill="currentColor" stroke="none"/>
+  </symbol>
+
+  <!-- 功能图标 -->
+  <symbol id="ico-help" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M9.4 9.2c.3-1.7 1.5-2.7 3-2.7 1.7 0 3 1.2 3 2.8 0 1.4-.9 2.1-2 2.8-.9.6-1.3 1.1-1.3 2.1"/>
+    </g>
+    <circle cx="12" cy="17.6" r="1.3" fill="currentColor"/>
+  </symbol>
+  <symbol id="ico-log" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M6 3.5h9l3.5 3.5v13.5H6Z" stroke-linejoin="round"/>
+      <path d="M10 9.5h6M10 13h6M10 16.5h4"/>
+    </g>
+  </symbol>
+  <symbol id="ico-sound" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 9.5h3.5L13 5v14l-5.5-4.5H4Z"/>
+      <path d="M16.5 9c1.2 1.6 1.2 4.4 0 6M19.4 6.4c2.3 3 2.3 8.2 0 11.2"/>
+    </g>
+  </symbol>
+  <symbol id="ico-mute" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 9.5h3.5L13 5v14l-5.5-4.5H4Z"/>
+      <path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/>
+    </g>
+  </symbol>
+  <symbol id="ico-close" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6L6 18"/>
+    </g>
+  </symbol>
+  <symbol id="ico-exit" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 4H5v16h5"/>
+      <path d="M14 8l4 4-4 4M9 12h9"/>
+    </g>
+  </symbol>
+  <symbol id="ico-share" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 15V4M8 8l4-4 4 4"/>
+      <path d="M4 13v6h16v-6"/>
+    </g>
+  </symbol>
+  <symbol id="ico-check" viewBox="0 0 24 24">
+    <path d="M4.5 12.5l5 5 10-11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="ico-arrow" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12h15M13 6l6 6-6 6"/>
+    </g>
+  </symbol>
+  <symbol id="ico-back" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 12H5M11 6l-6 6 6 6"/>
+    </g>
+  </symbol>
+  <symbol id="ico-copy" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="8" y="8" width="12" height="12" rx="2.5"/>
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+    </g>
+  </symbol>
+  <symbol id="ico-link" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M10 14a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-5.6-5.6l-1.2 1.2"/>
+      <path d="M14 10a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 5.6 5.6l1.2-1.2"/>
+    </g>
+  </symbol>
+  <symbol id="ico-clock" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 7v5.5l3.5 2"/>
+    </g>
+  </symbol>
+  <symbol id="ico-users" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="9" cy="8" r="3.5"/>
+      <path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/>
+      <path d="M16 5.2a3.4 3.4 0 0 1 0 5.6M18 14.4c2 .8 3.4 2.9 3.4 5.6"/>
+    </g>
+  </symbol>
+  <symbol id="ico-refresh" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 11a8 8 0 1 0-2.3 5.7"/>
+      <path d="M20 4v7h-7"/>
+    </g>
+  </symbol>
+  <symbol id="ico-star" viewBox="0 0 24 24">
+    <path d="M12 2.5l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.7l-6.1 3.4 1.4-6.8-5.1-4.7 6.9-.8Z" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="ico-minus" viewBox="0 0 24 24">
+    <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ico-plus" viewBox="0 0 24 24">
+    <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ico-seal" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+      <circle cx="12" cy="10" r="6.5"/>
+      <path d="M8.5 15.5 7 21l5-2.5 5 2.5-1.5-5.5"/>
+    </g>
+  </symbol>
+  <symbol id="ico-flag" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 21V3.5"/>
+      <path d="M6 4h11.5l-3.2 4.3 3.2 4.7H6"/>
+    </g>
+  </symbol>
+  <symbol id="ico-compass" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>
+    </g>
+  </symbol>
+  <symbol id="ico-boot" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 3.5h5v6.7l4.3 2.3c1.6.9 2.7 2.3 2.7 4.2v3.8H4.5V13L7 11.2z"/>
+      <path d="M7 14h12"/>
+    </g>
+  </symbol>
+  <symbol id="ico-tent" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4 3 20h18z"/>
+      <path d="M12 11.5 8.5 20M12 11.5 15.5 20"/>
+    </g>
+  </symbol>
+  <symbol id="ico-whistle" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9h11v3.5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5z"/>
+      <path d="M14 10.5h7"/>
+      <circle cx="7.5" cy="12.2" r="1.4"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- ========== 背景 ========== -->
+<div class="page-bg" aria-hidden="true">
+  <div class="bg-sun"></div>
+  <div class="bg-contour"><svg viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice"><use href="#terrain-lines"/></svg></div>
+  <div class="bg-ridge bg-ridge-far"></div>
+  <div class="bg-ridge bg-ridge-near"></div>
+  <div class="bg-scene"><svg viewBox="0 0 480 300" preserveAspectRatio="xMidYMax slice"><use href="#scene-mountains"/></svg></div>
+</div>
+
+<div id="app" role="main"></div>
+
+<!-- 吐司 -->
+<div id="toastLayer" class="toast-layer" role="status" aria-live="polite"></div>
+
+<!-- 底部弹层（表单/确认） -->
+<div id="sheetLayer" class="layer sheet-layer" hidden>
+  <div class="layer-scrim" data-act="sheet-close"></div>
+  <section class="sheet" id="sheetPanel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1"></section>
+</div>
+
+<!-- 居中弹窗（规则/记录/分享） -->
+<div id="modalLayer" class="layer modal-layer" hidden>
+  <div class="layer-scrim" data-act="sheet-close"></div>
+  <section class="modal-card" id="modalPanel" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1"></section>
+</div>
+
+<!-- 庆祝层 -->
+<div id="celebrateLayer" class="celebrate-layer" aria-hidden="true"></div>
+
+<!-- 断线提示 -->
+<div id="offlineBanner" class="offline-banner" role="status" hidden>
+  <span class="offline-dot"></span>网络连接中断，正在重连…
+</div>
+
+<!-- 加载 -->
+<div id="bootLoading" class="boot-loading">
+  <div class="boot-card">
+    <svg class="boot-badge" viewBox="0 0 120 120" aria-hidden="true"><use href="#logo-badge"/></svg>
+    <div class="boot-ring" aria-hidden="true"></div>
+    <p class="boot-copy">正在支帐篷…</p>
+    <p class="boot-stuck">加载有点慢，检查网络后 <a href="javascript:location.reload()">刷新页面</a></p>
+  </div>
+</div>
+
+<noscript>
+  <div class="noscript">同词相遇需要开启 JavaScript 才能联机游玩。</div>
+</noscript>
+
+<!-- 依赖顺序固定：game → render → supabase → net → online -->
+<script src="game.js?v=20261126b"></script>
+<script src="render.js?v=20261126q"></script>
+<script src="supabase.min.js?v=20260101"></script>
+<script src="net.js?v=20261126"></script>
+<script src="online.js?v=20261126e"></script>
+<script>
+(function () {
+  var booted = false;
+  window.__swBooted = function () { booted = true; };
+  try {
+    if (window.SWR && typeof SWR.init === 'function') SWR.init();
+    if (window.SWN && typeof SWN.init === 'function') {
+      SWN.init({
+        sessionKey: 'sameword-online',
+        title: '同词相遇',
+        maxPlayers: 4,
+        getState: function () { return SWR.getState(); },
+        onWaiting: function (v) { SWR.renderWaiting(v); },
+        onState: function (s, m) { SWR.applyRemote(s, m); },
+        onClosed: function (r) { SWR.onRoomClosed(r); },
+        onPlayerLeft: function (i) { SWR.onPlayerLeft(i); },
+        onNet: function (on, silent) { SWR.setNet(on, silent); }
+      });
+      SWN.tryRestore().then(function (ok) {
+        if (!ok && window.SWR) SWR.renderLanding();
+      }).catch(function () {
+        if (window.SWR) SWR.renderLanding();
+      });
+    } else if (window.SWR && typeof SWR.renderLanding === 'function') {
+      SWR.renderLanding();
+    }
+  } catch (err) {
+    try { if (window.SWR && typeof SWR.renderLanding === 'function') SWR.renderLanding(); } catch (e2) {}
+  }
+  setTimeout(function () {
+    var el = document.getElementById('bootLoading');
+    if (!booted && el) el.classList.add('is-stuck');
+  }, 5500);
+})();
+</script>
+<script src="../track.js?v=20261125"></script>
+</body>
+</html>

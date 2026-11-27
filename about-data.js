@@ -1,6 +1,6 @@
 /* 关于弹窗数据：发版时只需要改这个文件。supportQrs 填赞赏码图片路径即可展示。 */
 window.ABOUT_DATA = {
-  updated: '2026-11-24',
+  updated: '2026-11-27',
   authorUrl: 'https://xhslink.com/m/6v4n9vWAfvp',
   // 可放微信/支付宝两张，也可只放一张：{ label: '微信', src: 'support-wechat.png' }
   supportQrs: [
@@ -10,6 +10,7 @@ window.ABOUT_DATA = {
     {
       month: '2026 年 11 月',
       items: [
+        { d: '11.27', t: '新游戏《面具摔跤手》上线；新游戏《同词相遇》上线' },
         { d: '11.24', t: '新游戏《牛头王》上线' },
         { d: '11.17', t: '新游戏《大宋百商图》上线；《炸弹克星》开放 19~21 关' },
         { d: '11.06', t: '《炸弹克星》开放 16~18 关' },

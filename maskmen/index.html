@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF3E2">
+<meta name="description" content="面具摔跤手 Maskmen 单机人机版：六色摔跤手，打空手牌赢下赛季。">
+<title>面具摔跤手 · Maskmen</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- ============ 原创 SVG 图形库 ============ -->
+<svg class="svg-defs" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- 六张原创面具 -->
+    <symbol id="mask-red" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M60 1C51 12 55 18 60 24C65 18 69 12 60 1Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M43 9C39 18 44 24 50 26C49 17 47 13 43 9Z" fill="#FBF3E2" stroke="#201B16" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M77 9C81 18 76 24 70 26C71 17 73 13 77 9Z" fill="#FBF3E2" stroke="#201B16" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M29 47L47 39L44 63L31 65Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M91 47L73 39L76 63L89 65Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M27 35L50 29M93 35L70 29" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M40 80Q60 98 80 80" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M50 86V91M60 90V95M70 86V91" fill="none" stroke="#201B16" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="28" cy="74" r="2.6" fill="#201B16"/><circle cx="92" cy="74" r="2.6" fill="#201B16"/>
+    </symbol>
+
+    <symbol id="mask-blue" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M63 0L46 26L58 23L48 45L72 14L58 17Z" fill="#FFD84D" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <circle cx="43" cy="54" r="10.5" fill="#FBF3E2" stroke="#201B16" stroke-width="4"/>
+      <circle cx="77" cy="54" r="10.5" fill="#FBF3E2" stroke="#201B16" stroke-width="4"/>
+      <path d="M24 36L46 32M96 36L74 32" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M48 84Q60 94 72 84" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M24 70H34M86 70H96" fill="none" stroke="#201B16" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="M33 10L27 20M87 10L93 20" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+    </symbol>
+
+    <symbol id="mask-green" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M58 22C40 8 27 13 31 25C38 31 50 30 58 22Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M62 22C80 8 93 13 89 25C82 31 70 30 62 22Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M60 24V7" fill="none" stroke="#201B16" stroke-width="4" stroke-linecap="round"/>
+      <path d="M31 62L44 42L57 62Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M89 62L76 42L63 62Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M38 84L48 91L58 84L68 91L78 84" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 76Q28 82 34 78M96 76Q92 82 86 78" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="mask-orange" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M60 0L67 13L82 15L71 26L74 41L60 34L46 41L49 26L38 15L53 13Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M28 54Q41 41 54 54Q41 67 28 54Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M92 54Q79 41 66 54Q79 67 92 54Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M42 79Q60 99 78 79Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M50 82V91M60 84V96M70 82V91" fill="none" stroke="#201B16" stroke-width="3" stroke-linecap="round"/>
+      <path d="M25 32L44 36M95 32L76 36" fill="none" stroke="#201B16" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="mask-purple" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M60 1L78 21L60 41L42 21Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M60 10L70 21L60 32L50 21Z" fill="currentColor" stroke="#201B16" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M30 49H54V62H30Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M90 49H66V62H90Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M26 38H52M94 38H68" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M40 86H80" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M44 82V90M52 82V90M60 82V90M68 82V90M76 82V90" fill="none" stroke="#201B16" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="mask-gray" viewBox="0 0 120 120">
+      <path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="currentColor" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M42 4H78L86 25H34Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M51 9H69M60 9V22" fill="none" stroke="#201B16" stroke-width="4" stroke-linecap="round"/>
+      <path d="M27 47H54V64H27Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M93 47H66V64H93Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M25 37H55M95 37H65" fill="none" stroke="#201B16" stroke-width="5" stroke-linecap="round"/>
+      <path d="M40 86H80" fill="none" stroke="#201B16" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="40" cy="86" r="3.4" fill="#201B16"/><circle cx="80" cy="86" r="3.4" fill="#201B16"/>
+      <path d="M22 74H32M88 74H98" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- 六位原创经纪人随身物件（玩家/AI 身份，不使用摔跤手面具） -->
+    <symbol id="prop-1" viewBox="0 0 120 120">
+      <path d="M17 73C35 62 85 62 103 73C101 82 82 88 60 88C38 88 19 82 17 73Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M36 72L43 32C51 27 69 27 77 32L84 72Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M37 63H83V72H37Z" fill="#F2C230" stroke="#201B16" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M53 33C55 43 55 53 54 63M68 33C67 43 68 53 69 63" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+    </symbol>
+
+    <symbol id="prop-2" viewBox="0 0 120 120">
+      <path d="M18 67C20 52 31 44 45 48C52 50 57 56 60 62C63 56 68 50 75 48C89 44 100 52 102 67C94 61 84 62 76 69C68 76 63 70 60 65C57 70 52 76 44 69C36 62 26 61 18 67Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M25 64C31 57 39 56 46 61M95 64C89 57 81 56 74 61" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    </symbol>
+
+    <symbol id="prop-3" viewBox="0 0 120 120">
+      <path d="M31 45C27 58 32 70 43 73C54 70 59 58 55 45Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <ellipse cx="43" cy="44" rx="13" ry="6" fill="#FBF3E2" stroke="#201B16" stroke-width="4"/>
+      <ellipse cx="43" cy="44" rx="7" ry="2.5" fill="#F2C230"/>
+      <path d="M51 70C62 83 78 87 94 80" fill="none" stroke="#201B16" stroke-width="10" stroke-linecap="round"/>
+      <path d="M53 70C63 81 77 84 91 78" fill="none" stroke="#FBF3E2" stroke-width="2.5" stroke-linecap="round" opacity=".65"/>
+      <circle cx="96" cy="80" r="7" fill="#F2C230" stroke="#201B16" stroke-width="3"/>
+      <path d="M40 32C33 25 39 17 46 21C53 25 47 34 42 30" fill="none" stroke="#F2C230" stroke-width="4" stroke-linecap="round"/>
+      <path d="M52 28C46 21 52 13 59 18C66 23 59 31 55 27" fill="none" stroke="#F2C230" stroke-width="4" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="prop-4" viewBox="0 0 120 120">
+      <path d="M7 48L22 43M113 48L98 43" fill="none" stroke="#201B16" stroke-width="6" stroke-linecap="round"/>
+      <rect x="20" y="43" width="34" height="29" rx="9" fill="#201B16" stroke="#201B16" stroke-width="4"/>
+      <rect x="66" y="43" width="34" height="29" rx="9" fill="#201B16" stroke="#201B16" stroke-width="4"/>
+      <path d="M54 50Q60 45 66 50" fill="none" stroke="#201B16" stroke-width="6" stroke-linecap="round"/>
+      <path d="M28 49L40 67M74 49L86 67" fill="none" stroke="#FBF3E2" stroke-width="3.5" stroke-linecap="round" opacity=".55"/>
+    </symbol>
+
+    <symbol id="prop-5" viewBox="0 0 120 120">
+      <path d="M19 84H49V103H19Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M22 89H46" fill="none" stroke="#F2C230" stroke-width="4"/>
+      <path d="M28 63C17 58 12 70 19 79C24 85 34 85 41 80Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M41 82C31 80 23 70 24 57C25 40 38 29 55 28C74 27 88 37 91 53C94 70 83 83 67 85L41 85Z" fill="#201B16" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M30 58C28 48 34 39 44 35" fill="none" stroke="#FBF3E2" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <path d="M58 43V74M67 41V76M76 44V72" fill="none" stroke="#F2C230" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="prop-6" viewBox="0 0 120 120">
+      <path d="M28 66C28 24 92 24 92 66" fill="none" stroke="#201B16" stroke-width="10" stroke-linecap="round"/>
+      <rect x="15" y="54" width="22" height="32" rx="9" fill="#201B16" stroke="#201B16" stroke-width="4"/>
+      <rect x="83" y="54" width="22" height="32" rx="9" fill="#201B16" stroke="#201B16" stroke-width="4"/>
+      <rect x="21" y="61" width="10" height="18" rx="5" fill="#F2C230"/>
+      <rect x="89" y="61" width="10" height="18" rx="5" fill="#F2C230"/>
+      <path d="M90 82C84 94 72 97 62 92" fill="none" stroke="#201B16" stroke-width="6" stroke-linecap="round"/>
+      <ellipse cx="58" cy="91" rx="7" ry="5" fill="#201B16" stroke="#201B16" stroke-width="2"/>
+      <circle cx="57" cy="91" r="2" fill="#F2C230"/>
+    </symbol>
+
+    <!-- 腰带 -->
+    <symbol id="belt" viewBox="0 0 64 40">
+      <path d="M2 18H62V24H2Z" fill="currentColor" stroke="#201B16" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="21" y="7" width="22" height="26" rx="5" fill="currentColor" stroke="#201B16" stroke-width="3"/>
+      <path d="M32 12L35 19L42 19L36 23L38 30L32 26L26 30L28 23L22 19L29 19Z" fill="#FBF3E2" stroke="#201B16" stroke-width="1.4" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- 图标 -->
+    <symbol id="ico-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M9.6 9.2a2.6 2.6 0 1 1 3.5 2.5c-.7.3-1.1.8-1.1 1.6v.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="ico-log" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="ico-sound" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 8.5a5 5 0 0 1 0 7M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="ico-mute" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="ico-exit" viewBox="0 0 24 24"><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5M10 8l-4 4 4 4M6 12h9" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ico-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="ico-matrix" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="ico-pass" viewBox="0 0 24 24"><path d="M4 12h12M11 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ico-skip" viewBox="0 0 24 24"><path d="M5 5l7 7-7 7M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app" data-screen="home">
+
+  <!-- ================= 封面 ================= -->
+  <main class="screen screen-home" data-screen="home">
+    <div class="poster">
+      <div class="poster-art" aria-hidden="true">
+        <div class="poster-burst"></div>
+        <div class="poster-mask pm-1"><svg class="mask"><use href="#mask-red"/></svg></div>
+        <div class="poster-mask pm-2"><svg class="mask"><use href="#mask-orange"/></svg></div>
+        <div class="poster-mask pm-3"><svg class="mask"><use href="#mask-blue"/></svg></div>
+        <div class="poster-badge">6 色<br><small>60 张</small></div>
+      </div>
+      <p class="kicker">六色面具 · 单机人机版</p>
+      <h1 class="poster-title">面具摔跤手</h1>
+      <p class="poster-en">MASKMEN</p>
+      <p class="tagline">六位摔跤手，关系越打越明。<br>先把手里最后一张面具拍在台上的人，赢下赛季。</p>
+      <div class="home-actions">
+        <button class="btn btn-primary btn-lg" id="btn-start">开始比赛</button>
+        <button class="btn btn-ghost" id="btn-continue" hidden>继续上局</button>
+      </div>
+      <p class="home-save" id="home-save" hidden></p>
+      <div class="home-links">
+        <button class="linkbtn" data-open="rules">玩法规则</button>
+        <button class="linkbtn" data-open="stats">战绩</button>
+      </div>
+      <p class="home-note">2~6 人 | 你 + 1~5 个 AI</p>
+      <p class="home-stats" id="home-stats"></p>
+    </div>
+  </main>
+
+  <!-- ================= 设置 ================= -->
+  <main class="screen screen-setup" data-screen="setup" hidden>
+    <div class="setup card">
+      <p class="kicker">赛前登记</p>
+      <h2 class="setup-title">组建你的擂台</h2>
+
+      <label class="field">
+        <span>你的名字</span>
+        <input id="player-name" type="text" maxlength="8" autocomplete="off" placeholder="你">
+      </label>
+
+      <div class="field">
+        <span>AI 对手</span>
+        <div class="seg" id="ai-count" role="group" aria-label="AI 对手数量">
+          <button type="button" data-count="1">1</button>
+          <button type="button" data-count="2">2</button>
+          <button type="button" data-count="3">3</button>
+          <button type="button" data-count="4">4</button>
+          <button type="button" data-count="5">5</button>
+        </div>
+        <p class="hint" id="ai-hint"></p>
+      </div>
+
+      <div class="roster-head">
+        <span>经纪人名单</span>
+        <span class="diff-chip">难度 · 标准</span>
+      </div>
+      <ul class="roster" id="roster"></ul>
+      <!-- <p class="roster-note">席位图标是经纪人的随身物件；卡面面具才是摔跤手。</p> -->
+
+      <div class="setup-actions">
+        <button class="btn btn-ghost" id="btn-setup-back">返回</button>
+        <button class="btn btn-primary" id="btn-setup-start">开赛</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= 对局 ================= -->
+  <main class="screen screen-game" data-screen="game" hidden>
+    <header class="topbar">
+      <button class="brand" id="btn-home" aria-label="返回首页">
+        <svg class="brand-mask"><use href="#mask-orange"/></svg>
+        <span>面具摔跤手</span>
+      </button>
+      <div class="hud">
+        <b id="hud-season">第 1 赛季</b>
+        <span id="hud-round">第 1 回合</span>
+      </div>
+      <div class="top-actions">
+        <button class="iconbtn" data-open="rules" aria-label="规则"><svg><use href="#ico-help"/></svg></button>
+        <button class="iconbtn" data-open="log" aria-label="日志"><svg><use href="#ico-log"/></svg></button>
+        <button class="iconbtn" id="btn-sound" aria-label="声音"><svg><use href="#ico-sound"/></svg></button>
+        <button class="iconbtn" id="btn-exit" aria-label="退出"><svg><use href="#ico-exit"/></svg></button>
+      </div>
+    </header>
+
+    <div class="game-main">
+      <section class="turn card" id="turn">
+        <div class="turn-main">
+          <span class="turn-avatar" id="turn-avatar"></span>
+          <div class="turn-text">
+            <p class="turn-title" id="turn-title">准备开始</p>
+            <p class="turn-sub" id="turn-sub"></p>
+          </div>
+        </div>
+        <div class="trick" id="trick" aria-label="本回合出牌记录"></div>
+      </section>
+
+      <section class="board-wrap card">
+        <div class="board-head">
+          <h2>力量关系</h2>
+          <span class="board-legend">上强 ↓ 下弱 · 异列不可比</span>
+          <button class="mini" data-open="matrix"><svg><use href="#ico-matrix"/></svg>关系表</button>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="board-foot" id="board-foot"></div>
+      </section>
+
+      <section class="seats" id="seats" aria-label="玩家席位"></section>
+
+      <section class="hand-wrap card" id="hand-wrap">
+        <div class="hand-head">
+          <h2>你的手牌</h2>
+          <span class="hand-count" id="hand-count"></span>
+        </div>
+        <div class="hand" id="hand"></div>
+      </section>
+    </div>
+
+    <footer class="actions" id="actions">
+      <button class="btn btn-pass" id="btn-pass"><svg><use href="#ico-pass"/></svg>跳过本回合</button>
+      <button class="btn btn-ghost" data-open="matrix"><svg><use href="#ico-matrix"/></svg>关系表</button>
+    </footer>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="live" id="live" aria-live="polite"></div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header class="modal-head">
+      <h2 id="modal-title">标题</h2>
+      <button class="iconbtn" id="modal-close" aria-label="关闭"><svg><use href="#ico-close"/></svg></button>
+    </header>
+    <div class="modal-body" id="modal-body"></div>
+    <footer class="modal-foot" id="modal-foot"></footer>
+  </div>
+</div>
+
+<script src="game.js"></script>
+<script src="ai.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+<script src="../track.js?v=20261125"></script>
+</body>
+</html>

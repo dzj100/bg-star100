@@ -84,6 +84,7 @@ button { font-family:inherit; }
 .game-card:active { transform:scale(.96); }
 .card-icon { height:40px; display:flex; align-items:center; justify-content:center; font-size:33px; line-height:1; }
 .card-icon .ico-svg { height:36px; width:auto; }
+.card-icon .ico-svg.ico-same { height:40px; }
 .card-icon .ico-img { width:38px; height:38px; object-fit:contain; }
 .card-title { font-size:.84rem; font-weight:700; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .card-meta { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px 6px; max-width:100%; }
@@ -428,7 +429,7 @@ var ICO_TICKET = '<svg class="ico-svg" viewBox="0 0 52 30">' +
   '<path d="M43.4 12.4 l1.15 2.35 2.6 .38 -1.88 1.83 .44 2.58 -2.31 -1.22 -2.31 1.22 .44 -2.58 -1.88 -1.83 2.6 -.38 Z" fill="#f6e9f8"/>' +
 '</svg>';
 /* 牛头王：牧场风格的正面牛头，与游戏内 SVG 卡牌同一套轮廓 */
-var ICO_BULL = '<svg class="ico-svg" viewBox="0 0 64 64" aria-hidden="true">' +
+var ICO_BULL = '<svg class="ico-svg" viewBox="4 6 56 45" aria-hidden="true">' +
   '<path d="M20.5 24.5C15 24 9.2 20.3 5.5 13.4c6.2-.9 11.2.5 15.2 4.1l3.4 4.6-3.6 2.4z" fill="#7a4217"/>' +
   '<path d="M43.5 24.5C49 24 54.8 20.3 58.5 13.4c-6.2-.9-11.2.5-15.2 4.1l-3.4 4.6 3.6 2.4z" fill="#7a4217"/>' +
   '<path d="M18.5 30.2c-4.1-.7-7.3-2.6-9.6-5.6 4.2-1.2 8.1-.4 11.1 2.4l-.6 3.4-.9-.2z" fill="#9a5a1f"/>' +
@@ -487,6 +488,43 @@ var ICO_BOMB = '<svg class="ico-svg" viewBox="0 0 170 152" aria-hidden="true">' 
   '</g>' +
 '</svg>';
 
+/* 面具摔跤手：金光面具（原创 SVG） */
+var ICO_MASK = '<svg class="ico-svg" viewBox="0 0 120 120" aria-hidden="true">' +
+  '<path d="M60 9C95 9 111 30 111 57C111 89 88 111 60 115C32 111 9 89 9 57C9 30 25 9 60 9Z" fill="#F08A1E" stroke="#201B16" stroke-width="5" stroke-linejoin="round"/>' +
+  '<path d="M60 0L67 13L82 15L71 26L74 41L60 34L46 41L49 26L38 15L53 13Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>' +
+  '<path d="M28 54Q41 41 54 54Q41 67 28 54Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>' +
+  '<path d="M92 54Q79 41 66 54Q79 67 92 54Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>' +
+  '<path d="M42 79Q60 99 78 79Z" fill="#FBF3E2" stroke="#201B16" stroke-width="4" stroke-linejoin="round"/>' +
+  '<path d="M50 82V91M60 84V96M70 82V91" fill="none" stroke="#201B16" stroke-width="3" stroke-linecap="round"/>' +
+  '<path d="M25 32L44 36M95 32L76 36" fill="none" stroke="#201B16" stroke-width="4" stroke-linecap="round"/>' +
+'</svg>';
+
+/* 同词相遇：与游戏内 #logo-badge 同源（营地徽章 + 山景 + 叠放「词」气泡），色值取游戏调色板 */
+var ICO_SAME = '<svg class="ico-svg ico-same" viewBox="0 0 120 120" aria-hidden="true">' +
+  '<defs><clipPath id="swLogoClip"><circle cx="60" cy="62" r="47"/></clipPath></defs>' +
+  '<circle cx="60" cy="62" r="55" fill="#FBF7EC" stroke="#22301F" stroke-width="3.2"/>' +
+  '<circle cx="60" cy="62" r="48" fill="none" stroke="#22301F" stroke-width="1.6" stroke-dasharray="5 5" opacity=".4"/>' +
+  '<g clip-path="url(#swLogoClip)">' +
+    '<circle cx="60" cy="36" r="12" fill="#F2C14E" stroke="#22301F" stroke-width="2.1"/>' +
+    '<g stroke="#F2C14E" stroke-width="1.9" stroke-linecap="round" opacity=".9">' +
+      '<path d="M60 16v-5"/><path d="M40 22l-4-4"/><path d="M80 22l4-4"/>' +
+      '<path d="M34 40h-5"/><path d="M86 40h5"/>' +
+    '</g>' +
+    '<path d="M4 82 30 44 44 64 60 42 82 68 94 56 116 84v26H4Z" fill="#7FAE6A" stroke="#22301F" stroke-width="2.2" stroke-linejoin="round"/>' +
+    '<path d="M24 51 30 44 36 53Z" fill="#FBF7EC"/>' +
+    '<path d="M55 50 60 42 66 51Z" fill="#FBF7EC"/>' +
+    '<path d="M4 92 26 70 40 84 56 66 78 88 94 76 116 94v22H4Z" fill="#2F6B4F" stroke="#22301F" stroke-width="2.2" stroke-linejoin="round"/>' +
+    '<path d="M18 79 24 70 30 80Z" fill="#FBF7EC" opacity=".92"/>' +
+    '<path d="M70 84 78 74 86 86Z" fill="#FBF7EC" opacity=".7"/>' +
+  '</g>' +
+  '<g>' +
+    '<path d="M17 66h40a9 9 0 0 1 9 9v13a9 9 0 0 1-9 9H35l-9 8v-8h-9a9 9 0 0 1-9-9V75a9 9 0 0 1 9-9Z" fill="#FBF7EC" stroke="#22301F" stroke-width="2.7" stroke-linejoin="round"/>' +
+    '<text x="41" y="89" text-anchor="middle" font-size="19" font-weight="900" fill="#22301F">词</text>' +
+    '<path d="M64 71h34a9 9 0 0 1 9 9v12a9 9 0 0 1-9 9h-4v7l-9-7H64a9 9 0 0 1-9-9V80a9 9 0 0 1 9-9Z" fill="#F2C14E" stroke="#22301F" stroke-width="2.7" stroke-linejoin="round"/>' +
+    '<text x="81" y="94" text-anchor="middle" font-size="18" font-weight="900" fill="#22301F">词</text>' +
+  '</g>' +
+'</svg>';
+
 /* ---------------- 数据 ---------------- */
 /* min/max 用于“按人数搜索”，players 为展示标签 */
 var GAMES = [
@@ -510,6 +548,7 @@ var GAMES = [
   { mode:'solo',   name:'流冰航路',   players:'1人',  min:1, max:1,  type:'单人策略解谜', icon:'⛵',  url:'frozen-passage/index.html' },
   { mode:'solo',   name:'大宋百商图', players:'1~4人', min:1, max:4,  type:'模拟经营管理', icon:'🏮', url:'dasong-merchants/index.html' },
   { mode:'solo',   name:'牛头王',     players:'1人',  min:1, max:1,  type:'人机手牌博弈',   icon:ICO_BULL, url:'six-nimmt/index.html' },
+  { mode:'solo',   name:'面具摔跤手', players:'1人', min:1, max:1,  type:'人机手牌博弈',   icon:ICO_MASK, url:'maskmen/index.html' },
   /* —— 联机 —— */
   { mode:'online', name:'弑君者OL',   players:'2~4人',  min:2, max:4,  type:'合作扑克闯关', icon:'⚔️',    url:'regicide/index_ol.html' },
   { mode:'online', name:'月面探险OL', players:'2~5人',  min:2, max:5,  type:'合作角色扮演', icon:'🌕',    url:'moon-adventure/index_ol.html' },
@@ -517,7 +556,8 @@ var GAMES = [
   { mode:'online', name:'神探缉凶OL', players:'2人',    min:2, max:2,  type:'1v1对战策略推理', icon:'🕵️', url:'fugitive/index_ol.html' },
   { mode:'online', name:'渗透因子OL', players:'2~5人',  min:2, max:5,  type:'合作推理烧脑', icon:ICO_INFIL, url:'infiltraitors/index_ol.html' },
   { mode:'online', name:'炸弹克星OL', players:'2~5人',  min:2, max:5,  type:'合作推理解谜', icon:ICO_BOMB, url:'bomb-busters/index.html' },
-  { mode:'online', name:'流冰航路OL', players:'2~4人', min:2, max:4, type:'合作策略解谜', icon:'⛵',  url:'frozen-passage/index_ol.html' }
+  { mode:'online', name:'流冰航路OL', players:'2~4人', min:2, max:4, type:'合作策略解谜', icon:'⛵',  url:'frozen-passage/index_ol.html' },
+  { mode:'online', name:'同词相遇OL', players:'2~4人', min:2, max:4, type:'联机默契猜词', icon:ICO_SAME, url:'same-word/index.html' }
 ];
 
 /* ---------------- 渲染列表 ---------------- */

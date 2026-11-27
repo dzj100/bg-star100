@@ -144,6 +144,8 @@ let _pushInFlight   = false;      // 推送在途（串行化：防并发 UPDATE
 let _pushQueued     = false;      // 在途期间又有推送请求：完成后以最新本地状态补发
 let _pushStatus     = '';         // 粘性状态标记：开局等一次性 status 随排队补发送达，不因串行化丢失
 let _lastWaitingSig = '';         // 等候室渲染签名（座位/选关未变则跳过重绘）
+let _netBusy       = false;       // 创建/加入进行中：防连点重复建房、重复占座
+let _netPingSeq    = 0;           // 大厅连通性自检的并发令牌
 
 function _saveSession() {
   if (_onlineRoomId) {
@@ -234,6 +236,39 @@ let HOOK_showLanding = null;
    大厅 UI
    ============================================================ */
 
+/** 房间号规范化：全角数字转半角并去掉非数字（中文输入法常打出全角） */
+function _normalizeRoomCode(value) {
+  return String(value || '')
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/\D/g, '')
+    .slice(0, 4);
+}
+
+/** 网络/业务错误统一转成玩家能看懂的提示（net.js 未加载时兜底为原始信息） */
+function _netErrText(error, fallback) {
+  if (typeof netErrorText === 'function') return netErrorText(error, fallback);
+  return String((error && error.message) || '') || fallback;
+}
+
+/** 大厅连通性自检：提示当前网络能否连到联机服务（切换 Wi-Fi/流量后自动重测） */
+async function _checkLobbyNet() {
+  if (typeof netPing !== 'function') return;
+  const seq = ++_netPingSeq;
+  const el = document.getElementById('net-health');
+  if (!el) return;
+  el.innerHTML = '<span>正在检测联机服务…</span>';
+  const r = await netPing();
+  if (seq !== _netPingSeq) return;
+  const box = document.getElementById('net-health');
+  if (!box) return;
+  if (r.ok) {
+    box.innerHTML = `<span style="color:var(--green);">✓ 联机服务连接正常（${r.ms}ms）</span>`;
+    return;
+  }
+  box.innerHTML = `<span style="color:var(--danger);">⚠️ ${_esc(_netErrText(r.error, '联机服务连接失败'))}</span><br>`
+    + '<span onclick="_checkLobbyNet()" style="color:var(--gold);text-decoration:underline;cursor:pointer;">重新检测</span>';
+}
+
 function renderOnlineLobby() {
   const colors = typeof HOOK_getPlayerColors === 'function' ? HOOK_getPlayerColors() : [];
   document.getElementById('online').innerHTML = `
@@ -258,9 +293,11 @@ function renderOnlineLobby() {
                  border-radius:8px;margin-bottom:12px;">
         <button class="start-btn" onclick="onJoinRoom()" style="background:var(--surface);border:2px solid var(--gold);color:var(--gold);">加入房间</button>
       </div>
+      <div id="net-health" style="margin-top:16px;text-align:center;font-size:.82rem;color:var(--text-dim);line-height:1.6;min-height:1.3em;"></div>
     </div>`;
   var pref = /[?&]room=(\d{4})(?:&|$)/.exec(location.search);
   if (pref) document.getElementById('joinRoomInput').value = pref[1];
+  _checkLobbyNet();
 }
 
 /* ============================================================
@@ -296,10 +333,12 @@ function _hideNetLoading() {
    ============================================================ */
 
 async function onCreateRoom() {
+  if (_netBusy) return;
   const name = prompt('输入你的名字（房主）:', '');
   if (!name || !name.trim()) return;
   _myPlayerName = name.trim();
 
+  _netBusy = true;
   _showNetLoading('正在创建房间...');
   try {
     const roomId = await netCreateRoom(_myPlayerName);
@@ -313,19 +352,24 @@ async function onCreateRoom() {
     _subscribeToRoom(roomId);
     renderWaitingRoom({ seats: [{ name: _myPlayerName, seatIndex: 0 }] });
   } catch (e) {
-    alert('创建房间失败: ' + e.message);
+    alert('创建房间失败：' + _netErrText(e, '请稍后再试'));
   } finally {
+    _netBusy = false;
     _hideNetLoading();
   }
 }
 
 async function onJoinRoom() {
-  const roomId = (document.getElementById('joinRoomInput').value || '').trim().toUpperCase();
+  if (_netBusy) return;
+  const input = document.getElementById('joinRoomInput');
+  const roomId = _normalizeRoomCode(input && input.value);
   const name   = (document.getElementById('joinNameInput').value  || '').trim();
-  if (!roomId || roomId.length !== 4) { alert('请输入4位房间号'); return; }
-  if (!name)                           { alert('请输入你的名字');  return; }
+  if (roomId.length !== 4) { alert('请输入4位房间号'); return; }
+  if (!name)               { alert('请输入你的名字');  return; }
+  if (input.value !== roomId) input.value = roomId;
 
   _myPlayerName = name;
+  _netBusy = true;
   _showNetLoading('正在加入房间...');
   try {
     const { seatIndex, room } = await netJoinRoom(roomId, name);
@@ -351,8 +395,9 @@ async function onJoinRoom() {
       renderWaitingRoom(room);
     }
   } catch (e) {
-    alert(e.message || '加入失败');
+    alert(_netErrText(e, '加入失败'));
   } finally {
+    _netBusy = false;
     _hideNetLoading();
   }
 }
@@ -767,7 +812,7 @@ async function startOnlineGame() {
     await _markPushAndSend(window._getOnlineState(), 'playing');
     try { if (window.BG) BG.onlineStart(seats.length); } catch (e) {}
   } catch (e) {
-    alert('开始游戏失败: ' + e.message);
+    alert('开始游戏失败：' + _netErrText(e, '请稍后再试'));
   } finally {
     _hideNetLoading();
   }
@@ -1244,7 +1289,11 @@ function initOnline(hooks) {
     if (document.visibilityState === 'hidden') return;
     _recoverConnection();
   });
-  window.addEventListener('online', () => _recoverConnection());
+  window.addEventListener('online', () => {
+    _recoverConnection();
+    // 玩家按提示切换到 Wi-Fi/移动数据后，大厅里的连通性提示自动重测
+    if (document.getElementById('net-health')) _checkLobbyNet();
+  });
   window.addEventListener('pageshow', (e) => { if (e.persisted) _recoverConnection(); });
 
   // 启动重连检测

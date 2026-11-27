@@ -24,11 +24,22 @@ const NET_CONFIG = {
 // ════════════════════════════════════════════════════════════════
 
 // 统一禁用 HTTP 缓存（no-store）：iOS WebKit 可能复用 GET 响应导致"读到旧数据"，
-// 断线重连/轮询拉取必须是网络最新值
+// 断线重连/轮询拉取必须是网络最新值。
+// 同时给每个请求加超时：部分网络到 supabase.co 的链路会被静默丢弃，
+// 没有超时的话 loading 会一直转圈，玩家只能杀进程。
+const NET_TIMEOUT_MS = 8000;
+
+function _netFetch(input, init) {
+  const opts = Object.assign({}, init, { cache: 'no-store' });
+  if (typeof AbortController !== 'function') return fetch(input, opts);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, NET_TIMEOUT_MS);
+  return fetch(input, Object.assign({}, opts, { signal: ctrl.signal }))
+    .finally(() => clearTimeout(timer));
+}
+
 const _supabase = supabase.createClient(NET_CONFIG.SUPABASE_URL, NET_CONFIG.SUPABASE_ANON, {
-  global: {
-    fetch: (input, init) => fetch(input, Object.assign({}, init, { cache: 'no-store' })),
-  },
+  global: { fetch: _netFetch },
 });
 
 /** 将用户输入的短房间号转为完整数据库 ID */
@@ -54,6 +65,39 @@ function _rpcError(error, fallback) {
   return known ? known[1] : (msg || fallback);
 }
 
+function _sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** 链路层失败（断网/超时/被重置），区别于服务端返回的业务错误 */
+function _isNetworkError(error) {
+  if (!error) return false;
+  const name = String(error.name || '');
+  const msg = String(error.message || error.details || error || '');
+  return /AbortError|TimeoutError/i.test(name)
+    || /failed to fetch|load failed|networkerror|network request failed|abort|timed? out|econn|enotfound|err_internet|offline/i.test(msg);
+}
+
+/** 面向玩家的错误文案：网络类统一引导切换网络，业务类原样透出 */
+function netErrorText(error, fallback) {
+  if (_isNetworkError(error)) {
+    return '网络连不上联机服务，请切换 Wi-Fi / 移动数据后再试';
+  }
+  const msg = String((error && (error.message || error.details)) || error || '');
+  return msg || fallback || '网络异常，请稍后再试';
+}
+
+/** 轻量连通性探测（大厅自检）：只读一行，判断当前网络能否连到联机服务 */
+async function netPing() {
+  const t0 = Date.now();
+  try {
+    const { error } = await _supabase.from('rooms').select('id').limit(1);
+    return { ok: !error, ms: Date.now() - t0, error: error || null };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, error: e };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 
 function generateRoomId() {
@@ -64,24 +108,52 @@ function generateRoomId() {
 
 /**
  * 创建房间
+ *
+ * 不再先 SELECT 判重（弱网下多一次往返就多一次失败面），直接 INSERT，
+ * 由主键冲突兜住撞号；网络错误用同一房间号重试：
+ * 若上一次其实已写入成功，重试会命中 23505，回查确认是自己的房后就按成功返回，
+ * 不会给玩家留下"房间里没有人、但房号已创建"的幽灵局。
+ *
  * @returns {string} 用户可见的 4 位房间号
  */
 async function netCreateRoom(hostName) {
-  let roomId;
-  let exists = true;
-  while (exists) {
-    roomId = generateRoomId();
-    const { data } = await _supabase.from('rooms').select('id').eq('id', roomId).single();
-    exists = !!data;
+  const ATTEMPTS = 3;
+  let roomId = generateRoomId();
+  let lastError = null;
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    let error = null;
+    try {
+      ({ error } = await _supabase.from('rooms').insert({
+        id: roomId,
+        host_name: hostName,
+        status: 'waiting',
+        seats: [{ name: hostName, joinedAt: new Date().toISOString(), seatIndex: 0 }],
+      }));
+    } catch (e) {
+      error = e;
+    }
+    if (!error) return _shortId(roomId);
+
+    // 房间号撞车 or 上一次超时其实已建成功：回查确认
+    if (error.code === '23505') {
+      try {
+        const { data } = await _supabase
+          .from('rooms').select('id,host_name,status').eq('id', roomId).single();
+        if (data && data.host_name === hostName && data.status === 'waiting') {
+          return _shortId(roomId);
+        }
+      } catch (e) {}
+      roomId = generateRoomId();
+      lastError = error;
+      continue;
+    }
+
+    lastError = error;
+    if (!_isNetworkError(error) || attempt === ATTEMPTS - 1) break;
+    await _sleep(500 * (attempt + 1));
   }
-  const { error } = await _supabase.from('rooms').insert({
-    id: roomId,
-    host_name: hostName,
-    status: 'waiting',
-    seats: [{ name: hostName, joinedAt: new Date().toISOString(), seatIndex: 0 }],
-  });
-  if (error) throw error;
-  return _shortId(roomId);
+  throw lastError || new Error('创建房间失败');
 }
 
 /**
