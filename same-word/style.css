@@ -430,6 +430,7 @@ img { max-width: 100%; }
   align-items: center;
   text-align: center;
   padding: 10px 4px 0;
+  margin-top: auto;
 }
 .hero-sun {
   position: absolute;
@@ -565,6 +566,8 @@ img { max-width: 100%; }
   height: 62px;
   opacity: .95;
 }
+/* 内容块在高屏上整体垂直居中：上方留白与山野行留白对分，品牌行贴底 */
+.landing > .camp-strip { margin-top: auto; }
 .camp-strip svg { height: 100%; width: auto; }
 .camp-strip .cs-tent { height: 66px; }
 .camp-strip .cs-flag { height: 58px; }
@@ -578,7 +581,7 @@ img { max-width: 100%; }
   margin: 0 2px;
 }
 .credit {
-  margin-top: auto;
+  margin-top: 0;
   padding-top: 16px;
   text-align: center;
   font-size: 12.5px;
@@ -1688,6 +1691,7 @@ img { max-width: 100%; }
 }
 
 .trail-card { padding: 12px; }
+.trail-card .hist-table { margin-bottom: 0; }
 .trail { list-style: none; display: flex; flex-direction: column; }
 .trail-row {
   position: relative;

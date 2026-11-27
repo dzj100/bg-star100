@@ -8,7 +8,9 @@
   var TIME_OPTIONS = [0, 15, 30, 60];
   var PARTY_ROUNDS = [10, 15, 20];
   var LIMITS = { WORD: 10, NAME: 12, MIN_PARTY_ROUNDS: 5, MAX_PARTY_ROUNDS: 50 };
-  var GRACE_MS = 800;
+  // 房主在真正截止后再等一拍：成员按本机校准的时钟提交，
+  // 会因收到开轮状态的网络延迟而晚到，宽限期要覆盖这段延迟
+  var GRACE_MS = 3000;
 
   var RE_STRIP = /[\s\p{P}~\uFF5E\u00B7\u2026]/gu;
   var RE_ALNUM = /[\p{L}\p{N}]/u;
@@ -348,6 +350,23 @@
   function finalizeRound(S, now) {
     if (!S || S.phase !== 'playing') return null;
     var t = nowMs(now);
+    // 幂等保护：旧快照回灌可能把已结算的轮次又拉回 playing，
+    // 同一轮只允许进 history 一次
+    var hist = S.history || [];
+    var prev = hist.length ? hist[hist.length - 1] : null;
+    if (prev && prev.round === S.round) {
+      S.decisions = {};
+      if (S.mode === MODES.DUEL && (prev.pairs || []).some(function (p) { return p.kind === 'exact'; })) {
+        finish(S, 'match', null, t);
+      } else if (S.mode === MODES.PARTY && prev.all) {
+        finish(S, 'allmatch', null, t);
+      } else {
+        S.phase = 'reveal';
+        S.deadline = null;
+        S.hostNow = t;
+      }
+      return prev;
+    }
     var seats = activeSeats(S);
     var words = [];
     var norm = {};

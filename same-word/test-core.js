@@ -340,7 +340,7 @@ test('非法表态被拒', () => {
 test('超时空词不可 same', () => {
   const S = mkDuel({ settings: { timeLimit: 15 } });
   SWG.submit(S, 0, '苹果', T0 + 1);
-  ok(SWG.hostTick(S, T0 + S.deadline - T0 + 800));
+  ok(SWG.hostTick(S, S.deadline + SWG.GRACE_MS));
   eq(S.phase, 'reveal');
   eq(S.history[0].words, ['苹果', '']);
   eq(SWG.duelDecide(S, 0, 'same', T0 + 20000).error, 'EMPTY_WORD');
@@ -351,10 +351,10 @@ test('超时空词不可 same', () => {
 });
 test('双方超时 → 只能下一轮', () => {
   const S = mkDuel({ settings: { timeLimit: 15 } });
-  ok(SWG.hostTick(S, S.deadline + 800));
+  ok(SWG.hostTick(S, S.deadline + SWG.GRACE_MS));
   eq(S.phase, 'reveal');
   eq(S.history[0].words, ['', '']);
-  notOk(SWG.hostTick(S, S.deadline + 900));
+  notOk(SWG.hostTick(S, S.deadline + SWG.GRACE_MS + 100));
   eq(SWG.duelDecide(S, 0, 'same', T0 + 30000).error, 'EMPTY_WORD');
 });
 test('giveup 结算只执行一次', () => {
@@ -445,7 +445,7 @@ test('空词不可发起/接受认证', () => {
   const S = mkParty({ settings: { timeLimit: 15 } });
   SWG.submit(S, 0, '西瓜', T0 + 1);
   SWG.submit(S, 1, '空调', T0 + 2);
-  SWG.hostTick(S, S.deadline + 800);
+  SWG.hostTick(S, S.deadline + SWG.GRACE_MS);
   eq(S.phase, 'reveal');
   eq(S.history[0].words, ['西瓜', '空调', '']);
   eq(SWG.toggleClaim(S, 0, 2, T0 + 30000).error, 'EMPTY_WORD');
@@ -642,16 +642,16 @@ test('不限时且未交齐 → 不推进', () => {
   notOk(SWG.hostTick(S, T0 + 999999));
   eq(S.phase, 'playing');
 });
-test('限时 deadline+800 未到不推进', () => {
+test('限时宽限期未到不推进', () => {
   const S = mkParty({ settings: { timeLimit: 15 } });
   SWG.submit(S, 0, '西瓜', T0 + 1);
-  notOk(SWG.hostTick(S, S.deadline + 799));
+  notOk(SWG.hostTick(S, S.deadline + SWG.GRACE_MS - 1));
   eq(S.phase, 'playing');
 });
-test('限时 deadline+800 补空并揭晓', () => {
+test('限时宽限期补空并揭晓', () => {
   const S = mkParty({ settings: { timeLimit: 15 } });
   SWG.submit(S, 0, '西瓜', T0 + 1);
-  const tickAt = S.deadline + 800;
+  const tickAt = S.deadline + SWG.GRACE_MS;
   ok(SWG.hostTick(S, tickAt));
   eq(S.phase, 'reveal');
   eq(S.subs[1], { word: '', at: tickAt, done: true, round: 1 });
@@ -661,6 +661,20 @@ test('tick 幂等：揭晓后不重复写历史', () => {
   const S = partyReveal(['西瓜', '空调', '夏天']);
   notOk(SWG.hostTick(S, T0 + 50));
   eq(S.history.length, 1);
+});
+test('finalize 幂等：同轮旧快照回灌不重复记历史', () => {
+  const S = mkParty({ settings: { timeLimit: 15 } });
+  SWG.submit(S, 0, '西瓜', T0 + 1);
+  SWG.submit(S, 1, '空调', T0 + 2);
+  SWG.hostTick(S, S.deadline + SWG.GRACE_MS);
+  eq(S.history.length, 1);
+  eq(S.phase, 'reveal');
+  // 陈旧快照把同一轮拉回 playing（history 已含本轮）再 tick 一次
+  S.phase = 'playing';
+  S.deadline = T0 + 15000;
+  ok(SWG.hostTick(S, T0 + 16000));
+  eq(S.history.length, 1);
+  eq(S.phase, 'reveal');
 });
 test('activeSeats 不足 → giveup 且只结算一次', () => {
   const S = mkParty();

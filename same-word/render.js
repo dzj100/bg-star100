@@ -26,6 +26,8 @@
   var MY_SEAT = 0;
   var clockOffset = 0;
   var lastHostNow = 0;
+  var clockSaved = null;
+  var clockSavedKey = '';
   var draft = '';
   var draftRound = '';
   var autoSubmitKey = '';
@@ -313,20 +315,46 @@
   function roundKeyNow() { return roundKey(S); }
   function rawRemain() {
     if (!S || !S.deadline) return null;
-    // 留 1s 网络缓冲（SPEC §6.3）：各端提前收口，避免房主宽限期内被代填空词
-    return S.deadline - 1000 - (Date.now() + clockOffset);
+    return S.deadline - (Date.now() + clockOffset);
   }
   function remainMs() {
     var r = rawRemain();
     return r == null ? null : Math.max(0, r);
   }
+  var CLOCK_STORE_PREFIX = 'sameword-clock:';
+  function clockStorageKey() {
+    return CLOCK_STORE_PREFIX + (roomCode() || '-');
+  }
+  // 刷新恢复时沿用同一 hostNow 的旧校准：hostNow 是开局时刻，
+  // 用它重算会把「已经过了多久」当成「本机时钟偏差」
+  function savedOffsetFor(hostNow) {
+    try {
+      var k = clockStorageKey();
+      if (clockSavedKey !== k) { clockSavedKey = k; clockSaved = null; }
+      if (!clockSaved) clockSaved = JSON.parse(localStorage.getItem(k) || 'null');
+      if (clockSaved && Number(clockSaved.hostNow) === hostNow && isFinite(clockSaved.offset)) {
+        return Number(clockSaved.offset);
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function saveOffset(hostNow, offset) {
+    clockSaved = { hostNow: hostNow, offset: offset };
+    try { localStorage.setItem(clockStorageKey(), JSON.stringify(clockSaved)); } catch (e) { /* ignore */ }
+  }
   function recordClock(state) {
     if (!state) return;
     var h = Number(state.hostNow || state._ts || 0);
-    if (h && h !== lastHostNow) {
-      lastHostNow = h;
-      clockOffset = h - Date.now();
-    }
+    if (!h) return;
+    // 房主本机就是权威时钟，不需要也不允许校准
+    if (netIsHost()) { lastHostNow = h; clockOffset = 0; return; }
+    if (lastHostNow && h < lastHostNow) return; // 旧快照不回拨校准
+    if (h === lastHostNow) return;
+    var saved = savedOffsetFor(h);
+    lastHostNow = h;
+    if (saved != null) { clockOffset = saved; return; }
+    clockOffset = h - Date.now();
+    saveOffset(h, clockOffset);
   }
 
   /* ---------------- 座位 / 状态读取 ---------------- */
@@ -1006,29 +1034,66 @@
     if (pending && typeof pending.catch === 'function') pending.catch(function () { /* ignore */ });
   }
 
-  function copyText(text) {
-    var done = function () { toast('已复制，快发给朋友', 'ok'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
-    } else {
-      fallbackCopy(text, done);
-    }
-  }
-  function fallbackCopy(text, cb) {
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.width = '1px';
+    ta.style.height = '1px';
+    ta.style.padding = '0';
+    ta.style.border = '0';
+    ta.style.opacity = '0.01';
+    ta.style.fontSize = '16px';
+    ta.style.zIndex = '-1';
+    document.body.appendChild(ta);
+    var ok = false;
     try {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
+      ta.focus({ preventScroll: true });
       ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      cb();
-    } catch (e) {
-      toast('复制失败，请长按选择', 'warn');
+      try { ta.setSelectionRange(0, text.length); } catch (e) { /* iOS */ }
+      ok = document.execCommand('copy') === true;
+    } catch (e) { ok = false; }
+    if (ta.parentNode) ta.parentNode.removeChild(ta);
+    return ok;
+  }
+  function showCopySheet(text) {
+    openLayer('sheet',
+      '<div class="sheet-head"><div><h2 class="sheet-title" id="sheetTitle">复制链接</h2></div>' +
+      '<button class="sheet-close" data-act="sheet-close" aria-label="关闭">' + ico('close') + '</button></div>' +
+      '<div class="sheet-body"><p class="sheet-body" style="font-size:15px;line-height:1.7;color:var(--ink-soft);margin-bottom:12px">' +
+      '这台浏览器不允许自动复制，请长按下面的链接手动选择复制。</p>' +
+      '<input class="input" id="copyFallbackInput" readonly value="' + esc(text) + '"></div>' +
+      '<div class="sheet-actions"><button class="btn btn-ghost btn-lg" data-act="sheet-close">知道了</button></div>',
+      function (panel) {
+        var input = panel.querySelector('#copyFallbackInput');
+        if (!input) return;
+        // openLayer 会在 60ms 后把焦点移回面板，选中要排在它之后
+        window.setTimeout(function () {
+          if (!input.isConnected) return;
+          try {
+            input.focus({ preventScroll: true });
+            input.select();
+            input.setSelectionRange(0, input.value.length);
+          } catch (e) { /* ignore */ }
+        }, 120);
+      });
+  }
+  function copyText(text) {
+    var value = String(text == null ? '' : text);
+    // 必须在点击手势内同步复制：iOS / 微信内置浏览器在 await 之后会静默拒绝
+    if (legacyCopy(value)) { toast('已复制，快发给朋友', 'ok'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(function () {
+        toast('已复制，快发给朋友', 'ok');
+      }, function () {
+        showCopySheet(value);
+      });
+      return;
     }
+    showCopySheet(value);
   }
 
   async function shareInvite() {
@@ -1039,7 +1104,9 @@
       try {
         await navigator.share({ title: '同词相遇', text: text, url: url });
         return;
-      } catch (e) { /* 用户取消或不可用 */ }
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 用户自己取消，不当作失败去复制
+      }
     }
     copyText(url);
   }
@@ -1428,7 +1495,7 @@
   function autoSubmitIfNeeded() {
     if (!S || S.phase !== 'playing' || !S.deadline) return;
     var rem = rawRemain();
-    if (rem == null || rem > 350) return;
+    if (rem == null || rem > 0) return;
     var rk = roundKeyNow();
     if (autoSubmitKey === rk) return;
     var me = mySeat();
@@ -2062,17 +2129,19 @@
     var rows = hist.map(function (row) {
       var ex = (row.pairs || []).filter(function (p) { return p.kind === 'exact'; })[0];
       var ag = (row.pairs || []).filter(function (p) { return p.kind === 'agree'; })[0];
-      var cls = ex ? 'hit' : (ag ? 'agree' : '');
       var words = (row.words || []).map(function (w, i) {
-        return '<b>' + esc(playerName(i)) + '</b> ' + (w ? esc(w) : '<span class="miss">超时</span>');
-      }).join('<span class="pw-plus">×</span>');
-      var mark = ex ? '💥 撞词' : (ag ? '🤝 意思一样' : '—');
-      return '<li class="trail-row ' + cls + '">' +
-        '<span class="trail-round">第 ' + esc(row.round) + ' 轮</span>' +
-        '<span class="trail-words">' + words + '</span>' +
-        '<span class="trail-mark ' + (ag ? 'ag' : '') + '">' + mark + '</span></li>';
+        return '<span><b>' + esc(playerName(i)) + '</b> ' + (w ? esc(w) : '<span class="miss">超时</span>') + '</span>';
+      }).join('');
+      var mark = ex ? '<span class="hit-mark">💥 撞词</span>'
+        : ag ? '<span class="agree-mark">🤝 意思一样</span>'
+        : '<span class="muted">—</span>';
+      return '<tr><td>第 ' + esc(row.round) + ' 轮</td>' +
+        '<td><div class="hist-words">' + words + '</div></td>' +
+        '<td>' + mark + '</td></tr>';
     }).join('');
-    return '<section class="card trail-card"><div class="eyebrow">脑回路轨迹</div><ul class="trail">' + rows + '</ul></section>';
+    return '<section class="card trail-card"><div class="eyebrow">脑回路轨迹</div>' +
+      '<table class="hist-table"><thead><tr><th>轮次</th><th>两人写的</th><th>结果</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></section>';
   }
 
   function duelHeroHTML(level) {
@@ -2418,6 +2487,42 @@
   var shareText = '';
   var shareSize = { w: 0, h: 0 };
 
+  // 首页底部山野场景（index.html 的 #scene-mountains）栅格化后复用到分享图顶图；
+  // 独立 svg 文档里 CSS 变量失效，导出前先把调色板换成字面色值
+  var SCENE_VARS = {
+    '--paper': '#FBF7EC', '--ink': '#22301F', '--sun': '#F2C14E',
+    '--moss': '#7FAE6A', '--forest': '#2F6B4F', '--forest-d': '#1E4D38',
+    '--lake': '#2A9D8F', '--sand': '#E8D9B5'
+  };
+  var heroSceneImg = null;
+  var heroScenePromise = null;
+
+  function sceneSVGDataUrl() {
+    var sym = document.getElementById('scene-mountains');
+    if (!sym) return '';
+    var inner = sym.innerHTML || '';
+    Object.keys(SCENE_VARS).forEach(function (k) {
+      inner = inner.split('var(' + k + ')').join(SCENE_VARS[k]);
+    });
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" ' +
+      'preserveAspectRatio="xMidYMax slice">' + inner + '</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  function loadHeroScene() {
+    if (heroSceneImg) return Promise.resolve(heroSceneImg);
+    if (heroScenePromise) return heroScenePromise;
+    heroScenePromise = new Promise(function (resolve) {
+      var url = sceneSVGDataUrl();
+      if (!url || typeof Image === 'undefined') { resolve(null); return; }
+      var img = new Image();
+      img.onload = function () { heroSceneImg = img; resolve(img); };
+      img.onerror = function () { resolve(null); };
+      img.src = url;
+    });
+    return heroScenePromise;
+  }
+
   function canvasFont(ctx, weight, size) {
     ctx.font = weight + ' ' + size + 'px "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
   }
@@ -2500,9 +2605,11 @@
   }
 
   function drawHeroStamp(ctx, cx, cy, label) {
+    var scale = 1.5;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(-8 * Math.PI / 180);
+    ctx.scale(scale, scale);
     ctx.strokeStyle = 'rgba(47,107,79,.85)';
     ctx.lineWidth = 3;
     ctx.setLineDash([8, 6]);
@@ -2528,7 +2635,7 @@
     ctx.restore();
   }
 
-  function drawShareHero(ctx) {
+  function drawShareHero(ctx, sceneImg) {
     var band = 320;
     var g = ctx.createLinearGradient(0, 0, 0, band);
     g.addColorStop(0, '#CFEAF3');
@@ -2537,22 +2644,43 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, SHARE_W, band);
 
-    ctx.fillStyle = '#F2B233';
-    ctx.beginPath();
-    ctx.arc(772, 84, 46, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#22301F';
-    ctx.lineWidth = 5;
-    ctx.stroke();
+    if (sceneImg) {
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      var sceneH = SHARE_W * 300 / 480;
+      ctx.drawImage(sceneImg, 0, band - sceneH, SHARE_W, sceneH);
+      ctx.restore();
 
-    ctx.fillStyle = '#2F6B4F';
-    ctx.beginPath(); ctx.moveTo(-40, band); ctx.lineTo(170, 250); ctx.lineTo(380, band); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#1F4C37';
-    ctx.beginPath(); ctx.moveTo(290, band); ctx.lineTo(520, 236); ctx.lineTo(750, band); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#5E7C52';
-    ctx.beginPath(); ctx.moveTo(600, band); ctx.lineTo(786, 262); ctx.lineTo(950, band); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#E7EFD8';
-    ctx.fillRect(0, band - 16, SHARE_W, 16);
+      // 纸色柔光垫在文字下，层叠山脊上标题依然清晰
+      ctx.save();
+      ctx.translate(250, 104);
+      ctx.scale(1.5, 1);
+      var glow = ctx.createRadialGradient(0, 0, 20, 0, 0, 360);
+      glow.addColorStop(0, 'rgba(251,247,236,.9)');
+      glow.addColorStop(0.6, 'rgba(251,247,236,.5)');
+      glow.addColorStop(1, 'rgba(251,247,236,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0, 0, 360, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else {
+      // 场景图未就绪时退回手绘山形
+      ctx.fillStyle = '#F2B233';
+      ctx.beginPath();
+      ctx.arc(772, 84, 46, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#22301F';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#2F6B4F';
+      ctx.beginPath(); ctx.moveTo(-40, band); ctx.lineTo(170, 250); ctx.lineTo(380, band); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1F4C37';
+      ctx.beginPath(); ctx.moveTo(290, band); ctx.lineTo(520, 236); ctx.lineTo(750, band); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#5E7C52';
+      ctx.beginPath(); ctx.moveTo(600, band); ctx.lineTo(786, 262); ctx.lineTo(950, band); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#E7EFD8';
+      ctx.fillRect(0, band - 16, SHARE_W, 16);
+    }
 
     canvasFont(ctx, 800, 22);
     ctx.fillStyle = '#4C5B45';
@@ -2781,7 +2909,7 @@
     ctx.fillStyle = '#FBF7EC';
     ctx.fillRect(0, 0, SHARE_W, cv.height);
 
-    var band = drawShareHero(ctx);
+    var band = drawShareHero(ctx, heroSceneImg);
     var y = band + 36;
 
     var level = duel ? duelLevelInfo() : null;
@@ -2789,17 +2917,28 @@
     var rank = duel ? null : rankInfo(info);
 
     fillRound(ctx, 48, y, 244, 130, 22, '#F2B233', '#22301F', 6);
-    canvasFont(ctx, 900, 92);
+    var numTxt = String(hist);
+    var unitTxt = duel ? '轮' : '局';
+    canvasFont(ctx, 900, 96);
+    var numW = ctx.measureText(numTxt).width;
+    canvasFont(ctx, 900, 32);
+    var unitW = ctx.measureText(unitTxt).width;
+    var unitGap = 8;
+    var groupW = numW + unitGap + unitW;
+    var numX = 48 + (244 - groupW) / 2;
+    var baseY = y + 99;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    canvasFont(ctx, 900, 96);
     ctx.fillStyle = '#22301F';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(duel ? hist : hist), 74, y + 66);
-    canvasFont(ctx, 900, 26);
-    ctx.fillText(duel ? '轮' : '局', 74 + (String(hist).length * 52), y + 84);
+    ctx.fillText(numTxt, numX, baseY);
+    canvasFont(ctx, 900, 32);
+    ctx.fillText(unitTxt, numX + numW + unitGap, baseY);
 
     var stampY = y + 65;
     var title = resultTitleText();
-    var titleEnd = drawTextBlock(ctx, title, 316, y + 2, 36, 900, '#22301F', 396, 46, 3);
-    drawHeroStamp(ctx, 790, stampY, duel ? '默契认证' : '同频认证');
+    var titleEnd = drawTextBlock(ctx, title, 316, y + 2, 36, 900, '#22301F', 330, 46, 3);
+    drawHeroStamp(ctx, 760, stampY, duel ? '默契认证' : '同频认证');
     y = Math.max(y + 130 + 24, titleEnd + 24);
 
     var badgeText = duel ? level.t : (rank.special || cpTitleText(info.pairs.length ? info.pairs[0].n : 0));
@@ -2896,18 +3035,22 @@
     window.setTimeout(function () {
       var wrap = $('#shareWrap');
       if (!wrap) return;
-      try {
-        var res = buildShareImage();
-        shareDataUrl = res.dataUrl;
-        shareBlob = res.blob;
-        shareFileName = res.fileName;
-        shareSize = { w: res.width, h: res.height };
-        shareText = buildShareText();
-        wrap.innerHTML = shareReadyHTML();
-      } catch (e) {
-        wrap.innerHTML = '<p class="share-tip">长图生成失败了，直接发文字吧。</p>' +
-          '<div class="sheet-actions"><button class="btn btn-primary" data-act="share-text">分享文字</button></div>';
-      }
+      var paint = function () {
+        if (!wrap.isConnected) return;
+        try {
+          var res = buildShareImage();
+          shareDataUrl = res.dataUrl;
+          shareBlob = res.blob;
+          shareFileName = res.fileName;
+          shareSize = { w: res.width, h: res.height };
+          shareText = buildShareText();
+          wrap.innerHTML = shareReadyHTML();
+        } catch (e) {
+          wrap.innerHTML = '<p class="share-tip">长图生成失败了，直接发文字吧。</p>' +
+            '<div class="sheet-actions"><button class="btn btn-primary" data-act="share-text">分享文字</button></div>';
+        }
+      };
+      loadHeroScene().then(paint, paint);
     }, 40);
   };
 
@@ -2949,14 +3092,18 @@
         await navigator.share({ title: '同词相遇战绩', text: shareText || buildShareText(), url: inviteURL(roomCode()) });
         return;
       }
-    } catch (e) { /* 用户取消 */ }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // 用户取消分享，不擅自改成下载
+    }
     downloadShare();
   }
 
   async function shareTextOnly() {
     var text = (shareText || buildShareText()) + ' ' + inviteURL(roomCode());
     if (navigator.share) {
-      try { await navigator.share({ title: '同词相遇', text: text }); return; } catch (e) { /* ignore */ }
+      try { await navigator.share({ title: '同词相遇', text: text }); return; } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
     }
     copyText(text);
   }
@@ -3092,15 +3239,47 @@
     }, 1000);
   }
 
+  function phaseRank(ph) {
+    return ph === 'finished' ? 2 : ph === 'reveal' ? 1 : 0;
+  }
+  // 自己这次推送从发出到返回之间，本地可能已经结算/开下一轮；
+  // 若返回的快照是旧的房主视角，不能拿它覆盖本地
+  function hostViewOlder(local, remote) {
+    if (!local || !local.phase || !remote || !remote.phase) return false;
+    var lg = Number(local.gameNo) || 1, rg = Number(remote.gameNo) || 1;
+    if (lg !== rg) return rg < lg;
+    var lr = Number(local.round) || 1, rr = Number(remote.round) || 1;
+    if (lr !== rr) return rr < lr;
+    return phaseRank(remote.phase) < phaseRank(local.phase);
+  }
+  function adoptPushed(local, remote) {
+    var G = window.SWG;
+    var out = null;
+    if (G && typeof G.mergeState === 'function') {
+      try {
+        // 旧快照：强制以本地房主字段为准（座位提交仍按 at 合并）
+        out = G.mergeState(local, remote, {
+          seat: mySeat(),
+          isHost: hostViewOlder(local, remote) ? true : netIsHost(),
+        });
+      } catch (e) { out = null; }
+    }
+    if (!out) out = (hostViewOlder(local, remote) || netIsHost()) ? local : remote;
+    out.rev = remote.rev;
+    out._ts = remote._ts;
+    out._pushId = remote._pushId;
+    return out;
+  }
+
   SWR.pushState = async function () {
     if (!S || !hasSWN() || !window.SWN.pushState) return;
     try {
       var r = await window.SWN.pushState(S);
       if (r && r.ok) {
         pushFails = 0;
-        if (r.state && r.state.phase) {
-          S = r.state;
-          recordClock(r.state);
+        if (r.state && r.state.phase && S) {
+          S = adoptPushed(S, r.state);
+          recordClock(S);
           renderGame();
         }
         return;

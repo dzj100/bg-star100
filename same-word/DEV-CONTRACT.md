@@ -94,7 +94,7 @@ SWG.toggleRematch(S, seat, at);
 SWG.disableRematch(S, seat);                                // 结算页离席/人数不足时清理
 
 // 房主时钟推进（只房主调用；有变化返回 true）
-SWG.hostTick(S, now);   // playing: allDone/超时+800ms → finalizeRound
+SWG.hostTick(S, now);   // playing: allDone/超时+3000ms → finalizeRound（同轮幂等）
                         // reveal duel: 双方都表态后，全部 same → agree+finished；否则 startRound（未全员表态则等待）
                         // reveal party: allReady → 满局 limit / 否则 startRound
                         // finished: allRematch → restartGame
@@ -169,7 +169,7 @@ SWN.tryRestore() -> Promise<boolean>                     // 刷新/断线恢复�
 - 任何在座玩家都可推送；**不要**沿用 take-time 的“只有 currentPlayer 能推”。合并由 `SWG.mergeState` 保证字段所有权。
 - `rev` 单调递增；写前读最新 rev，`rev=remote.rev+1`，带 `expectRev` 写；冲突重读重试 3 次。
 - Realtime 订阅 + 2.5s 轮询兜底；断线/切前后台/`online` 事件强制重同步；重订阅。
-- 超时：房主 `deadline` + `hostNow`；成员按 `offset=hostNow-Date.now()` 算剩余，≤350ms 自动提交（有合法草稿就提交，否则空提交），房主 deadline+800ms 补空并结算。
+- 超时：房主 `deadline` + `hostNow`（房主 offset=0，成员 offset 持久化到 localStorage）；剩余 ≤0 才自动提交（有合法草稿就提交，否则空提交），房主 deadline+3000ms 补空并结算；同一轮 finalize 幂等。
 - 离席：不退座位接管；`netLeaveRoom` 移除 seat；房主检测到座位消失 → `onPlayerLeft` + `SWG.markDeparted` + 推送。房主离开 → 成员 `onClosed('host-left')`。剩余人数不足由 `hostTick` 判 giveup。
 - 会话键 `localStorage['sameword-online']`；刷新恢复房间/座位；房间不存在/已解散清会话。
 - 房间状态：waiting → playing → finished；`pushState` 时 `phase==='finished'` 则 status='finished'，restart 后回 'playing'。

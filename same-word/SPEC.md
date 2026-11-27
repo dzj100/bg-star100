@@ -347,9 +347,10 @@ L = {
 ### 6.3 倒计时
 
 - 房主开局/新轮写入 `deadline = hostNow + timeLimit*1000`（不限时为 `null`）。
-- 各端 `timerOffset = hostNow - Date.now()`；显示剩余 = `deadline - 1000 - (Date.now()+timerOffset)`（留 1s 网络缓冲）。
-- 非不限时：剩余 ≤350ms 自动提交草稿（每位玩家各自提交自己的）。
-- 房主在 `deadline + 800ms` 宽限期后仍未收齐，代未交者写入空词并推进揭晓。
+- 房主 `timerOffset = 0`；成员 `timerOffset = hostNow - Date.now()`，并把 `{hostNow, offset}` 存入 `localStorage`：刷新后同一 `hostNow` 直接复用旧校准，不会把「本轮已经过了多久」误算成时钟偏差。
+- 显示剩余 = `deadline - (Date.now()+timerOffset)`；到 0 才判超时。
+- 非不限时：剩余 ≤0 自动提交草稿（每位玩家各自提交自己的）。
+- 房主在 `deadline + 3000ms` 宽限期后仍未收齐，代未交者写入空词并推进揭晓。
 - 房主设备休眠导致推进延迟：任何成员在 `deadline+8s` 后看到仍未推进，可显示「房主暂时离线，等待恢复…」；不做成员代推进（避免双权威）。
 
 ### 6.4 推送与恢复（沿用 take-time 在产方案）
