@@ -537,7 +537,8 @@ same-word/
 └── test-e2e.js       # Playwright 双端/三端联机
 ```
 
-`index.html` 脚本顺序：`game.js → render.js → supabase.min.js → net.js → online.js`，末尾引 `../track.js`。
+`index.html` 脚本顺序：`game.js → render.js → supabase.min.js → net.js → online.js`，末尾引 `../track.js`（带 `data-mode="online"`）。
+联机开局/结算上报：房主真正开新局（含「再来一局」gameNo 递增）经 `BG.onlineStart(玩家数)` 记起点；`netUpdateGameState` 在房主侧把 `onlineState` 与结算 `BG.onlineEnd(result)` 接到 track.js，result 为 `match/allmatch/agree/limit/giveup`，局中解散记 `left`；房主刷新恢复不重复记开局。
 `initOnline({ ... })` 钩子按 take-time 模式接入；等候室的玩法/限时/局数由 `waitingExtras` 渲染。
 
 平台首页 `index.html` 的 `GAMES` 增加：

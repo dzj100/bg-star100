@@ -243,6 +243,19 @@ async function netUpdateGameState(shortId, gameState, status, expectRev) {
   const update = { state: gameState };
   if (status) update.status = status;
 
+  try {
+    // 只有房主记录开局/结算，避免成员推自己字段时误结掉本地残留的起点
+    const isHostView = !window.SWN || typeof SWN.isHost !== 'function' || SWN.isHost();
+    if (window.BG && isHostView) {
+      // 结算：带上同词相遇自己的 result（match/allmatch/agree/limit/giveup），
+      // 有起点时才真正落库；随后 onlineState 的通用兜底会因起点已清而跳过
+      if (status === 'finished' && gameState && gameState.result && typeof BG.onlineEnd === 'function') {
+        BG.onlineEnd(String(gameState.result));
+      }
+      if (typeof BG.onlineState === 'function') BG.onlineState(status, gameState);
+    }
+  } catch (e) {}
+
   const hasExpect = typeof expectRev === 'number' && isFinite(expectRev);
 
   try {

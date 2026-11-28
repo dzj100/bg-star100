@@ -243,7 +243,7 @@ UI 点击处理约定：
   });
   SWN.tryRestore().then(ok => { if (!ok) SWR.renderLanding(); });
 </script>
-<script src="../track.js?v=20261125"></script>
+<script src="../track.js?v=20261125" data-mode="online"></script>
 ```
 
 ## 7. 验收

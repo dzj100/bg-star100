@@ -24,6 +24,7 @@
   const MIN_ROUNDS = 5;
   const MAX_ROUNDS = 50;
   const WAIT_DEBOUNCE_MS = 160;
+  const TRACK_ROUND_KEY = 'sameword-track-round';
 
   const _cfg = {
     sessionKey: 'sameword-online',
@@ -58,6 +59,7 @@
   let _pollTimer = null;
   let _netOnline = null;       // null=未知
   let _closed = false;
+  let _trackGameNo = 0;        // 已上报开局的 gameNo（再来一局会递增）
 
   // ── 新鲜度（rev 为主，_ts/_pushId 去重） ──
   let _lastRev = 0;
@@ -290,6 +292,9 @@
     _waitQueued = null;
     _waitFlush = null;
     _closed = false;
+    _trackGameNo = 0;
+    const tr = _readTrackRound();
+    if (tr && tr.room === code) _trackGameNo = Number(tr.gameNo) || 0;
     if (row && Array.isArray(row.seats)) {
       row.seats.forEach(function (s) {
         if (s && typeof s.seatIndex === 'number') _seatNames[s.seatIndex] = s.name || '';
@@ -327,6 +332,7 @@
     _lastResyncAt = 0;
     _lastRecoverAt = 0;
     _closed = false;
+    _trackGameNo = 0;
     // 会话结束属于主动收尾，静默复位连接状态，避免“重连中”横幅常驻
     _netOnline = true;
     _emit('onNet', true, true);
@@ -349,6 +355,45 @@
       _lastRoom.state = state;
       _lastRoom.status = _status;
     }
+  }
+
+  // 开局/结算埋点（track.js）：只有房主真正开新局才记起点，再来一局 gameNo 递增会重新记
+  function _readTrackRound() {
+    try {
+      const v = JSON.parse(localStorage.getItem(TRACK_ROUND_KEY) || 'null');
+      if (v && v.room && v.at && Date.now() - v.at < 12 * 3600 * 1000) return v;
+    } catch (e) {}
+    return null;
+  }
+
+  function _writeTrackRound(no) {
+    try {
+      localStorage.setItem(TRACK_ROUND_KEY, JSON.stringify({ room: _room, gameNo: no, at: Date.now() }));
+    } catch (e) {}
+  }
+
+  function _clearTrackRound() {
+    try {
+      const v = _readTrackRound();
+      if (!v || v.room === _room) localStorage.removeItem(TRACK_ROUND_KEY);
+    } catch (e) {}
+  }
+
+  function _noteGameStart(state) {
+    if (!_isHost || !state || state.phase !== 'playing') return;
+    const no = Number(state.gameNo) || 1;
+    if (no <= _trackGameNo) return; // 刷新恢复时沿用本地已上报的 gameNo，避免重复记开局
+    _trackGameNo = no;
+    _writeTrackRound(no);
+    const names = Array.isArray(state.seatNames) ? state.seatNames : [];
+    const ghosts = Array.isArray(state.departed) ? state.departed : [];
+    const players = Math.max(1, names.length - ghosts.length);
+    try { if (window.BG && typeof BG.onlineStart === 'function') BG.onlineStart(players); } catch (e) {}
+  }
+
+  function _noteGameEnd(result) {
+    _trackGameNo = 0;
+    try { if (window.BG && typeof BG.onlineEnd === 'function') BG.onlineEnd(result || 'left'); } catch (e) {}
   }
 
   function _stale(remote) {
@@ -598,6 +643,7 @@
   function _close(reason) {
     if (_closed) return;
     console.log('[SWN] room closed:', reason);
+    _clearTrackRound();
     _teardown();
     _closed = true;
     _emit('onClosed', reason);
@@ -818,6 +864,7 @@
         last = next;
         if (res && res.ok) {
           _trackApplied(next, wStatus);
+          _noteGameStart(next);
           return { ok: true, state: next };
         }
         if (res && !res.conflict) console.warn('[SWN] waiting push error:', res.error);
@@ -832,6 +879,7 @@
 
       if (res && res.ok) {
         _trackApplied(next, status);
+        _noteGameStart(next);
         return { ok: true, state: next };
       }
       if (res && !res.conflict) console.warn('[SWN] push transport error:', res.error);
@@ -872,6 +920,7 @@
       const res = await netUpdateGameState(_room, next, 'playing', expectRev);
       if (res && res.ok) {
         _trackApplied(next, 'playing');
+        _noteGameStart(next);
         _waitingSig = '';
         _setNet(true);
         console.log('[SWN] game started');
@@ -967,6 +1016,8 @@
 
     try {
       if (wasHost) {
+        // 房主局中解散：先按「中途离开」结掉本轮埋点，随后的 finished 推送不会再记一次
+        if (_status === 'playing') _noteGameEnd('left');
         // 房主离开 = 解散：status='finished' + state.closed='host-left'
         let roomRow = null;
         try { roomRow = await netGetRoom(room); } catch (e) {}
@@ -995,6 +1046,7 @@
       console.warn('[SWN] leave network failed:', (e && e.message) || e);
     }
 
+    _clearTrackRound();
     _teardown();
     _closed = true;
     _emit('onClosed', 'left');
